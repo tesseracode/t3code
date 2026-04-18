@@ -1,0 +1,17 @@
+{
+  "id": "copilot-dynamic-models",
+  "slug": "copilot-dynamic-models",
+  "title": "Build model capabilities dynamically from Copilot SDK runtime data instead of static BUILT_IN_MODELS. Use supportedReasoningEfforts from client.listModels() to populate reasoningEffortLevels per model. Also investigate using copilot-api for broader model listing (44 models vs SDK's 16).",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-04-18T10:23:36Z",
+  "updated_at": "2026-04-18T20:06:58Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-04-18T10:43:31Z",
+    "base_commit": "923c64aaa7f2459e1af2092d854239110f5954d9",
+    "has_patch": true
+  },
+  "reconcile": {}
+}
