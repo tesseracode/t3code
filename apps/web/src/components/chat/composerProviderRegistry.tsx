@@ -124,6 +124,10 @@ function getProviderStateFromCapabilities(
       : (resolveEffort(caps, rawEffort) ?? null);
   const ultrathinkActive =
     caps.promptInjectedEffortLevels.length > 0 && isClaudeUltrathinkPrompt(prompt);
+  const xhighActive =
+    !ultrathinkActive &&
+    promptEffort === "xhigh" &&
+    (provider === "codex" || provider === "copilot");
 
   return {
     provider,
@@ -134,6 +138,11 @@ function getProviderStateFromCapabilities(
       ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
       : {}),
     ...(ultrathinkActive ? { modelPickerIconClassName: "ultrathink-chroma" } : {}),
+    ...(xhighActive ? { composerFrameClassName: "xhigh-frame" } : {}),
+    ...(xhighActive
+      ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
+      : {}),
+    ...(xhighActive ? { modelPickerIconClassName: "xhigh-chroma" } : {}),
   };
 }
 
