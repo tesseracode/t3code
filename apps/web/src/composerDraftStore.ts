@@ -531,7 +531,7 @@ function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
 }
 
 function normalizeProviderKind(value: unknown): ProviderKind | null {
-  return value === "codex" || value === "claudeAgent" || value === "cursor" || value === "opencode"
+  return value === "codex" || value === "copilot" || value === "claudeAgent" || value === "cursor" || value === "opencode"
     ? value
     : null;
 }
@@ -553,6 +553,10 @@ function normalizeProviderModelOptions(
   const cursorCandidate =
     candidate?.cursor && typeof candidate.cursor === "object"
       ? (candidate.cursor as Record<string, unknown>)
+      : null;
+  const copilotCandidate =
+    candidate?.copilot && typeof candidate.copilot === "object"
+      ? (candidate.copilot as Record<string, unknown>)
       : null;
   const openCodeCandidate =
     candidate?.opencode && typeof candidate.opencode === "object"
@@ -670,11 +674,20 @@ function normalizeProviderModelOptions(
         }
       : undefined;
 
-  if (!codex && !claude && cursor === undefined && !opencode) {
+  const copilotReasoningEffort = isCodexReasoningEffort(copilotCandidate?.reasoningEffort)
+    ? copilotCandidate.reasoningEffort
+    : undefined;
+  const copilot =
+    copilotReasoningEffort !== undefined
+      ? { reasoningEffort: copilotReasoningEffort }
+      : undefined;
+
+  if (!codex && !claude && !copilot && cursor === undefined && !opencode) {
     return null;
   }
   return {
     ...(codex ? { codex } : {}),
+    ...(copilot ? { copilot } : {}),
     ...(claude ? { claudeAgent: claude } : {}),
     ...(cursor !== undefined ? { cursor } : {}),
     ...(opencode ? { opencode } : {}),

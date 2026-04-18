@@ -4,6 +4,7 @@ import {
   type ClaudeAgentEffort,
   type ClaudeModelOptions,
   type CodexModelOptions,
+  type CopilotModelOptions,
   type CursorModelOptions,
   type ModelCapabilities,
   type ModelSelection,
@@ -158,6 +159,8 @@ export function normalizeProviderModelOptionsWithCapabilities(
   switch (provider) {
     case "codex":
       return normalizeCodexModelOptionsWithCapabilities(caps, modelOptions as CodexModelOptions);
+    case "copilot":
+      return normalizeCodexModelOptionsWithCapabilities(caps, modelOptions as CodexModelOptions);
     case "claudeAgent":
       return normalizeClaudeModelOptionsWithCapabilities(caps, modelOptions as ClaudeModelOptions);
     case "cursor":
@@ -260,6 +263,12 @@ export function createModelSelection(
         provider,
         model,
         ...(options ? { options: options as CodexModelOptions } : {}),
+      };
+    case "copilot":
+      return {
+        provider,
+        model,
+        ...(options ? { options: options as CopilotModelOptions } : {}),
       };
     case "claudeAgent":
       return {

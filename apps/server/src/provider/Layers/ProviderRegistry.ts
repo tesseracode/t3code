@@ -9,10 +9,12 @@ import { Effect, Equal, FileSystem, Layer, Path, PubSub, Ref, Stream } from "eff
 import { ServerConfig } from "../../config.ts";
 import { ClaudeProviderLive } from "./ClaudeProvider.ts";
 import { CodexProviderLive } from "./CodexProvider.ts";
+import { CopilotProviderLive } from "./CopilotProvider.ts";
 import { CursorProviderLive } from "./CursorProvider.ts";
 import { OpenCodeProviderLive } from "./OpenCodeProvider.ts";
 import { ClaudeProvider } from "../Services/ClaudeProvider.ts";
 import { CodexProvider } from "../Services/CodexProvider.ts";
+import { CopilotProvider } from "../Services/CopilotProvider.ts";
 import { CursorProvider } from "../Services/CursorProvider.ts";
 import { OpenCodeProvider } from "../Services/OpenCodeProvider.ts";
 import { ProviderRegistry, type ProviderRegistryShape } from "../Services/ProviderRegistry.ts";
@@ -90,6 +92,7 @@ const ProviderRegistryLiveBase = Layer.effect(
   Effect.gen(function* () {
     const codexProvider = yield* CodexProvider;
     const claudeProvider = yield* ClaudeProvider;
+    const copilotProvider = yield* CopilotProvider;
     const openCodeProvider = yield* OpenCodeProvider;
     const config = yield* ServerConfig;
     const fileSystem = yield* FileSystem.FileSystem;
@@ -109,6 +112,12 @@ const ProviderRegistryLiveBase = Layer.effect(
         getSnapshot: claudeProvider.getSnapshot,
         refresh: claudeProvider.refresh,
         streamChanges: claudeProvider.streamChanges,
+      },
+      {
+        provider: "copilot",
+        getSnapshot: copilotProvider.getSnapshot,
+        refresh: copilotProvider.refresh,
+        streamChanges: copilotProvider.streamChanges,
       },
       {
         provider: "opencode",
@@ -284,6 +293,7 @@ export const ProviderRegistryLive = Layer.unwrap(
   Effect.sync(() =>
     ProviderRegistryLiveBase.pipe(
       Layer.provideMerge(CursorProviderLive),
+      Layer.provideMerge(CopilotProviderLive),
       Layer.provideMerge(CodexProviderLive),
       Layer.provideMerge(ClaudeProviderLive),
       Layer.provideMerge(OpenCodeProviderLive),

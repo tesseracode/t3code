@@ -52,8 +52,14 @@ export const OpenCodeModelOptions = Schema.Struct({
 });
 export type OpenCodeModelOptions = typeof OpenCodeModelOptions.Type;
 
+export const CopilotModelOptions = Schema.Struct({
+  reasoningEffort: Schema.optional(CodexReasoningEffort),
+});
+export type CopilotModelOptions = typeof CopilotModelOptions.Type;
+
 export const ProviderModelOptions = Schema.Struct({
   codex: Schema.optional(CodexModelOptions),
+  copilot: Schema.optional(CopilotModelOptions),
   claudeAgent: Schema.optional(ClaudeModelOptions),
   cursor: Schema.optional(CursorModelOptions),
   opencode: Schema.optional(OpenCodeModelOptions),
@@ -87,6 +93,7 @@ export type ModelCapabilities = typeof ModelCapabilities.Type;
 
 export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderKind, string> = {
   codex: "gpt-5.4",
+  copilot: "gpt-5.4",
   claudeAgent: "claude-sonnet-4-6",
   cursor: "auto",
   opencode: "openai/gpt-5",
@@ -97,6 +104,7 @@ export const DEFAULT_MODEL = DEFAULT_MODEL_BY_PROVIDER.codex;
 /** Per-provider text generation model defaults. */
 export const DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER: Record<ProviderKind, string> = {
   codex: "gpt-5.4-mini",
+  copilot: "gpt-5.4-mini",
   claudeAgent: "claude-haiku-4-5",
   cursor: "composer-2",
   opencode: "openai/gpt-5",
@@ -110,6 +118,17 @@ export const MODEL_SLUG_ALIASES_BY_PROVIDER: Record<ProviderKind, Record<string,
     "gpt-5.3": "gpt-5.3-codex",
     "5.3-spark": "gpt-5.3-codex-spark",
     "gpt-5.3-spark": "gpt-5.3-codex-spark",
+  },
+  copilot: {
+    "5": "gpt-5",
+    "5-mini": "gpt-5-mini",
+    "5.4": "gpt-5.4",
+    "5.4-mini": "gpt-5.4-mini",
+    "4.1": "gpt-4.1",
+    haiku: "claude-haiku-4.5",
+    sonnet: "claude-sonnet-4.6",
+    opus: "claude-opus-4.7",
+    gemini: "gemini-3-pro-preview",
   },
   claudeAgent: {
     opus: "claude-opus-4-7",
@@ -145,6 +164,7 @@ export const MODEL_SLUG_ALIASES_BY_PROVIDER: Record<ProviderKind, Record<string,
 
 export const PROVIDER_DISPLAY_NAMES: Record<ProviderKind, string> = {
   codex: "Codex",
+  copilot: "GitHub Copilot",
   claudeAgent: "Claude",
   cursor: "Cursor",
   opencode: "OpenCode",

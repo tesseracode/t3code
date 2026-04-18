@@ -58,7 +58,7 @@ function getRawEffort(
   provider: ProviderKind,
   modelOptions: ProviderOptions | null | undefined,
 ): string | null {
-  if (provider === "codex") {
+  if (provider === "codex" || provider === "copilot") {
     return trimOrNull((modelOptions as CodexModelOptions | undefined)?.reasoningEffort);
   }
   if (provider === "cursor") {
@@ -71,7 +71,7 @@ function getRawEffort(
 }
 
 function getEffortKey(provider: ProviderKind): string {
-  if (provider === "codex") return "reasoningEffort";
+  if (provider === "codex" || provider === "copilot") return "reasoningEffort";
   if (provider === "cursor") return "reasoning";
   if (provider === "opencode") return "variant";
   return "effort";
