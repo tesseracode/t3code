@@ -1,0 +1,17 @@
+{
+  "id": "copilot-turn-timing",
+  "slug": "copilot-turn-timing",
+  "title": "Fix Worked for X elapsed time calculation — use sendTurn() timestamp instead of SDK assistant.turn_start event timestamp for the turn.started event createdAt field.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-04-20T10:02:20Z",
+  "updated_at": "2026-04-20T10:03:04Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-04-20T10:02:29Z",
+    "base_commit": "a2f37cc6cba6676a81d9a839dbc77372abb3a2e9",
+    "has_patch": true
+  },
+  "reconcile": {}
+}
