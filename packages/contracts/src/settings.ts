@@ -96,6 +96,7 @@ export const CopilotSettings = Schema.Struct({
   binaryPath: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   homePath: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   customModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  hideInternalModels: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
 });
 export type CopilotSettings = typeof CopilotSettings.Type;
 
@@ -248,6 +249,7 @@ const CopilotSettingsPatch = Schema.Struct({
   binaryPath: Schema.optionalKey(Schema.String),
   homePath: Schema.optionalKey(Schema.String),
   customModels: Schema.optionalKey(Schema.Array(Schema.String)),
+  hideInternalModels: Schema.optionalKey(Schema.Boolean),
 });
 
 const CursorSettingsPatch = Schema.Struct({

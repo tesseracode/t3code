@@ -310,7 +310,7 @@ const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
     }
 
     // Build models from SDK response, fall back to built-in
-    const runtimeModels: ServerProviderModel[] = sdkResult.models.length > 0
+    const allModels: ServerProviderModel[] = sdkResult.models.length > 0
       ? sdkResult.models.map((info: any) => ({
           slug: info.id ?? info.slug ?? info.name,
           name: info.name ?? info.id ?? info.slug,
@@ -318,6 +318,11 @@ const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
           capabilities: buildCapabilitiesFromSdkModel(info),
         }))
       : [...BUILT_IN_MODELS];
+
+    // Filter out internal-only models when the setting is enabled
+    const runtimeModels = settings.hideInternalModels
+      ? allModels.filter((model) => !model.name.toLowerCase().includes("internal only"))
+      : allModels;
 
     return buildServerProvider({
       provider: PROVIDER,

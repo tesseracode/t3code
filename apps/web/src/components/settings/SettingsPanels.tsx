@@ -1458,6 +1458,36 @@ export function GeneralSettingsPanel() {
                       </div>
                     ) : null}
 
+                    {providerCard.provider === "copilot" ? (
+                      <div className="border-t border-border/60 px-4 py-3 sm:px-5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-medium text-foreground">
+                              Hide internal-only models
+                            </span>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              Filter out models marked as internal-only from the model picker.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={settings.providers.copilot.hideInternalModels}
+                            onCheckedChange={(checked) =>
+                              updateSettings({
+                                providers: {
+                                  ...settings.providers,
+                                  copilot: {
+                                    ...settings.providers.copilot,
+                                    hideInternalModels: Boolean(checked),
+                                  },
+                                },
+                              })
+                            }
+                            aria-label="Hide internal-only models"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+
                     <div className="border-t border-border/60 px-4 py-3 sm:px-5">
                       <div className="text-xs font-medium text-foreground">Models</div>
                       <div className="mt-1 text-xs text-muted-foreground">
