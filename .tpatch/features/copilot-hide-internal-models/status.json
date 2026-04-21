@@ -2,11 +2,16 @@
   "id": "copilot-hide-internal-models",
   "slug": "copilot-hide-internal-models",
   "title": "Add a toggle in Copilot provider settings to hide models marked as internal-only (e.g. claude-opus-4.6-1m with Internal only in name) from the model selection list. Default off (show all).",
-  "state": "requested",
+  "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-04-21T05:47:05Z",
-  "updated_at": "2026-04-21T05:47:05Z",
-  "last_command": "add",
-  "apply": {},
+  "updated_at": "2026-04-21T06:31:35Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-04-21T06:30:29Z",
+    "base_commit": "3007567ac01585b47bb81630f4789c2b40e6be02",
+    "has_patch": true
+  },
   "reconcile": {}
 }
