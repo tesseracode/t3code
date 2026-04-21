@@ -1,0 +1,9 @@
+ .claude/skills/tessera-patch/SKILL.md         | 259 ++++++++++++++++----------
+ .cursor/rules/tessera-patch.mdc               |  60 ++++++
+ .github/prompts/tessera-patch-apply.prompt.md |  60 ++++++
+ .github/skills/tessera-patch/SKILL.md         |  60 ++++++
+ .tpatch/FEATURES.md                           |   3 +
+ .tpatch/workflows/tessera-patch-generic.md    |  60 ++++++
+ .windsurfrules                                |  60 ++++++
+ README.md                                     |  10 +-
+ 8 files changed, 471 insertions(+), 101 deletions(-)
