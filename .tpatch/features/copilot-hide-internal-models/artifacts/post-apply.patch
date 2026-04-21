@@ -1,8 +1,21 @@
 diff --git a/apps/server/src/provider/Layers/CopilotProvider.ts b/apps/server/src/provider/Layers/CopilotProvider.ts
-index 27499e5e..5c089cc8 100644
+index 27499e5e..1d6d1246 100644
 --- a/apps/server/src/provider/Layers/CopilotProvider.ts
 +++ b/apps/server/src/provider/Layers/CopilotProvider.ts
-@@ -310,7 +310,7 @@ const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
+@@ -161,12 +161,6 @@ const BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [
+     isCustom: false,
+     capabilities: CLAUDE_EFFORT_CAPABILITIES,
+   },
+-  {
+-    slug: "claude-opus-4.6-1m",
+-    name: "Claude Opus 4.6 (1M context)",
+-    isCustom: false,
+-    capabilities: CLAUDE_EFFORT_CAPABILITIES,
+-  },
+   {
+     slug: "claude-opus-4.5",
+     name: "Claude Opus 4.5",
+@@ -310,7 +304,7 @@ const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
      }
  
      // Build models from SDK response, fall back to built-in
@@ -11,7 +24,7 @@ index 27499e5e..5c089cc8 100644
        ? sdkResult.models.map((info: any) => ({
            slug: info.id ?? info.slug ?? info.name,
            name: info.name ?? info.id ?? info.slug,
-@@ -319,6 +319,11 @@ const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
+@@ -319,6 +313,11 @@ const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
          }))
        : [...BUILT_IN_MODELS];
  

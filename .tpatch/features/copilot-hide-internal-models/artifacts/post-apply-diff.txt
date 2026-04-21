@@ -1,2 +1,2 @@
- .tpatch/features/copilot-hide-internal-models/status.json | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ .../artifacts/post-apply.patch                     | 110 +++------------------
+ 1 file changed, 14 insertions(+), 96 deletions(-)

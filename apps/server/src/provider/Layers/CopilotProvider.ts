@@ -162,12 +162,6 @@ const BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [
     capabilities: CLAUDE_EFFORT_CAPABILITIES,
   },
   {
-    slug: "claude-opus-4.6-1m",
-    name: "Claude Opus 4.6 (1M context)",
-    isCustom: false,
-    capabilities: CLAUDE_EFFORT_CAPABILITIES,
-  },
-  {
     slug: "claude-opus-4.5",
     name: "Claude Opus 4.5",
     isCustom: false,

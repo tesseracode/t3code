@@ -1,14 +1,14 @@
 # Implementation Record: copilot-hide-internal-models
 
-**Recorded**: 2026-04-21T06:31:35Z
-**Files changed**: 4
-**Patch size**: 5329 bytes
+**Recorded**: 2026-04-21T07:23:00Z
+**Files changed**: 1
+**Patch size**: 642 bytes
 
 ## Change Summary
 
 ```
- .tpatch/features/copilot-hide-internal-models/status.json | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ .../artifacts/post-apply.patch                     | 110 +++------------------
+ 1 file changed, 14 insertions(+), 96 deletions(-)
 ```
 
 ## Replay Instructions
@@ -20,4 +20,4 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-hide-internal-models/artifacts/post-apply.patch
 ```
 
-*Patch was captured as a committed diff from `feature/copilot-provider~1` to `HEAD`.*
+*Patch was captured as a committed diff from `feature/copilot-provider~2` to `HEAD`.*
