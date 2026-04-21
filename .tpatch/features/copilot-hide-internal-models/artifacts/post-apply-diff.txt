@@ -1,2 +1,2 @@
- .../artifacts/post-apply.patch                     | 110 +++------------------
- 1 file changed, 14 insertions(+), 96 deletions(-)
+ .../artifacts/post-apply.patch                     | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
