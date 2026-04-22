@@ -2,6 +2,7 @@
 
 | Slug | Title | State | Compatibility |
 |------|-------|-------|---------------|
+| `background-tasks-ui` | Add background task tracking and UI across providers. Maintain a live count of active background agents/subagents, show a badge indicator in the status bar, and add a collapsible task panel to view active/completed background tasks. For Copilot: track via subagent.started/completed, system.notification (agent_completed), and session.background_tasks_changed. For Claude: track via collab_agent_tool_call lifecycle. Requires: adapter-level task registry, new runtime event for task count updates, and frontend task panel component. Depends on copilot-command-events for system.notification handling. | requested | unknown |
 | `copilot-cli-provider` | Expand the providers so that not only claude and codex are
  supported, but add the ability to use the copilot cli, as requested in
  this github issue from the upstream
