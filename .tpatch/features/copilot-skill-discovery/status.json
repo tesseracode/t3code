@@ -1,0 +1,17 @@
+{
+  "id": "copilot-skill-discovery",
+  "slug": "copilot-skill-discovery",
+  "title": "Surface Copilot SDK skills to the UI. Handle session.skills_loaded event and call rpc.skills.list() as fallback after session creation. Map SDK skills to ServerProviderSkill schema and update provider snapshot so dollar-sign autocomplete populates.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-04-22T06:30:46Z",
+  "updated_at": "2026-04-22T06:55:02Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-04-22T06:54:27Z",
+    "base_commit": "c98e1b6c1456d28e11049364c7b3abc7398d1af0",
+    "has_patch": true
+  },
+  "reconcile": {}
+}
