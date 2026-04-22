@@ -1,14 +1,14 @@
 # Implementation Record: copilot-skill-discovery
 
-**Recorded**: 2026-04-22T06:55:02Z
-**Files changed**: 2
-**Patch size**: 4019 bytes
+**Recorded**: 2026-04-22T07:56:15Z
+**Files changed**: 1
+**Patch size**: 4373 bytes
 
 ## Change Summary
 
 ```
- .tpatch/FEATURES.md | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../artifacts/post-apply.patch                     | 182 ++++++++++-----------
+ 1 file changed, 88 insertions(+), 94 deletions(-)
 ```
 
 ## Replay Instructions
@@ -20,4 +20,4 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-skill-discovery/artifacts/post-apply.patch
 ```
 
-*Patch was captured as a committed diff from `feature/copilot-provider~1` to `HEAD`.*
+*Patch was captured as a committed diff from `1ff08263~2` to `HEAD`.*
