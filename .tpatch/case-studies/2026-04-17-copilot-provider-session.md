@@ -115,6 +115,16 @@ Only issue: the implement phase's JSON validation accepts the `"op"` key (matchi
 
 ---
 
+## 9. FEATURES.md Not Regenerated on State Transitions
+
+`status.json` correctly updates to `applied` after `tpatch apply --mode done` and `tpatch record`, but `FEATURES.md` retains the previous state (`requested`). The table only updates when another command happens to regenerate it.
+
+**Repro:** `tpatch add` → skip analyze/define/explore → `tpatch apply --mode started` → `--mode done` → `record` → check FEATURES.md (still shows `requested` while status.json shows `applied`).
+
+**Impact:** Low — FEATURES.md is a convenience view, status.json is authoritative. But it's confusing when auditing feature state.
+
+---
+
 ## Summary — Priority Ranking
 
 | # | Issue | Impact | Effort |
@@ -124,6 +134,7 @@ Only issue: the implement phase's JSON validation accepts the `"op"` key (matchi
 | 6 | Auto-generate recipe from record | Medium (every Path B feature) | Medium |
 | 5 | Cross-feature pollution in record | Medium (manual workaround exists) | Medium |
 | 4 | Feature dependency tracking | Medium (rebase workaround exists) | Large |
+| 9 | FEATURES.md stale on state transitions | Low (cosmetic, status.json is correct) | Trivial |
 | 2 | Skill content gaps | Low (agent figures it out) | Small |
 | 7 | --manual works well | Positive validation | — |
 | 8 | v0.4.2 record fixes work | Positive validation | — |
