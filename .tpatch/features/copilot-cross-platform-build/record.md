@@ -1,14 +1,14 @@
 # Implementation Record: copilot-cross-platform-build
 
-**Recorded**: 2026-04-22T06:05:20Z
+**Recorded**: 2026-04-22T08:52:29Z
 **Files changed**: 1
-**Patch size**: 1670 bytes
+**Patch size**: 3484 bytes
 
 ## Change Summary
 
 ```
- .tpatch/FEATURES.md | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ .../artifacts/post-apply.patch                     | 79 +++++++++++++++++-----
+ 1 file changed, 61 insertions(+), 18 deletions(-)
 ```
 
 ## Replay Instructions
