@@ -1,0 +1,14 @@
+{
+  "feature": "copilot-cross-platform-build",
+  "version": 1,
+  "description": "Install target platform Copilot binary during cross-compilation builds.",
+  "operations": [
+    {
+      "id": "01",
+      "type": "replace-in-file",
+      "path": "scripts/build-desktop-artifact.ts",
+      "search": "    })`bun install --production`,\n  );\n\n  const buildEnv: NodeJS.ProcessEnv = {\n    ...process.env,\n  };",
+      "replace": "    })`bun install --production`,\n  );\n\n  // Ensure the Copilot SDK platform binary is installed for the target platform.\n  // bun only installs optional deps for the host OS, so when cross-compiling\n  // (e.g., building a Windows installer on macOS) the target binary is missing.\n  const copilotPlatformMap: Record<string, Record<string, string[]>> = {\n    mac: {\n      arm64: [\"@github/copilot-darwin-arm64\"],\n      x64: [\"@github/copilot-darwin-x64\"],\n      universal: [\"@github/copilot-darwin-arm64\", \"@github/copilot-darwin-x64\"],\n    },\n    linux: {\n      arm64: [\"@github/copilot-linux-arm64\"],\n      x64: [\"@github/copilot-linux-x64\"],\n    },\n    win: {\n      arm64: [\"@github/copilot-win32-arm64\"],\n      x64: [\"@github/copilot-win32-x64\"],\n    },\n  };\n  const copilotPlatformPackages = copilotPlatformMap[options.platform]?.[options.arch] ?? [];\n  if (copilotPlatformPackages.length > 0) {\n    yield* Effect.log(\n      `[desktop-artifact] Installing Copilot SDK platform binaries: ${copilotPlatformPackages.join(\", \")}`,\n    );\n    yield* runCommand(\n      ChildProcess.make({\n        cwd: stageAppDir,\n        ...commandOutputOptions(options.verbose),\n        shell: process.platform === \"win32\",\n      })`bun add ${copilotPlatformPackages.join(\" \")}`,\n    );\n  }\n\n  const buildEnv: NodeJS.ProcessEnv = {\n    ...process.env,\n  };"
+    }
+  ]
+}
