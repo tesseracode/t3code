@@ -7,6 +7,7 @@
  * @module CopilotProviderLive
  */
 import { normalizeCopilotCliPathOverride, resolveBundledCopilotCliPath } from "./copilotCliPath.ts";
+import { getCopilotDiscoveredSkills } from "./CopilotAdapter.ts";
 import type {
   ModelCapabilities,
   ServerProvider,
@@ -323,6 +324,7 @@ const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
       enabled: true,
       checkedAt: now,
       models: runtimeModels,
+      skills: [...getCopilotDiscoveredSkills()],
       probe: {
         installed: true,
         version: null,

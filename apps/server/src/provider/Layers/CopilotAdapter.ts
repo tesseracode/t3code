@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   type CodexReasoningEffort,
   type ModelSelection,
+  type ServerProviderSkill,
   EventId,
   type ProviderApprovalDecision,
   ProviderItemId,
@@ -114,6 +115,42 @@ interface ActiveCopilotSession extends CopilotTurnTrackingState {
   pendingApprovalResolvers: Map<string, PendingApprovalRequest>;
   pendingUserInputResolvers: Map<string, PendingUserInputRequest>;
   unsubscribe: () => void;
+}
+
+// ── Copilot Skill Discovery ─────────────────────────────────────────────
+
+/**
+ * Module-level store for discovered Copilot skills.
+ * Populated from `session.skills_loaded` events and `rpc.skills.list()`.
+ * Read by `CopilotProvider.ts` during snapshot enrichment.
+ */
+let discoveredCopilotSkills: ReadonlyArray<ServerProviderSkill> = [];
+
+/** Get the most recently discovered skills (read by CopilotProvider). */
+export function getCopilotDiscoveredSkills(): ReadonlyArray<ServerProviderSkill> {
+  return discoveredCopilotSkills;
+}
+
+function mapSdkSkillToServerProviderSkill(skill: {
+  name: string;
+  description?: string;
+  source?: string;
+  userInvocable?: boolean;
+  enabled?: boolean;
+  path?: string;
+}): ServerProviderSkill {
+  const name = skill.name.trim();
+  const displayName = name
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return {
+    name,
+    path: skill.path?.trim() || name,
+    enabled: skill.enabled !== false,
+    ...(skill.description ? { shortDescription: skill.description } : {}),
+    ...(skill.source ? { scope: skill.source } : {}),
+    ...(displayName !== name ? { displayName } : {}),
+  };
 }
 
 interface CopilotSessionHandle {
@@ -1079,6 +1116,11 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
               },
             },
           ];
+        case "session.skills_loaded": {
+          const skills = (event.data.skills ?? []).map(mapSdkSkillToServerProviderSkill);
+          discoveredCopilotSkills = skills;
+          return [];
+        }
         case "exit_plan_mode.requested":
           return [
             {
@@ -1555,6 +1597,19 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
             reason: "session.started",
           }),
         ]);
+
+        // Non-blocking skill discovery fallback — belt-and-suspenders alongside
+        // the session.skills_loaded event handler. Fire-and-forget.
+        void (async () => {
+          try {
+            const skillsResult = await (session.rpc as any).skills?.list?.();
+            if (Array.isArray(skillsResult?.skills) && skillsResult.skills.length > 0) {
+              discoveredCopilotSkills = skillsResult.skills.map(mapSdkSkillToServerProviderSkill);
+            }
+          } catch {
+            // Experimental RPC — silently ignore failures
+          }
+        })();
 
         return {
           provider: PROVIDER,
