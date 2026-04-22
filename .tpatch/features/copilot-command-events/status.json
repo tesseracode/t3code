@@ -1,0 +1,12 @@
+{
+  "id": "copilot-command-events",
+  "slug": "copilot-command-events",
+  "title": "Wire up Copilot SDK command and shell execution events. Map command.execute, command.completed, command.queued, shell_completed, and shell_detached_completed events in CopilotAdapter mapSessionEvent to surface as command execution timeline entries. These are currently dropped by the default case.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-04-22T10:44:43Z",
+  "updated_at": "2026-04-22T10:44:43Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}

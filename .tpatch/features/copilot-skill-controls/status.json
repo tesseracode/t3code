@@ -1,0 +1,12 @@
+{
+  "id": "copilot-skill-controls",
+  "slug": "copilot-skill-controls",
+  "title": "Add mid-session skill management for Copilot provider. Wire up rpc.skills.enable(), rpc.skills.disable(), and rpc.skills.reload() SDK methods. Add UI toggles to enable/disable individual skills during an active session without restarting.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-04-22T10:44:43Z",
+  "updated_at": "2026-04-22T10:44:43Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}

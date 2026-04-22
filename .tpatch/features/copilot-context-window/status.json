@@ -1,0 +1,12 @@
+{
+  "id": "copilot-context-window",
+  "slug": "copilot-context-window",
+  "title": "Wire up Copilot SDK context window visualization and token tracking. Surface token usage from session.usage_info in the context window meter component so users can see consumption, compaction thresholds, and remaining capacity. session.usage_info is already mapped but its data may not fully propagate to the UI meter.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-04-22T10:44:43Z",
+  "updated_at": "2026-04-22T10:44:43Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}
