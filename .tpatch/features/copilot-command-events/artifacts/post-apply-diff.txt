@@ -1,0 +1,5 @@
+ .tpatch/FEATURES.md                                 |  3 +--
+ .tpatch/features/copilot-command-events/status.json | 13 +++++++++----
+ .tpatch/features/copilot-context-window/request.md  |  8 --------
+ .tpatch/features/copilot-context-window/status.json | 12 ------------
+ 4 files changed, 10 insertions(+), 26 deletions(-)
