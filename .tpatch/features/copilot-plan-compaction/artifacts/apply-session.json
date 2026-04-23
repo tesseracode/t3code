@@ -1,6 +1,6 @@
 {
   "slug": "copilot-plan-compaction",
-  "completed_at": "2026-04-20T09:49:27Z",
-  "base_commit": "a192fe0e175bb686bb64c0da2efc4b3b2b915ce5",
+  "completed_at": "2026-04-23T06:33:46Z",
+  "base_commit": "74ee2fdc185adc935ec47c8c8bd79f8a21a65cb2",
   "has_patch": true
 }

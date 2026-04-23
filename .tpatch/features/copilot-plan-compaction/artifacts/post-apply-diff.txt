@@ -1,2 +1,5 @@
- .tpatch/FEATURES.md | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../artifacts/apply-session.json                   |   4 +-
+ .../artifacts/post-apply-diff.txt                  |  13 +-
+ .../artifacts/post-apply.patch                     | 140 ++++-----------------
+ .../features/copilot-plan-compaction/status.json   |  10 +-
+ 4 files changed, 45 insertions(+), 122 deletions(-)

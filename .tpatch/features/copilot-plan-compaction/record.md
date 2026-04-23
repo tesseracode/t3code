@@ -1,14 +1,17 @@
 # Implementation Record: copilot-plan-compaction
 
-**Recorded**: 2026-04-20T09:52:38Z
+**Recorded**: 2026-04-23T06:34:34Z
 **Files changed**: 1
-**Patch size**: 4797 bytes
+**Patch size**: 1689 bytes
 
 ## Change Summary
 
 ```
- .tpatch/FEATURES.md | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../artifacts/apply-session.json                   |   4 +-
+ .../artifacts/post-apply-diff.txt                  |  13 +-
+ .../artifacts/post-apply.patch                     | 140 ++++-----------------
+ .../features/copilot-plan-compaction/status.json   |  10 +-
+ 4 files changed, 45 insertions(+), 122 deletions(-)
 ```
 
 ## Replay Instructions
@@ -20,4 +23,4 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-plan-compaction/artifacts/post-apply.patch
 ```
 
-*Patch was captured as a committed diff from `feature/copilot-provider~1` to `HEAD`.*
+*Patch was captured as a committed diff from `b644b2ae~1` to `HEAD`.*
