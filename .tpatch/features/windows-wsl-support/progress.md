@@ -17,10 +17,10 @@
 - WSL2 shares host network stack — localhost TCP works cross-boundary
 
 ## Phase 0 — BackendTarget Abstraction
-- [ ] Extract `BackendTarget` interface from `startBackend()` in main.ts
-- [ ] Implement `LocalBackendTarget` wrapping existing logic
-- [ ] Verify no regression on existing local flow
-- [ ] Typecheck passes
+- [x] Extract `BackendTarget` interface from `startBackend()` in main.ts
+- [x] Implement `LocalBackendTarget` wrapping existing logic
+- [x] Verify no regression on existing local flow (typecheck passes)
+- [x] Typecheck passes
 
 ## Phase 1 — WSL Server Spawning (MVP)
 - [ ] Implement `WslBackendTarget` with `wsl.exe` spawning

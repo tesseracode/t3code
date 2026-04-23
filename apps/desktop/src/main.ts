@@ -75,6 +75,7 @@ import {
 } from "./updateMachine.ts";
 import { isArm64HostRunningIntelBuild, resolveDesktopRuntimeInfo } from "./runtimeArch.ts";
 import { resolveDesktopAppBranding } from "./appBranding.ts";
+import { createDefaultBackendTarget, type BackendTarget } from "./backendTarget.ts";
 
 syncShellEnvironment();
 
@@ -211,6 +212,7 @@ let backendEndpointUrl: string | null = null;
 let backendAdvertisedHost: string | null = null;
 let backendReadinessAbortController: AbortController | null = null;
 let backendInitialWindowOpenInFlight: Promise<void> | null = null;
+const backendTarget: BackendTarget = createDefaultBackendTarget();
 let backendListeningDetector: ServerListeningDetector | null = null;
 let restartAttempt = 0;
 let restartTimer: ReturnType<typeof setTimeout> | null = null;
@@ -724,16 +726,7 @@ function resolveAboutCommitHash(): string | null {
   return aboutCommitHashCache;
 }
 
-function resolveBackendEntry(): string {
-  return Path.join(resolveAppRoot(), "apps/server/dist/bin.mjs");
-}
-
-function resolveBackendCwd(): string {
-  if (!app.isPackaged) {
-    return resolveAppRoot();
-  }
-  return OS.homedir();
-}
+// resolveBackendEntry and resolveBackendCwd moved to backendTarget.ts
 
 function resolveDesktopStaticDir(): string | null {
   const appRoot = resolveAppRoot();
@@ -1372,47 +1365,37 @@ function startBackend(): void {
   if (isQuitting || backendProcess) return;
 
   backendObservabilitySettings = readPersistedBackendObservabilitySettings();
-  const backendEntry = resolveBackendEntry();
-  if (!FS.existsSync(backendEntry)) {
-    scheduleBackendRestart(`missing server entry at ${backendEntry}`);
+
+  if (!backendTarget.isAvailable()) {
+    scheduleBackendRestart(`backend target '${backendTarget.displayLabel}' is not available`);
     return;
   }
 
   const captureBackendLogs = !isDevelopment;
-  const child = ChildProcess.spawn(process.execPath, [backendEntry, "--bootstrap-fd", "3"], {
-    cwd: resolveBackendCwd(),
-    // In Electron main, process.execPath points to the Electron binary.
-    // Run the child in Node mode so this backend process does not become a GUI app instance.
-    env: {
-      ...backendChildEnv(),
-      ELECTRON_RUN_AS_NODE: "1",
+  const { child, bootstrapDelivered } = backendTarget.spawn(
+    {
+      mode: "desktop",
+      noBrowser: true,
+      port: backendPort,
+      t3Home: BASE_DIR,
+      host: backendBindHost,
+      desktopBootstrapToken: backendBootstrapToken,
+      ...(backendObservabilitySettings.otlpTracesUrl
+        ? { otlpTracesUrl: backendObservabilitySettings.otlpTracesUrl }
+        : {}),
+      ...(backendObservabilitySettings.otlpMetricsUrl
+        ? { otlpMetricsUrl: backendObservabilitySettings.otlpMetricsUrl }
+        : {}),
     },
-    stdio: captureBackendLogs
-      ? ["ignore", "pipe", "pipe", "pipe"]
-      : ["ignore", "inherit", "inherit", "pipe"],
-  });
-  const bootstrapStream = child.stdio[3];
-  if (bootstrapStream && "write" in bootstrapStream) {
-    bootstrapStream.write(
-      `${JSON.stringify({
-        mode: "desktop",
-        noBrowser: true,
-        port: backendPort,
-        t3Home: BASE_DIR,
-        host: backendBindHost,
-        desktopBootstrapToken: backendBootstrapToken,
-        ...(backendObservabilitySettings.otlpTracesUrl
-          ? { otlpTracesUrl: backendObservabilitySettings.otlpTracesUrl }
-          : {}),
-        ...(backendObservabilitySettings.otlpMetricsUrl
-          ? { otlpMetricsUrl: backendObservabilitySettings.otlpMetricsUrl }
-          : {}),
-      })}\n`,
-    );
-    bootstrapStream.end();
-  } else {
+    {
+      env: backendChildEnv(),
+      captureOutput: captureBackendLogs,
+    },
+  );
+
+  if (!bootstrapDelivered) {
     child.kill("SIGTERM");
-    scheduleBackendRestart("missing desktop bootstrap pipe");
+    scheduleBackendRestart("failed to deliver bootstrap config");
     return;
   }
   const listeningDetector = new ServerListeningDetector();
@@ -1426,7 +1409,7 @@ function startBackend(): void {
   };
   writeBackendSessionBoundary(
     "START",
-    `pid=${child.pid ?? "unknown"} port=${backendPort} cwd=${resolveBackendCwd()}`,
+    `pid=${child.pid ?? "unknown"} port=${backendPort} target=${backendTarget.displayLabel}`,
   );
   captureBackendOutput(child);
 
