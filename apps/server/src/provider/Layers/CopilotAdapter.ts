@@ -1045,6 +1045,39 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
                 },
               },
             }));
+          // Extract audio content blocks
+          const audioEvents: ProviderRuntimeEvent[] = contents
+            .filter((content: { type: string }) => content.type === "audio")
+            .map((content: { type: string; data?: string; mimeType?: string }) => ({
+              ...base({ itemId: event.data.toolCallId }),
+              type: "item.completed" as const,
+              payload: {
+                itemType: "dynamic_tool_call" as const,
+                status: "completed" as const,
+                title: "Audio",
+                data: {
+                  contentType: "audio",
+                  base64: content.data,
+                  mimeType: content.mimeType,
+                },
+              },
+            }));
+          // Extract file/resource_link content blocks
+          const fileEvents: ProviderRuntimeEvent[] = contents
+            .filter((content: { type: string }) =>
+              content.type === "resource_link" || content.type === "resource",
+            )
+            .map((content: { type: string; name?: string; uri?: string; title?: string; description?: string }) => ({
+              ...base({ itemId: event.data.toolCallId }),
+              type: "item.completed" as const,
+              payload: {
+                itemType: "dynamic_tool_call" as const,
+                status: "completed" as const,
+                title: content.name ?? content.title ?? content.uri ?? "Resource",
+                detail: trimToUndefined(content.description),
+                data: content,
+              },
+            }));
           return [
             {
               ...base({ itemId: event.data.toolCallId }),
@@ -1062,6 +1095,8 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
               },
             },
             ...imageEvents,
+            ...audioEvents,
+            ...fileEvents,
             ...(trimToUndefined(event.data.result?.content)
               ? [
                   {
