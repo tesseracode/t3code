@@ -48,10 +48,13 @@ export interface BackendTarget {
    * Spawn the backend server process.
    * The caller is responsible for event handling (error, exit, readiness detection).
    */
-  spawn(config: BackendBootstrapConfig, options: {
-    readonly env: NodeJS.ProcessEnv;
-    readonly captureOutput: boolean;
-  }): BackendSpawnResult;
+  spawn(
+    config: BackendBootstrapConfig,
+    options: {
+      readonly env: NodeJS.ProcessEnv;
+      readonly captureOutput: boolean;
+    },
+  ): BackendSpawnResult;
   /**
    * Translate a path from the host OS to the target's filesystem.
    * For local targets, this is a no-op.
@@ -96,26 +99,25 @@ export class LocalBackendTarget implements BackendTarget {
   readonly type = "local" as const;
   readonly displayLabel = "Local";
 
-  spawn(config: BackendBootstrapConfig, options: {
-    readonly env: NodeJS.ProcessEnv;
-    readonly captureOutput: boolean;
-  }): BackendSpawnResult {
+  spawn(
+    config: BackendBootstrapConfig,
+    options: {
+      readonly env: NodeJS.ProcessEnv;
+      readonly captureOutput: boolean;
+    },
+  ): BackendSpawnResult {
     const backendEntry = resolveBackendEntry();
 
-    const child = ChildProcess.spawn(
-      process.execPath,
-      [backendEntry, "--bootstrap-fd", "3"],
-      {
-        cwd: resolveBackendCwd(),
-        env: {
-          ...options.env,
-          ELECTRON_RUN_AS_NODE: "1",
-        },
-        stdio: options.captureOutput
-          ? ["ignore", "pipe", "pipe", "pipe"]
-          : ["ignore", "inherit", "inherit", "pipe"],
+    const child = ChildProcess.spawn(process.execPath, [backendEntry, "--bootstrap-fd", "3"], {
+      cwd: resolveBackendCwd(),
+      env: {
+        ...options.env,
+        ELECTRON_RUN_AS_NODE: "1",
       },
-    );
+      stdio: options.captureOutput
+        ? ["ignore", "pipe", "pipe", "pipe"]
+        : ["ignore", "inherit", "inherit", "pipe"],
+    });
 
     // Deliver bootstrap config via fd 3 pipe
     const bootstrapStream = child.stdio[3];
@@ -139,9 +141,29 @@ export class LocalBackendTarget implements BackendTarget {
   }
 }
 
+import {
+  WslBackendTarget,
+  isWslAvailable,
+  getDefaultWslDistro,
+  isNodeAvailableInWsl,
+} from "./wslBackendTarget.ts";
+
 /**
  * Create the default backend target.
+ *
+ * On Windows, if WSL is available with Node.js and the server installed,
+ * creates a WslBackendTarget so WSL projects use a native Linux server.
+ * Falls back to LocalBackendTarget otherwise.
  */
 export function createDefaultBackendTarget(): BackendTarget {
+  if (process.platform === "win32" && isWslAvailable()) {
+    const distro = getDefaultWslDistro();
+    if (distro && isNodeAvailableInWsl(distro)) {
+      const wsl = new WslBackendTarget({ distro });
+      if (wsl.isAvailable()) {
+        return wsl;
+      }
+    }
+  }
   return new LocalBackendTarget();
 }
