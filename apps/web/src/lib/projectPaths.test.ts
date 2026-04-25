@@ -11,6 +11,7 @@ import {
   inferProjectTitleFromPath,
   isExplicitRelativeProjectPath,
   isFilesystemBrowseQuery,
+  normalizeProjectPathForEnvironmentInput,
   normalizeProjectPathForComparison,
   normalizeProjectPathForDispatch,
   isUnsupportedWindowsProjectPath,
@@ -61,6 +62,31 @@ describe("projectPaths", () => {
     expect(isFilesystemBrowseQuery("C:\\Work\\Repo\\", "Win32")).toBe(true);
     expect(isUnsupportedWindowsProjectPath("C:\\Work\\Repo\\", "MacIntel")).toBe(true);
     expect(isUnsupportedWindowsProjectPath("C:\\Work\\Repo\\", "Win32")).toBe(false);
+  });
+
+  it("normalizes WSL UNC paths for linux-targeted project entry", () => {
+    expect(
+      normalizeProjectPathForEnvironmentInput(
+        "\\\\wsl.localhost\\Ubuntu-24.04\\home\\julius\\repo\\",
+        "Linux",
+      ),
+    ).toBe("/home/julius/repo/");
+    expect(
+      isFilesystemBrowseQuery("\\\\wsl.localhost\\Ubuntu-24.04\\home\\julius\\repo", "Linux"),
+    ).toBe(true);
+    expect(
+      isUnsupportedWindowsProjectPath(
+        "\\\\wsl.localhost\\Ubuntu-24.04\\home\\julius\\repo",
+        "Linux",
+      ),
+    ).toBe(false);
+    expect(
+      resolveProjectPathForDispatch(
+        "\\\\wsl.localhost\\Ubuntu-24.04\\home\\julius\\repo\\",
+        undefined,
+        "Linux",
+      ),
+    ).toBe("/home/julius/repo");
   });
 
   it("detects explicit relative project paths", () => {

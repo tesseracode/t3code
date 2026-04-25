@@ -34,7 +34,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
 import { useGitStatus } from "~/lib/gitStatusState";
-import { usePrimaryEnvironmentId } from "../environments/primary";
+import { readPrimaryEnvironmentDescriptor, usePrimaryEnvironmentId } from "../environments/primary";
 import { readEnvironmentApi } from "../environmentApi";
 import { isElectron } from "../env";
 import { readLocalApi } from "../localApi";
@@ -132,6 +132,7 @@ import {
   type TerminalContextDraft,
   type TerminalContextSelection,
 } from "../lib/terminalContext";
+import { isReusableDraftForProjectRef } from "../lib/projectDrafts";
 import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
@@ -643,13 +644,11 @@ export default function ChatView(props: ChatViewProps) {
   );
   const clearComposerDraftContent = useComposerDraftStore((store) => store.clearComposerContent);
   const setDraftThreadContext = useComposerDraftStore((store) => store.setDraftThreadContext);
-  const getDraftSessionByLogicalProjectKey = useComposerDraftStore(
-    (store) => store.getDraftSessionByLogicalProjectKey,
+  const getDraftSessionByProjectRef = useComposerDraftStore(
+    (store) => store.getDraftSessionByProjectRef,
   );
   const getDraftSession = useComposerDraftStore((store) => store.getDraftSession);
-  const setLogicalProjectDraftThreadId = useComposerDraftStore(
-    (store) => store.setLogicalProjectDraftThreadId,
-  );
+  const setProjectDraftThreadId = useComposerDraftStore((store) => store.setProjectDraftThreadId);
   const draftThread = useComposerDraftStore((store) =>
     routeKind === "server"
       ? store.getDraftSessionByRef(routeThreadRef)
@@ -926,22 +925,13 @@ export default function ChatView(props: ChatViewProps) {
         throw new Error("No active project is available for this pull request.");
       }
       const activeProjectRef = scopeProjectRef(activeProject.environmentId, activeProject.id);
-      const logicalProjectKey = deriveLogicalProjectKeyFromSettings(
-        activeProject,
-        projectGroupingSettings,
-      );
-      const storedDraftSession = getDraftSessionByLogicalProjectKey(logicalProjectKey);
+      const storedDraftSession = getDraftSessionByProjectRef(activeProjectRef);
       if (storedDraftSession) {
         setDraftThreadContext(storedDraftSession.draftId, input);
-        setLogicalProjectDraftThreadId(
-          logicalProjectKey,
-          activeProjectRef,
-          storedDraftSession.draftId,
-          {
-            threadId: storedDraftSession.threadId,
-            ...input,
-          },
-        );
+        setProjectDraftThreadId(activeProjectRef, storedDraftSession.draftId, {
+          threadId: storedDraftSession.threadId,
+          ...input,
+        });
         if (routeKind !== "draft" || draftId !== storedDraftSession.draftId) {
           await navigate({
             to: "/draft/$draftId",
@@ -954,11 +944,12 @@ export default function ChatView(props: ChatViewProps) {
       const activeDraftSession = routeKind === "draft" && draftId ? getDraftSession(draftId) : null;
       if (
         !isServerThread &&
-        activeDraftSession?.logicalProjectKey === logicalProjectKey &&
-        draftId
+        draftId &&
+        activeDraftSession &&
+        isReusableDraftForProjectRef(activeProjectRef, activeDraftSession)
       ) {
         setDraftThreadContext(draftId, input);
-        setLogicalProjectDraftThreadId(logicalProjectKey, activeProjectRef, draftId, {
+        setProjectDraftThreadId(activeProjectRef, draftId, {
           threadId: activeDraftSession.threadId,
           createdAt: activeDraftSession.createdAt,
           runtimeMode: activeDraftSession.runtimeMode,
@@ -970,7 +961,7 @@ export default function ChatView(props: ChatViewProps) {
 
       const nextDraftId = newDraftId();
       const nextThreadId = newThreadId();
-      setLogicalProjectDraftThreadId(logicalProjectKey, activeProjectRef, nextDraftId, {
+      setProjectDraftThreadId(activeProjectRef, nextDraftId, {
         threadId: nextThreadId,
         createdAt: new Date().toISOString(),
         runtimeMode: DEFAULT_RUNTIME_MODE,
@@ -987,13 +978,12 @@ export default function ChatView(props: ChatViewProps) {
       activeProject,
       draftId,
       getDraftSession,
-      getDraftSessionByLogicalProjectKey,
+      getDraftSessionByProjectRef,
       isServerThread,
       navigate,
-      projectGroupingSettings,
       routeKind,
       setDraftThreadContext,
-      setLogicalProjectDraftThreadId,
+      setProjectDraftThreadId,
     ],
   );
 
@@ -1047,6 +1037,32 @@ export default function ChatView(props: ChatViewProps) {
       ? primaryServerConfig
       : (activeEnvRuntimeState?.serverConfig ?? primaryServerConfig);
   const providerStatuses = serverConfig?.providers ?? EMPTY_PROVIDERS;
+  const activeEnvironmentLabel = useMemo(() => {
+    if (!activeThread?.environmentId) {
+      return null;
+    }
+
+    const isPrimary =
+      primaryEnvironmentId !== null && activeThread.environmentId === primaryEnvironmentId;
+
+    return resolveEnvironmentOptionLabel({
+      isPrimary,
+      environmentId: activeThread.environmentId,
+      runtimeLabel: isPrimary
+        ? (readPrimaryEnvironmentDescriptor()?.label ?? null)
+        : (activeEnvRuntimeState?.descriptor?.label ?? null),
+      savedLabel: savedEnvironmentRegistry[activeThread.environmentId]?.label ?? null,
+    });
+  }, [
+    activeEnvRuntimeState?.descriptor?.label,
+    activeThread,
+    primaryEnvironmentId,
+    savedEnvironmentRegistry,
+  ]);
+  const activeEnvironmentIsPrimary =
+    activeThread?.environmentId !== undefined &&
+    primaryEnvironmentId !== null &&
+    activeThread.environmentId === primaryEnvironmentId;
   const unlockedSelectedProvider = resolveSelectableProvider(
     providerStatuses,
     selectedProviderByThreadId ?? threadProvider ?? "codex",
@@ -1420,6 +1436,7 @@ export default function ChatView(props: ChatViewProps) {
         worktreePath: activeThread?.worktreePath ?? null,
       })
     : null;
+  const activeWorkspacePath = gitCwd ?? activeProject?.cwd ?? null;
   const gitStatusQuery = useGitStatus({ environmentId, cwd: gitCwd });
   const keybindings = useServerKeybindings();
   const availableEditors = useServerAvailableEditors();
@@ -3223,6 +3240,9 @@ export default function ChatView(props: ChatViewProps) {
           {...(routeKind === "draft" && draftId ? { draftId } : {})}
           activeThreadTitle={activeThread.title}
           activeProjectName={activeProject?.name}
+          activeEnvironmentLabel={activeEnvironmentLabel}
+          activeEnvironmentIsPrimary={activeEnvironmentIsPrimary}
+          activeWorkspacePath={activeWorkspacePath}
           isGitRepo={isGitRepo}
           openInCwd={gitCwd}
           activeProjectScripts={activeProject?.scripts}

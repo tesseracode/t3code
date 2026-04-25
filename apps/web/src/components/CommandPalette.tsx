@@ -58,6 +58,7 @@ import {
   isExplicitRelativeProjectPath,
   isFilesystemBrowseQuery,
   isUnsupportedWindowsProjectPath,
+  normalizeProjectPathForEnvironmentInput,
   resolveProjectPathForDispatch,
 } from "../lib/projectPaths";
 import { isTerminalFocused } from "../lib/terminalFocus";
@@ -130,6 +131,20 @@ function getEnvironmentBrowsePlatform(os: string | null | undefined): string {
     return "Linux";
   }
   return typeof navigator === "undefined" ? "" : navigator.platform;
+}
+
+function getBrowsePathExample(platform: string): string {
+  return isWindowsPlatform(platform) ? "C:\\Projects\\my-app" : "~/projects/my-app";
+}
+
+function getBrowseInputPlaceholder(input: {
+  mode: "root-browse" | "submenu-browse";
+  platform: string;
+  environmentLabel: string | null;
+}): string {
+  const prefix = input.mode === "root-browse" ? "Enter project path" : "Enter path";
+  const environmentSuffix = input.environmentLabel ? ` in ${input.environmentLabel}` : "";
+  return `${prefix}${environmentSuffix} (e.g. ${getBrowsePathExample(input.platform)})`;
 }
 
 interface AddProjectEnvironmentOption {
@@ -280,37 +295,53 @@ function OpenCommandPaletteDialog() {
     savedEnvironmentRegistry,
     savedEnvironmentRuntimeById,
   ]);
+  const getBrowsePlatformForEnvironment = useCallback(
+    (environmentId: EnvironmentId | null): string => {
+      const os =
+        environmentId && primaryEnvironmentId && environmentId === primaryEnvironmentId
+          ? (readPrimaryEnvironmentDescriptor()?.platform.os ?? null)
+          : environmentId
+            ? (savedEnvironmentRuntimeById[environmentId]?.descriptor?.platform.os ??
+              savedEnvironmentRuntimeById[environmentId]?.serverConfig?.environment.platform.os ??
+              null)
+            : null;
+      return getEnvironmentBrowsePlatform(os);
+    },
+    [primaryEnvironmentId, savedEnvironmentRuntimeById],
+  );
   const defaultAddProjectEnvironmentId = addProjectEnvironmentOptions[0]?.environmentId ?? null;
   const browseEnvironmentId = addProjectEnvironmentId ?? defaultAddProjectEnvironmentId;
-  const browseEnvironmentPlatform = useMemo(() => {
-    const os =
-      browseEnvironmentId && primaryEnvironmentId && browseEnvironmentId === primaryEnvironmentId
-        ? (readPrimaryEnvironmentDescriptor()?.platform.os ?? null)
-        : browseEnvironmentId
-          ? (savedEnvironmentRuntimeById[browseEnvironmentId]?.descriptor?.platform.os ??
-            savedEnvironmentRuntimeById[browseEnvironmentId]?.serverConfig?.environment.platform
-              .os ??
-            null)
-          : null;
-    return getEnvironmentBrowsePlatform(os);
-  }, [browseEnvironmentId, primaryEnvironmentId, savedEnvironmentRuntimeById]);
+  const browseEnvironmentPlatform = useMemo(
+    () => getBrowsePlatformForEnvironment(browseEnvironmentId),
+    [browseEnvironmentId, getBrowsePlatformForEnvironment],
+  );
+  const browseEnvironmentLabel = useMemo(
+    () =>
+      addProjectEnvironmentOptions.find((option) => option.environmentId === browseEnvironmentId)
+        ?.label ?? null,
+    [addProjectEnvironmentOptions, browseEnvironmentId],
+  );
   const isBrowsing = isFilesystemBrowseQuery(query, browseEnvironmentPlatform);
   const paletteMode = getCommandPaletteMode({ currentView, isBrowsing });
   const getAddProjectInitialQueryForEnvironment = useCallback(
     (environmentId: EnvironmentId | null): string => {
+      const browsePlatform = getBrowsePlatformForEnvironment(environmentId);
       const environmentSettings =
         environmentId && primaryEnvironmentId && environmentId === primaryEnvironmentId
           ? settings
           : environmentId
             ? savedEnvironmentRuntimeById[environmentId]?.serverConfig?.settings
             : null;
-      const baseDirectory = environmentSettings?.addProjectBaseDirectory?.trim() ?? "";
+      const baseDirectory = normalizeProjectPathForEnvironmentInput(
+        environmentSettings?.addProjectBaseDirectory?.trim() ?? "",
+        browsePlatform,
+      );
       if (baseDirectory.length === 0) {
-        return "~/";
+        return browsePlatform === "Win32" ? "C:\\" : "~/";
       }
       return ensureBrowseDirectoryPath(baseDirectory);
     },
-    [primaryEnvironmentId, savedEnvironmentRuntimeById, settings],
+    [getBrowsePlatformForEnvironment, primaryEnvironmentId, savedEnvironmentRuntimeById, settings],
   );
 
   const projectCwdById = useMemo(
@@ -549,9 +580,13 @@ function OpenCommandPaletteDialog() {
   }
 
   function handleQueryChange(nextQuery: string): void {
+    const normalizedQuery =
+      currentView?.initialQuery !== undefined
+        ? normalizeProjectPathForEnvironmentInput(nextQuery, browseEnvironmentPlatform)
+        : nextQuery;
     setHighlightedItemValue(null);
-    setQuery(nextQuery);
-    if (nextQuery === "" && currentView?.initialQuery) {
+    setQuery(normalizedQuery);
+    if (normalizedQuery === "" && currentView?.initialQuery) {
       popView();
     }
   }
@@ -741,7 +776,11 @@ function OpenCommandPaletteDialog() {
         return;
       }
 
-      const cwd = resolveProjectPathForDispatch(rawCwd, currentProjectCwdForBrowse);
+      const cwd = resolveProjectPathForDispatch(
+        rawCwd,
+        currentProjectCwdForBrowse,
+        browseEnvironmentPlatform,
+      );
       if (cwd.length === 0) return;
 
       const existing = findProjectByPath(
@@ -855,7 +894,14 @@ function OpenCommandPaletteDialog() {
     displayedGroups = relativePathNeedsActiveProject ? [] : browseGroups;
   }
 
-  const inputPlaceholder = getCommandPaletteInputPlaceholder(paletteMode);
+  const inputPlaceholder =
+    paletteMode === "root-browse" || paletteMode === "submenu-browse"
+      ? getBrowseInputPlaceholder({
+          mode: paletteMode,
+          platform: browseEnvironmentPlatform,
+          environmentLabel: browseEnvironmentLabel,
+        })
+      : getCommandPaletteInputPlaceholder(paletteMode);
   const isSubmenu = paletteMode === "submenu" || paletteMode === "submenu-browse";
   const hasHighlightedBrowseItem = highlightedItemValue?.startsWith("browse:") ?? false;
   const canSubmitBrowsePath = isBrowsing && !relativePathNeedsActiveProject;
@@ -891,10 +937,15 @@ function OpenCommandPaletteDialog() {
       ? (browseResult?.parentPath ?? trimmedQuery)
       : browseDirectoryPath || trimmedQuery;
 
-    const resolvedPath = resolveProjectPathForDispatch(initialPath, currentProjectCwdForBrowse);
+    const resolvedPath = resolveProjectPathForDispatch(
+      initialPath,
+      currentProjectCwdForBrowse,
+      browseEnvironmentPlatform,
+    );
     return resolvedPath.length > 0 ? resolvedPath : undefined;
   }, [
     browseDirectoryPath,
+    browseEnvironmentPlatform,
     browseResult?.parentPath,
     canOpenProjectFromFileManager,
     currentProjectCwdForBrowse,

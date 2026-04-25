@@ -6,6 +6,33 @@ import {
 } from "@t3tools/shared/path";
 import { isWindowsPlatform } from "./utils";
 
+function isLinuxPlatform(platform: string): boolean {
+  return platform.toLowerCase() === "linux";
+}
+
+function isWslUncPath(value: string): boolean {
+  const normalized = value.trim().replace(/\\/g, "/");
+  return /^\/\/wsl(?:\.localhost|\$)\/[^/]+(?:\/.*)?$/i.test(normalized);
+}
+
+function wslUncPathToLinuxPath(value: string): string | null {
+  const normalized = value.trim().replace(/\\/g, "/");
+  const match = normalized.match(/^\/\/wsl(?:\.localhost|\$)\/[^/]+(\/.*)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  return (match[1] ?? "/").replace(/\/+/g, "/");
+}
+
+export function normalizeProjectPathForEnvironmentInput(value: string, platform: string): string {
+  if (!isLinuxPlatform(platform)) {
+    return value;
+  }
+
+  return wslUncPathToLinuxPath(value) ?? value;
+}
+
 function isRootPath(value: string): boolean {
   return value === "/" || value === "\\" || /^[a-zA-Z]:[/\\]?$/.test(value);
 }
@@ -104,28 +131,37 @@ export function isFilesystemBrowseQuery(
   value: string,
   platform = typeof navigator === "undefined" ? "" : navigator.platform,
 ): boolean {
+  const normalizedValue = normalizeProjectPathForEnvironmentInput(value, platform);
   const allowWindowsPaths = isWindowsPlatform(platform);
   return (
-    value.startsWith("./") ||
-    value.startsWith("../") ||
-    value.startsWith(".\\") ||
-    value.startsWith("..\\") ||
-    value.startsWith("/") ||
-    value.startsWith("~/") ||
-    (allowWindowsPaths && isWindowsAbsolutePath(value))
+    normalizedValue.startsWith("./") ||
+    normalizedValue.startsWith("../") ||
+    normalizedValue.startsWith(".\\") ||
+    normalizedValue.startsWith("..\\") ||
+    normalizedValue.startsWith("/") ||
+    normalizedValue.startsWith("~/") ||
+    (allowWindowsPaths && isWindowsAbsolutePath(normalizedValue))
   );
 }
 
 export function isUnsupportedWindowsProjectPath(value: string, platform: string): boolean {
-  return isWindowsAbsolutePath(value) && !isWindowsPlatform(platform);
+  return (
+    isWindowsAbsolutePath(value) &&
+    !isWindowsPlatform(platform) &&
+    !(isLinuxPlatform(platform) && isWslUncPath(value))
+  );
 }
 
 export function normalizeProjectPathForDispatch(value: string): string {
   return trimTrailingPathSeparators(value.trim());
 }
 
-export function resolveProjectPathForDispatch(value: string, cwd?: string | null): string {
-  const trimmedValue = value.trim();
+export function resolveProjectPathForDispatch(
+  value: string,
+  cwd?: string | null,
+  platform?: string,
+): string {
+  const trimmedValue = normalizeProjectPathForEnvironmentInput(value, platform ?? "").trim();
   if (!isExplicitRelativePath(trimmedValue) || !cwd) {
     return normalizeProjectPathForDispatch(trimmedValue);
   }

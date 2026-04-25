@@ -75,7 +75,11 @@ import {
 } from "./updateMachine.ts";
 import { isArm64HostRunningIntelBuild, resolveDesktopRuntimeInfo } from "./runtimeArch.ts";
 import { resolveDesktopAppBranding } from "./appBranding.ts";
-import { createDefaultBackendTarget, type BackendTarget } from "./backendTarget.ts";
+import {
+  createDefaultBackendEnvironmentManager,
+  type ManagedBackendEnvironment,
+} from "./backendEnvironment.ts";
+import { type BackendTarget } from "./backendTarget.ts";
 
 syncShellEnvironment();
 
@@ -212,7 +216,13 @@ let backendEndpointUrl: string | null = null;
 let backendAdvertisedHost: string | null = null;
 let backendReadinessAbortController: AbortController | null = null;
 let backendInitialWindowOpenInFlight: Promise<void> | null = null;
-const backendTarget: BackendTarget = createDefaultBackendTarget();
+const primaryBackendEnvironment: ManagedBackendEnvironment = createDefaultBackendEnvironmentManager(
+  {
+    rootBaseDir: BASE_DIR,
+    appRoot: ROOT_DIR,
+  },
+).primaryEnvironment;
+const backendTarget: BackendTarget = primaryBackendEnvironment.target;
 let backendListeningDetector: ServerListeningDetector | null = null;
 let restartAttempt = 0;
 let restartTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1366,7 +1376,7 @@ function startBackend(): void {
 
   backendObservabilitySettings = readPersistedBackendObservabilitySettings();
 
-  if (!backendTarget.isAvailable()) {
+  if (!backendTarget.ensureReady()) {
     scheduleBackendRestart(`backend target '${backendTarget.displayLabel}' is not available`);
     return;
   }
@@ -1377,7 +1387,7 @@ function startBackend(): void {
       mode: "desktop",
       noBrowser: true,
       port: backendPort,
-      t3Home: BASE_DIR,
+      t3Home: primaryBackendEnvironment.baseDir,
       host: backendBindHost,
       desktopBootstrapToken: backendBootstrapToken,
       ...(backendObservabilitySettings.otlpTracesUrl
@@ -1409,7 +1419,7 @@ function startBackend(): void {
   };
   writeBackendSessionBoundary(
     "START",
-    `pid=${child.pid ?? "unknown"} port=${backendPort} target=${backendTarget.displayLabel}`,
+    `pid=${child.pid ?? "unknown"} port=${backendPort} target=${backendTarget.displayLabel} baseDir=${primaryBackendEnvironment.baseDir}`,
   );
   captureBackendOutput(child);
 
@@ -1542,7 +1552,7 @@ function registerIpcHandlers(): void {
   ipcMain.removeAllListeners(GET_LOCAL_ENVIRONMENT_BOOTSTRAP_CHANNEL);
   ipcMain.on(GET_LOCAL_ENVIRONMENT_BOOTSTRAP_CHANNEL, (event) => {
     event.returnValue = {
-      label: "Local environment",
+      label: primaryBackendEnvironment.displayLabel,
       httpBaseUrl: backendHttpUrl || null,
       wsBaseUrl: backendWsUrl || null,
       bootstrapToken: backendBootstrapToken || undefined,

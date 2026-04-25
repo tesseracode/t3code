@@ -9,7 +9,7 @@ import { scopeThreadRef } from "@t3tools/client-runtime";
 import { memo } from "react";
 import GitActionsControl from "../GitActionsControl";
 import { type DraftId } from "~/composerDraftStore";
-import { DiffIcon, TerminalSquareIcon } from "lucide-react";
+import { CloudIcon, DiffIcon, MonitorIcon, TerminalSquareIcon } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import ProjectScriptsControl, { type NewProjectScriptInput } from "../ProjectScriptsControl";
@@ -23,6 +23,9 @@ interface ChatHeaderProps {
   draftId?: DraftId;
   activeThreadTitle: string;
   activeProjectName: string | undefined;
+  activeEnvironmentLabel: string | null;
+  activeEnvironmentIsPrimary: boolean;
+  activeWorkspacePath: string | null;
   isGitRepo: boolean;
   openInCwd: string | null;
   activeProjectScripts: ProjectScript[] | undefined;
@@ -49,6 +52,9 @@ export const ChatHeader = memo(function ChatHeader({
   draftId,
   activeThreadTitle,
   activeProjectName,
+  activeEnvironmentLabel,
+  activeEnvironmentIsPrimary,
+  activeWorkspacePath,
   isGitRepo,
   openInCwd,
   activeProjectScripts,
@@ -78,11 +84,37 @@ export const ChatHeader = memo(function ChatHeader({
         >
           {activeThreadTitle}
         </h2>
-        {activeProjectName && (
-          <Badge variant="outline" className="min-w-0 shrink overflow-hidden">
-            <span className="min-w-0 truncate">{activeProjectName}</span>
-          </Badge>
-        )}
+        {activeProjectName ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Badge variant="outline" className="min-w-0 shrink overflow-hidden">
+                  <span className="min-w-0 truncate">{activeProjectName}</span>
+                </Badge>
+              }
+            />
+            <TooltipPopup side="bottom">
+              {activeWorkspacePath ? `Project path: ${activeWorkspacePath}` : activeProjectName}
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
+        {activeEnvironmentLabel ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Badge variant="outline" className="min-w-0 shrink gap-1 overflow-hidden">
+                  {activeEnvironmentIsPrimary ? (
+                    <MonitorIcon className="size-3 shrink-0" />
+                  ) : (
+                    <CloudIcon className="size-3 shrink-0" />
+                  )}
+                  <span className="min-w-0 truncate">{activeEnvironmentLabel}</span>
+                </Badge>
+              }
+            />
+            <TooltipPopup side="bottom">Environment: {activeEnvironmentLabel}</TooltipPopup>
+          </Tooltip>
+        ) : null}
         {activeProjectName && !isGitRepo && (
           <Badge variant="outline" className="shrink-0 text-[10px] text-amber-700">
             No Git

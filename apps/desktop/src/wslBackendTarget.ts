@@ -68,6 +68,26 @@ function wslTest(
   }
 }
 
+function formatExecFileSyncError(error: unknown): string | undefined {
+  if (!(error instanceof Error)) {
+    return undefined;
+  }
+
+  const withStreams = error as Error & {
+    readonly stdout?: Buffer | string;
+    readonly stderr?: Buffer | string;
+  };
+  const stderr = withStreams.stderr?.toString().trim();
+  if (stderr && stderr.length > 0) {
+    return stderr;
+  }
+  const stdout = withStreams.stdout?.toString().trim();
+  if (stdout && stdout.length > 0) {
+    return stdout;
+  }
+  return error.message;
+}
+
 // ── Node.js Resolution ─────────────────────────────────────────────────
 
 /**
@@ -129,7 +149,8 @@ export function listWslDistros(): WslDistro[] {
     const output = raw
       .toString("utf16le")
       .replace(/^\uFEFF/, "")
-      .replace(/\0/g, "");
+      .split("\0")
+      .join("");
     const lines = output
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -198,12 +219,20 @@ function manualWindowsToWslPath(windowsPath: string): string {
 // ── Server Installation ────────────────────────────────────────────────
 
 const WSL_SERVER_DIR = ".t3/server";
+const WSL_SERVER_FINGERPRINT_FILE = ".wsl-bundle-fingerprint";
 
 /**
  * Check if the server is installed inside a WSL distro.
  */
 export function isServerInstalledInWsl(distro?: string): boolean {
   return wslTest(["bash", "-c", `test -f "$HOME/${WSL_SERVER_DIR}/apps/server/dist/bin.mjs"`], {
+    distro,
+    timeout: 5000,
+  });
+}
+
+function readInstalledWslServerFingerprint(distro?: string): string | undefined {
+  return wslExec(["bash", "-c", `cat "$HOME/${WSL_SERVER_DIR}/${WSL_SERVER_FINGERPRINT_FILE}"`], {
     distro,
     timeout: 5000,
   });
@@ -227,6 +256,35 @@ export function isNodeAvailableInWsl(distro?: string): boolean {
   }
 }
 
+export function canReachNpmRegistryInWsl(distro?: string): boolean {
+  if (process.platform !== "win32") return false;
+  try {
+    ChildProcess.execFileSync(
+      "wsl.exe",
+      [
+        ...distroArgs(distro),
+        "--exec",
+        "bash",
+        "-c",
+        `${NODE_RESOLVE_PREAMBLE}\nexport npm_config_fetch_retries=0 npm_config_fetch_timeout=15000\nnpm ping --loglevel error >/dev/null`,
+      ],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 20000,
+      },
+    );
+    return true;
+  } catch (error) {
+    const detail = formatExecFileSyncError(error);
+    if (detail) {
+      console.error(
+        `[desktop] WSL npm registry check failed${distro ? ` for ${distro}` : ""}: ${detail}`,
+      );
+    }
+    return false;
+  }
+}
+
 /**
  * Install the server bundle into a WSL distro's ~/.t3/server/ directory.
  * Copies the built server dist from the Windows host into WSL.
@@ -235,26 +293,61 @@ export function isNodeAvailableInWsl(distro?: string): boolean {
 export function installServerInWsl(hostServerDir: string, distro?: string): boolean {
   if (process.platform !== "win32") return false;
 
+  if (!canReachNpmRegistryInWsl(distro)) {
+    return false;
+  }
+
   const wslServerDir = `$HOME/${WSL_SERVER_DIR}`;
   const wslHostPath = windowsToWslPath(hostServerDir, distro);
 
-  // Create target directory and copy server files
   const script = [
-    `mkdir -p "${wslServerDir}/apps/server"`,
-    `cp -r "${wslHostPath}/apps/server/dist" "${wslServerDir}/apps/server/dist"`,
-    // Copy package.json and node_modules if they exist
-    `[ -f "${wslHostPath}/apps/server/package.json" ] && cp "${wslHostPath}/apps/server/package.json" "${wslServerDir}/apps/server/"`,
-    `[ -d "${wslHostPath}/node_modules" ] && cp -r "${wslHostPath}/node_modules" "${wslServerDir}/node_modules"`,
-    `[ -f "${wslHostPath}/package.json" ] && cp "${wslHostPath}/package.json" "${wslServerDir}/"`,
-  ].join(" && ");
+    "set -euo pipefail",
+    NODE_RESOLVE_PREAMBLE,
+    'src="$1"',
+    `target="${wslServerDir}"`,
+    `fingerprint_file="${wslServerDir}/${WSL_SERVER_FINGERPRINT_FILE}"`,
+    'fingerprint="$(cat "$src/.wsl-bundle-fingerprint")"',
+    'installed_fingerprint=""',
+    'if [ -f "$fingerprint_file" ]; then',
+    '  installed_fingerprint="$(cat "$fingerprint_file")"',
+    "fi",
+    'if [ "$installed_fingerprint" = "$fingerprint" ] && [ -f "$target/apps/server/dist/bin.mjs" ]; then',
+    "  exit 0",
+    "fi",
+    'tmp="${target}.tmp.$$"',
+    'prev="${target}.prev"',
+    'rm -rf "$tmp" "$prev"',
+    'mkdir -p "$tmp/apps/server"',
+    'cp -R "$src/apps/server/dist" "$tmp/apps/server/"',
+    'cp "$src/apps/server/package.json" "$tmp/apps/server/package.json"',
+    'cd "$tmp/apps/server"',
+    "export npm_config_fetch_retries=1 npm_config_fetch_timeout=30000",
+    "npm install --omit=dev --no-package-lock --no-audit --no-fund",
+    `printf '%s\n' "$fingerprint" > "$tmp/${WSL_SERVER_FINGERPRINT_FILE}"`,
+    'if [ -d "$target" ]; then',
+    '  mv "$target" "$prev"',
+    "fi",
+    'mv "$tmp" "$target"',
+    'rm -rf "$prev"',
+  ].join("\n");
 
   try {
-    ChildProcess.execFileSync("wsl.exe", [...distroArgs(distro), "--exec", "bash", "-c", script], {
-      stdio: "ignore",
-      timeout: 120000,
-    });
-    return true;
-  } catch {
+    ChildProcess.execFileSync(
+      "wsl.exe",
+      [...distroArgs(distro), "--exec", "bash", "-c", script, "bash", wslHostPath],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 180000,
+      },
+    );
+    return isServerInstalledInWsl(distro);
+  } catch (error) {
+    const detail = formatExecFileSyncError(error);
+    if (detail) {
+      console.error(
+        `[desktop] Failed to install WSL server bundle${distro ? ` for ${distro}` : ""}: ${detail}`,
+      );
+    }
     return false;
   }
 }
@@ -264,6 +357,10 @@ export function installServerInWsl(hostServerDir: string, distro?: string): bool
 export interface WslBackendTargetOptions {
   /** WSL distro name (defaults to the default distro) */
   readonly distro?: string;
+  /** Staged Windows-side server bundle that can be copied into WSL */
+  readonly installSourceRoot?: string;
+  /** Fingerprint for the staged server bundle */
+  readonly installFingerprint?: string;
 }
 
 /**
@@ -281,13 +378,42 @@ export interface WslBackendTargetOptions {
 export class WslBackendTarget implements BackendTarget {
   readonly type = "wsl" as const;
   readonly distro: string | undefined;
+  readonly installSourceRoot: string | undefined;
+  readonly installFingerprint: string | undefined;
 
   constructor(options?: WslBackendTargetOptions) {
     this.distro = options?.distro;
+    this.installSourceRoot = options?.installSourceRoot;
+    this.installFingerprint = options?.installFingerprint;
   }
 
   get displayLabel(): string {
     return this.distro ? `WSL (${this.distro})` : "WSL";
+  }
+
+  ensureReady(): boolean {
+    if (!isWslAvailable()) return false;
+
+    const distro = this.distro ?? getDefaultWslDistro();
+    if (!distro) return false;
+    if (!isNodeAvailableInWsl(distro)) return false;
+
+    const serverInstalled = isServerInstalledInWsl(distro);
+    if (serverInstalled) {
+      if (!this.installFingerprint) {
+        return true;
+      }
+      const installedFingerprint = readInstalledWslServerFingerprint(distro);
+      if (installedFingerprint === this.installFingerprint) {
+        return true;
+      }
+    }
+
+    if (!this.installSourceRoot) {
+      return false;
+    }
+
+    return installServerInWsl(this.installSourceRoot, distro);
   }
 
   spawn(
@@ -343,7 +469,12 @@ export class WslBackendTarget implements BackendTarget {
     const distro = this.distro ?? getDefaultWslDistro();
     if (!distro) return false;
     if (!isNodeAvailableInWsl(distro)) return false;
-    return isServerInstalledInWsl(distro);
+    if (!isServerInstalledInWsl(distro)) {
+      return false;
+    }
+    return this.installFingerprint
+      ? readInstalledWslServerFingerprint(distro) === this.installFingerprint
+      : true;
   }
 }
 

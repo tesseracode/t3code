@@ -45,6 +45,11 @@ export interface BackendTarget {
   /** Human-readable label for UI display */
   readonly displayLabel: string;
   /**
+   * Prepare the target for startup, performing any one-time setup required
+   * before the backend process can be spawned.
+   */
+  ensureReady(): boolean;
+  /**
    * Spawn the backend server process.
    * The caller is responsible for event handling (error, exit, readiness detection).
    */
@@ -99,6 +104,10 @@ export class LocalBackendTarget implements BackendTarget {
   readonly type = "local" as const;
   readonly displayLabel = "Local";
 
+  ensureReady(): boolean {
+    return this.isAvailable();
+  }
+
   spawn(
     config: BackendBootstrapConfig,
     options: {
@@ -147,6 +156,7 @@ import {
   getDefaultWslDistro,
   isNodeAvailableInWsl,
 } from "./wslBackendTarget.ts";
+import { prepareWslServerBundle } from "./wslServerBundle.ts";
 
 /**
  * Create the default backend target.
@@ -159,9 +169,16 @@ export function createDefaultBackendTarget(): BackendTarget {
   if (process.platform === "win32" && isWslAvailable()) {
     const distro = getDefaultWslDistro();
     if (distro && isNodeAvailableInWsl(distro)) {
-      const wsl = new WslBackendTarget({ distro });
-      if (wsl.isAvailable()) {
-        return wsl;
+      const bundle = prepareWslServerBundle({
+        appRoot: resolveAppRoot(),
+        cacheRoot: Path.join(OS.homedir(), ".t3", "wsl-server-bundles"),
+      });
+      if (bundle) {
+        return new WslBackendTarget({
+          distro,
+          installSourceRoot: bundle.hostPath,
+          installFingerprint: bundle.fingerprint,
+        });
       }
     }
   }

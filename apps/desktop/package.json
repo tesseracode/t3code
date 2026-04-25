@@ -12,6 +12,7 @@
     "start": "node scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
+    "test:wsl-support": "vitest run --passWithNoTests src/backendEnvironment.test.ts src/wslBackendTarget.test.ts src/wslServerBundle.test.ts",
     "smoke-test": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
