@@ -297,7 +297,7 @@ export class WslBackendTarget implements BackendTarget {
       readonly captureOutput: boolean;
     },
   ): BackendSpawnResult {
-    const serverEntry = `$HOME/${WSL_SERVER_DIR}/apps/server/dist/bin.mjs`;
+    const serverEntryRelative = `${WSL_SERVER_DIR}/apps/server/dist/bin.mjs`;
 
     // Translate t3Home to WSL path
     const wslT3Home = windowsToWslPath(config.t3Home, this.distro);
@@ -307,7 +307,8 @@ export class WslBackendTarget implements BackendTarget {
     };
 
     // fd 3 pipe doesn't work across wsl.exe — use --bootstrap-json instead.
-    // Dynamic values passed as positional args to avoid shell injection.
+    // Keep the server entry path inside the bash script so `$HOME` expands in
+    // the WSL shell rather than being passed to Node as a literal string.
     const bootstrapJson = JSON.stringify(wslConfig);
 
     const child = ChildProcess.spawn(
@@ -317,10 +318,9 @@ export class WslBackendTarget implements BackendTarget {
         "--exec",
         "bash",
         "-c",
-        // $1 = serverEntry, $2 = bootstrapJson (passed as positional args below)
-        `${NODE_RESOLVE_PREAMBLE}\nexec node "$1" --bootstrap-json "$2"`,
+        // $1 = bootstrapJson (passed as a positional arg below)
+        `${NODE_RESOLVE_PREAMBLE}\nexec node "$HOME/${serverEntryRelative}" --bootstrap-json "$1"`,
         "bash", // $0
-        serverEntry,
         bootstrapJson,
       ],
       {

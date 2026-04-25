@@ -76,6 +76,16 @@ const HANDLED_TURN_START_KEY_MAX = 10_000;
 const HANDLED_TURN_START_KEY_TTL = Duration.minutes(30);
 const DEFAULT_RUNTIME_MODE: RuntimeMode = "full-access";
 const DEFAULT_THREAD_TITLE = "New thread";
+const AUTO_TEXT_GENERATION_PROVIDERS = new Set<ProviderKind>([
+  "codex",
+  "claudeAgent",
+  "cursor",
+  "opencode",
+]);
+
+function supportsAutoTextGenerationProvider(provider: ProviderKind): boolean {
+  return AUTO_TEXT_GENERATION_PROVIDERS.has(provider);
+}
 
 function canReplaceThreadTitle(currentTitle: string, titleSeed?: string): boolean {
   const trimmedCurrentTitle = currentTitle.trim();
@@ -467,6 +477,9 @@ const make = Effect.gen(function* () {
     yield* Effect.gen(function* () {
       const { textGenerationModelSelection: modelSelection } =
         yield* serverSettingsService.getSettings;
+      if (!supportsAutoTextGenerationProvider(modelSelection.provider)) {
+        return;
+      }
 
       const generated = yield* textGeneration.generateBranchName({
         cwd,
@@ -512,6 +525,9 @@ const make = Effect.gen(function* () {
       yield* Effect.gen(function* () {
         const { textGenerationModelSelection: modelSelection } =
           yield* serverSettingsService.getSettings;
+        if (!supportsAutoTextGenerationProvider(modelSelection.provider)) {
+          return;
+        }
 
         const generated = yield* textGeneration.generateThreadTitle({
           cwd: input.cwd,
