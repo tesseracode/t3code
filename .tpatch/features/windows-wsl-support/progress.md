@@ -27,6 +27,7 @@
 - Multiple concurrent WSL environments must not share the same `t3Home` / server `baseDir`; otherwise they collide on sqlite state, logs, and persisted `environmentId`.
 - Draft reuse and new-thread routing must stay bound to the physical `projectRef` (`environmentId + projectId`), not just a logical repo grouping, once the same repo can exist in local and WSL environments.
 - Add-project UX needs to follow the selected environment's path rules. Linux-targeted entry can accept pasted `\\wsl.localhost\...` UNC paths, but the visible placeholder should stay Linux-style.
+- Copilot SDK runtime changes and the Windows-specific CLI resolver bug are tracked separately in `upgrade-github-copilot-sdk-to-0-3-0-adapt-the-copilot`; this feature keeps only the environment-management work.
 - `bun run test` is not a safe default `test_command` on Windows right now because the unrelated `scripts/mock-update-server.test.ts` symlink case fails with `EPERM`.
 - The failing symlink test comes from upstream commit `8dba2d64` (`Adopt Node-native TypeScript for desktop and server (#2098)`), which is present on both `main` and `origin/main`.
 
@@ -51,6 +52,9 @@
 - [x] WSL bundle staging + Linux-side dependency install wired into desktop startup
 - [x] Focused desktop coverage added for WSL bundle staging, stale fingerprint reinstall, and npm-registry failure fast path
 - [x] Added desktop-side managed environment scaffolding with isolated server base dirs for local and per-distro WSL targets
+- [x] Desktop IPC exposes managed-environment listing and registration preparation for local and WSL targets
+- [x] Saved environment persistence retains desktop-managed metadata and encrypted credentials
+- [x] Server runtime/settings/keybindings/provider cache writes use unique temp paths so concurrent persistence does not collide
 - [x] All WSL commands use `execFileSync` (no shell interpolation)
 - [x] All WSL commands use `--exec` (bypass default shell variable expansion)
 - [x] `bash -c` with positional args for safe JSON passing (no shell injection)
@@ -66,7 +70,7 @@
 - [ ] Project and thread creation flow chooses `environmentId` instead of relying on one global backend target
 - [ ] Project-to-target routing based on path prefix and explicit environment selection
 - [ ] Define whether opening a WSL folder should reuse the current window or open a separate window; separate window is optional UX, not the core routing model
-- [ ] Give each managed server instance an isolated `baseDir` so local + WSL + multi-WSL can coexist safely
+- [x] Give each managed server instance an isolated `baseDir` so local + WSL + multi-WSL can coexist safely
 - [ ] Distro picker UI
 
 ## Test Command Assessment
@@ -83,6 +87,6 @@
 - [x] Record patch
 - [x] Generate recipe: `node .tpatch/tools/generate-recipe.cjs windows-wsl-support <base> HEAD`
 - [x] Verify patch scope (no pollution)
-- [ ] Update spec.md with implementation findings
+- [x] Update spec.md with implementation findings
 - [x] Capture takeover workflow case study
 - [x] Commit tpatch metadata

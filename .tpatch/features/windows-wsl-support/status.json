@@ -1,13 +1,13 @@
 {
   "id": "windows-wsl-support",
   "slug": "windows-wsl-support",
-  "title": "Add Windows and WSL support for T3 Code. Support running projects from both Windows filesystem and WSL distros in the same instance. Research dual-server architecture (Windows server + WSL server) for cross-boundary project support. Includes: WSL distro detection, wsl.exe server spawning, wslpath translation, auto-install of server binary inside WSL, and native file watching via inotify. Also fix Copilot SDK binary resolution on Windows.",
+  "title": "Add Windows and WSL support for T3 Code. Support running projects from both Windows filesystem and WSL distros in the same desktop instance, with desktop-managed environment registration, isolated per-environment state, wsl.exe server spawning, wslpath translation, auto-install of the server binary inside WSL, and native file watching via inotify.",
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-04-22T04:27:24Z",
-  "updated_at": "2026-04-25T07:31:58Z",
+  "updated_at": "2026-04-25T21:06:04Z",
   "last_command": "record",
-  "notes": "Patch recorded",
+  "notes": "Artifacts regenerated from a scoped temp-index snapshot so untracked WSL feature files are included in the replay patch and recipe",
   "apply": {
     "completed_at": "2026-04-25T07:30:50Z",
     "base_commit": "c2a3500df1def613d30720116ac54ce6a6d289b4",

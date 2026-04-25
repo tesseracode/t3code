@@ -125,9 +125,52 @@ The recorded `post-apply.patch` contained the correct 18 feature files from the 
 
 **Implication:** for takeover work on a dirty branch, you must verify both the patch headers and the summary output.
 
+### C. GitHub Copilot SDK 0.3.0 introduced a cross-platform protocol break
+
+The permission approval flow changed in `@github/copilot-sdk@0.3.0`. The public package-root typings still looked close to the older `PermissionRequest` / `PermissionRequestResult` contract, but the runtime behavior required a different approval shape.
+
+**Implication:** this was not just a Windows problem. Any instance upgrading to 0.3.0 would need adapter-side compatibility work unless the upstream integration already handled the newer approval protocol.
+
+### D. The Windows bug was real, but it was only one piece of the failure
+
+The Windows-specific issue was Bun/Electron CLI resolution to the actual `copilot.exe` binary. That bug happened in the same session as the SDK upgrade break, which made it tempting to record both under the Windows feature.
+
+**Implication:** proximity during debugging is not a valid feature boundary. One problem was platform-specific path resolution, while the other was a cross-platform SDK contract change.
+
+### E. Highest-numbered replay patches must be treated as authoritative artifacts
+
+This repo treats the highest-numbered patch in a feature's patch stack as the replay artifact that matters. That means a polluted or partial final patch is not just messy documentation; it is a broken reconstruction mechanism.
+
+**Implication:** if a feature is being repaired after the fact, it is often safer to regenerate the final patch from an explicit scoped diff than to trust the existing patch sequence.
+
+### F. Untracked feature files can silently disappear from replay metadata
+
+The earlier scoped-diff regeneration fixed dirty-tree pollution, but it still missed new files that were not yet tracked by git. In this takeover, that meant the WSL replay metadata initially omitted `backendTarget.test.ts` and `atomicFile.ts`, and the SDK replay metadata initially omitted the new Copilot regression tests.
+
+**Implication:** a `git stash create` snapshot is not enough when the feature still has untracked files. The safer repair workflow is a temporary index seeded from `HEAD`, then `git add --all -- <explicit feature file list>`, then diff the feature base commit against the synthetic tree. That preserves scoped replay artifacts without staging or stashing the entire dirty branch.
+
+## 6. Splitting a Bug Across Multiple Already-Applied Features
+
+This takeover turned into a feature-boundary correction exercise, not just a patch-recording exercise.
+
+At first glance, the Windows failure looked like it belonged entirely to `windows-wsl-support` because the visible symptom was local Copilot startup on Windows. After tracing the actual changes, the split was clearer:
+
+- `windows-wsl-support` owns the desktop-managed environment work: local-primary registration, WSL target plumbing, environment routing, and the UI/runtime glue needed to make Windows and WSL coexist predictably.
+- `upgrade-github-copilot-sdk-to-0-3-0-adapt-the-copilot` owns the SDK 0.3.0 upgrade, the permission-protocol adapter changes, the Windows Bun/Electron CLI resolution fix, and the build-time Copilot package version alignment.
+
+The difficult part is that both features were already effectively in flight, and one of them was already marked `applied`. That changes the workflow:
+
+- you cannot rely on the state machine alone to tell the historical truth
+- you have to correct the feature contract and metadata after discovering the better boundary
+- you may need to regenerate cumulative replay artifacts so the highest-numbered patch reconstructs the feature on its own
+
+In practice, that meant re-scoping the WSL artifacts, creating a brand-new feature for the SDK upgrade, and regenerating the final patch and recipe for each feature separately.
+
+This is the main takeover lesson: fixing a bug in an already-applied feature is often less about changing code and more about restoring truthful patch history.
+
 ---
 
-## 6. Recommended Takeover Workflow
+## 7. Recommended Takeover Workflow
 
 For a feature that is already started or partially recorded, the best workflow is:
 
@@ -139,14 +182,15 @@ For a feature that is already started or partially recorded, the best workflow i
 6. `tpatch record <slug> --from <feature-commit>~1`
 7. generate the recipe from the same commit range
 8. compare patch headers against `git diff --name-only <feature-commit>~1..HEAD`
-9. correct any polluted summaries
-10. commit only the tpatch metadata
+9. if the work actually spans multiple features, split the file lists and regenerate each feature's final replay patch separately
+10. correct any polluted summaries or stale feature descriptions
+11. commit only the tpatch metadata
 
 This is close to the user's proposed methodology, but stricter about respecting the existing feature state and stricter about verifying summary pollution.
 
 ---
 
-## 7. Overall Evaluation
+## 8. Overall Evaluation
 
 The proposed methodology and the skill describe the same underlying Path B workflow, but at different levels of rigor.
 
@@ -154,5 +198,6 @@ The proposed methodology and the skill describe the same underlying Path B workf
 - The skill is better about state discipline because it forces `status` / `next` before action.
 - The repo's generate-recipe step remains necessary and useful; it fills a real Path B gap.
 - For already-applied features, the safest hybrid is: **skill-first state check, proposed-flow commit boundary, then record/generate/metadata commit**.
+- When a debugging session uncovers both platform-specific fixes and cross-platform dependency-adaptation work, the correct response is usually feature separation, not one oversized retrospective patch.
 
 That hybrid is the best match for incomplete features that are resumed later on a branch with unrelated churn.
