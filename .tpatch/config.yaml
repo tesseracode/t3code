@@ -11,5 +11,7 @@ merge_strategy: 3way
 # Max LLM validation retries when output fails to parse (0 disables retry)
 max_retries: 2
 
-# Shell command run by `tpatch test <slug>` (e.g. "go test ./...", "bun test")
-test_command: ""
+# Shell command run by `tpatch test <slug>`.
+# This is intentionally feature-scoped for windows-wsl-support because the full
+# workspace suite currently fails on an unrelated Windows symlink test.
+test_command: "bun run test:windows-wsl-support"
