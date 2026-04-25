@@ -10,6 +10,7 @@ vi.mock("node:child_process", () => ({
   spawn: spawnMock,
 }));
 
+import type { BackendBootstrapConfig } from "./backendTarget.ts";
 import {
   canReachNpmRegistryInWsl,
   installServerInWsl,
@@ -18,6 +19,14 @@ import {
 } from "./wslBackendTarget.ts";
 
 const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+const TEST_BOOTSTRAP_CONFIG: BackendBootstrapConfig = {
+  mode: "desktop",
+  noBrowser: true,
+  port: 3210,
+  t3Home: "C:\\Users\\test\\.t3",
+  host: "127.0.0.1",
+  desktopBootstrapToken: "bootstrap-token",
+};
 
 function setPlatform(platform: NodeJS.Platform): void {
   Object.defineProperty(process, "platform", {
@@ -159,5 +168,26 @@ describe("wslBackendTarget", () => {
           args.some((value) => typeof value === "string" && value.includes("npm install")),
       ),
     ).toBe(true);
+  });
+
+  it("hides the spawned WSL console window", () => {
+    execFileSyncMock.mockReturnValue("/mnt/c/Users/test/.t3\n");
+    spawnMock.mockReturnValue({ pid: 1234 });
+
+    const target = new WslBackendTarget({ distro: "Ubuntu-24.04" });
+
+    target.spawn(TEST_BOOTSTRAP_CONFIG, {
+      env: {},
+      captureOutput: true,
+    });
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      "wsl.exe",
+      expect.any(Array),
+      expect.objectContaining({
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      }),
+    );
   });
 });

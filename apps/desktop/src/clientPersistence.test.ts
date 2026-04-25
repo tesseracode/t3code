@@ -87,6 +87,21 @@ describe("clientPersistence", () => {
     expect(readSavedEnvironmentRegistry(registryPath)).toEqual([savedRegistryRecord]);
   });
 
+  it("preserves desktop-managed saved environment metadata", () => {
+    const registryPath = makeTempPath("saved-environments.json");
+    const managedRecord: PersistedSavedEnvironmentRecord = {
+      ...savedRegistryRecord,
+      management: {
+        kind: "desktop-managed",
+        environmentKey: "wsl:Ubuntu-24.04",
+      },
+    };
+
+    writeSavedEnvironmentRegistry(registryPath, [managedRecord]);
+
+    expect(readSavedEnvironmentRegistry(registryPath)).toEqual([managedRecord]);
+  });
+
   it("persists encrypted saved environment secrets when encryption is available", () => {
     const registryPath = makeTempPath("saved-environments.json");
     const secretStorage = makeSecretStorage(true);

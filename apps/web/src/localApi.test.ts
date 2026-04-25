@@ -164,6 +164,10 @@ function makeDesktopBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridg
     getLocalEnvironmentBootstrap: () => null,
     getClientSettings: async () => null,
     setClientSettings: async () => undefined,
+    listManagedEnvironments: async () => [],
+    prepareManagedEnvironmentRegistration: async () => {
+      throw new Error("prepareManagedEnvironmentRegistration not implemented in test");
+    },
     getSavedEnvironmentRegistry: async () => [],
     setSavedEnvironmentRegistry: async () => undefined,
     getSavedEnvironmentSecret: async () => null,

@@ -288,6 +288,10 @@ const createDesktopBridgeStub = (overrides?: {
     }),
     getClientSettings: vi.fn().mockResolvedValue(null),
     setClientSettings: vi.fn().mockResolvedValue(undefined),
+    listManagedEnvironments: vi.fn().mockResolvedValue([]),
+    prepareManagedEnvironmentRegistration: vi.fn().mockImplementation(async () => {
+      throw new Error("Managed environment registration is not implemented in this story.");
+    }),
     getSavedEnvironmentRegistry: vi.fn().mockResolvedValue([]),
     setSavedEnvironmentRegistry: vi.fn().mockResolvedValue(undefined),
     getSavedEnvironmentSecret: vi.fn().mockResolvedValue(null),

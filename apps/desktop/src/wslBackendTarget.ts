@@ -451,6 +451,7 @@ export class WslBackendTarget implements BackendTarget {
       ],
       {
         env: options.env,
+        windowsHide: true,
         stdio: options.captureOutput
           ? ["ignore", "pipe", "pipe"]
           : ["ignore", "inherit", "inherit"],

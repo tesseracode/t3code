@@ -5,6 +5,7 @@
  */
 import type { ProviderKind, ServerProvider } from "@t3tools/contracts";
 import { Effect, Equal, FileSystem, Layer, Path, PubSub, Ref, Stream } from "effect";
+import * as Semaphore from "effect/Semaphore";
 
 import { ServerConfig } from "../../config.ts";
 import { ClaudeProviderLive } from "./ClaudeProvider.ts";
@@ -153,6 +154,7 @@ const ProviderRegistryLiveBase = Layer.effect(
     const fallbackByProvider = new Map(
       fallbackProviders.map((provider) => [provider.provider, provider] as const),
     );
+    const persistSemaphore = yield* Semaphore.make(1);
 
     const cachedProviders = yield* Effect.forEach(
       activeProviders,
@@ -182,14 +184,16 @@ const ProviderRegistryLiveBase = Layer.effect(
     const providersRef = yield* Ref.make<ReadonlyArray<ServerProvider>>(cachedProviders);
 
     const persistProvider = (provider: ServerProvider) =>
-      writeProviderStatusCache({
-        filePath: cachePathByProvider.get(provider.provider)!,
-        provider,
-      }).pipe(
-        Effect.provideService(FileSystem.FileSystem, fileSystem),
-        Effect.provideService(Path.Path, path),
-        Effect.tapError(Effect.logError),
-        Effect.ignore,
+      persistSemaphore.withPermits(1)(
+        writeProviderStatusCache({
+          filePath: cachePathByProvider.get(provider.provider)!,
+          provider,
+        }).pipe(
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+          Effect.provideService(Path.Path, path),
+          Effect.tapError(Effect.logError),
+          Effect.ignore,
+        ),
       );
 
     const upsertProviders = Effect.fn("upsertProviders")(function* (

@@ -23,6 +23,8 @@ import type {
   ClientSettings,
   DesktopTheme,
   DesktopAppBranding,
+  DesktopManagedEnvironmentCandidate,
+  DesktopManagedEnvironmentRegistration,
   DesktopServerExposureMode,
   DesktopServerExposureState,
   DesktopUpdateChannel,
@@ -99,6 +101,9 @@ const GET_APP_BRANDING_CHANNEL = "desktop:get-app-branding";
 const GET_LOCAL_ENVIRONMENT_BOOTSTRAP_CHANNEL = "desktop:get-local-environment-bootstrap";
 const GET_CLIENT_SETTINGS_CHANNEL = "desktop:get-client-settings";
 const SET_CLIENT_SETTINGS_CHANNEL = "desktop:set-client-settings";
+const LIST_MANAGED_ENVIRONMENTS_CHANNEL = "desktop:list-managed-environments";
+const PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL =
+  "desktop:prepare-managed-environment-registration";
 const GET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL = "desktop:get-saved-environment-registry";
 const SET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL = "desktop:set-saved-environment-registry";
 const GET_SAVED_ENVIRONMENT_SECRET_CHANNEL = "desktop:get-saved-environment-secret";
@@ -205,6 +210,20 @@ type LinuxDesktopNamedApp = Electron.App & {
   setDesktopName?: (desktopName: string) => void;
 };
 
+interface ManagedBackendRuntime {
+  readonly environment: ManagedBackendEnvironment;
+  child: ChildProcess.ChildProcess | null;
+  port: number | null;
+  bootstrapToken: string | null;
+  httpBaseUrl: string | null;
+  wsBaseUrl: string | null;
+  startPromise: Promise<DesktopManagedEnvironmentRegistration> | null;
+  listeningDetector: ServerListeningDetector | null;
+  restartAttempt: number;
+  restartTimer: ReturnType<typeof setTimeout> | null;
+  expectedExit: boolean;
+}
+
 let mainWindow: BrowserWindow | null = null;
 let backendProcess: ChildProcess.ChildProcess | null = null;
 let backendPort = 0;
@@ -216,16 +235,17 @@ let backendEndpointUrl: string | null = null;
 let backendAdvertisedHost: string | null = null;
 let backendReadinessAbortController: AbortController | null = null;
 let backendInitialWindowOpenInFlight: Promise<void> | null = null;
-const primaryBackendEnvironment: ManagedBackendEnvironment = createDefaultBackendEnvironmentManager(
-  {
-    rootBaseDir: BASE_DIR,
-    appRoot: ROOT_DIR,
-  },
-).primaryEnvironment;
+const backendEnvironmentManager = createDefaultBackendEnvironmentManager({
+  rootBaseDir: BASE_DIR,
+  appRoot: ROOT_DIR,
+});
+const primaryBackendEnvironment: ManagedBackendEnvironment =
+  backendEnvironmentManager.primaryEnvironment;
 const backendTarget: BackendTarget = primaryBackendEnvironment.target;
 let backendListeningDetector: ServerListeningDetector | null = null;
 let restartAttempt = 0;
 let restartTimer: ReturnType<typeof setTimeout> | null = null;
+const managedBackendRuntimes = new Map<string, ManagedBackendRuntime>();
 let isQuitting = false;
 let desktopProtocolRegistered = false;
 let aboutCommitHashCache: string | null | undefined;
@@ -591,17 +611,369 @@ function initializePackagedLogging(): void {
   }
 }
 
-function captureBackendOutput(child: ChildProcess.ChildProcess): void {
+function captureBackendOutput(
+  child: ChildProcess.ChildProcess,
+  listeningDetector?: ServerListeningDetector | null,
+): void {
   const attachStream = (stream: NodeJS.ReadableStream | null | undefined): void => {
     stream?.on("data", (chunk: unknown) => {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
       backendLogSink?.write(buffer);
-      backendListeningDetector?.push(buffer);
+      (listeningDetector ?? backendListeningDetector)?.push(buffer);
     });
   };
 
   attachStream(child.stdout);
   attachStream(child.stderr);
+}
+
+function listManagedBackendEnvironments(): readonly ManagedBackendEnvironment[] {
+  return backendEnvironmentManager
+    .listEnvironments()
+    .filter((environment) => environment.key !== primaryBackendEnvironment.key);
+}
+
+function toDesktopManagedEnvironmentCandidate(
+  environment: ManagedBackendEnvironment,
+): DesktopManagedEnvironmentCandidate {
+  return {
+    key: environment.key,
+    label: environment.displayLabel,
+    kind: environment.kind,
+  };
+}
+
+function requireManagedBackendEnvironment(environmentKey: string): ManagedBackendEnvironment {
+  const environment = backendEnvironmentManager.getEnvironment(environmentKey);
+  if (!environment || environment.key === primaryBackendEnvironment.key) {
+    throw new Error(`Unknown managed environment '${environmentKey}'.`);
+  }
+  return environment;
+}
+
+function getOrCreateManagedBackendRuntime(
+  environment: ManagedBackendEnvironment,
+): ManagedBackendRuntime {
+  const existing = managedBackendRuntimes.get(environment.key);
+  if (existing) {
+    return existing;
+  }
+
+  const runtime: ManagedBackendRuntime = {
+    environment,
+    child: null,
+    port: null,
+    bootstrapToken: null,
+    httpBaseUrl: null,
+    wsBaseUrl: null,
+    startPromise: null,
+    listeningDetector: null,
+    restartAttempt: 0,
+    restartTimer: null,
+    expectedExit: false,
+  };
+  managedBackendRuntimes.set(environment.key, runtime);
+  return runtime;
+}
+
+function toManagedBackendRegistration(
+  runtime: ManagedBackendRuntime,
+): DesktopManagedEnvironmentRegistration {
+  if (!runtime.httpBaseUrl || !runtime.wsBaseUrl || !runtime.bootstrapToken) {
+    throw new Error(`Managed environment '${runtime.environment.key}' is not ready.`);
+  }
+
+  return {
+    key: runtime.environment.key,
+    label: runtime.environment.displayLabel,
+    kind: runtime.environment.kind,
+    httpBaseUrl: runtime.httpBaseUrl,
+    wsBaseUrl: runtime.wsBaseUrl,
+    bootstrapToken: runtime.bootstrapToken,
+  };
+}
+
+function clearManagedBackendRestartTimer(runtime: ManagedBackendRuntime): void {
+  if (runtime.restartTimer) {
+    clearTimeout(runtime.restartTimer);
+    runtime.restartTimer = null;
+  }
+}
+
+function scheduleManagedBackendRestart(runtime: ManagedBackendRuntime, reason: string): void {
+  if (isQuitting || runtime.expectedExit || runtime.restartTimer) {
+    return;
+  }
+
+  const delayMs = Math.min(500 * 2 ** runtime.restartAttempt, 10_000);
+  runtime.restartAttempt += 1;
+  writeDesktopLogHeader(
+    `managed backend exited unexpectedly key=${runtime.environment.key} reason=${sanitizeLogValue(reason)} restartMs=${delayMs}`,
+  );
+
+  runtime.restartTimer = setTimeout(() => {
+    runtime.restartTimer = null;
+    void ensureManagedBackendEnvironmentRegistration(runtime.environment.key).catch((error) => {
+      writeDesktopLogHeader(
+        `managed backend restart failed key=${runtime.environment.key} message=${sanitizeLogValue(formatErrorMessage(error))}`,
+      );
+    });
+  }, delayMs);
+}
+
+function stopManagedBackendEnvironment(environmentKey: string): void {
+  const runtime = managedBackendRuntimes.get(environmentKey);
+  if (!runtime) {
+    return;
+  }
+
+  clearManagedBackendRestartTimer(runtime);
+  runtime.expectedExit = true;
+  runtime.listeningDetector = null;
+
+  const child = runtime.child;
+  runtime.child = null;
+  runtime.startPromise = null;
+  managedBackendRuntimes.delete(environmentKey);
+
+  if (!child) {
+    return;
+  }
+
+  if (child.exitCode === null && child.signalCode === null) {
+    expectedBackendExitChildren.add(child);
+    child.kill("SIGTERM");
+    setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL");
+      }
+    }, 2_000).unref();
+  }
+}
+
+function stopManagedBackendEnvironments(): void {
+  for (const environmentKey of managedBackendRuntimes.keys()) {
+    stopManagedBackendEnvironment(environmentKey);
+  }
+}
+
+async function startManagedBackendRuntime(
+  runtime: ManagedBackendRuntime,
+): Promise<DesktopManagedEnvironmentRegistration> {
+  clearManagedBackendRestartTimer(runtime);
+
+  if (!runtime.environment.target.ensureReady()) {
+    throw new Error(
+      `Managed backend target '${runtime.environment.displayLabel}' is not available.`,
+    );
+  }
+
+  const preferredPort = runtime.port ?? Math.max(DEFAULT_DESKTOP_BACKEND_PORT + 1, backendPort + 1);
+  const port = await resolveDesktopBackendPort({
+    host: DESKTOP_LOOPBACK_HOST,
+    startPort: preferredPort,
+  });
+
+  runtime.port = port;
+  if (runtime.expectedExit) {
+    throw new Error("Managed backend start canceled.");
+  }
+  runtime.bootstrapToken = Crypto.randomBytes(24).toString("hex");
+  runtime.httpBaseUrl = `http://${DESKTOP_LOOPBACK_HOST}:${port}`;
+  runtime.wsBaseUrl = `ws://${DESKTOP_LOOPBACK_HOST}:${port}`;
+
+  const listeningDetector = new ServerListeningDetector();
+  runtime.listeningDetector = listeningDetector;
+
+  let child: ChildProcess.ChildProcess | null = null;
+
+  try {
+    const spawnResult = runtime.environment.target.spawn(
+      {
+        mode: "desktop",
+        noBrowser: true,
+        port,
+        t3Home: runtime.environment.baseDir,
+        host: DESKTOP_LOOPBACK_HOST,
+        desktopBootstrapToken: runtime.bootstrapToken,
+        ...(backendObservabilitySettings.otlpTracesUrl
+          ? { otlpTracesUrl: backendObservabilitySettings.otlpTracesUrl }
+          : {}),
+        ...(backendObservabilitySettings.otlpMetricsUrl
+          ? { otlpMetricsUrl: backendObservabilitySettings.otlpMetricsUrl }
+          : {}),
+      },
+      {
+        env: backendChildEnv(),
+        captureOutput: !isDevelopment,
+      },
+    );
+
+    const startedChild = spawnResult.child;
+    child = startedChild;
+    if (!spawnResult.bootstrapDelivered) {
+      startedChild.kill("SIGTERM");
+      throw new Error("Failed to deliver managed backend bootstrap config.");
+    }
+
+    runtime.child = startedChild;
+    captureBackendOutput(startedChild, listeningDetector);
+    writeDesktopLogHeader(
+      `managed backend start requested key=${runtime.environment.key} port=${port} target=${runtime.environment.displayLabel}`,
+    );
+
+    startedChild.once("spawn", () => {
+      runtime.restartAttempt = 0;
+    });
+
+    startedChild.on("error", (error) => {
+      if (runtime.listeningDetector === listeningDetector) {
+        listeningDetector.fail(error);
+        runtime.listeningDetector = null;
+      }
+      const wasExpected = runtime.expectedExit || expectedBackendExitChildren.has(startedChild);
+      if (runtime.child === startedChild) {
+        runtime.child = null;
+      }
+      if (wasExpected || isQuitting) {
+        return;
+      }
+      scheduleManagedBackendRestart(runtime, error.message);
+    });
+
+    startedChild.on("exit", (code, signal) => {
+      if (runtime.listeningDetector === listeningDetector) {
+        listeningDetector.fail(
+          new Error(
+            `managed backend exited before readiness (code=${code ?? "null"} signal=${signal ?? "null"})`,
+          ),
+        );
+        runtime.listeningDetector = null;
+      }
+      const wasExpected = runtime.expectedExit || expectedBackendExitChildren.has(startedChild);
+      if (runtime.child === startedChild) {
+        runtime.child = null;
+      }
+      if (wasExpected || isQuitting) {
+        return;
+      }
+      scheduleManagedBackendRestart(runtime, `code=${code ?? "null"} signal=${signal ?? "null"}`);
+    });
+
+    await waitForBackendStartupReady({
+      listeningPromise: listeningDetector.promise,
+      waitForHttpReady: () =>
+        waitForHttpReady(runtime.httpBaseUrl ?? `http://${DESKTOP_LOOPBACK_HOST}:${port}`, {
+          timeoutMs: 60_000,
+        }),
+      cancelHttpWait: () => undefined,
+    });
+
+    runtime.listeningDetector = null;
+    if (runtime.expectedExit) {
+      throw new Error("Managed backend start canceled.");
+    }
+    writeDesktopLogHeader(
+      `managed backend ready key=${runtime.environment.key} baseUrl=${runtime.httpBaseUrl}`,
+    );
+    return toManagedBackendRegistration(runtime);
+  } catch (error) {
+    runtime.listeningDetector = null;
+    if (runtime.child === child) {
+      runtime.child = null;
+    }
+    if (child && child.exitCode === null && child.signalCode === null) {
+      const failedChild = child;
+      runtime.expectedExit = true;
+      expectedBackendExitChildren.add(failedChild);
+      failedChild.kill("SIGTERM");
+      setTimeout(() => {
+        if (failedChild.exitCode === null && failedChild.signalCode === null) {
+          failedChild.kill("SIGKILL");
+        }
+      }, 2_000).unref();
+      runtime.expectedExit = false;
+    }
+    runtime.bootstrapToken = null;
+    runtime.httpBaseUrl = null;
+    runtime.wsBaseUrl = null;
+    throw error;
+  }
+}
+
+async function ensureManagedBackendEnvironmentRegistration(
+  environmentKey: string,
+): Promise<DesktopManagedEnvironmentRegistration> {
+  const environment = requireManagedBackendEnvironment(environmentKey);
+  const runtime = getOrCreateManagedBackendRuntime(environment);
+
+  if (runtime.startPromise) {
+    return runtime.startPromise;
+  }
+
+  if (runtime.child && runtime.httpBaseUrl && runtime.wsBaseUrl && runtime.bootstrapToken) {
+    return toManagedBackendRegistration(runtime);
+  }
+
+  const startPromise = startManagedBackendRuntime(runtime).finally(() => {
+    if (runtime.startPromise === startPromise) {
+      runtime.startPromise = null;
+    }
+  });
+  runtime.startPromise = startPromise;
+  return startPromise;
+}
+
+function syncManagedBackendsAfterRegistryWrite(
+  previousRecords: readonly PersistedSavedEnvironmentRecord[],
+  nextRecords: readonly PersistedSavedEnvironmentRecord[],
+): void {
+  const nextManagedKeys = new Set(
+    nextRecords.flatMap((record) =>
+      record.management?.kind === "desktop-managed" ? [record.management.environmentKey] : [],
+    ),
+  );
+
+  for (const record of previousRecords) {
+    if (
+      record.management?.kind === "desktop-managed" &&
+      !nextManagedKeys.has(record.management.environmentKey)
+    ) {
+      stopManagedBackendEnvironment(record.management.environmentKey);
+    }
+  }
+}
+
+async function readHydratedSavedEnvironmentRegistry(): Promise<
+  readonly PersistedSavedEnvironmentRecord[]
+> {
+  const records = readSavedEnvironmentRegistry(SAVED_ENVIRONMENT_REGISTRY_PATH);
+  const hydratedRecords: PersistedSavedEnvironmentRecord[] = [];
+
+  for (const record of records) {
+    if (record.management?.kind !== "desktop-managed") {
+      hydratedRecords.push(record);
+      continue;
+    }
+
+    try {
+      const registration = await ensureManagedBackendEnvironmentRegistration(
+        record.management.environmentKey,
+      );
+      hydratedRecords.push({
+        ...record,
+        httpBaseUrl: registration.httpBaseUrl,
+        wsBaseUrl: registration.wsBaseUrl,
+      });
+    } catch (error) {
+      writeDesktopLogHeader(
+        `managed backend hydration warning key=${record.management.environmentKey} message=${sanitizeLogValue(formatErrorMessage(error))}`,
+      );
+      hydratedRecords.push(record);
+    }
+  }
+
+  return hydratedRecords;
 }
 
 initializePackagedLogging();
@@ -1571,9 +1943,28 @@ function registerIpcHandlers(): void {
     writeClientSettings(CLIENT_SETTINGS_PATH, rawSettings as ClientSettings);
   });
 
+  ipcMain.removeHandler(LIST_MANAGED_ENVIRONMENTS_CHANNEL);
+  ipcMain.handle(LIST_MANAGED_ENVIRONMENTS_CHANNEL, async () =>
+    listManagedBackendEnvironments().map((environment) =>
+      toDesktopManagedEnvironmentCandidate(environment),
+    ),
+  );
+
+  ipcMain.removeHandler(PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL);
+  ipcMain.handle(
+    PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL,
+    async (_event, rawEnvironmentKey: unknown) => {
+      if (typeof rawEnvironmentKey !== "string" || rawEnvironmentKey.trim().length === 0) {
+        throw new Error("Invalid managed environment key.");
+      }
+
+      return ensureManagedBackendEnvironmentRegistration(rawEnvironmentKey);
+    },
+  );
+
   ipcMain.removeHandler(GET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL);
   ipcMain.handle(GET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL, async () =>
-    readSavedEnvironmentRegistry(SAVED_ENVIRONMENT_REGISTRY_PATH),
+    readHydratedSavedEnvironmentRegistry(),
   );
 
   ipcMain.removeHandler(SET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL);
@@ -1582,10 +1973,11 @@ function registerIpcHandlers(): void {
       throw new Error("Invalid saved environment registry payload.");
     }
 
-    writeSavedEnvironmentRegistry(
-      SAVED_ENVIRONMENT_REGISTRY_PATH,
-      rawRecords as readonly PersistedSavedEnvironmentRecord[],
-    );
+    const previousRecords = readSavedEnvironmentRegistry(SAVED_ENVIRONMENT_REGISTRY_PATH);
+    const nextRecords = rawRecords as readonly PersistedSavedEnvironmentRecord[];
+
+    writeSavedEnvironmentRegistry(SAVED_ENVIRONMENT_REGISTRY_PATH, nextRecords);
+    syncManagedBackendsAfterRegistryWrite(previousRecords, nextRecords);
   });
 
   ipcMain.removeHandler(GET_SAVED_ENVIRONMENT_SECRET_CHANNEL);
@@ -2100,6 +2492,7 @@ app.on("before-quit", () => {
   writeDesktopLogHeader("before-quit received");
   clearUpdatePollTimer();
   cancelBackendReadinessWait();
+  stopManagedBackendEnvironments();
   stopBackend();
   restoreStdIoCapture?.();
 });

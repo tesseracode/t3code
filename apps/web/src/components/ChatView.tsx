@@ -34,7 +34,11 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
 import { useGitStatus } from "~/lib/gitStatusState";
-import { readPrimaryEnvironmentDescriptor, usePrimaryEnvironmentId } from "../environments/primary";
+import {
+  readPrimaryEnvironmentBootstrapLabel,
+  readPrimaryEnvironmentDescriptor,
+  usePrimaryEnvironmentId,
+} from "../environments/primary";
 import { readEnvironmentApi } from "../environmentApi";
 import { isElectron } from "../env";
 import { readLocalApi } from "../localApi";
@@ -848,6 +852,8 @@ export default function ChatView(props: ChatViewProps) {
   // drive the environment picker in BranchToolbar.
   const allProjects = useStore(useShallow(selectProjectsAcrossEnvironments));
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const primaryEnvironmentLabel =
+    readPrimaryEnvironmentBootstrapLabel() ?? readPrimaryEnvironmentDescriptor()?.label ?? null;
   const savedEnvironmentRegistry = useSavedEnvironmentRegistryStore((s) => s.byId);
   const savedEnvironmentRuntimeById = useSavedEnvironmentRuntimeStore((s) => s.byId);
   const projectGroupingSettings = useSettings((settings) => ({
@@ -876,7 +882,9 @@ export default function ChatView(props: ChatViewProps) {
       const label = resolveEnvironmentOptionLabel({
         isPrimary,
         environmentId: p.environmentId,
-        runtimeLabel: runtimeState?.descriptor?.label ?? null,
+        runtimeLabel: isPrimary
+          ? primaryEnvironmentLabel
+          : (runtimeState?.descriptor?.label ?? null),
         savedLabel: savedRecord?.label ?? null,
       });
       envs.push({
@@ -896,6 +904,7 @@ export default function ChatView(props: ChatViewProps) {
     activeProject,
     allProjects,
     projectGroupingSettings,
+    primaryEnvironmentLabel,
     primaryEnvironmentId,
     savedEnvironmentRegistry,
     savedEnvironmentRuntimeById,
@@ -1049,12 +1058,13 @@ export default function ChatView(props: ChatViewProps) {
       isPrimary,
       environmentId: activeThread.environmentId,
       runtimeLabel: isPrimary
-        ? (readPrimaryEnvironmentDescriptor()?.label ?? null)
+        ? primaryEnvironmentLabel
         : (activeEnvRuntimeState?.descriptor?.label ?? null),
       savedLabel: savedEnvironmentRegistry[activeThread.environmentId]?.label ?? null,
     });
   }, [
     activeEnvRuntimeState?.descriptor?.label,
+    primaryEnvironmentLabel,
     activeThread,
     primaryEnvironmentId,
     savedEnvironmentRegistry,

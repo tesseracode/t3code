@@ -33,7 +33,11 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { useCommandPaletteStore } from "../commandPaletteStore";
 import { readEnvironmentApi } from "../environmentApi";
-import { readPrimaryEnvironmentDescriptor, usePrimaryEnvironmentId } from "../environments/primary";
+import {
+  readPrimaryEnvironmentBootstrapLabel,
+  readPrimaryEnvironmentDescriptor,
+  usePrimaryEnvironmentId,
+} from "../environments/primary";
 import {
   useSavedEnvironmentRegistryStore,
   useSavedEnvironmentRuntimeStore,
@@ -242,7 +246,8 @@ function OpenCommandPaletteDialog() {
   );
   const [isPickingProjectFolder, setIsPickingProjectFolder] = useState(false);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
-  const primaryEnvironmentLabel = readPrimaryEnvironmentDescriptor()?.label ?? null;
+  const primaryEnvironmentLabel =
+    readPrimaryEnvironmentBootstrapLabel() ?? readPrimaryEnvironmentDescriptor()?.label ?? null;
   const savedEnvironmentRegistry = useSavedEnvironmentRegistryStore((state) => state.byId);
   const savedEnvironmentRuntimeById = useSavedEnvironmentRuntimeStore((state) => state.byId);
 
@@ -921,6 +926,7 @@ function OpenCommandPaletteDialog() {
     browseEnvironmentId !== null &&
     primaryEnvironmentId !== null &&
     browseEnvironmentId === primaryEnvironmentId &&
+    isWindowsPlatform(browseEnvironmentPlatform) &&
     typeof window !== "undefined" &&
     window.desktopBridge !== undefined;
   const fileManagerInitialPath = useMemo(() => {

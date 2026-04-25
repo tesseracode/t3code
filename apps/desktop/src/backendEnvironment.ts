@@ -4,7 +4,6 @@ import * as Path from "node:path";
 import { LocalBackendTarget, type BackendTarget } from "./backendTarget.ts";
 import {
   extractWslDistroFromPath,
-  getDefaultWslDistro,
   isNodeAvailableInWsl,
   isWslAvailable,
   isWslPath,
@@ -104,9 +103,8 @@ export function createDefaultBackendEnvironmentManager(
 
   const allEnvironments = [localEnvironment, ...wslEnvironments];
   const byKey = new Map(allEnvironments.map((environment) => [environment.key, environment]));
-  const defaultDistro = getDefaultWslDistro();
-  const primaryEnvironment =
-    (defaultDistro ? byKey.get(`wsl:${defaultDistro}`) : undefined) ?? localEnvironment;
+  // Keep the desktop bootstrap local. Extra WSL environments are opt-in via Connections.
+  const primaryEnvironment = localEnvironment;
 
   return {
     primaryEnvironment,

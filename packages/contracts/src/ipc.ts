@@ -125,6 +125,13 @@ export interface DesktopEnvironmentBootstrap {
   bootstrapToken?: string;
 }
 
+export interface PersistedDesktopManagedEnvironmentMetadata {
+  kind: "desktop-managed";
+  environmentKey: string;
+}
+
+export type PersistedSavedEnvironmentManagement = PersistedDesktopManagedEnvironmentMetadata;
+
 export interface PersistedSavedEnvironmentRecord {
   environmentId: EnvironmentId;
   label: string;
@@ -132,6 +139,19 @@ export interface PersistedSavedEnvironmentRecord {
   httpBaseUrl: string;
   createdAt: string;
   lastConnectedAt: string | null;
+  management?: PersistedSavedEnvironmentManagement;
+}
+
+export interface DesktopManagedEnvironmentCandidate {
+  key: string;
+  label: string;
+  kind: "local" | "wsl";
+}
+
+export interface DesktopManagedEnvironmentRegistration extends DesktopManagedEnvironmentCandidate {
+  httpBaseUrl: string;
+  wsBaseUrl: string;
+  bootstrapToken: string;
 }
 
 export type DesktopServerExposureMode = "local-only" | "network-accessible";
@@ -151,6 +171,10 @@ export interface DesktopBridge {
   getLocalEnvironmentBootstrap: () => DesktopEnvironmentBootstrap | null;
   getClientSettings: () => Promise<ClientSettings | null>;
   setClientSettings: (settings: ClientSettings) => Promise<void>;
+  listManagedEnvironments: () => Promise<readonly DesktopManagedEnvironmentCandidate[]>;
+  prepareManagedEnvironmentRegistration: (
+    environmentKey: string,
+  ) => Promise<DesktopManagedEnvironmentRegistration>;
   getSavedEnvironmentRegistry: () => Promise<readonly PersistedSavedEnvironmentRecord[]>;
   setSavedEnvironmentRegistry: (
     records: readonly PersistedSavedEnvironmentRecord[],

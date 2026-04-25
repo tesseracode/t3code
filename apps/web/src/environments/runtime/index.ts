@@ -15,6 +15,7 @@ export {
 } from "./catalog";
 
 export {
+  addDesktopManagedEnvironment,
   addSavedEnvironment,
   disconnectSavedEnvironment,
   ensureEnvironmentConnectionBootstrapped,

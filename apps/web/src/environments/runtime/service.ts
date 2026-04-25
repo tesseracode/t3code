@@ -808,7 +808,7 @@ async function ensureSavedEnvironmentConnection(
   const knownEnvironment = createKnownEnvironment({
     id: record.environmentId,
     label: record.label,
-    source: "manual",
+    source: record.management?.kind === "desktop-managed" ? "desktop-managed" : "manual",
     target: {
       httpBaseUrl: record.httpBaseUrl,
       wsBaseUrl: record.wsBaseUrl,
@@ -944,6 +944,69 @@ export async function removeSavedEnvironment(environmentId: EnvironmentId): Prom
   await disconnectSavedEnvironment(environmentId);
 }
 
+function toPersistedSavedEnvironmentRecords(records: ReadonlyArray<SavedEnvironmentRecord>) {
+  return records.map((entry) => ({
+    environmentId: entry.environmentId,
+    label: entry.label,
+    httpBaseUrl: entry.httpBaseUrl,
+    wsBaseUrl: entry.wsBaseUrl,
+    createdAt: entry.createdAt,
+    lastConnectedAt: entry.lastConnectedAt,
+    ...(entry.management ? { management: entry.management } : {}),
+  }));
+}
+
+async function registerSavedEnvironment(input: {
+  readonly label: string;
+  readonly httpBaseUrl: string;
+  readonly wsBaseUrl: string;
+  readonly credential: string;
+  readonly management?: SavedEnvironmentRecord["management"];
+}): Promise<SavedEnvironmentRecord> {
+  const descriptor = await fetchRemoteEnvironmentDescriptor({
+    httpBaseUrl: input.httpBaseUrl,
+  });
+  const environmentId = descriptor.environmentId;
+
+  if (environmentConnections.has(environmentId) || getSavedEnvironmentRecord(environmentId)) {
+    throw new Error("This environment is already saved.");
+  }
+
+  const bearerSession = await bootstrapRemoteBearerSession({
+    httpBaseUrl: input.httpBaseUrl,
+    credential: input.credential,
+  });
+
+  const record: SavedEnvironmentRecord = {
+    environmentId,
+    label: input.label.trim() || descriptor.label,
+    wsBaseUrl: input.wsBaseUrl,
+    httpBaseUrl: input.httpBaseUrl,
+    createdAt: isoNow(),
+    lastConnectedAt: isoNow(),
+    ...(input.management ? { management: input.management } : {}),
+  };
+
+  await persistSavedEnvironmentRecord(record);
+  const didPersistBearerToken = await writeSavedEnvironmentBearerToken(
+    environmentId,
+    bearerSession.sessionToken,
+  );
+  if (!didPersistBearerToken) {
+    await ensureLocalApi().persistence.setSavedEnvironmentRegistry(
+      toPersistedSavedEnvironmentRecords(listSavedEnvironmentRecords()),
+    );
+    throw new Error("Unable to persist saved environment credentials.");
+  }
+
+  await ensureSavedEnvironmentConnection(record, {
+    bearerToken: bearerSession.sessionToken,
+    role: bearerSession.role,
+  });
+  useSavedEnvironmentRegistryStore.getState().upsert(record);
+  return record;
+}
+
 export async function addSavedEnvironment(input: {
   readonly label: string;
   readonly pairingUrl?: string;
@@ -955,53 +1018,37 @@ export async function addSavedEnvironment(input: {
     ...(input.host !== undefined ? { host: input.host } : {}),
     ...(input.pairingCode !== undefined ? { pairingCode: input.pairingCode } : {}),
   });
-  const descriptor = await fetchRemoteEnvironmentDescriptor({
+  return registerSavedEnvironment({
+    label: input.label,
     httpBaseUrl: resolvedTarget.httpBaseUrl,
-  });
-  const environmentId = descriptor.environmentId;
-
-  if (environmentConnections.has(environmentId)) {
-    throw new Error("This environment is already connected.");
-  }
-
-  const bearerSession = await bootstrapRemoteBearerSession({
-    httpBaseUrl: resolvedTarget.httpBaseUrl,
+    wsBaseUrl: resolvedTarget.wsBaseUrl,
     credential: resolvedTarget.credential,
   });
+}
 
-  const record: SavedEnvironmentRecord = {
-    environmentId,
-    label: input.label.trim() || descriptor.label,
-    wsBaseUrl: resolvedTarget.wsBaseUrl,
-    httpBaseUrl: resolvedTarget.httpBaseUrl,
-    createdAt: isoNow(),
-    lastConnectedAt: isoNow(),
-  };
-
-  await persistSavedEnvironmentRecord(record);
-  const didPersistBearerToken = await writeSavedEnvironmentBearerToken(
-    environmentId,
-    bearerSession.sessionToken,
-  );
-  if (!didPersistBearerToken) {
-    await ensureLocalApi().persistence.setSavedEnvironmentRegistry(
-      listSavedEnvironmentRecords().map((entry) => ({
-        environmentId: entry.environmentId,
-        label: entry.label,
-        httpBaseUrl: entry.httpBaseUrl,
-        wsBaseUrl: entry.wsBaseUrl,
-        createdAt: entry.createdAt,
-        lastConnectedAt: entry.lastConnectedAt,
-      })),
-    );
-    throw new Error("Unable to persist saved environment credentials.");
+export async function addDesktopManagedEnvironment(input: {
+  readonly environmentKey: string;
+  readonly label?: string;
+}): Promise<SavedEnvironmentRecord> {
+  const desktopBridge = window.desktopBridge;
+  if (!desktopBridge) {
+    throw new Error("Desktop-managed environments are only available in the desktop app.");
   }
-  await ensureSavedEnvironmentConnection(record, {
-    bearerToken: bearerSession.sessionToken,
-    role: bearerSession.role,
+
+  const registration = await desktopBridge.prepareManagedEnvironmentRegistration(
+    input.environmentKey,
+  );
+
+  return registerSavedEnvironment({
+    label: input.label?.trim() || registration.label,
+    httpBaseUrl: registration.httpBaseUrl,
+    wsBaseUrl: registration.wsBaseUrl,
+    credential: registration.bootstrapToken,
+    management: {
+      kind: "desktop-managed",
+      environmentKey: registration.key,
+    },
   });
-  useSavedEnvironmentRegistryStore.getState().upsert(record);
-  return record;
 }
 
 export async function ensureEnvironmentConnectionBootstrapped(

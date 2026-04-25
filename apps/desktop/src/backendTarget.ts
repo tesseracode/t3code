@@ -76,8 +76,8 @@ export interface BackendTarget {
 
 function resolveAppRoot(): string {
   if (!app.isPackaged) {
-    // Development: use the repo root
-    return Path.resolve(Path.join(app.getAppPath(), ".."));
+    // Development: resolve from the compiled desktop bundle back to the repo root.
+    return Path.resolve(__dirname, "../../..");
   }
   // Production: app.asar root
   return app.getAppPath();
@@ -150,37 +150,12 @@ export class LocalBackendTarget implements BackendTarget {
   }
 }
 
-import {
-  WslBackendTarget,
-  isWslAvailable,
-  getDefaultWslDistro,
-  isNodeAvailableInWsl,
-} from "./wslBackendTarget.ts";
-import { prepareWslServerBundle } from "./wslServerBundle.ts";
-
 /**
  * Create the default backend target.
  *
- * On Windows, if WSL is available with Node.js and the server installed,
- * creates a WslBackendTarget so WSL projects use a native Linux server.
- * Falls back to LocalBackendTarget otherwise.
+ * Desktop bootstraps locally by default. Extra WSL runtimes are exposed as
+ * opt-in managed environments via Connections.
  */
 export function createDefaultBackendTarget(): BackendTarget {
-  if (process.platform === "win32" && isWslAvailable()) {
-    const distro = getDefaultWslDistro();
-    if (distro && isNodeAvailableInWsl(distro)) {
-      const bundle = prepareWslServerBundle({
-        appRoot: resolveAppRoot(),
-        cacheRoot: Path.join(OS.homedir(), ".t3", "wsl-server-bundles"),
-      });
-      if (bundle) {
-        return new WslBackendTarget({
-          distro,
-          installSourceRoot: bundle.hostPath,
-          installFingerprint: bundle.fingerprint,
-        });
-      }
-    }
-  }
   return new LocalBackendTarget();
 }

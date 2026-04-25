@@ -23,6 +23,27 @@ import { ServerSettingsService } from "../../serverSettings.ts";
 
 const PROVIDER = "copilot" as const;
 
+interface CopilotProviderClientHandle {
+  start(): Promise<void>;
+  listModels(): Promise<ReadonlyArray<unknown>>;
+  stop(): Promise<unknown>;
+  readonly rpc?: {
+    readonly account?: {
+      readonly getQuota?: () => Promise<unknown>;
+    };
+  };
+}
+
+export interface CopilotProviderCheckOptions {
+  readonly clientFactory?: (options: Record<string, unknown>) => CopilotProviderClientHandle;
+}
+
+interface CopilotProviderStatusCheckError {
+  readonly _tag: "CopilotProviderStatusCheckError";
+  readonly message: string;
+  readonly cause: unknown;
+}
+
 const DEFAULT_COPILOT_MODEL_CAPABILITIES: ModelCapabilities = {
   reasoningEffortLevels: [],
   supportsFastMode: false,
@@ -92,9 +113,7 @@ const CLAUDE_EFFORT_CAPABILITIES: ModelCapabilities = {
 };
 
 const CLAUDE_OPUS_47_CAPABILITIES: ModelCapabilities = {
-  reasoningEffortLevels: [
-    { value: "medium", label: "Medium", isDefault: true },
-  ],
+  reasoningEffortLevels: [{ value: "medium", label: "Medium", isDefault: true }],
   supportsFastMode: false,
   supportsThinkingToggle: false,
   contextWindowOptions: [],
@@ -227,85 +246,93 @@ const makeErrorProvider = (message: string): ServerProvider =>
 /**
  * Check Copilot provider status using the SDK.
  */
-const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
-  function* (settings: CopilotSettings) {
-    const now = new Date().toISOString();
+export const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(function* (
+  settings: CopilotSettings,
+  options?: CopilotProviderCheckOptions,
+) {
+  const now = new Date().toISOString();
 
-    if (!settings.enabled) {
-      return buildServerProvider({
-        provider: PROVIDER,
-        enabled: false,
-        checkedAt: now,
-        models: BUILT_IN_MODELS,
-        probe: {
-          installed: false,
-          version: null,
-          status: "error",
-          auth: { status: "unknown" },
-          message: "GitHub Copilot provider is disabled.",
-        },
-      });
-    }
-
-    // Attempt SDK-based detection
-    const sdkResult = yield* Effect.tryPromise({
-      try: async () => {
-        const { CopilotClient } = await import("@github/copilot-sdk");
-        const cliPath = normalizeCopilotCliPathOverride(settings.binaryPath)
-          ?? resolveBundledCopilotCliPath();
-        const clientOptions: Record<string, unknown> = { logLevel: "error" };
-        if (cliPath) {
-          clientOptions.cliPath = cliPath;
-        }
-        const client = new CopilotClient(clientOptions as any);
-        await client.start();
-        try {
-          const [models, quota] = await Promise.all([
-            client.listModels().catch(() => [] as any[]),
-            client.rpc?.account?.getQuota?.().catch(() => null),
-          ]);
-          return { started: true, models, quota, error: null as string | null };
-        } finally {
-          await client.stop().catch(() => {});
-        }
+  if (!settings.enabled) {
+    return buildServerProvider({
+      provider: PROVIDER,
+      enabled: false,
+      checkedAt: now,
+      models: BUILT_IN_MODELS,
+      probe: {
+        installed: false,
+        version: null,
+        status: "error",
+        auth: { status: "unknown" },
+        message: "GitHub Copilot provider is disabled.",
       },
-      catch: (error: unknown) => ({
-        _tag: "CopilotSdkError" as const,
-        message: error instanceof Error ? error.message : String(error),
-      }),
-    }).pipe(
-      Effect.orElseSucceed(() => ({
+    });
+  }
+
+  // Attempt SDK-based detection
+  const sdkResult = yield* Effect.tryPromise({
+    try: async () => {
+      const { CopilotClient } = await import("@github/copilot-sdk");
+      const cliPath =
+        normalizeCopilotCliPathOverride(settings.binaryPath) ?? resolveBundledCopilotCliPath();
+      const clientOptions: Record<string, unknown> = { logLevel: "error" };
+      if (cliPath) {
+        clientOptions.cliPath = cliPath;
+      }
+      const client =
+        options?.clientFactory?.(clientOptions) ?? new CopilotClient(clientOptions as any);
+      await client.start();
+      try {
+        const [models, quota] = await Promise.all([
+          client.listModels().catch(() => [] as any[]),
+          client.rpc?.account?.getQuota?.().catch(() => null),
+        ]);
+        return { started: true, models, quota, error: null as string | null };
+      } finally {
+        await client.stop().catch(() => {});
+      }
+    },
+    catch: (cause: unknown): CopilotProviderStatusCheckError => ({
+      _tag: "CopilotProviderStatusCheckError",
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    }),
+  }).pipe(
+    Effect.catchTag("CopilotProviderStatusCheckError", (error) =>
+      Effect.succeed({
         started: false,
-        models: [] as any[],
+        models: [] as ReadonlyArray<unknown>,
         quota: null,
-        error: "Failed to start GitHub Copilot SDK" as string | null,
-      })),
-    );
+        error: error.message,
+      }),
+    ),
+  );
 
-    if (!sdkResult.started) {
-      const errorMsg = sdkResult.error ?? "Unknown error";
-      const isAuthError = errorMsg.toLowerCase().includes("unauthenticated") ||
-        errorMsg.toLowerCase().includes("unauthorized");
+  if (!sdkResult.started) {
+    const errorMsg = sdkResult.error ?? "Unknown error";
+    const isAuthError =
+      errorMsg.toLowerCase().includes("unauthenticated") ||
+      errorMsg.toLowerCase().includes("unauthorized");
 
-      return buildServerProvider({
-        provider: PROVIDER,
-        enabled: false,
-        checkedAt: now,
-        models: BUILT_IN_MODELS,
-        probe: {
-          installed: !errorMsg.includes("Cannot find module"),
-          version: null,
-          status: "error",
-          auth: { status: isAuthError ? "unauthenticated" : "unknown" },
-          message: isAuthError
-            ? "GitHub Copilot is not authenticated. Sign in via your IDE or GitHub CLI."
-            : `GitHub Copilot SDK error: ${errorMsg}`,
-        },
-      });
-    }
+    return buildServerProvider({
+      provider: PROVIDER,
+      enabled: false,
+      checkedAt: now,
+      models: BUILT_IN_MODELS,
+      probe: {
+        installed: !errorMsg.includes("Cannot find module"),
+        version: null,
+        status: "error",
+        auth: { status: isAuthError ? "unauthenticated" : "unknown" },
+        message: isAuthError
+          ? "GitHub Copilot is not authenticated. Sign in via your IDE or GitHub CLI."
+          : `GitHub Copilot SDK error: ${errorMsg}`,
+      },
+    });
+  }
 
-    // Build models from SDK response, fall back to built-in
-    const allModels: ServerProviderModel[] = sdkResult.models.length > 0
+  // Build models from SDK response, fall back to built-in
+  const allModels: ServerProviderModel[] =
+    sdkResult.models.length > 0
       ? sdkResult.models.map((info: any) => ({
           slug: info.id ?? info.slug ?? info.name,
           name: info.name ?? info.id ?? info.slug,
@@ -314,26 +341,25 @@ const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus")(
         }))
       : [...BUILT_IN_MODELS];
 
-    // Filter out internal-only models when the setting is enabled
-    const runtimeModels = settings.hideInternalModels
-      ? allModels.filter((model) => !model.name.toLowerCase().includes("internal only"))
-      : allModels;
+  // Filter out internal-only models when the setting is enabled
+  const runtimeModels = settings.hideInternalModels
+    ? allModels.filter((model) => !model.name.toLowerCase().includes("internal only"))
+    : allModels;
 
-    return buildServerProvider({
-      provider: PROVIDER,
-      enabled: true,
-      checkedAt: now,
-      models: runtimeModels,
-      skills: [...getCopilotDiscoveredSkills()],
-      probe: {
-        installed: true,
-        version: null,
-        status: "ready",
-        auth: { status: "authenticated" },
-      },
-    });
-  },
-);
+  return buildServerProvider({
+    provider: PROVIDER,
+    enabled: true,
+    checkedAt: now,
+    models: runtimeModels,
+    skills: [...getCopilotDiscoveredSkills()],
+    probe: {
+      installed: true,
+      version: null,
+      status: "ready",
+      auth: { status: "authenticated" },
+    },
+  });
+});
 
 export const CopilotProviderLive = Layer.effect(
   CopilotProvider,
@@ -343,9 +369,7 @@ export const CopilotProviderLive = Layer.effect(
     const checkProvider = Effect.gen(function* () {
       const settings = yield* serverSettings.getSettings;
       return yield* checkCopilotProviderStatus(settings.providers.copilot);
-    }).pipe(
-      Effect.orElseSucceed(() => makeErrorProvider("Failed to check Copilot status")),
-    );
+    }).pipe(Effect.orElseSucceed(() => makeErrorProvider("Failed to check Copilot status")));
 
     return yield* makeManagedServerProvider<CopilotSettings>({
       getSettings: serverSettings.getSettings.pipe(

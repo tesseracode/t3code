@@ -32,7 +32,6 @@ const RepoRoot = Effect.service(Path.Path).pipe(
   Effect.flatMap((path) => path.fromFileUrl(new URL("..", import.meta.url))),
 );
 const encodeJsonString = Schema.encodeEffect(Schema.UnknownFromJsonString);
-
 interface DesktopBuildIconAssets {
   readonly macIconPng: string;
   readonly linuxIconPng: string;
@@ -797,8 +796,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     },
   };
   const copilotPlatformPackages = copilotPlatformMap[options.platform]?.[options.arch] ?? [];
-  const copilotVersion =
-    resolvedServerDependencies["@github/copilot-sdk"] ? "^1.0.34" : undefined;
+  const copilotVersion = resolvedServerDependencies["@github/copilot-sdk"] ? "^1.0.36" : undefined;
   const copilotPlatformDeps: Record<string, string> = {};
   if (copilotVersion) {
     for (const pkg of copilotPlatformPackages) {

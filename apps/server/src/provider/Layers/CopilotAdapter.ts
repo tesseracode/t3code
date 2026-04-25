@@ -65,6 +65,7 @@ export interface CopilotAdapterLiveOptions {
 }
 
 interface PendingApprovalRequest {
+  readonly request: CopilotPermissionRequest;
   readonly requestType:
     | "command_execution_approval"
     | "file_change_approval"
@@ -72,7 +73,7 @@ interface PendingApprovalRequest {
     | "dynamic_tool_call"
     | "unknown";
   readonly turnId: TurnId | undefined;
-  readonly resolve: (result: PermissionRequestResult) => void;
+  readonly resolve: (result: CopilotPermissionRequestResult) => void;
 }
 
 interface CopilotUserInputRequest {
@@ -95,6 +96,131 @@ interface PendingUserInputRequest {
 interface CopilotSessionConfiguration {
   readonly model: string | undefined;
   readonly reasoningEffort: CodexReasoningEffort | undefined;
+}
+
+// @github/copilot-sdk@0.3.0 uses the newer permission decision protocol at runtime,
+// but the package root still exports legacy PermissionRequest/PermissionRequestResult types.
+// Keep a local structural view until the SDK's public typings catch up.
+type CopilotPermissionRequest =
+  | {
+      readonly kind: "shell";
+      readonly toolCallId?: string;
+      readonly canOfferSessionApproval: boolean;
+      readonly commands: ReadonlyArray<{
+        readonly identifier: string;
+        readonly readOnly: boolean;
+      }>;
+      readonly fullCommandText: string;
+      readonly hasWriteFileRedirection: boolean;
+      readonly intention: string;
+      readonly possiblePaths: ReadonlyArray<string>;
+      readonly possibleUrls: ReadonlyArray<{
+        readonly url: string;
+      }>;
+      readonly warning?: string;
+    }
+  | {
+      readonly kind: "write";
+      readonly toolCallId?: string;
+      readonly canOfferSessionApproval: boolean;
+      readonly diff: string;
+      readonly fileName: string;
+      readonly intention: string;
+      readonly newFileContents?: string;
+    }
+  | {
+      readonly kind: "read";
+      readonly toolCallId?: string;
+      readonly intention: string;
+      readonly path: string;
+    }
+  | {
+      readonly kind: "mcp";
+      readonly toolCallId?: string;
+      readonly args?: Record<string, unknown>;
+      readonly readOnly: boolean;
+      readonly serverName: string;
+      readonly toolName: string;
+      readonly toolTitle: string;
+    }
+  | {
+      readonly kind: "url";
+      readonly toolCallId?: string;
+      readonly intention: string;
+      readonly url: string;
+    }
+  | {
+      readonly kind: "memory";
+      readonly toolCallId?: string;
+      readonly action?: "store" | "vote";
+      readonly citations?: string;
+      readonly direction?: "upvote" | "downvote";
+      readonly fact: string;
+      readonly reason?: string;
+      readonly subject?: string;
+    }
+  | {
+      readonly kind: "custom-tool";
+      readonly toolCallId?: string;
+      readonly args?: Record<string, unknown>;
+      readonly toolDescription: string;
+      readonly toolName: string;
+    }
+  | {
+      readonly kind: "hook";
+      readonly toolCallId?: string;
+      readonly hookMessage?: string;
+      readonly toolArgs?: Record<string, unknown>;
+      readonly toolName: string;
+    };
+
+type CopilotPermissionSessionApproval =
+  | {
+      readonly kind: "commands";
+      readonly commandIdentifiers: ReadonlyArray<string>;
+    }
+  | {
+      readonly kind: "read";
+    }
+  | {
+      readonly kind: "write";
+    }
+  | {
+      readonly kind: "mcp";
+      readonly serverName: string;
+      readonly toolName: string | null;
+    }
+  | {
+      readonly kind: "memory";
+    }
+  | {
+      readonly kind: "custom-tool";
+      readonly toolName: string;
+    };
+
+type CopilotPermissionRequestResult =
+  | {
+      readonly kind: "approve-once";
+    }
+  | {
+      readonly kind: "approve-for-session";
+      readonly approval: CopilotPermissionSessionApproval;
+    }
+  | {
+      readonly kind: "reject";
+      readonly feedback?: string;
+    }
+  | {
+      readonly kind: "user-not-available";
+    }
+  | {
+      readonly kind: "no-result";
+    };
+
+function toSdkPermissionRequestResult(
+  result: CopilotPermissionRequestResult,
+): PermissionRequestResult {
+  return result as PermissionRequestResult;
 }
 
 interface ActiveCopilotSession extends CopilotTurnTrackingState {
@@ -180,54 +306,25 @@ function mapSdkSkillToServerProviderSkill(skill: {
     return null;
   }
   const name = skill.name.trim();
-  const displayName = name
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  const displayName = name.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return {
     name,
     path: skill.path?.trim() || name,
     enabled: skill.enabled !== false,
-    ...(skill.description ? { description: skill.description, shortDescription: skill.description } : {}),
+    ...(skill.description
+      ? { description: skill.description, shortDescription: skill.description }
+      : {}),
     ...(skill.source ? { scope: skill.source } : {}),
     ...(displayName !== name ? { displayName } : {}),
   };
 }
 
-interface CopilotSessionHandle {
-  readonly sessionId: string;
-  readonly rpc: {
-    readonly mode: {
-      set(input: { mode: "interactive" | "plan" | "autopilot" }): Promise<{
-        mode: "interactive" | "plan" | "autopilot";
-      }>;
-    };
-    readonly plan: {
-      read(): Promise<{
-        exists: boolean;
-        content: string | null;
-        path: string | null;
-      }>;
-    };
-  };
-  destroy(): Promise<void>;
-  on(handler: (event: SessionEvent) => void): () => void;
-  send(options: { prompt: string; attachments?: unknown; mode?: string }): Promise<string>;
-  abort(): Promise<void>;
-  getMessages(): Promise<SessionEvent[]>;
-}
+type CopilotSessionHandle = Awaited<ReturnType<CopilotClient["createSession"]>>;
 
-interface CopilotClientHandle {
-  start(): Promise<void>;
-  listModels(): Promise<ModelInfo[]>;
-  createSession(
-    config: Parameters<CopilotClient["createSession"]>[0],
-  ): Promise<CopilotSessionHandle>;
-  resumeSession(
-    sessionId: string,
-    config: Parameters<CopilotClient["resumeSession"]>[1],
-  ): Promise<CopilotSessionHandle>;
-  stop(): Promise<Error[]>;
-}
+type CopilotClientHandle = Pick<
+  CopilotClient,
+  "start" | "listModels" | "createSession" | "resumeSession" | "stop"
+>;
 
 function toMessage(cause: unknown, fallback: string): string {
   if (cause instanceof Error && cause.message.length > 0) {
@@ -359,19 +456,83 @@ function toInteractionMode(mode: string): "default" | "plan" {
 
 function approvalDecisionToPermissionResult(
   decision: ProviderApprovalDecision,
-): PermissionRequestResult {
+  request?: CopilotPermissionRequest,
+): CopilotPermissionRequestResult {
+  const sessionApprovalFromPermissionRequest = () => {
+    if (!request) {
+      return undefined;
+    }
+
+    switch (request.kind) {
+      case "shell": {
+        if (!request.canOfferSessionApproval) {
+          return undefined;
+        }
+        const commandIdentifiers = request.commands
+          .map((command) => trimToUndefined(command.identifier))
+          .filter((identifier): identifier is string => identifier !== undefined);
+        return commandIdentifiers.length > 0
+          ? {
+              kind: "approve-for-session" as const,
+              approval: {
+                kind: "commands" as const,
+                commandIdentifiers,
+              },
+            }
+          : undefined;
+      }
+      case "write":
+        return request.canOfferSessionApproval
+          ? {
+              kind: "approve-for-session" as const,
+              approval: { kind: "write" as const },
+            }
+          : undefined;
+      case "read":
+        return {
+          kind: "approve-for-session" as const,
+          approval: { kind: "read" as const },
+        };
+      case "mcp":
+        return {
+          kind: "approve-for-session" as const,
+          approval: {
+            kind: "mcp" as const,
+            serverName: request.serverName,
+            toolName: request.toolName,
+          },
+        };
+      case "memory":
+        return {
+          kind: "approve-for-session" as const,
+          approval: { kind: "memory" as const },
+        };
+      case "custom-tool":
+        return {
+          kind: "approve-for-session" as const,
+          approval: {
+            kind: "custom-tool" as const,
+            toolName: request.toolName,
+          },
+        };
+      default:
+        return undefined;
+    }
+  };
+
   switch (decision) {
     case "accept":
+      return { kind: "approve-once" };
     case "acceptForSession":
-      return { kind: "approved" };
+      return sessionApprovalFromPermissionRequest() ?? { kind: "approve-once" };
     case "decline":
     case "cancel":
     default:
-      return { kind: "denied-interactively-by-user" };
+      return { kind: "reject" };
   }
 }
 
-function requestTypeFromPermissionRequest(request: PermissionRequest) {
+function requestTypeFromPermissionRequest(request: CopilotPermissionRequest) {
   switch (request.kind) {
     case "shell":
       return "command_execution_approval" as const;
@@ -387,7 +548,7 @@ function requestTypeFromPermissionRequest(request: PermissionRequest) {
   }
 }
 
-function requestDetailFromPermissionRequest(request: PermissionRequest): string | undefined {
+function requestDetailFromPermissionRequest(request: CopilotPermissionRequest): string | undefined {
   switch (request.kind) {
     case "shell":
       return trimToUndefined(String(request.fullCommandText ?? ""));
@@ -787,17 +948,19 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
             },
           ];
         }
-        case "session.title_changed":
+        case "session.title_changed": {
+          const titleMetadata = asRecord(event.data);
           return [
             {
               ...base(),
               type: "thread.metadata.updated",
               payload: {
                 name: event.data.title,
-                metadata: event.data,
+                ...(titleMetadata ? { metadata: titleMetadata } : {}),
               },
             },
           ];
+        }
         case "session.model_change":
           return [
             {
@@ -836,16 +999,16 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
               },
             },
           ];
-        case "session.context_changed":
+        case "session.context_changed": {
+          const sessionContextMetadata = asRecord(event.data);
           return [
             {
               ...base(),
               type: "thread.metadata.updated",
-              payload: {
-                metadata: event.data,
-              },
+              payload: sessionContextMetadata ? { metadata: sessionContextMetadata } : {},
             },
           ];
+        }
         case "session.usage_info":
           return [
             {
@@ -1031,20 +1194,27 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           // Extract image content blocks as separate image_view events
           const imageEvents: ProviderRuntimeEvent[] = contents
             .filter((content: { type: string }) => content.type === "image")
-            .map((content: { type: string; data?: string; mimeType?: string; description?: string }) => ({
-              ...base({ itemId: event.data.toolCallId }),
-              type: "item.completed" as const,
-              payload: {
-                itemType: "image_view" as const,
-                status: "completed" as const,
-                title: trimToUndefined(content.description) ?? "Image",
-                data: {
-                  base64: content.data,
-                  mimeType: content.mimeType,
-                  description: content.description,
+            .map(
+              (content: {
+                type: string;
+                data?: string;
+                mimeType?: string;
+                description?: string;
+              }) => ({
+                ...base({ itemId: event.data.toolCallId }),
+                type: "item.completed" as const,
+                payload: {
+                  itemType: "image_view" as const,
+                  status: "completed" as const,
+                  title: trimToUndefined(content.description) ?? "Image",
+                  data: {
+                    base64: content.data,
+                    mimeType: content.mimeType,
+                    description: content.description,
+                  },
                 },
-              },
-            }));
+              }),
+            );
           // Extract audio content blocks
           const audioEvents: ProviderRuntimeEvent[] = contents
             .filter((content: { type: string }) => content.type === "audio")
@@ -1064,28 +1234,35 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
             }));
           // Extract file/resource_link content blocks
           const fileEvents: ProviderRuntimeEvent[] = contents
-            .filter((content: { type: string }) =>
-              content.type === "resource_link" || content.type === "resource",
+            .filter(
+              (content: { type: string }) =>
+                content.type === "resource_link" || content.type === "resource",
             )
-            .map((content: { type: string; name?: string; uri?: string; title?: string; description?: string }) => ({
-              ...base({ itemId: event.data.toolCallId }),
-              type: "item.completed" as const,
-              payload: {
-                itemType: "dynamic_tool_call" as const,
-                status: "completed" as const,
-                title: content.name ?? content.title ?? content.uri ?? "Resource",
-                detail: trimToUndefined(content.description),
-                data: content,
-              },
-            }));
+            .map(
+              (content: {
+                type: string;
+                name?: string;
+                uri?: string;
+                title?: string;
+                description?: string;
+              }) => ({
+                ...base({ itemId: event.data.toolCallId }),
+                type: "item.completed" as const,
+                payload: {
+                  itemType: "dynamic_tool_call" as const,
+                  status: "completed" as const,
+                  title: content.name ?? content.title ?? content.uri ?? "Resource",
+                  detail: trimToUndefined(content.description),
+                  data: content,
+                },
+              }),
+            );
           return [
             {
               ...base({ itemId: event.data.toolCallId }),
               type: "item.completed",
               payload: {
-                itemType: hasTerminal
-                  ? "command_execution"
-                  : "dynamic_tool_call",
+                itemType: hasTerminal ? "command_execution" : "dynamic_tool_call",
                 status: event.data.success ? "completed" : "failed",
                 title: record.toolTitlesByCallId.get(event.data.toolCallId) ?? "Tool call",
                 ...(trimToUndefined(event.data.result?.content)
@@ -1241,9 +1418,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
                 payload: {
                   taskId: toRuntimeTaskId(kind.agentId) ?? RuntimeTaskId.make(kind.agentId),
                   status: kind.status === "failed" ? "failed" : "completed",
-                  ...(trimToUndefined(kind.description)
-                    ? { summary: kind.description }
-                    : {}),
+                  ...(trimToUndefined(kind.description) ? { summary: kind.description } : {}),
                 },
               },
             ];
@@ -1254,12 +1429,9 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
                 ...base(),
                 type: "task.completed",
                 payload: {
-                  taskId:
-                    toRuntimeTaskId(kind.shellId) ?? RuntimeTaskId.make(kind.shellId),
+                  taskId: toRuntimeTaskId(kind.shellId) ?? RuntimeTaskId.make(kind.shellId),
                   status: "completed",
-                  ...(trimToUndefined(kind.description)
-                    ? { summary: kind.description }
-                    : {}),
+                  ...(trimToUndefined(kind.description) ? { summary: kind.description } : {}),
                 },
               },
             ];
@@ -1277,16 +1449,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           ];
         }
         case "system.message":
-          return [
-            {
-              ...base(),
-              type: "runtime.warning",
-              payload: {
-                message: trimToUndefined(event.data.content) ?? "System message",
-                detail: { role: event.data.role, name: event.data.name },
-              },
-            },
-          ];
+          return [];
         case "command.execute":
           return [
             {
@@ -1325,6 +1488,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
       pendingUserInputResolvers: Map<string, PendingUserInputRequest>,
     ) => {
       const onPermissionRequest = (request: PermissionRequest) => {
+        const permissionRequest = request as CopilotPermissionRequest;
         // In plan mode, restrict write/shell operations:
         // - Supervised modes: let the request flow to the user for approval
         //   (don't silently deny — the user should decide)
@@ -1334,37 +1498,40 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
         const runtimeMode = getRuntimeMode();
         if (
           interactionMode === "plan" &&
-          (request.kind === "shell" || request.kind === "write")
+          (permissionRequest.kind === "shell" || permissionRequest.kind === "write")
         ) {
           if (runtimeMode === "full-access") {
-            return Promise.resolve<PermissionRequestResult>({
-              kind: "denied-interactively-by-user",
-            });
+            return Promise.resolve(
+              toSdkPermissionRequestResult({
+                kind: "reject",
+              }),
+            );
           }
           // In supervised/approval-required modes, fall through to the
           // normal approval flow so the user sees the request
         }
 
         return getRuntimeMode() === "full-access"
-          ? Promise.resolve<PermissionRequestResult>({ kind: "approved" })
+          ? Promise.resolve(toSdkPermissionRequestResult({ kind: "approve-once" }))
           : new Promise<PermissionRequestResult>((resolve) => {
               const requestId = `copilot-approval-${randomUUID()}`;
               const turnId = getCurrentTurnId();
               pendingApprovalResolvers.set(requestId, {
-                requestType: requestTypeFromPermissionRequest(request),
+                request: permissionRequest,
+                requestType: requestTypeFromPermissionRequest(permissionRequest),
                 turnId,
-                resolve,
+                resolve: (result) => resolve(toSdkPermissionRequestResult(result)),
               });
               void emitRuntimeEvents([
                 makeSyntheticEvent(
                   threadId,
                   "request.opened",
                   {
-                    requestType: requestTypeFromPermissionRequest(request),
-                    ...(requestDetailFromPermissionRequest(request)
-                      ? { detail: requestDetailFromPermissionRequest(request) }
+                    requestType: requestTypeFromPermissionRequest(permissionRequest),
+                    ...(requestDetailFromPermissionRequest(permissionRequest)
+                      ? { detail: requestDetailFromPermissionRequest(permissionRequest) }
                       : {}),
-                    args: request,
+                    args: permissionRequest,
                   },
                   { requestId, turnId },
                 ),
@@ -1611,7 +1778,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
         // best effort
       }
       for (const pending of record.pendingApprovalResolvers.values()) {
-        pending.resolve({ kind: "denied-interactively-by-user" });
+        pending.resolve({ kind: "user-not-available" });
       }
       for (const pending of record.pendingUserInputResolvers.values()) {
         pending.resolve({ answer: "", wasFreeform: true });
@@ -1946,7 +2113,8 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           });
         }
         record.pendingApprovalResolvers.delete(requestId);
-        pending.resolve(approvalDecisionToPermissionResult(decision));
+        const resolution = approvalDecisionToPermissionResult(decision, pending.request);
+        pending.resolve(resolution);
         yield* Queue.offer(
           runtimeEventQueue,
           makeSyntheticEvent(
@@ -1955,7 +2123,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
             {
               requestType: pending.requestType,
               decision,
-              resolution: approvalDecisionToPermissionResult(decision),
+              resolution,
             },
             { requestId, turnId: pending.turnId },
           ),

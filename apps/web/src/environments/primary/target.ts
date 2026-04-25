@@ -12,6 +12,11 @@ function getDesktopLocalEnvironmentBootstrap(): DesktopEnvironmentBootstrap | nu
   return window.desktopBridge?.getLocalEnvironmentBootstrap() ?? null;
 }
 
+export function readPrimaryEnvironmentBootstrapLabel(): string | null {
+  const label = getDesktopLocalEnvironmentBootstrap()?.label?.trim();
+  return label && label.length > 0 ? label : null;
+}
+
 function normalizeBaseUrl(rawValue: string): string {
   return new URL(rawValue, window.location.origin).toString();
 }

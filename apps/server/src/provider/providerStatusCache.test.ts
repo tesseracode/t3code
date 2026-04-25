@@ -2,6 +2,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import type { ServerProvider } from "@t3tools/contracts";
 import { assert, it } from "@effect/vitest";
 import { Effect, FileSystem } from "effect";
+import { vi } from "vitest";
 
 import {
   hydrateCachedProvider,
@@ -9,6 +10,7 @@ import {
   resolveProviderStatusCachePath,
   writeProviderStatusCache,
 } from "./providerStatusCache.ts";
+import { makeAtomicTempPath } from "../atomicFile.ts";
 
 const makeProvider = (
   provider: ServerProvider["provider"],
@@ -72,6 +74,23 @@ it.layer(NodeServices.layer)("providerStatusCache", (it) => {
       assert.deepStrictEqual(yield* readProviderStatusCache(openCodePath), openCodeProvider);
     }),
   );
+
+  it("generates unique temp file paths even within the same millisecond", () => {
+    const restoreNow = vi.spyOn(Date, "now").mockReturnValue(1_777_109_485_269);
+
+    try {
+      const targetPath = "C:/tmp/copilot.json";
+      const tempPaths = new Set([
+        makeAtomicTempPath(targetPath),
+        makeAtomicTempPath(targetPath),
+        makeAtomicTempPath(targetPath),
+      ]);
+
+      assert.equal(tempPaths.size, 3);
+    } finally {
+      restoreNow.mockRestore();
+    }
+  });
 
   it("hydrates cached provider status while preserving current settings-derived models", () => {
     const cachedCodex = makeProvider("codex", {

@@ -146,7 +146,7 @@ describe("backendEnvironment", () => {
     }
   });
 
-  it("creates isolated base directories for local and per-distro WSL environments", () => {
+  it("keeps the primary desktop environment local while discovering WSL environments", () => {
     isWslAvailableMock.mockReturnValue(true);
     listWslDistrosMock.mockReturnValue([
       { name: "Ubuntu-24.04", isDefault: true },
@@ -166,7 +166,7 @@ describe("backendEnvironment", () => {
       appRoot: "D:\\Development\\TesseraCode\\t3code",
     });
 
-    expect(manager.primaryEnvironment.key).toBe("wsl:Ubuntu-24.04");
+    expect(manager.primaryEnvironment.key).toBe("local");
     expect(manager.listEnvironments()).toEqual([
       expect.objectContaining({
         key: "local",

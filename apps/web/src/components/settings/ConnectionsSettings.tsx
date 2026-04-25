@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   type AuthClientSession,
   type AuthPairingLink,
+  type DesktopManagedEnvironmentCandidate,
   type DesktopServerExposureState,
   type EnvironmentId,
 } from "@t3tools/contracts";
@@ -62,6 +63,7 @@ import {
   type SavedEnvironmentRuntimeState,
   useSavedEnvironmentRegistryStore,
   useSavedEnvironmentRuntimeStore,
+  addDesktopManagedEnvironment,
   addSavedEnvironment,
   getPrimaryEnvironmentConnection,
   reconnectSavedEnvironment,
@@ -158,6 +160,18 @@ function getSavedBackendStatusTooltip(
   return record.lastConnectedAt
     ? `Last connected at ${formatAccessTimestamp(record.lastConnectedAt)}`
     : "Not connected yet.";
+}
+
+function getManagedEnvironmentKindLabel(kind: DesktopManagedEnvironmentCandidate["kind"]): string {
+  return kind === "wsl" ? "WSL" : "Local";
+}
+
+function getSavedEnvironmentScopeLabel(record: SavedEnvironmentRecord): string {
+  if (record.management?.kind === "desktop-managed") {
+    return record.management.environmentKey.startsWith("wsl:") ? "WSL managed" : "Local managed";
+  }
+
+  return "Paired remote";
 }
 
 /** Direct row in the card – same pattern as the Provider / ACP-agent list rows. */
@@ -701,6 +715,7 @@ function SavedBackendListRow({
   const descriptorLabel = runtime?.descriptor?.label ?? null;
   const statusTooltip = getSavedBackendStatusTooltip(runtime, record, nowMs);
   const metadataBits = [
+    getSavedEnvironmentScopeLabel(record),
     roleLabel,
     record.lastConnectedAt
       ? `Last connected ${formatAccessTimestamp(record.lastConnectedAt)}`
@@ -767,6 +782,31 @@ export function ConnectionsSettings() {
         .map((record) => record.environmentId),
     [savedEnvironmentsById],
   );
+  const managedEnvironmentKeys = useMemo(
+    () =>
+      new Set(
+        Object.values(savedEnvironmentsById).flatMap((record) =>
+          record.management?.kind === "desktop-managed" ? [record.management.environmentKey] : [],
+        ),
+      ),
+    [savedEnvironmentsById],
+  );
+  const managedSavedEnvironmentIds = useMemo(
+    () =>
+      savedEnvironmentIds.filter(
+        (environmentId) =>
+          savedEnvironmentsById[environmentId]?.management?.kind === "desktop-managed",
+      ),
+    [savedEnvironmentIds, savedEnvironmentsById],
+  );
+  const pairedSavedEnvironmentIds = useMemo(
+    () =>
+      savedEnvironmentIds.filter(
+        (environmentId) =>
+          savedEnvironmentsById[environmentId]?.management?.kind !== "desktop-managed",
+      ),
+    [savedEnvironmentIds, savedEnvironmentsById],
+  );
 
   const [desktopServerExposureState, setDesktopServerExposureState] =
     useState<DesktopServerExposureState | null>(null);
@@ -796,6 +836,10 @@ export function ConnectionsSettings() {
   const [savedBackendPairingUrl, setSavedBackendPairingUrl] = useState("");
   const [savedBackendHost, setSavedBackendHost] = useState("");
   const [savedBackendPairingCode, setSavedBackendPairingCode] = useState("");
+  const [managedEnvironmentCandidates, setManagedEnvironmentCandidates] = useState<
+    ReadonlyArray<DesktopManagedEnvironmentCandidate>
+  >([]);
+  const [isLoadingManagedEnvironments, setIsLoadingManagedEnvironments] = useState(false);
   const [savedBackendError, setSavedBackendError] = useState<string | null>(null);
   const [isAddingSavedBackend, setIsAddingSavedBackend] = useState(false);
   const [reconnectingSavedEnvironmentId, setReconnectingSavedEnvironmentId] =
@@ -948,6 +992,40 @@ export function ConnectionsSettings() {
     savedBackendPairingCode,
     savedBackendPairingUrl,
   ]);
+
+  const handleAddManagedEnvironment = useCallback(
+    async (candidate: DesktopManagedEnvironmentCandidate) => {
+      setIsAddingSavedBackend(true);
+      setSavedBackendError(null);
+      try {
+        const record = await addDesktopManagedEnvironment({
+          environmentKey: candidate.key,
+          label: savedBackendLabel.trim() || candidate.label,
+        });
+        setSavedBackendLabel("");
+        setSavedBackendPairingUrl("");
+        setSavedBackendHost("");
+        setSavedBackendPairingCode("");
+        setAddBackendDialogOpen(false);
+        toastManager.add({
+          type: "success",
+          title: "Environment added",
+          description: `${record.label} is now managed by this desktop and will reconnect on app startup.`,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to add environment.";
+        setSavedBackendError(message);
+        toastManager.add({
+          type: "error",
+          title: "Could not add environment",
+          description: message,
+        });
+      } finally {
+        setIsAddingSavedBackend(false);
+      }
+    },
+    [savedBackendLabel],
+  );
 
   const handleReconnectSavedBackend = useCallback(async (environmentId: EnvironmentId) => {
     setReconnectingSavedEnvironmentId(environmentId);
@@ -1107,6 +1185,47 @@ export function ConnectionsSettings() {
     setDesktopServerExposureState(null);
     setDesktopServerExposureError(null);
   }, [canManageLocalBackend]);
+
+  useEffect(() => {
+    if (!desktopBridge) {
+      setManagedEnvironmentCandidates([]);
+      setIsLoadingManagedEnvironments(false);
+      return;
+    }
+
+    if (!addBackendDialogOpen) {
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingManagedEnvironments(true);
+    void desktopBridge
+      .listManagedEnvironments()
+      .then((candidates) => {
+        if (cancelled) {
+          return;
+        }
+        setManagedEnvironmentCandidates(candidates);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        const message =
+          error instanceof Error ? error.message : "Failed to load desktop-managed environments.";
+        setSavedBackendError(message);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingManagedEnvironments(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addBackendDialogOpen, desktopBridge]);
+
   const visibleDesktopPairingLinks = useMemo(
     () => desktopPairingLinks.filter((pairingLink) => pairingLink.role === "client"),
     [desktopPairingLinks],
@@ -1268,7 +1387,7 @@ export function ConnectionsSettings() {
       )}
 
       <SettingsSection
-        title="Remote environments"
+        title="Connections"
         headerAction={
           <Dialog
             open={addBackendDialogOpen}
@@ -1290,7 +1409,9 @@ export function ConnectionsSettings() {
             <DialogPopup>
               <DialogHeader>
                 <DialogTitle>Add Environment</DialogTitle>
-                <DialogDescription>Pair another environment to this client.</DialogDescription>
+                <DialogDescription>
+                  Add a desktop-managed or paired environment to this client.
+                </DialogDescription>
                 <div className="flex gap-1 rounded-lg border border-border/60 bg-muted/50 p-1">
                   <button
                     type="button"
@@ -1322,72 +1443,130 @@ export function ConnectionsSettings() {
               </DialogHeader>
               <DialogPanel>
                 <div className="space-y-4">
-                  {savedBackendMode === "pairing-url" ? (
-                    <p className="text-xs text-muted-foreground">
-                      Enter the full pairing URL from the environment you want to connect to.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Enter the backend host and pairing code separately.
-                    </p>
-                  )}
-                  <div className="space-y-3">
-                    <label className="block">
-                      <span className="mb-1.5 block text-xs font-medium text-foreground">
-                        Label
-                      </span>
-                      <Input
-                        value={savedBackendLabel}
-                        onChange={(event) => setSavedBackendLabel(event.target.value)}
-                        placeholder="My backend (optional)"
-                        disabled={isAddingSavedBackend}
-                        spellCheck={false}
-                      />
-                    </label>
+                  {desktopBridge ? (
+                    <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-3">
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-foreground">
+                          Available on this desktop
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Add a local or WSL backend that this desktop can manage for you.
+                        </p>
+                      </div>
+                      {isLoadingManagedEnvironments ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Spinner className="size-3.5" />
+                          Loading desktop-managed environments…
+                        </div>
+                      ) : managedEnvironmentCandidates.length > 0 ? (
+                        <div className="space-y-2">
+                          {managedEnvironmentCandidates.map((candidate) => {
+                            const alreadyAdded = managedEnvironmentKeys.has(candidate.key);
+                            return (
+                              <div
+                                key={candidate.key}
+                                className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/70 px-3 py-2"
+                              >
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <p className="truncate text-sm font-medium text-foreground">
+                                    {candidate.label}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {getManagedEnvironmentKindLabel(candidate.kind)} environment
+                                  </p>
+                                </div>
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  disabled={isAddingSavedBackend || alreadyAdded}
+                                  onClick={() => void handleAddManagedEnvironment(candidate)}
+                                >
+                                  {alreadyAdded ? "Added" : "Add"}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          No extra desktop-managed environments are available right now.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                  <div
+                    className={cn(
+                      "space-y-4",
+                      desktopBridge ? "border-t border-border/60 pt-4" : undefined,
+                    )}
+                  >
                     {savedBackendMode === "pairing-url" ? (
+                      <p className="text-xs text-muted-foreground">
+                        Enter the full pairing URL from the environment you want to connect to.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Enter the backend host and pairing code separately.
+                      </p>
+                    )}
+                    <div className="space-y-3">
                       <label className="block">
                         <span className="mb-1.5 block text-xs font-medium text-foreground">
-                          Pairing URL
+                          Label
                         </span>
                         <Input
-                          value={savedBackendPairingUrl}
-                          onChange={(event) => setSavedBackendPairingUrl(event.target.value)}
-                          placeholder="https://backend.example.com/pair#token=..."
+                          value={savedBackendLabel}
+                          onChange={(event) => setSavedBackendLabel(event.target.value)}
+                          placeholder="My backend (optional)"
                           disabled={isAddingSavedBackend}
                           spellCheck={false}
                         />
-                        <span className="mt-1 block text-[11px] text-muted-foreground">
-                          The full URL including the pairing token.
-                        </span>
                       </label>
-                    ) : (
-                      <>
+                      {savedBackendMode === "pairing-url" ? (
                         <label className="block">
                           <span className="mb-1.5 block text-xs font-medium text-foreground">
-                            Host
+                            Pairing URL
                           </span>
                           <Input
-                            value={savedBackendHost}
-                            onChange={(event) => setSavedBackendHost(event.target.value)}
-                            placeholder="https://backend.example.com"
+                            value={savedBackendPairingUrl}
+                            onChange={(event) => setSavedBackendPairingUrl(event.target.value)}
+                            placeholder="https://backend.example.com/pair#token=..."
                             disabled={isAddingSavedBackend}
                             spellCheck={false}
                           />
-                        </label>
-                        <label className="block">
-                          <span className="mb-1.5 block text-xs font-medium text-foreground">
-                            Pairing code
+                          <span className="mt-1 block text-[11px] text-muted-foreground">
+                            The full URL including the pairing token.
                           </span>
-                          <Input
-                            value={savedBackendPairingCode}
-                            onChange={(event) => setSavedBackendPairingCode(event.target.value)}
-                            placeholder="Pairing code"
-                            disabled={isAddingSavedBackend}
-                            spellCheck={false}
-                          />
                         </label>
-                      </>
-                    )}
+                      ) : (
+                        <>
+                          <label className="block">
+                            <span className="mb-1.5 block text-xs font-medium text-foreground">
+                              Host
+                            </span>
+                            <Input
+                              value={savedBackendHost}
+                              onChange={(event) => setSavedBackendHost(event.target.value)}
+                              placeholder="https://backend.example.com"
+                              disabled={isAddingSavedBackend}
+                              spellCheck={false}
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="mb-1.5 block text-xs font-medium text-foreground">
+                              Pairing code
+                            </span>
+                            <Input
+                              value={savedBackendPairingCode}
+                              onChange={(event) => setSavedBackendPairingCode(event.target.value)}
+                              placeholder="Pairing code"
+                              disabled={isAddingSavedBackend}
+                              spellCheck={false}
+                            />
+                          </label>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {savedBackendError ? (
                     <p className="text-xs text-destructive">{savedBackendError}</p>
@@ -1407,7 +1586,34 @@ export function ConnectionsSettings() {
           </Dialog>
         }
       >
-        {savedEnvironmentIds.map((environmentId) => (
+        {managedSavedEnvironmentIds.length > 0 ? (
+          <div className={ITEM_ROW_CLASSNAME}>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">
+              Managed by this desktop
+            </p>
+          </div>
+        ) : null}
+
+        {managedSavedEnvironmentIds.map((environmentId) => (
+          <SavedBackendListRow
+            key={environmentId}
+            environmentId={environmentId}
+            reconnectingEnvironmentId={reconnectingSavedEnvironmentId}
+            removingEnvironmentId={removingSavedEnvironmentId}
+            onReconnect={handleReconnectSavedBackend}
+            onRemove={handleRemoveSavedBackend}
+          />
+        ))}
+
+        {pairedSavedEnvironmentIds.length > 0 ? (
+          <div className={ITEM_ROW_CLASSNAME}>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">
+              Paired remotely
+            </p>
+          </div>
+        ) : null}
+
+        {pairedSavedEnvironmentIds.map((environmentId) => (
           <SavedBackendListRow
             key={environmentId}
             environmentId={environmentId}
@@ -1421,8 +1627,8 @@ export function ConnectionsSettings() {
         {savedEnvironmentIds.length === 0 ? (
           <div className={ITEM_ROW_CLASSNAME}>
             <p className="text-xs text-muted-foreground">
-              No remote environments yet. Click &ldquo;Add environment&rdquo; to pair another
-              environment.
+              No saved environments yet. Click &ldquo;Add environment&rdquo; to manage a desktop
+              environment or pair another remote one.
             </p>
           </div>
         ) : null}

@@ -1,5 +1,5 @@
 import { EnvironmentId } from "@t3tools/contracts";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockResolveRemotePairingTarget = vi.fn();
 const mockFetchRemoteEnvironmentDescriptor = vi.fn();
@@ -59,6 +59,10 @@ vi.mock("./connection", () => ({
 }));
 
 describe("addSavedEnvironment", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -99,6 +103,48 @@ describe("addSavedEnvironment", () => {
     );
     expect(mockSetSavedEnvironmentRegistry).toHaveBeenCalledWith([]);
     expect(mockUpsert).not.toHaveBeenCalled();
+
+    await resetEnvironmentServiceForTests();
+  });
+
+  it("persists desktop-managed metadata when registering via the desktop bridge", async () => {
+    const prepareManagedEnvironmentRegistration = vi.fn().mockResolvedValue({
+      key: "wsl:Ubuntu-24.04",
+      label: "WSL (Ubuntu-24.04)",
+      kind: "wsl",
+      httpBaseUrl: "http://127.0.0.1:13773/",
+      wsBaseUrl: "ws://127.0.0.1:13773/",
+      bootstrapToken: "desktop-bootstrap-token",
+    });
+
+    vi.stubGlobal("window", {
+      desktopBridge: {
+        prepareManagedEnvironmentRegistration,
+      },
+    });
+
+    const { addDesktopManagedEnvironment, resetEnvironmentServiceForTests } =
+      await import("./service");
+
+    await expect(
+      addDesktopManagedEnvironment({
+        environmentKey: "wsl:Ubuntu-24.04",
+      }),
+    ).rejects.toThrow("Unable to persist saved environment credentials.");
+
+    expect(prepareManagedEnvironmentRegistration).toHaveBeenCalledWith("wsl:Ubuntu-24.04");
+    expect(mockPersistSavedEnvironmentRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        environmentId: EnvironmentId.make("environment-1"),
+        label: "WSL (Ubuntu-24.04)",
+        httpBaseUrl: "http://127.0.0.1:13773/",
+        wsBaseUrl: "ws://127.0.0.1:13773/",
+        management: {
+          kind: "desktop-managed",
+          environmentKey: "wsl:Ubuntu-24.04",
+        },
+      }),
+    );
 
     await resetEnvironmentServiceForTests();
   });
