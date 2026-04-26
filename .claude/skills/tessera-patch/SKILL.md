@@ -163,7 +163,7 @@ On 3-way conflict, `tpatch reconcile --resolve` asks the provider to merge each 
 
 - `--resolve` — enable phase 3.5 (off by default; no heuristic fallback — ADR-010 D9).
 - `--apply` — auto-accept when every file is `resolved`. Requires `--resolve`.
-- `--max-conflicts N` — abort before calling the provider if conflicts > N (default 3).
+- `--max-conflicts N` — abort before calling the provider if conflicts > N (default 10).
 - `--model <name>` — override the resolver model for this run.
 - `--accept <slug>` / `--reject <slug>` / `--shadow-diff <slug>` — terminal operations on a pending shadow session. Mutually exclusive; take `<slug>` as the flag value, not a positional arg.
 
@@ -175,9 +175,9 @@ On 3-way conflict, `tpatch reconcile --resolve` asks the provider to merge each 
 | `blocked-requires-human` | At least one file failed validation (still has `<<<<<<<` markers, corrupted output, or no provider configured). |
 | `blocked-too-many-conflicts` | Conflict count exceeded `--max-conflicts`; the provider was never called. |
 
-### reconcile-session.json
+### resolution-session.json
 
-Each resolver run writes `.tpatch/features/<slug>/reconciliation/reconcile-session.json`. Shape:
+Each resolver run writes `.tpatch/features/<slug>/artifacts/resolution-session.json` (renamed from `reconcile-session.json` in v0.5.3 — that path is now the high-level reconcile summary). Shape:
 
 ```json
 {
