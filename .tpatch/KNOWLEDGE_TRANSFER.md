@@ -2,6 +2,21 @@
 
 You are taking over as the expert on this fork. Here's everything I learned across 3 weeks, 51+ commits, 18 features, 2 upstream syncs, and 1 cross-platform handoff.
 
+## CRITICAL UPDATE (2026-04-26)
+
+**The `reconciliation/v0.0.21-assessment` branch is INVALID.** It merged upstream but dropped 41 upstream files (builtInProviderCatalog.ts, composerProviderState.tsx, migration 026, etc.). It typechecks but is semantically incomplete — it has our old code without upstream's new features.
+
+**The correct approach is Option A: fresh branch from main + re-apply each feature from spec.** See `.tpatch/case-studies/2026-04-26-reimplementation-case-study.md` for details.
+
+**The "upstreamed" verdict for copilot-cli-provider is a FALSE POSITIVE.** Upstream did NOT add Copilot. Do not drop this feature.
+
+**Actual re-implementation count: 3 features** (not 5):
+1. `copilot-cli-provider` — model capabilities must use new `ProviderOptionDescriptor` format
+2. `copilot-dynamic-models` — same
+3. `effort-theming` — must use new `composerProviderState.tsx` instead of old `composerProviderRegistry.tsx`
+
+The other 10 applied features survive as-is (adapter-internal, build scripts, readme, desktop WSL).
+
 ## Read These Files First
 1. `.tpatch/RECONCILIATION_HANDOFF.md` — current situation (upstream v0.0.21 broke 5 features)
 2. `.tpatch/case-studies/2026-04-26-reconciliation-impact.md` — per-feature impact assessment
