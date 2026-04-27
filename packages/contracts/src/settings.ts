@@ -111,6 +111,15 @@ export const OpenCodeSettings = Schema.Struct({
 });
 export type OpenCodeSettings = typeof OpenCodeSettings.Type;
 
+export const CopilotSettings = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  binaryPath: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  homePath: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  customModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  hideInternalModels: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+});
+export type CopilotSettings = typeof CopilotSettings.Type;
+
 export const ObservabilitySettings = Schema.Struct({
   otlpTracesUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   otlpMetricsUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
@@ -135,6 +144,7 @@ export const ServerSettings = Schema.Struct({
   // Provider specific settings
   providers: Schema.Struct({
     codex: CodexSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+    copilot: CopilotSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     claudeAgent: ClaudeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     cursor: CursorSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     opencode: OpenCodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
@@ -171,6 +181,11 @@ export const DEFAULT_UNIFIED_SETTINGS: UnifiedSettings = {
 const ModelSelectionPatch = Schema.Union([
   Schema.Struct({
     provider: Schema.optionalKey(Schema.Literal("codex")),
+    model: Schema.optionalKey(TrimmedNonEmptyString),
+    options: Schema.optionalKey(ProviderOptionSelections),
+  }),
+  Schema.Struct({
+    provider: Schema.optionalKey(Schema.Literal("copilot")),
     model: Schema.optionalKey(TrimmedNonEmptyString),
     options: Schema.optionalKey(ProviderOptionSelections),
   }),
@@ -220,6 +235,14 @@ const OpenCodeSettingsPatch = Schema.Struct({
   customModels: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
+const CopilotSettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(Schema.String),
+  homePath: Schema.optionalKey(Schema.String),
+  customModels: Schema.optionalKey(Schema.Array(Schema.String)),
+  hideInternalModels: Schema.optionalKey(Schema.Boolean),
+});
+
 export const ServerSettingsPatch = Schema.Struct({
   // Server settings
   enableAssistantStreaming: Schema.optionalKey(Schema.Boolean),
@@ -235,6 +258,7 @@ export const ServerSettingsPatch = Schema.Struct({
   providers: Schema.optionalKey(
     Schema.Struct({
       codex: Schema.optionalKey(CodexSettingsPatch),
+      copilot: Schema.optionalKey(CopilotSettingsPatch),
       claudeAgent: Schema.optionalKey(ClaudeSettingsPatch),
       cursor: Schema.optionalKey(CursorSettingsPatch),
       opencode: Schema.optionalKey(OpenCodeSettingsPatch),

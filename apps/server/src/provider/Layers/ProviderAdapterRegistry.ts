@@ -17,6 +17,7 @@ import {
 } from "../Services/ProviderAdapterRegistry.ts";
 import { ClaudeAdapter } from "../Services/ClaudeAdapter.ts";
 import { CodexAdapter } from "../Services/CodexAdapter.ts";
+import { CopilotAdapter } from "../Services/CopilotAdapter.ts";
 import { CursorAdapter } from "../Services/CursorAdapter.ts";
 import { OpenCodeAdapter } from "../Services/OpenCodeAdapter.ts";
 import { createBuiltInAdapterList } from "../builtInProviderCatalog.ts";
@@ -29,11 +30,13 @@ const makeProviderAdapterRegistry = Effect.fn("makeProviderAdapterRegistry")(fun
   options?: ProviderAdapterRegistryLiveOptions,
 ) {
   const cursorAdapterOption = yield* Effect.serviceOption(CursorAdapter);
+  const copilotAdapterOption = yield* Effect.serviceOption(CopilotAdapter);
   const adapters =
     options?.adapters !== undefined
       ? options.adapters
       : createBuiltInAdapterList({
           codex: yield* CodexAdapter,
+          ...(copilotAdapterOption._tag === "Some" ? { copilot: copilotAdapterOption.value } : {}),
           claudeAgent: yield* ClaudeAdapter,
           opencode: yield* OpenCodeAdapter,
           ...(cursorAdapterOption._tag === "Some" ? { cursor: cursorAdapterOption.value } : {}),

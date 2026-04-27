@@ -4,6 +4,7 @@ import { PROVIDER_OPTIONS } from "../../session-logic";
 
 export const PROVIDER_ICON_BY_PROVIDER: Record<ProviderKind, Icon> = {
   codex: OpenAI,
+  copilot: OpenAI,
   claudeAgent: ClaudeAI,
   opencode: OpenCodeIcon,
   cursor: CursorIcon,

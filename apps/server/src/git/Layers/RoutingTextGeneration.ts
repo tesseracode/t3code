@@ -42,8 +42,10 @@ class OpenCodeTextGen extends Context.Service<OpenCodeTextGen, TextGenerationSha
 // ---------------------------------------------------------------------------
 
 const makeRoutingTextGeneration = Effect.gen(function* () {
-  const byProvider = {
-    codex: yield* CodexTextGen,
+  const codexTextGen = yield* CodexTextGen;
+  const byProvider: Record<string, TextGenerationShape> = {
+    codex: codexTextGen,
+    copilot: codexTextGen,
     claudeAgent: yield* ClaudeTextGen,
     cursor: yield* CursorTextGen,
     opencode: yield* OpenCodeTextGen,
@@ -51,13 +53,13 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
 
   return {
     generateCommitMessage: (input) =>
-      byProvider[input.modelSelection.provider].generateCommitMessage(input),
+      byProvider[input.modelSelection.provider]!.generateCommitMessage(input),
     generatePrContent: (input) =>
-      byProvider[input.modelSelection.provider].generatePrContent(input),
+      byProvider[input.modelSelection.provider]!.generatePrContent(input),
     generateBranchName: (input) =>
-      byProvider[input.modelSelection.provider].generateBranchName(input),
+      byProvider[input.modelSelection.provider]!.generateBranchName(input),
     generateThreadTitle: (input) =>
-      byProvider[input.modelSelection.provider].generateThreadTitle(input),
+      byProvider[input.modelSelection.provider]!.generateThreadTitle(input),
   } satisfies TextGenerationShape;
 });
 

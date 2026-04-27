@@ -1,0 +1,6 @@
+ .../artifacts/post-apply-diff.txt                  | 10 +--
+ .../artifacts/post-apply.patch                     | 88 ++++++++++++++++++++--
+ .tpatch/features/copilot-cli-provider/record.md    | 16 ++--
+ .tpatch/features/copilot-cli-provider/status.json  |  4 +-
+ .../artifacts/post-apply.patch                     | 88 ++++++++++++++++++++--
+ 5 files changed, 180 insertions(+), 26 deletions(-)

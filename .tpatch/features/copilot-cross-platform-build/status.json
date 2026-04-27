@@ -1,0 +1,17 @@
+{
+  "id": "copilot-cross-platform-build",
+  "slug": "copilot-cross-platform-build",
+  "title": "Add all Copilot SDK platform binaries as direct dependencies so cross-platform desktop builds include the correct native binary regardless of build host OS. Without this, building a Windows installer on macOS produces a package missing copilot.exe.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-04-22T04:39:42Z",
+  "updated_at": "2026-04-22T09:15:31Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-04-22T06:03:02Z",
+    "base_commit": "2843ee0933d584e1b20ab3b6701430b9e02e3234",
+    "has_patch": true
+  },
+  "reconcile": {}
+}
