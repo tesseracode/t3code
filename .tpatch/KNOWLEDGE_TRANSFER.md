@@ -27,6 +27,53 @@ git checkout feature/copilot-provider -- .tpatch/ .claude/
 
 See `.tpatch/case-studies/2026-04-26-fresh-branch-reconciliation.md` for the full story.
 
+## Recipe Generation Script
+
+We built `.tpatch/tools/generate-recipe.cjs` because tpatch's LLM `implement` phase produces garbage recipes 90%+ of the time. This script reverse-engineers a valid `apply-recipe.json` from a git diff range.
+
+### Usage
+```bash
+# Basic: from a commit range
+node .tpatch/tools/generate-recipe.cjs <slug> <from-ref> <to-ref>
+
+# Scoped to specific files (avoids cross-feature pollution)
+node .tpatch/tools/generate-recipe.cjs <slug> HEAD~1 HEAD -- apps/server/src/file.ts
+
+# After a fresh branch reconciliation (all features in one commit)
+node .tpatch/tools/generate-recipe.cjs copilot-cli-provider main HEAD -- \
+  apps/server/src/provider/Layers/CopilotAdapter.ts \
+  apps/server/src/provider/Layers/CopilotProvider.ts \
+  packages/contracts/src/orchestration.ts
+```
+
+### How it works
+1. Runs `git diff --diff-filter=A` for new files → `write-file` operations
+2. Runs `git diff --diff-filter=M` for modified files → parses unified diff hunks into `replace-in-file` operations
+3. Context lines (` ` prefix) are included in both `search` and `replace` for match uniqueness
+4. Validates every `search` string exists in the base ref (`git show <from>:<path>`)
+5. Writes to `.tpatch/features/<slug>/artifacts/apply-recipe.json`
+6. Exits non-zero on validation errors
+
+### Why it exists
+- tpatch's `implement` phase rarely produces usable recipes
+- `tpatch record` captures patches but NOT recipes
+- Recipes are the **deterministic replay** artifact — they target a specific upstream snapshot
+- Without recipes, features can only be re-applied via "read the spec and rewrite" (expensive)
+
+### Known limitations
+- Binary files are skipped
+- If the same text appears multiple times in a file, the search string may not be unique — add more context lines
+- After a single-commit reconciliation, ALL features get the same recipe unless you scope with `-- file1 file2`
+- The script uses CommonJS (`.cjs`) because the repo has `"type": "module"` in package.json
+
+### Suggested improvements
+- Integrate into `tpatch record` as auto-generation step
+- Add `--scope` flag to tpatch for per-feature file tracking
+- Support `delete-file` operations (currently only write + replace)
+- Hunk-level feature attribution (map hunks to features by content analysis)
+
+Full documentation: `.tpatch/tools/WORKFLOW.md`
+
 ## CROSS-POLLUTION WARNING
 
 All features share the same recorded patch (137KB, 27 files) because they're in one commit. `tpatch record <slug> --from main` captures ALL changes. This is acceptable but not ideal. Future work: one commit per feature for clean patches.
