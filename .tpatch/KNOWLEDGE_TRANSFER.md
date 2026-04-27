@@ -4,14 +4,21 @@ You are taking over as the expert on this fork. Here's everything learned across
 
 ## CURRENT STATE (2026-04-26)
 
-**Active branch: `feature/copilot-provider-v2`** — fresh branch from `main` (v0.0.21) with all features re-applied.
-- **14 applied**, **1 upstream_merged** (toast-close-button), **3 requested**
+**`main` is now our production fork** — upstream v0.0.21 + all 15 applied features.
+- **15 applied** (14 copilot features + 1 upstream_merged toast-close-button)
+- **3 requested** (background-tasks-ui, copilot-resource-rendering, custom-agents)
 - **10/10 typecheck** ✅
-- All features adapted to new `ProviderOptionDescriptor` model options system
+- **Full provider parity** including native text generation
 
-**Old branches (reference only, do NOT use):**
-- `feature/copilot-provider` — pre-v0.0.21, based on old upstream
-- `reconciliation/v0.0.21-assessment` — INVALID merge, dropped 41 upstream files
+**Branching strategy**: See `.tpatch/BRANCHING_STRATEGY.md`
+- `origin/main` = our fork (upstream + all features)
+- `upstream/main` = read-only upstream tracking
+- Future upstream syncs: create `reconcile/v<version>` branch, re-apply, merge into main
+
+**Old branches (archive only):**
+- `feature/copilot-provider` — pre-v0.0.21
+- `feature/copilot-provider-v2` — merged into main ✅
+- `reconciliation/v0.0.21-assessment` — invalid merge, case study data
 
 ## RECONCILIATION LESSON LEARNED
 
