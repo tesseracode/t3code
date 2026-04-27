@@ -68,6 +68,68 @@ Two sub-agents handled the mechanical work:
 | Priority | Recommendation |
 |----------|---------------|
 | P0 | Add `tpatch reconcile --fresh-branch <name>` mode — creates new branch from upstream, copies .tpatch/, provides feature specs as re-application context |
+| P0 | Auto-generate recipe from `tpatch record` — closes the biggest Path B gap |
 | P1 | Warn when `record --from` produces identical patches for multiple features (cross-pollution detection) |
 | P1 | Add `--state upstream_merged` flag to `tpatch amend` for manual state setting |
 | P2 | Sub-agent coordination support — "apply these 5 features in parallel on worktrees, merge results" |
+
+---
+
+## Appendix: Recipe Generation Script
+
+### The Problem
+
+tpatch's LLM `implement` phase produces unusable recipes 90%+ of the time (1-operation stubs, `ensure-directory src/`, truncated JSON). `tpatch record` captures patches but NOT recipes. This leaves a gap — features can be replayed via patch but not deterministically re-applied via recipe.
+
+We built `.tpatch/tools/generate-recipe.cjs` to close this gap by reverse-engineering a valid `apply-recipe.json` from a git diff range.
+
+### Usage
+
+```bash
+# From a commit range (all changed files)
+node .tpatch/tools/generate-recipe.cjs <slug> <from-ref> <to-ref>
+
+# Scoped to specific files (avoids cross-feature pollution)
+node .tpatch/tools/generate-recipe.cjs <slug> HEAD~1 HEAD -- apps/server/src/file.ts
+
+# After fresh branch reconciliation (scope per feature)
+node .tpatch/tools/generate-recipe.cjs copilot-cli-provider main HEAD -- \
+  apps/server/src/provider/Layers/CopilotAdapter.ts \
+  apps/server/src/provider/Layers/CopilotProvider.ts \
+  packages/contracts/src/orchestration.ts
+```
+
+### How It Works
+
+1. Runs `git diff --diff-filter=A` for new files → creates `write-file` operations with full file content
+2. Runs `git diff --diff-filter=M` for modified files → parses unified diff hunks into `replace-in-file` operations where `search` = before-context and `replace` = after-context
+3. Context lines (` ` prefix in unified diff) are included in both `search` and `replace` to ensure match uniqueness
+4. **Validates** every `search` string exists in the base ref via `git show <from>:<path>` — catches parsing errors before writing
+5. Writes to `.tpatch/features/<slug>/artifacts/apply-recipe.json`
+6. Exits non-zero on validation errors, reporting which operations failed
+
+### Why This Should Be Built Into tpatch
+
+This script has been used successfully across 14+ features in this fork. The pattern is:
+1. Agent implements feature (Path B)
+2. Agent commits code
+3. Agent runs `tpatch record` → captures patch
+4. Agent runs `generate-recipe.cjs` → captures recipe
+5. Both artifacts exist for replay
+
+Step 4 is manual and easy to forget. If `tpatch record` auto-generated a best-effort recipe from the captured diff, the tooling gap would close entirely. The recipe would be "good enough" for deterministic replay — agents can always refine it later.
+
+### Limitations
+
+- Binary files are skipped
+- If the same text appears multiple times in a file, the `search` string may not be unique (solution: include more surrounding context lines)
+- After single-commit reconciliation, all features get the same recipe unless scoped with `-- file1 file2`
+- Uses CommonJS (`.cjs`) because the repo has `"type": "module"` in `package.json`
+- No `delete-file` or `rename-file` operations (use Path B for those)
+
+### Suggested Improvements for tpatch Integration
+
+1. **`tpatch record --recipe`** — auto-generate recipe alongside the patch
+2. **Per-feature file tracking** in `status.json` — `"files": ["src/a.ts", "src/b.ts"]` — enables automatic scoping
+3. **Hunk attribution** — map diff hunks to features by matching against recipe search strings
+4. **Stale recipe detection** — compare recipe's search strings against current upstream, warn if they no longer match (v0.5.1's `recipe-provenance.json` is a start)
