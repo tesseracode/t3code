@@ -1,0 +1,4 @@
+# Test run — 2026-04-25T07:30:50Z
+# Command: bun run test:windows-wsl-support
+# Directory: D:\Development\TesseraCode\t3code
+

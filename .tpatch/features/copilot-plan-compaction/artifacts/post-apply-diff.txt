@@ -1,0 +1,12 @@
+ .tpatch/FEATURES.md                                |   19 +-
+ .../artifacts/post-apply-diff.txt                  |    5 +-
+ .../artifacts/post-apply.patch                     | 1870 ++++++----
+ .tpatch/features/copilot-cli-provider/record.md    |   11 +-
+ .tpatch/features/copilot-cli-provider/status.json  |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   14 +-
+ .../artifacts/post-apply.patch                     | 3831 +++++++++++++++++++-
+ .tpatch/features/copilot-dynamic-models/record.md  |   22 +-
+ .../features/copilot-dynamic-models/status.json    |    4 +-
+ .../artifacts/post-apply.patch                     | 3770 ++++++++++++++++++-
+ .tpatch/features/toast-close-button/status.json    |    4 +-
+ 11 files changed, 8528 insertions(+), 1026 deletions(-)

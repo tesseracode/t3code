@@ -546,6 +546,11 @@ export function GeneralSettingsPanel() {
       settings.providers.codex.homePath !== DEFAULT_UNIFIED_SETTINGS.providers.codex.homePath ||
       settings.providers.codex.customModels.length > 0,
     ),
+    copilot: Boolean(
+      settings.providers.copilot.binaryPath !==
+        DEFAULT_UNIFIED_SETTINGS.providers.copilot.binaryPath ||
+      settings.providers.copilot.customModels.length > 0,
+    ),
     claudeAgent: Boolean(
       settings.providers.claudeAgent.binaryPath !==
         DEFAULT_UNIFIED_SETTINGS.providers.claudeAgent.binaryPath ||
@@ -571,6 +576,7 @@ export function GeneralSettingsPanel() {
     Record<ProviderKind, string>
   >({
     codex: "",
+    copilot: "",
     claudeAgent: "",
     cursor: "",
     opencode: "",
