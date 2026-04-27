@@ -1,3 +1,8 @@
+---
+name: tessera-patch
+description: Customize open-source projects through natural-language patches while maintaining upstream compatibility.
+---
+
 # Tessera Patch — Claude Code Skill
 
 ## What This Is
@@ -154,6 +159,45 @@ The `implement` phase produces a deterministic recipe that the `apply` phase con
 - All `path` values are repo-relative. tpatch enforces path safety via `EnsureSafeRepoPath`; any `../`, absolute path, or symlink target outside the repo aborts `apply --mode execute`.
 - Operations are executed in the order they appear. Later ops may depend on earlier ops (e.g. `ensure-directory` before `write-file`).
 - There is no `delete-file` or `rename-file` op in the current schema. To delete a file, use Path B: `apply --mode started`, `git rm <path>`, `apply --mode done`, `record`. Richer ops are tracked in `feat-recipe-schema-expansion`.
+
+### Optional fields
+
+- **`created_by`** — optional string on any operation. Value is the parent feature slug whose patch originally created this file. From v0.6.0 this is a **live apply-time gate**: `tpatch apply --mode execute` rejects an op whose `created_by` parent is missing from the recipe's `depends_on` (hard-parent miss is fatal in execute, warning in `--dry-run`). Omit when the feature has no DAG provenance to declare.
+
+## Feature dependencies (v0.6.0+)
+
+Tessera Patch tracks a dependency DAG between features. Declare parents in `status.json` `depends_on`, or via the CLI:
+
+- `tpatch feature deps <slug>` — print depends_on + dependents.
+- `tpatch feature deps <slug> add <parent>[:hard|:soft]` — add an edge (defaults to hard).
+- `tpatch feature deps <slug> remove <parent>` — remove an edge (atomic).
+- `tpatch amend <slug> --depends-on <parent>[:hard|:soft]` — same, in batch with other edits.
+- `tpatch amend <slug> --remove-depends-on <parent>` — same, in batch.
+- `tpatch feature deps --validate-all` — global validation (cycles, dangling, kind conflict).
+- `tpatch status --dag` (add `--json` for harnesses) — render the DAG tree. Add a slug to scope to one feature's parents + children.
+
+Edge kinds:
+
+- **hard** (default) — `tpatch apply <child>` is blocked until every hard parent reaches state `applied` or `upstream_merged`.
+- **soft** — ordering hint only; never gates apply.
+
+Composable reconcile labels overlay on `Reconcile.Outcome`:
+
+- `waiting-on-parent` — at least one hard parent has not yet been applied.
+- `blocked-by-parent` — at least one hard parent is in a terminal-failure verdict.
+- `stale-parent-applied` — a hard parent was updated after the child's last reconcile.
+- Compound: when the child's own outcome is `blocked-requires-human` AND `blocked-by-parent` is set, `EffectiveOutcome` reports `blocked-by-parent-and-needs-resolution` (display-only — programmatic decisions still read `Outcome` and `Labels` separately).
+
+Recipe operations may set `created_by: "<parent-slug>"` to declare DAG provenance. From v0.6.0 this is a **live apply-time gate**: `tpatch apply --mode execute` rejects an operation whose `created_by` parent is missing from `depends_on` (hard fail in execute, downgraded to a warning in `--dry-run` per PRD §4.3).
+
+Removing a feature with downstream dependents requires `--cascade`:
+
+- `tpatch remove <slug>` — refuses if any dependent exists.
+- `tpatch remove <slug> --cascade` — TTY confirms, then removes leaves first (reverse-topological order).
+- `tpatch remove <slug> --cascade --force` — required for non-TTY use.
+- **`--force` alone never bypasses the dep-integrity gate** — it only suppresses the TTY confirm prompt (PRD §3.7, ADR-011 D7).
+
+Toggle the whole feature with `features_dependencies: true|false` in `.tpatch/config.yaml` (default `true` from v0.6.0).
 
 ## Reconcile Phase 3.5 — Provider-assisted conflict resolution (v0.5.0)
 

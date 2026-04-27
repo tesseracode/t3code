@@ -1,0 +1,17 @@
+{
+  "id": "copilot-icon-and-build-fix",
+  "slug": "copilot-icon-and-build-fix",
+  "title": "Fix two issues: (1) Copilot provider uses OpenAI icon instead of GithubCopilotIcon in providerIconUtils.ts and ModelPickerSidebar shows copilot as coming-soon when it should be active. (2) Desktop app build fails with missing @github/copilot package in asar — the SDK's dependency needs explicit inclusion in the build.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-04-27T07:47:23Z",
+  "updated_at": "2026-04-27T07:55:19Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-04-27T07:54:55Z",
+    "base_commit": "b3d877331f59d2d9ff1f4370d97ea6e69e7d1f03",
+    "has_patch": true
+  },
+  "reconcile": {}
+}
