@@ -1,14 +1,36 @@
 # Implementation Record: copilot-hide-internal-models
 
-**Recorded**: 2026-04-21T07:25:01Z
-**Files changed**: 5
-**Patch size**: 8045 bytes
+**Recorded**: 2026-04-27T01:56:36Z
+**Files changed**: 27
+**Patch size**: 137285 bytes
 
 ## Change Summary
 
 ```
- .../artifacts/post-apply.patch                     | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ .tpatch/FEATURES.md                                |   19 +-
+ .../artifacts/post-apply-diff.txt                  |    5 +-
+ .../artifacts/post-apply.patch                     | 1870 ++++++----
+ .tpatch/features/copilot-cli-provider/record.md    |   11 +-
+ .tpatch/features/copilot-cli-provider/status.json  |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   14 +-
+ .../artifacts/post-apply.patch                     | 3831 +++++++++++++++++++-
+ .tpatch/features/copilot-dynamic-models/record.md  |   22 +-
+ .../features/copilot-dynamic-models/status.json    |    4 +-
+ .../artifacts/post-apply.patch                     | 3829 ++++++++++++++++++-
+ .../artifacts/post-apply-diff.txt                  |   17 +-
+ .../artifacts/post-apply.patch                     | 3770 ++++++++++++++++++-
+ .tpatch/features/copilot-plan-compaction/record.md |   25 +-
+ .../features/copilot-plan-compaction/status.json   |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   22 +-
+ .../artifacts/post-apply.patch                     | 3732 ++++++++++++++++++-
+ .tpatch/features/copilot-skill-discovery/record.md |   30 +-
+ .../features/copilot-skill-discovery/status.json   |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   18 +-
+ .../copilot-turn-timing/artifacts/post-apply.patch | 3790 ++++++++++++++++++-
+ .tpatch/features/copilot-turn-timing/record.md     |   26 +-
+ .tpatch/features/copilot-turn-timing/status.json   |    4 +-
+ .tpatch/features/toast-close-button/status.json    |    4 +-
+ 23 files changed, 19791 insertions(+), 1264 deletions(-)
 ```
 
 ## Replay Instructions
@@ -20,4 +42,4 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-hide-internal-models/artifacts/post-apply.patch
 ```
 
-*Patch was captured as a committed diff from `3007567a~1` to `HEAD`.*
+*Patch was captured as a committed diff from `main` to `HEAD`.*

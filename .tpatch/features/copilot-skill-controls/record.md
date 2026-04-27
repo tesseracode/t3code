@@ -1,15 +1,52 @@
 # Implementation Record: copilot-skill-controls
 
-**Recorded**: 2026-04-23T09:36:37Z
-**Files changed**: 1
-**Patch size**: 2491 bytes
+**Recorded**: 2026-04-27T01:56:37Z
+**Files changed**: 27
+**Patch size**: 137285 bytes
 
 ## Change Summary
 
 ```
- .tpatch/FEATURES.md                                 |  2 +-
- .tpatch/features/copilot-skill-controls/status.json | 13 +++++++++----
- 2 files changed, 10 insertions(+), 5 deletions(-)
+ .tpatch/FEATURES.md                                |   19 +-
+ .../artifacts/post-apply-diff.txt                  |    5 +-
+ .../artifacts/post-apply.patch                     | 1870 ++++++----
+ .tpatch/features/copilot-cli-provider/record.md    |   11 +-
+ .tpatch/features/copilot-cli-provider/status.json  |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   37 +-
+ .../artifacts/post-apply.patch                     | 3726 ++++++++++++++++++-
+ .tpatch/features/copilot-command-events/record.md  |   45 +-
+ .../features/copilot-command-events/status.json    |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   31 +-
+ .../artifacts/post-apply.patch                     | 3841 +++++++++++++++++++-
+ .../copilot-cross-platform-build/record.md         |   39 +-
+ .../copilot-cross-platform-build/status.json       |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   14 +-
+ .../artifacts/post-apply.patch                     | 3831 ++++++++++++++++++-
+ .tpatch/features/copilot-dynamic-models/record.md  |   22 +-
+ .../features/copilot-dynamic-models/status.json    |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   26 +-
+ .../artifacts/post-apply.patch                     | 3829 ++++++++++++++++++-
+ .../copilot-hide-internal-models/record.md         |   34 +-
+ .../copilot-hide-internal-models/status.json       |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   17 +-
+ .../artifacts/post-apply.patch                     | 3770 ++++++++++++++++++-
+ .tpatch/features/copilot-plan-compaction/record.md |   25 +-
+ .../features/copilot-plan-compaction/status.json   |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   38 +-
+ .../artifacts/post-apply.patch                     | 3783 ++++++++++++++++++-
+ .tpatch/features/copilot-resource-events/record.md |   46 +-
+ .../features/copilot-resource-events/status.json   |    4 +-
+ .../artifacts/post-apply.patch                     | 3771 ++++++++++++++++++-
+ .../artifacts/post-apply-diff.txt                  |   22 +-
+ .../artifacts/post-apply.patch                     | 3732 ++++++++++++++++++-
+ .tpatch/features/copilot-skill-discovery/record.md |   30 +-
+ .../features/copilot-skill-discovery/status.json   |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   18 +-
+ .../copilot-turn-timing/artifacts/post-apply.patch | 3790 ++++++++++++++++++-
+ .tpatch/features/copilot-turn-timing/record.md     |   26 +-
+ .tpatch/features/copilot-turn-timing/status.json   |    4 +-
+ .tpatch/features/toast-close-button/status.json    |    4 +-
+ 39 files changed, 34978 insertions(+), 1510 deletions(-)
 ```
 
 ## Replay Instructions
@@ -21,4 +58,4 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-skill-controls/artifacts/post-apply.patch
 ```
 
-*Patch was captured as a committed diff from `8f0c0c49~1` to `HEAD`.*
+*Patch was captured as a committed diff from `main` to `HEAD`.*

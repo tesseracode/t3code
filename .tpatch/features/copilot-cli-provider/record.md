@@ -1,14 +1,15 @@
 # Implementation Record: copilot-cli-provider
 
-**Recorded**: 2026-04-20T07:35:33Z
-**Files changed**: 33
-**Patch size**: 131325 bytes
+**Recorded**: 2026-04-27T01:56:35Z
+**Files changed**: 27
+**Patch size**: 137285 bytes
 
 ## Change Summary
 
 ```
- .../artifacts/post-apply.patch                     | 117 ++++++++++++++++++++-
- 1 file changed, 115 insertions(+), 2 deletions(-)
+ .../artifacts/post-apply.patch                     | 1870 +++++++++++---------
+ .tpatch/features/toast-close-button/status.json    |    4 +-
+ 2 files changed, 1070 insertions(+), 804 deletions(-)
 ```
 
 ## Replay Instructions
