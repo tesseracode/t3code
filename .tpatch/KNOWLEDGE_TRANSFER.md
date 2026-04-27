@@ -1,21 +1,35 @@
 # Knowledge Transfer: tpatch Expert Context
 
-You are taking over as the expert on this fork. Here's everything I learned across 3 weeks, 51+ commits, 18 features, 2 upstream syncs, and 1 cross-platform handoff.
+You are taking over as the expert on this fork. Here's everything learned across 3+ weeks, 18 features, 3 upstream syncs, cross-platform handoff (macOS→Windows), and a full reconciliation.
 
-## CRITICAL UPDATE (2026-04-26)
+## CURRENT STATE (2026-04-26)
 
-**The `reconciliation/v0.0.21-assessment` branch is INVALID.** It merged upstream but dropped 41 upstream files (builtInProviderCatalog.ts, composerProviderState.tsx, migration 026, etc.). It typechecks but is semantically incomplete — it has our old code without upstream's new features.
+**Active branch: `feature/copilot-provider-v2`** — fresh branch from `main` (v0.0.21) with all features re-applied.
+- **14 applied**, **1 upstream_merged** (toast-close-button), **3 requested**
+- **10/10 typecheck** ✅
+- All features adapted to new `ProviderOptionDescriptor` model options system
 
-**The correct approach is Option A: fresh branch from main + re-apply each feature from spec.** See `.tpatch/case-studies/2026-04-26-reimplementation-case-study.md` for details.
+**Old branches (reference only, do NOT use):**
+- `feature/copilot-provider` — pre-v0.0.21, based on old upstream
+- `reconciliation/v0.0.21-assessment` — INVALID merge, dropped 41 upstream files
 
-**The "upstreamed" verdict for copilot-cli-provider is a FALSE POSITIVE.** Upstream did NOT add Copilot. Do not drop this feature.
+## RECONCILIATION LESSON LEARNED
 
-**Actual re-implementation count: 3 features** (not 5):
-1. `copilot-cli-provider` — model capabilities must use new `ProviderOptionDescriptor` format
-2. `copilot-dynamic-models` — same
-3. `effort-theming` — must use new `composerProviderState.tsx` instead of old `composerProviderRegistry.tsx`
+**Never merge upstream into the feature branch for structural refactors.** Use "Option A: fresh branch from main + re-apply":
+```bash
+git checkout -b feature/copilot-provider-v2 main
+git checkout feature/copilot-provider -- .tpatch/ .claude/
+# Copy our new files (CopilotAdapter.ts, CopilotProvider.ts, etc.)
+# Add "copilot" to all Record<ProviderKind, ...> — TypeScript guides you
+# Adapt to new APIs (ProviderOptionDescriptor, presentation field, etc.)
+# Sub-agents handle the mechanical work efficiently
+```
 
-The other 10 applied features survive as-is (adapter-internal, build scripts, readme, desktop WSL).
+See `.tpatch/case-studies/2026-04-26-fresh-branch-reconciliation.md` for the full story.
+
+## CROSS-POLLUTION WARNING
+
+All features share the same recorded patch (137KB, 27 files) because they're in one commit. `tpatch record <slug> --from main` captures ALL changes. This is acceptable but not ideal. Future work: one commit per feature for clean patches.
 
 ## Read These Files First
 1. `.tpatch/RECONCILIATION_HANDOFF.md` — current situation (upstream v0.0.21 broke 5 features)
