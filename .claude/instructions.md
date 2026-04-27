@@ -1,10 +1,12 @@
 # T3 Code Fork — Agent Instructions
 
 ## What this is
-A fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code) — a multi-provider coding assistant (Codex, Claude, Cursor, OpenCode). We added **GitHub Copilot** as a provider using `@github/copilot-sdk`.
+A fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code) — a multi-provider coding assistant (Codex, Claude, Cursor, OpenCode). We added **GitHub Copilot** as a provider using `@github/copilot-sdk`, plus WSL support, UI theming, and other improvements.
 
-## Branch
-`feature/copilot-provider` on `origin` (tesserabox/t3code). Sits on top of `main` which tracks `upstream/main`.
+## Branches
+- **`main`** — our production fork (upstream v0.0.21 + all features). Build and deploy from here.
+- **`upstream/main`** — read-only upstream tracking ref. Never push to it.
+- See `.tpatch/BRANCHING_STRATEGY.md` for upstream sync and reconciliation workflow.
 
 ## tpatch — fork patch management
 This repo uses `tpatch` to track fork-specific features as replayable patches. Key commands:

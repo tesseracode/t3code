@@ -1,45 +1,52 @@
 # T3 Code Fork — Session Handoff
 
-## Handoff: T3 Code Fork — Copilot Provider Integration
+**Read these files in order:**
+1. `.claude/instructions.md` — technical context, dev setup, gotchas
+2. `.tpatch/KNOWLEDGE_TRANSFER.md` — expert context, lessons learned, upstream API changes
+3. `.tpatch/BRANCHING_STRATEGY.md` — how we manage main, upstream, and reconciliation branches
+4. `.tpatch/tools/WORKFLOW.md` — tpatch Path B workflow + recipe generation script
 
-**Read `.claude/instructions.md` first** — it has the full technical context for this repo.
+## What this is
+A fork of `pingdotgg/t3code` at `github.com/tesseracode/t3code`. We added GitHub Copilot as a provider using `@github/copilot-sdk`, plus WSL support, UI theming, and other improvements.
 
-### What this is
-A fork of `pingdotgg/t3code` at `github.com/tesseracode/t3code`, branch `feature/copilot-provider`. We added GitHub Copilot as a provider using `@github/copilot-sdk`, plus several UI and build improvements.
+## Branch layout
+- **`main`** — our production fork (upstream v0.0.21 + all features). Build and deploy from here.
+- **`upstream/main`** — read-only upstream tracking. Never push to it.
+- Feature branches branch from `main` for new work.
+- Reconciliation branches (`reconcile/v<version>`) are created from `upstream/main` for upstream syncs.
 
-### How we work
-We use `tpatch` (v0.4.3) for fork patch management. Run `tpatch status` to see all features. Each feature has full context docs under `.tpatch/features/<slug>/` (analysis.md, spec.md, exploration.md, recipe, patch, record).
+## Current state
+- **15 applied features**, 1 upstream_merged, 3 requested
+- **10/10 typecheck** ✅
+- **Full Copilot provider parity** with other providers (Codex, Claude, Cursor, OpenCode)
 
-**Key workflow**: When implementing features, use **Path B** — `tpatch apply <slug> --mode started`, make changes, `tpatch apply <slug> --mode done`, `tpatch record <slug> --from <base>`. The LLM provider for `tpatch implement` produces low-quality recipes — act as the provider yourself. See the skill at `.claude/skills/tessera-patch/SKILL.md` for details.
+Run `tpatch status` for the full feature list.
 
-**After changes**: always typecheck (`bun run typecheck`), commit, record with tpatch, generate recipe from diff, push.
-
-### Current state (12 features)
-- **10 applied**: copilot-cli-provider, copilot-dynamic-models, copilot-plan-compaction, copilot-turn-timing, copilot-skill-discovery, copilot-hide-internal-models, copilot-cross-platform-build, effort-theming, readme-copilot-notice, toast-close-button
-- **2 backlogged**: custom-agents (cross-provider agent support), windows-wsl-support (WSL integration)
-
-### Open items / known gaps
-- **Plan mode Fix 2**: `exit_plan_mode.requested` — we surface the plan content but don't actively block the exit (no public SDK method found). Needs deeper investigation.
-- **Compaction events**: Mapped but untested in production — need to verify UI shows "compacted" state.
-- **Diff panel for Copilot**: Should work via CheckpointReactor but hasn't been verified — needs testing with a file-modifying Copilot turn in a git project.
-- **Skill discovery**: Implemented with merge-by-name and userInvocable filtering — create a `SKILL.md` in a workspace and verify `$` autocomplete populates.
-- **Toast close button**: Implemented, needs visual QA.
-- **SDK version**: On `@github/copilot-sdk@0.2.2` (latest stable as of Apr 21 2026). Check for newer versions periodically.
-
-### Dev setup
+## How we work
+Use **tpatch Path B** (agent-as-provider). The LLM implement phase produces garbage — always author changes yourself:
 ```bash
-nvm use 23  # or 24 for builds (not 24 for vite dev — rolldown compat issue)
+tpatch add --slug <name> "description"
+tpatch apply <slug> --mode started
+# Make changes, typecheck
+tpatch apply <slug> --mode done
+git commit
+tpatch record <slug> --from <parent>
+node .tpatch/tools/generate-recipe.cjs <slug> <parent> HEAD
+```
+
+## Dev setup
+```bash
+nvm use 23
 export PATH="./node_modules/.bin:$PATH"
 bun install && bun run dev
 ```
 
-### Upstream sync
+## Upstream sync workflow
+See `.tpatch/BRANCHING_STRATEGY.md` for the full procedure:
 ```bash
-git fetch upstream && git checkout main && git merge --ff-only upstream/main
-git checkout feature/copilot-provider -- .tpatch/
-tpatch reconcile --upstream-ref upstream/main
-# Then act as provider to re-apply features if needed
+git fetch upstream
+git checkout -b reconcile/v<new> upstream/main
+git checkout main -- .tpatch/ .claude/
+# Re-apply features against new upstream
+# Typecheck, commit, merge into main
 ```
-
-### Case study feedback
-Detailed tpatch feedback is at `.tpatch/case-studies/2026-04-17-copilot-provider-session.md` — includes 8 items for the tpatch maintainer.
