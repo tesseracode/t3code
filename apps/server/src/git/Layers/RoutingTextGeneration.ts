@@ -16,6 +16,7 @@ import { CodexTextGenerationLive } from "./CodexTextGeneration.ts";
 import { ClaudeTextGenerationLive } from "./ClaudeTextGeneration.ts";
 import { CursorTextGenerationLive } from "./CursorTextGeneration.ts";
 import { OpenCodeTextGenerationLive } from "./OpenCodeTextGeneration.ts";
+import { CopilotTextGenerationLive } from "./CopilotTextGeneration.ts";
 
 // ---------------------------------------------------------------------------
 // Internal service tags so both concrete layers can coexist.
@@ -37,6 +38,10 @@ class OpenCodeTextGen extends Context.Service<OpenCodeTextGen, TextGenerationSha
   "t3/git/Layers/RoutingTextGeneration/OpenCodeTextGen",
 ) {}
 
+class CopilotTextGenTag extends Context.Service<CopilotTextGenTag, TextGenerationShape>()(
+  "t3/git/Layers/RoutingTextGeneration/CopilotTextGen",
+) {}
+
 // ---------------------------------------------------------------------------
 // Routing implementation
 // ---------------------------------------------------------------------------
@@ -45,7 +50,7 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
   const codexTextGen = yield* CodexTextGen;
   const byProvider: Record<string, TextGenerationShape> = {
     codex: codexTextGen,
-    copilot: codexTextGen,
+    copilot: yield* CopilotTextGenTag,
     claudeAgent: yield* ClaudeTextGen,
     cursor: yield* CursorTextGen,
     opencode: yield* OpenCodeTextGen,
@@ -95,6 +100,14 @@ const InternalOpenCodeLayer = Layer.effect(
   }),
 ).pipe(Layer.provide(OpenCodeTextGenerationLive));
 
+const InternalCopilotLayer = Layer.effect(
+  CopilotTextGenTag,
+  Effect.gen(function* () {
+    const svc = yield* TextGeneration;
+    return svc;
+  }),
+).pipe(Layer.provide(CopilotTextGenerationLive));
+
 export const RoutingTextGenerationLive = Layer.effect(
   TextGeneration,
   makeRoutingTextGeneration,
@@ -103,4 +116,5 @@ export const RoutingTextGenerationLive = Layer.effect(
   Layer.provide(InternalClaudeLayer),
   Layer.provide(InternalCursorLayer),
   Layer.provide(InternalOpenCodeLayer),
+  Layer.provide(InternalCopilotLayer),
 );
