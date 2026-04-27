@@ -126,6 +126,12 @@ const PROVIDER_SETTINGS: readonly InstallProviderSettings[] = [
     homeDescription: "Optional custom Codex home and config directory.",
   },
   {
+    provider: "copilot",
+    title: "GitHub Copilot",
+    binaryPlaceholder: "Copilot SDK binary path",
+    binaryDescription: "Path to the Copilot SDK binary (optional, auto-detected)",
+  },
+  {
     provider: "claudeAgent",
     title: "Claude",
     binaryPlaceholder: "Claude binary path",
