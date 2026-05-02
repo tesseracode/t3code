@@ -13,5 +13,11 @@
     "base_commit": "b1ec56e74d1afc0b2a080207f412943e3fef47ff",
     "has_patch": true
   },
-  "reconcile": {}
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    }
+  ]
 }
