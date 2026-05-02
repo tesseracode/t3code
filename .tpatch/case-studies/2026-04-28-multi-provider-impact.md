@@ -65,14 +65,15 @@ The Multi-Provider PR replaces the closed `ProviderKind` literal union with an *
 | **windows-wsl-support** | 🟢 LOW | Desktop-only, independent |
 | **upgrade-copilot-sdk-0.3.0** | 🟢 LOW | Package version + CLI path resolution |
 
-### Tier 4 — Not applicable
+### Tier 4 — No code changes / not applicable
 
-| Feature | Status |
-|---------|--------|
-| toast-close-button | upstream_merged ✅ |
-| background-tasks-ui | requested (not implemented) |
-| copilot-resource-rendering | requested (not implemented) |
-| custom-agents | requested (not implemented) |
+| Feature | State | Action |
+|---------|-------|--------|
+| toast-close-button | upstream_merged | None |
+| background-tasks-ui | requested | None — not implemented |
+| copilot-resource-rendering | requested | None — not implemented |
+| custom-agents | requested | None — not implemented |
+| **system-generated-turns** | **defined** | **None** — no code changes. Spec may need re-validation against new orchestration layer. Another agent can re-run define/explore later. |
 
 ---
 
