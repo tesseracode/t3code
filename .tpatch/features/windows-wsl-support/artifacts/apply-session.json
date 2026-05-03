@@ -1,0 +1,6 @@
+{
+  "slug": "windows-wsl-support",
+  "completed_at": "2026-04-27T08:44:51Z",
+  "base_commit": "4170cdbd2e151b6e22567551fc99ccd42284893b",
+  "has_patch": true
+}
