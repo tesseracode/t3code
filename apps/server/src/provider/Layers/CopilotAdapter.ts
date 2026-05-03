@@ -5,6 +5,7 @@ import {
   type ServerProviderSkill,
   EventId,
   type ProviderApprovalDecision,
+  ProviderDriverKind,
   ProviderItemId,
   type ProviderRuntimeEvent,
   type ProviderSession,
@@ -56,7 +57,7 @@ import type {
   ProviderThreadTurnSnapshot,
 } from "../Services/ProviderAdapter.ts";
 
-const PROVIDER = "copilot" as const;
+const PROVIDER = ProviderDriverKind.make("copilot");
 const USER_INPUT_QUESTION_ID = "answer";
 const USER_INPUT_QUESTION_HEADER = "Question";
 
@@ -426,7 +427,7 @@ function mapSupportedModelsById(models: ReadonlyArray<ModelInfo>) {
 function getCopilotReasoningEffortFromSelection(
   modelSelection: ModelSelection | undefined,
 ): ReasoningEffort | undefined {
-  if (!modelSelection || modelSelection.provider !== PROVIDER) {
+  if (!modelSelection) {
     return undefined;
   }
   const effortEntry = modelSelection.options?.find(
@@ -741,7 +742,7 @@ function createSessionRecord(input: {
   };
 }
 
-const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
+export const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
   Effect.gen(function* () {
     const serverConfig = yield* ServerConfig;
     const serverSettings = yield* ServerSettingsService;
@@ -1793,8 +1794,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
               }),
           ),
         );
-        const requestedModelSelection =
-          input.modelSelection?.provider === PROVIDER ? input.modelSelection : undefined;
+        const requestedModelSelection = input.modelSelection ?? undefined;
         const sessionConfiguration: CopilotSessionConfiguration = {
           model: requestedModelSelection?.model,
           reasoningEffort: getCopilotReasoningEffortFromSelection(requestedModelSelection),
@@ -1826,7 +1826,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
         const cliPath =
           normalizeCopilotCliPathOverride(copilotSettings.binaryPath) ??
           resolveBundledCopilotCliPath();
-        const configDir = trimToUndefined(copilotSettings.homePath);
+        const configDir = undefined;
         const mcpServers = yield* Effect.tryPromise({
           try: () => loadCopilotMcpServers(configDir),
           catch: (cause) =>
@@ -1984,8 +1984,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
     const sendTurn: CopilotAdapterShape["sendTurn"] = (input) =>
       Effect.gen(function* () {
         const record = yield* getSessionRecord(input.threadId);
-        const requestedModelSelection =
-          input.modelSelection?.provider === PROVIDER ? input.modelSelection : undefined;
+        const requestedModelSelection = input.modelSelection ?? undefined;
         const explicitReasoningEffort =
           getCopilotReasoningEffortFromSelection(requestedModelSelection);
         const nextModel = requestedModelSelection?.model ?? record.model;

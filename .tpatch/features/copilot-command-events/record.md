@@ -1,5 +1,6 @@
 # Implementation Record: copilot-command-events
 
+<<<<<<< HEAD
 **Recorded**: 2026-04-27T01:56:36Z
 **Files changed**: 27
 **Patch size**: 137285 bytes
@@ -40,6 +41,11 @@
  .tpatch/features/toast-close-button/status.json    |    4 +-
  31 files changed, 27363 insertions(+), 1397 deletions(-)
 ```
+=======
+**Recorded**: 2026-05-03T07:26:10Z
+**Files changed**: 27
+**Patch size**: 169894 bytes
+>>>>>>> reconcile/multi-provider
 
 ## Replay Instructions
 
@@ -50,4 +56,8 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-command-events/artifacts/post-apply.patch
 ```
 
+<<<<<<< HEAD
 *Patch was captured as a committed diff from `main` to `HEAD`.*
+=======
+*Patch was captured as a committed diff from `e42c13bf~1` to `HEAD`.*
+>>>>>>> reconcile/multi-provider

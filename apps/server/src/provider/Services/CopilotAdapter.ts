@@ -14,12 +14,13 @@ import { Context } from "effect";
 
 import type { ProviderAdapterError } from "../Errors.ts";
 import type { ProviderAdapterShape } from "./ProviderAdapter.ts";
+import { ProviderDriverKind } from "@t3tools/contracts";
 
 /**
  * CopilotAdapterShape - Service API for the GitHub Copilot provider adapter.
  */
 export interface CopilotAdapterShape extends ProviderAdapterShape<ProviderAdapterError> {
-  readonly provider: "copilot";
+  readonly provider: ProviderDriverKind;
 }
 
 /**

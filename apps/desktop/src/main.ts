@@ -5,6 +5,11 @@ import * as OS from "node:os";
 import * as Path from "node:path";
 
 import {
+  createDefaultBackendTarget,
+  type BackendTarget,
+} from "./backendTarget.ts";
+
+import {
   app,
   BrowserWindow,
   type BrowserWindowConstructorOptions,
@@ -76,7 +81,6 @@ import {
 import { isArm64HostRunningIntelBuild, resolveDesktopRuntimeInfo } from "./runtimeArch.ts";
 import { resolveDesktopAppBranding } from "./appBranding.ts";
 import { bindFirstRevealTrigger, type RevealSubscription } from "./windowReveal.ts";
-import { createDefaultBackendTarget, type BackendTarget } from "./backendTarget.ts";
 
 syncShellEnvironment();
 
@@ -213,13 +217,13 @@ let backendEndpointUrl: string | null = null;
 let backendAdvertisedHost: string | null = null;
 let backendReadinessAbortController: AbortController | null = null;
 let backendInitialWindowOpenInFlight: Promise<void> | null = null;
-const backendTarget: BackendTarget = createDefaultBackendTarget();
 let backendListeningDetector: ServerListeningDetector | null = null;
 let restartAttempt = 0;
 let restartTimer: ReturnType<typeof setTimeout> | null = null;
 let isQuitting = false;
 let desktopProtocolRegistered = false;
 let aboutCommitHashCache: string | null | undefined;
+const backendTarget: BackendTarget = createDefaultBackendTarget();
 let desktopLogSink: RotatingFileSink | null = null;
 let backendLogSink: RotatingFileSink | null = null;
 let restoreStdIoCapture: (() => void) | null = null;
@@ -727,7 +731,16 @@ function resolveAboutCommitHash(): string | null {
   return aboutCommitHashCache;
 }
 
-// resolveBackendEntry and resolveBackendCwd moved to backendTarget.ts
+function resolveBackendEntry(): string {
+  return Path.join(resolveAppRoot(), "apps/server/dist/bin.mjs");
+}
+
+function resolveBackendCwd(): string {
+  if (!app.isPackaged) {
+    return resolveAppRoot();
+  }
+  return OS.homedir();
+}
 
 function resolveDesktopStaticDir(): string | null {
   const appRoot = resolveAppRoot();
@@ -1366,37 +1379,38 @@ function startBackend(): void {
   if (isQuitting || backendProcess) return;
 
   backendObservabilitySettings = readPersistedBackendObservabilitySettings();
-
-  if (!backendTarget.isAvailable()) {
-    scheduleBackendRestart(`backend target '${backendTarget.displayLabel}' is not available`);
+  const backendEntry = resolveBackendEntry();
+  if (!FS.existsSync(backendEntry)) {
+    scheduleBackendRestart(`missing server entry at ${backendEntry}`);
     return;
   }
 
   const captureBackendLogs = !isDevelopment;
-  const { child, bootstrapDelivered } = backendTarget.spawn(
-    {
-      mode: "desktop",
-      noBrowser: true,
-      port: backendPort,
-      t3Home: BASE_DIR,
-      host: backendBindHost,
-      desktopBootstrapToken: backendBootstrapToken,
-      ...(backendObservabilitySettings.otlpTracesUrl
-        ? { otlpTracesUrl: backendObservabilitySettings.otlpTracesUrl }
-        : {}),
-      ...(backendObservabilitySettings.otlpMetricsUrl
-        ? { otlpMetricsUrl: backendObservabilitySettings.otlpMetricsUrl }
-        : {}),
+  const bootstrapConfig = {
+    mode: "desktop" as const,
+    noBrowser: true,
+    port: backendPort,
+    t3Home: BASE_DIR,
+    host: backendBindHost,
+    desktopBootstrapToken: backendBootstrapToken,
+    ...(backendObservabilitySettings.otlpTracesUrl
+      ? { otlpTracesUrl: backendObservabilitySettings.otlpTracesUrl }
+      : {}),
+    ...(backendObservabilitySettings.otlpMetricsUrl
+      ? { otlpMetricsUrl: backendObservabilitySettings.otlpMetricsUrl }
+      : {}),
+  };
+  const spawnResult = backendTarget.spawn(bootstrapConfig, {
+    env: {
+      ...backendChildEnv(),
+      ELECTRON_RUN_AS_NODE: "1",
     },
-    {
-      env: backendChildEnv(),
-      captureOutput: captureBackendLogs,
-    },
-  );
-
-  if (!bootstrapDelivered) {
+    captureOutput: captureBackendLogs,
+  });
+  const child = spawnResult.child;
+  if (!spawnResult.bootstrapDelivered) {
     child.kill("SIGTERM");
-    scheduleBackendRestart("failed to deliver bootstrap config");
+    scheduleBackendRestart("missing desktop bootstrap pipe");
     return;
   }
   const listeningDetector = new ServerListeningDetector();
@@ -1410,7 +1424,7 @@ function startBackend(): void {
   };
   writeBackendSessionBoundary(
     "START",
-    `pid=${child.pid ?? "unknown"} port=${backendPort} target=${backendTarget.displayLabel}`,
+    `pid=${child.pid ?? "unknown"} port=${backendPort} cwd=${resolveBackendCwd()}`,
   );
   captureBackendOutput(child);
 

@@ -573,7 +573,10 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     directories: {
       buildResources: "apps/desktop/resources",
     },
-    asarUnpack: ["node_modules/@github/copilot-*/**", "node_modules/@github/copilot/**"],
+    asarUnpack: [
+      "node_modules/@github/copilot-*/**",
+      "node_modules/@github/copilot/**",
+    ],
   };
   const updateChannel = resolveDesktopUpdateChannel(version);
   const publishConfig = resolveGitHubPublishConfig(updateChannel);
@@ -818,39 +821,16 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     })`bun install --production`,
   );
 
-  // Force-install Copilot platform binaries for the target platform.
-  // bun skips packages with os/cpu restrictions that don't match the host,
-  // so cross-compilation needs npm --force to bypass the os check.
-  const copilotPlatformMap: Record<string, Record<string, string[]>> = {
-    mac: {
-      arm64: ["@github/copilot-darwin-arm64"],
-      x64: ["@github/copilot-darwin-x64"],
-      universal: ["@github/copilot-darwin-arm64", "@github/copilot-darwin-x64"],
-    },
-    linux: {
-      arm64: ["@github/copilot-linux-arm64"],
-      x64: ["@github/copilot-linux-x64"],
-    },
-    win: {
-      arm64: ["@github/copilot-win32-arm64"],
-      x64: ["@github/copilot-win32-x64"],
-    },
-  };
-  const copilotPlatformPackages = copilotPlatformMap[options.platform]?.[options.arch] ?? [];
-  if (copilotPlatformPackages.length > 0) {
-    yield* Effect.log(
-      `[desktop-artifact] Force-installing Copilot platform binaries: ${copilotPlatformPackages.join(", ")}`,
-    );
-    for (const pkg of copilotPlatformPackages) {
-      yield* runCommand(
-        ChildProcess.make({
-          cwd: stageAppDir,
-          ...commandOutputOptions(options.verbose),
-          shell: process.platform === "win32",
-        })`npm install ${pkg}@latest --no-save --force`,
-      );
-    }
-  }
+  // Force-install cross-platform Copilot SDK binaries so the asar contains
+  // the correct native module for the target platform.
+  yield* Effect.log("[desktop-artifact] Ensuring cross-platform Copilot SDK binaries...");
+  yield* runCommand(
+    ChildProcess.make({
+      cwd: stageAppDir,
+      ...commandOutputOptions(options.verbose),
+      shell: process.platform === "win32",
+    })`npm install --force @github/copilot-sdk`,
+  ).pipe(Effect.ignore({ log: true }));
 
   const buildEnv: NodeJS.ProcessEnv = {
     ...process.env,

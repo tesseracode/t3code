@@ -114,9 +114,7 @@ const bootstrapFdFlag = Flag.integer("bootstrap-fd").pipe(
   Flag.optional,
 );
 const bootstrapJsonFlag = Flag.string("bootstrap-json").pipe(
-  Flag.withDescription(
-    "Inline bootstrap config as a JSON string. Alternative to --bootstrap-fd for environments where fd passing is not available (e.g., WSL via wsl.exe).",
-  ),
+  Flag.withDescription("Pass one-time bootstrap secrets as a JSON string."),
   Flag.optional,
 );
 const autoBootstrapProjectFromCwdFlag = Flag.boolean("auto-bootstrap-project-from-cwd").pipe(
@@ -248,7 +246,7 @@ export const resolveServerConfig = (
       bootstrapFd !== undefined
         ? yield* readBootstrapEnvelope(BootstrapEnvelopeSchema, bootstrapFd)
         : bootstrapJsonRaw !== undefined
-          ? Schema.decodeOption(BootstrapEnvelopeSchema)(JSON.parse(bootstrapJsonRaw))
+          ? Option.some(Schema.decodeUnknownSync(BootstrapEnvelopeSchema)(JSON.parse(bootstrapJsonRaw)))
           : Option.none();
     const bootstrap = Option.getOrUndefined(bootstrapEnvelope);
 

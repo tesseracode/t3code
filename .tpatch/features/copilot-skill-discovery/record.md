@@ -1,5 +1,6 @@
 # Implementation Record: copilot-skill-discovery
 
+<<<<<<< HEAD
 **Recorded**: 2026-04-27T01:56:36Z
 **Files changed**: 27
 **Patch size**: 137285 bytes
@@ -28,6 +29,11 @@
  .tpatch/features/toast-close-button/status.json    |    4 +-
  19 files changed, 16005 insertions(+), 1165 deletions(-)
 ```
+=======
+**Recorded**: 2026-05-03T07:26:10Z
+**Files changed**: 27
+**Patch size**: 169894 bytes
+>>>>>>> reconcile/multi-provider
 
 ## Replay Instructions
 
@@ -38,4 +44,8 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-skill-discovery/artifacts/post-apply.patch
 ```
 
+<<<<<<< HEAD
 *Patch was captured as a committed diff from `main` to `HEAD`.*
+=======
+*Patch was captured as a committed diff from `e42c13bf~1` to `HEAD`.*
+>>>>>>> reconcile/multi-provider

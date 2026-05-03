@@ -10,16 +10,13 @@ import { normalizeCopilotCliPathOverride, resolveBundledCopilotCliPath } from ".
 import { getCopilotDiscoveredSkills } from "./CopilotAdapter.ts";
 import type {
   ModelCapabilities,
-  ServerProvider,
   ServerProviderModel,
   CopilotSettings,
 } from "@t3tools/contracts";
-import { Effect, Equal, Layer, Stream } from "effect";
+import { Effect } from "effect";
 
-import { buildServerProvider } from "../providerSnapshot.ts";
-import { makeManagedServerProvider } from "../makeManagedServerProvider.ts";
+import { buildServerProvider, type ServerProviderDraft } from "../providerSnapshot.ts";
 import { CopilotProvider } from "../Services/CopilotProvider.ts";
-import { ServerSettingsService } from "../../serverSettings.ts";
 
 const PROVIDER = "copilot" as const;
 
@@ -225,9 +222,8 @@ const BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [
   },
 ];
 
-const makePendingCopilotProvider = (): ServerProvider =>
+const makePendingCopilotProvider = (): ServerProviderDraft =>
   buildServerProvider({
-    provider: PROVIDER,
     presentation: COPILOT_PRESENTATION,
     enabled: false,
     checkedAt: new Date().toISOString(),
@@ -241,9 +237,8 @@ const makePendingCopilotProvider = (): ServerProvider =>
     },
   });
 
-const makeErrorProvider = (message: string): ServerProvider =>
+const makeErrorProvider = (message: string): ServerProviderDraft =>
   buildServerProvider({
-    provider: PROVIDER,
     presentation: COPILOT_PRESENTATION,
     enabled: false,
     checkedAt: new Date().toISOString(),
@@ -268,7 +263,6 @@ export const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus"
 
   if (!settings.enabled) {
     return buildServerProvider({
-      provider: PROVIDER,
       presentation: COPILOT_PRESENTATION,
       enabled: false,
       checkedAt: now,
@@ -329,7 +323,6 @@ export const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus"
       errorMsg.toLowerCase().includes("unauthorized");
 
     return buildServerProvider({
-      provider: PROVIDER,
       presentation: COPILOT_PRESENTATION,
       enabled: false,
       checkedAt: now,
@@ -363,7 +356,6 @@ export const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus"
     : allModels;
 
   return buildServerProvider({
-    provider: PROVIDER,
     presentation: COPILOT_PRESENTATION,
     enabled: true,
     checkedAt: now,
@@ -378,28 +370,5 @@ export const checkCopilotProviderStatus = Effect.fn("checkCopilotProviderStatus"
   });
 });
 
-export const CopilotProviderLive = Layer.effect(
-  CopilotProvider,
-  Effect.gen(function* () {
-    const serverSettings = yield* ServerSettingsService;
-
-    const checkProvider = Effect.gen(function* () {
-      const settings = yield* serverSettings.getSettings;
-      return yield* checkCopilotProviderStatus(settings.providers.copilot);
-    }).pipe(Effect.orElseSucceed(() => makeErrorProvider("Failed to check Copilot status")));
-
-    return yield* makeManagedServerProvider<CopilotSettings>({
-      getSettings: serverSettings.getSettings.pipe(
-        Effect.map((settings) => settings.providers.copilot),
-        Effect.orDie,
-      ),
-      streamSettings: serverSettings.streamChanges.pipe(
-        Stream.map((settings) => settings.providers.copilot),
-      ),
-      haveSettingsChanged: (previous, next) => !Equal.equals(previous, next),
-      initialSnapshot: makePendingCopilotProvider,
-      checkProvider,
-      refreshInterval: "120 seconds",
-    });
-  }),
-);
+// CopilotProviderLive is superseded by CopilotDriver which creates its own
+// managed snapshot per instance. Retained as dead code during migration.
