@@ -113,6 +113,10 @@ const bootstrapFdFlag = Flag.integer("bootstrap-fd").pipe(
   Flag.withDescription("Read one-time bootstrap secrets from the given file descriptor."),
   Flag.optional,
 );
+const bootstrapJsonFlag = Flag.string("bootstrap-json").pipe(
+  Flag.withDescription("Pass one-time bootstrap secrets as a JSON string."),
+  Flag.optional,
+);
 const autoBootstrapProjectFromCwdFlag = Flag.boolean("auto-bootstrap-project-from-cwd").pipe(
   Flag.withDescription(
     "Create a project for the current working directory on startup when missing.",
@@ -185,6 +189,7 @@ interface CliServerFlags {
   readonly devUrl: Option.Option<URL>;
   readonly noBrowser: Option.Option<boolean>;
   readonly bootstrapFd: Option.Option<number>;
+  readonly bootstrapJson: Option.Option<string>;
   readonly autoBootstrapProjectFromCwd: Option.Option<boolean>;
   readonly logWebSocketEvents: Option.Option<boolean>;
 }
@@ -231,14 +236,18 @@ export const resolveServerConfig = (
       devUrl: flags.devUrl ?? Option.none(),
       noBrowser: flags.noBrowser ?? Option.none(),
       bootstrapFd: flags.bootstrapFd ?? Option.none(),
+      bootstrapJson: flags.bootstrapJson ?? Option.none(),
       autoBootstrapProjectFromCwd: flags.autoBootstrapProjectFromCwd ?? Option.none(),
       logWebSocketEvents: flags.logWebSocketEvents ?? Option.none(),
     } satisfies CliServerFlags;
     const bootstrapFd = Option.getOrUndefined(normalizedFlags.bootstrapFd) ?? env.bootstrapFd;
+    const bootstrapJsonRaw = Option.getOrUndefined(normalizedFlags.bootstrapJson);
     const bootstrapEnvelope =
       bootstrapFd !== undefined
         ? yield* readBootstrapEnvelope(BootstrapEnvelopeSchema, bootstrapFd)
-        : Option.none();
+        : bootstrapJsonRaw !== undefined
+          ? Option.some(Schema.decodeUnknownSync(BootstrapEnvelopeSchema)(JSON.parse(bootstrapJsonRaw)))
+          : Option.none();
     const bootstrap = Option.getOrUndefined(bootstrapEnvelope);
 
     const mode: RuntimeMode = Option.getOrElse(
@@ -384,6 +393,7 @@ const resolveCliAuthConfig = (
       devUrl: flags.devUrl ?? Option.none(),
       noBrowser: Option.none(),
       bootstrapFd: Option.none(),
+      bootstrapJson: Option.none(),
       autoBootstrapProjectFromCwd: Option.none(),
       logWebSocketEvents: Option.none(),
     },
@@ -764,6 +774,7 @@ const sharedServerCommandFlags = {
   devUrl: devUrlFlag,
   noBrowser: noBrowserFlag,
   bootstrapFd: bootstrapFdFlag,
+  bootstrapJson: bootstrapJsonFlag,
   autoBootstrapProjectFromCwd: autoBootstrapProjectFromCwdFlag,
   logWebSocketEvents: logWebSocketEventsFlag,
 } as const;

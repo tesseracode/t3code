@@ -5,6 +5,11 @@ import * as OS from "node:os";
 import * as Path from "node:path";
 
 import {
+  createDefaultBackendTarget,
+  type BackendTarget,
+} from "./backendTarget.ts";
+
+import {
   app,
   BrowserWindow,
   type BrowserWindowConstructorOptions,
@@ -218,6 +223,7 @@ let restartTimer: ReturnType<typeof setTimeout> | null = null;
 let isQuitting = false;
 let desktopProtocolRegistered = false;
 let aboutCommitHashCache: string | null | undefined;
+const backendTarget: BackendTarget = createDefaultBackendTarget();
 let desktopLogSink: RotatingFileSink | null = null;
 let backendLogSink: RotatingFileSink | null = null;
 let restoreStdIoCapture: (() => void) | null = null;
@@ -1380,38 +1386,29 @@ function startBackend(): void {
   }
 
   const captureBackendLogs = !isDevelopment;
-  const child = ChildProcess.spawn(process.execPath, [backendEntry, "--bootstrap-fd", "3"], {
-    cwd: resolveBackendCwd(),
-    // In Electron main, process.execPath points to the Electron binary.
-    // Run the child in Node mode so this backend process does not become a GUI app instance.
+  const bootstrapConfig = {
+    mode: "desktop" as const,
+    noBrowser: true,
+    port: backendPort,
+    t3Home: BASE_DIR,
+    host: backendBindHost,
+    desktopBootstrapToken: backendBootstrapToken,
+    ...(backendObservabilitySettings.otlpTracesUrl
+      ? { otlpTracesUrl: backendObservabilitySettings.otlpTracesUrl }
+      : {}),
+    ...(backendObservabilitySettings.otlpMetricsUrl
+      ? { otlpMetricsUrl: backendObservabilitySettings.otlpMetricsUrl }
+      : {}),
+  };
+  const spawnResult = backendTarget.spawn(bootstrapConfig, {
     env: {
       ...backendChildEnv(),
       ELECTRON_RUN_AS_NODE: "1",
     },
-    stdio: captureBackendLogs
-      ? ["ignore", "pipe", "pipe", "pipe"]
-      : ["ignore", "inherit", "inherit", "pipe"],
+    captureOutput: captureBackendLogs,
   });
-  const bootstrapStream = child.stdio[3];
-  if (bootstrapStream && "write" in bootstrapStream) {
-    bootstrapStream.write(
-      `${JSON.stringify({
-        mode: "desktop",
-        noBrowser: true,
-        port: backendPort,
-        t3Home: BASE_DIR,
-        host: backendBindHost,
-        desktopBootstrapToken: backendBootstrapToken,
-        ...(backendObservabilitySettings.otlpTracesUrl
-          ? { otlpTracesUrl: backendObservabilitySettings.otlpTracesUrl }
-          : {}),
-        ...(backendObservabilitySettings.otlpMetricsUrl
-          ? { otlpMetricsUrl: backendObservabilitySettings.otlpMetricsUrl }
-          : {}),
-      })}\n`,
-    );
-    bootstrapStream.end();
-  } else {
+  const child = spawnResult.child;
+  if (!spawnResult.bootstrapDelivered) {
     child.kill("SIGTERM");
     scheduleBackendRestart("missing desktop bootstrap pipe");
     return;
