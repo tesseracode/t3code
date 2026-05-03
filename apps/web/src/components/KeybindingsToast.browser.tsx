@@ -125,6 +125,12 @@ function createBaseServerConfig(): ServerConfig {
           serverPassword: "",
           customModels: [],
         },
+        copilot: {
+          enabled: true,
+          binaryPath: "",
+          customModels: [],
+          hideInternalModels: false,
+        },
       },
     },
   };
