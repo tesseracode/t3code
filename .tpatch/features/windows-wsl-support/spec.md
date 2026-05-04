@@ -28,3 +28,24 @@
 6. Add desktop-managed environment registration, persistence, and reconnect flows.
 7. Harden multi-environment persistence so isolated base directories and atomic writes protect runtime files.
 8. Set up Windows CI pipeline for smoke testing.
+
+## Files Touched (reconciliation reference)
+
+| File | What it does |
+|------|-------------|
+| `apps/desktop/src/backendTarget.ts` | BackendTarget interface + LocalBackendTarget |
+| `apps/desktop/src/wslBackendTarget.ts` | WslBackendTarget + distro detection + path translation |
+| `apps/desktop/src/backendEnvironment.ts` | BackendEnvironmentManager + WSL auto-discovery |
+| `apps/desktop/src/wslServerBundle.ts` | Server bundle preparation for WSL targets |
+| `apps/desktop/src/main.ts` | IPC channels (list-managed-environments, prepare-managed-environment-registration) + BackendTarget wiring |
+| `apps/server/src/cli.ts` | --bootstrap-json flag (WSL fd 3 workaround) |
+| `apps/server/src/cli-config.test.ts` | bootstrapJson in test fixtures |
+
+## Reconciliation Checklist
+
+On every upstream sync, verify:
+```bash
+ls apps/desktop/src/backendTarget.ts apps/desktop/src/wslBackendTarget.ts apps/desktop/src/backendEnvironment.ts apps/desktop/src/wslServerBundle.ts
+grep "LIST_MANAGED_ENVIRONMENTS\|PREPARE_MANAGED_ENVIRONMENT" apps/desktop/src/main.ts
+grep "bootstrapJson\|bootstrap-json" apps/server/src/cli.ts
+```

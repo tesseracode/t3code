@@ -1,14 +1,16 @@
 # Implementation Record: windows-wsl-support
 
-<<<<<<< HEAD
-**Recorded**: 2026-04-27T08:47:40Z
-**Files changed**: 5
-**Patch size**: 32406 bytes
-=======
-**Recorded**: 2026-05-03T07:26:11Z
-**Files changed**: 27
-**Patch size**: 169894 bytes
->>>>>>> reconcile/multi-provider
+**Recorded**: 2026-05-04T06:22:13Z
+**Files changed**: 3
+**Patch size**: 12201 bytes
+
+## Change Summary
+
+```
+ .../windows-wsl-support/artifacts/post-apply.patch | 5111 ++------------------
+ .tpatch/features/windows-wsl-support/spec.md       |   21 +
+ 2 files changed, 303 insertions(+), 4829 deletions(-)
+```
 
 ## Replay Instructions
 
@@ -19,8 +21,4 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/windows-wsl-support/artifacts/post-apply.patch
 ```
 
-<<<<<<< HEAD
-*Patch was captured as a committed diff from `5507cb73~1` to `HEAD`.*
-=======
-*Patch was captured as a committed diff from `e42c13bf~1` to `HEAD`.*
->>>>>>> reconcile/multi-provider
+*Patch was captured as a committed diff from `27bead0f~1` to `HEAD`.*
