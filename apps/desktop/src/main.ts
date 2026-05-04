@@ -8,6 +8,7 @@ import {
   createDefaultBackendTarget,
   type BackendTarget,
 } from "./backendTarget.ts";
+import { createDefaultBackendEnvironmentManager, type ManagedBackendEnvironment } from "./backendEnvironment.ts";
 
 import {
   app,
@@ -107,6 +108,8 @@ const SET_SAVED_ENVIRONMENT_SECRET_CHANNEL = "desktop:set-saved-environment-secr
 const REMOVE_SAVED_ENVIRONMENT_SECRET_CHANNEL = "desktop:remove-saved-environment-secret";
 const GET_SERVER_EXPOSURE_STATE_CHANNEL = "desktop:get-server-exposure-state";
 const SET_SERVER_EXPOSURE_MODE_CHANNEL = "desktop:set-server-exposure-mode";
+const LIST_MANAGED_ENVIRONMENTS_CHANNEL = "desktop:list-managed-environments";
+const PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL = "desktop:prepare-managed-environment-registration";
 const BASE_DIR = process.env.T3CODE_HOME?.trim() || Path.join(OS.homedir(), ".t3");
 const STATE_DIR = Path.join(BASE_DIR, "userdata");
 const DESKTOP_SETTINGS_PATH = Path.join(STATE_DIR, "desktop-settings.json");
@@ -224,6 +227,16 @@ let isQuitting = false;
 let desktopProtocolRegistered = false;
 let aboutCommitHashCache: string | null | undefined;
 const backendTarget: BackendTarget = createDefaultBackendTarget();
+const backendEnvironmentManager = createDefaultBackendEnvironmentManager({
+  rootBaseDir: BASE_DIR,
+  appRoot: ROOT_DIR,
+});
+
+function listManagedBackendEnvironments(): readonly ManagedBackendEnvironment[] {
+  return backendEnvironmentManager
+    .listEnvironments()
+    .filter((environment) => environment.key !== backendEnvironmentManager.primaryEnvironment.key);
+}
 let desktopLogSink: RotatingFileSink | null = null;
 let backendLogSink: RotatingFileSink | null = null;
 let restoreStdIoCapture: (() => void) | null = null;
@@ -1862,6 +1875,35 @@ function registerIpcHandlers(): void {
       state: updateState,
     } satisfies DesktopUpdateCheckResult;
   });
+
+  ipcMain.removeHandler(LIST_MANAGED_ENVIRONMENTS_CHANNEL);
+  ipcMain.handle(LIST_MANAGED_ENVIRONMENTS_CHANNEL, async () =>
+    listManagedBackendEnvironments().map((environment) => ({
+      key: environment.key,
+      displayLabel: environment.displayLabel,
+      kind: environment.kind,
+    })),
+  );
+
+  ipcMain.removeHandler(PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL);
+  ipcMain.handle(
+    PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL,
+    async (_event, rawEnvironmentKey: string) => {
+      const environment = backendEnvironmentManager.getEnvironment(rawEnvironmentKey);
+      if (!environment) {
+        throw new Error(`Unknown managed environment: ${rawEnvironmentKey}`);
+      }
+      // Ensure the target is ready (e.g., WSL server bundle installed)
+      const ready = environment.target.ensureReady();
+      return {
+        key: environment.key,
+        displayLabel: environment.displayLabel,
+        kind: environment.kind,
+        ready,
+        baseDir: environment.baseDir,
+      };
+    },
+  );
 }
 
 function getIconOption(): { icon: string } | Record<string, never> {
