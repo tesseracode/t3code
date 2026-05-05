@@ -5,20 +5,12 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-04-27T04:50:12Z",
-<<<<<<< HEAD
-  "updated_at": "2026-04-27T05:52:13Z",
-=======
   "updated_at": "2026-05-03T07:26:11Z",
->>>>>>> reconcile/multi-provider
   "last_command": "record",
   "notes": "Patch recorded",
   "apply": {
     "completed_at": "2026-04-27T05:51:55Z",
-<<<<<<< HEAD
-    "base_commit": "b1ec56e74d1afc0b2a080207f412943e3fef47ff",
-=======
     "base_commit": "fc8a225a788a0590f38d2c2e9494cfb68a342fe0",
->>>>>>> reconcile/multi-provider
     "has_patch": true
   },
   "reconcile": {},

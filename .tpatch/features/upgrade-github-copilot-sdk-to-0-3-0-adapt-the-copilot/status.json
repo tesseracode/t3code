@@ -5,21 +5,12 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-04-25T10:56:31Z",
-<<<<<<< HEAD
-  "updated_at": "2026-04-25T21:06:04Z",
-  "last_command": "record",
-  "notes": "Artifacts regenerated from a scoped temp-index snapshot so the replay patch and recipe include the SDK regression tests and corrected build script diff",
-  "apply": {
-    "completed_at": "2026-04-25T11:00:46Z",
-    "base_commit": "f41a6aede11c78cb0194eb80a64bbd94c1a9cdea",
-=======
   "updated_at": "2026-05-03T07:26:11Z",
   "last_command": "record",
   "notes": "Patch recorded",
   "apply": {
     "completed_at": "2026-04-25T11:00:46Z",
     "base_commit": "fc8a225a788a0590f38d2c2e9494cfb68a342fe0",
->>>>>>> reconcile/multi-provider
     "has_patch": true
   },
   "reconcile": {}

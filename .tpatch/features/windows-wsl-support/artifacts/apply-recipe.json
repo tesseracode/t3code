@@ -664,6 +664,14 @@
       "description": "Modify ipc.ts",
       "search": "  getLocalEnvironmentBootstrap: () => DesktopEnvironmentBootstrap | null;\n  getClientSettings: () => Promise<ClientSettings | null>;\n  setClientSettings: (settings: ClientSettings) => Promise<void>;\n  getSavedEnvironmentRegistry: () => Promise<readonly PersistedSavedEnvironmentRecord[]>;\n  setSavedEnvironmentRegistry: (\n    records: readonly PersistedSavedEnvironmentRecord[],",
       "replace": "  getLocalEnvironmentBootstrap: () => DesktopEnvironmentBootstrap | null;\n  getClientSettings: () => Promise<ClientSettings | null>;\n  setClientSettings: (settings: ClientSettings) => Promise<void>;\n  listManagedEnvironments: () => Promise<readonly DesktopManagedEnvironmentCandidate[]>;\n  prepareManagedEnvironmentRegistration: (\n    environmentKey: string,\n  ) => Promise<DesktopManagedEnvironmentRegistration>;\n  getSavedEnvironmentRegistry: () => Promise<readonly PersistedSavedEnvironmentRecord[]>;\n  setSavedEnvironmentRegistry: (\n    records: readonly PersistedSavedEnvironmentRecord[],"
+    },
+    {
+      "id": "84",
+      "type": "replace-in-file",
+      "path": "apps/server/scripts/cli.ts",
+      "description": "Spawn the Node executable directly during the server build so Windows paths under C:\\Program Files are not split by shell mode.",
+      "search": "          cwd: serverDir,\n          stdout: config.verbose ? \"inherit\" : \"ignore\",\n          stderr: \"inherit\",\n          // Windows needs shell mode to resolve `.cmd` shims on PATH.\n          shell: process.platform === \"win32\",\n        }),",
+      "replace": "          cwd: serverDir,\n          stdout: config.verbose ? \"inherit\" : \"ignore\",\n          stderr: \"inherit\",\n        }),"
     }
   ]
 }

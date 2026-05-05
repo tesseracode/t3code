@@ -77,9 +77,10 @@
 
 - `tpatch test <slug>` reads the global `.tpatch/config.yaml` `test_command`.
 - `bun run test` is too broad as the default command on Windows today because it fails in an unrelated scripts-package symlink test.
-- Added feature-scoped scripts: `apps/desktop:test:wsl-support` and root `test:windows-wsl-support`.
-- `tpatch` is now configured to run `bun run test:windows-wsl-support` for this feature branch.
-- `tpatch test windows-wsl-support` currently fails on Windows before running Bun because the CLI shells through `sh`; direct PowerShell execution of `bun run test:windows-wsl-support` passes.
+- The original feature-scoped scripts (`apps/desktop:test:wsl-support` and root `test:windows-wsl-support`) were removed during later reconciliation.
+- `tpatch` is now configured to run `bun run --filter t3 build`, which exercises the server build wrapper used by `bun run dev:desktop`.
+- On Windows, `tpatch test` still needs a POSIX `sh` on `PATH`; this checkout validates with `C:\Program Files\Git\usr\bin` prepended.
+- Current manual validation also includes the desktop package tests via `bun run test` from `apps/desktop`.
 - If we want a repo-wide default later, fix or gate the Windows symlink test first.
 
 ## tpatch Tracking

@@ -11,6 +11,7 @@
 7. File watching uses native `inotify` inside WSL (not polling).
 8. The desktop app can list additional desktop-managed environments and prepare registration metadata for local and WSL targets.
 9. Managed local and WSL environments persist saved-environment metadata, encrypted credentials, runtime state, settings, keybindings, and provider cache files without clobbering each other.
+10. On Windows, `bun run dev:desktop` builds the server even when Node is installed under `C:\Program Files`.
 
 ## Out of Scope
 
@@ -31,21 +32,24 @@
 
 ## Files Touched (reconciliation reference)
 
-| File | What it does |
-|------|-------------|
-| `apps/desktop/src/backendTarget.ts` | BackendTarget interface + LocalBackendTarget |
-| `apps/desktop/src/wslBackendTarget.ts` | WslBackendTarget + distro detection + path translation |
-| `apps/desktop/src/backendEnvironment.ts` | BackendEnvironmentManager + WSL auto-discovery |
-| `apps/desktop/src/wslServerBundle.ts` | Server bundle preparation for WSL targets |
-| `apps/desktop/src/main.ts` | IPC channels (list-managed-environments, prepare-managed-environment-registration) + BackendTarget wiring |
-| `apps/server/src/cli.ts` | --bootstrap-json flag (WSL fd 3 workaround) |
-| `apps/server/src/cli-config.test.ts` | bootstrapJson in test fixtures |
+| File                                     | What it does                                                                                              |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `apps/desktop/src/backendTarget.ts`      | BackendTarget interface + LocalBackendTarget                                                              |
+| `apps/desktop/src/wslBackendTarget.ts`   | WslBackendTarget + distro detection + path translation                                                    |
+| `apps/desktop/src/backendEnvironment.ts` | BackendEnvironmentManager + WSL auto-discovery                                                            |
+| `apps/desktop/src/wslServerBundle.ts`    | Server bundle preparation for WSL targets                                                                 |
+| `apps/desktop/src/main.ts`               | IPC channels (list-managed-environments, prepare-managed-environment-registration) + BackendTarget wiring |
+| `apps/server/src/cli.ts`                 | --bootstrap-json flag (WSL fd 3 workaround)                                                               |
+| `apps/server/scripts/cli.ts`             | Server package build wrapper for desktop dev                                                              |
+| `apps/server/src/cli-config.test.ts`     | bootstrapJson in test fixtures                                                                            |
 
 ## Reconciliation Checklist
 
 On every upstream sync, verify:
+
 ```bash
 ls apps/desktop/src/backendTarget.ts apps/desktop/src/wslBackendTarget.ts apps/desktop/src/backendEnvironment.ts apps/desktop/src/wslServerBundle.ts
 grep "LIST_MANAGED_ENVIRONMENTS\|PREPARE_MANAGED_ENVIRONMENT" apps/desktop/src/main.ts
 grep "bootstrapJson\|bootstrap-json" apps/server/src/cli.ts
+bun run --filter t3 build
 ```

@@ -12,6 +12,6 @@ merge_strategy: 3way
 max_retries: 2
 
 # Shell command run by `tpatch test <slug>`.
-# This is intentionally feature-scoped for windows-wsl-support because the full
-# workspace suite currently fails on an unrelated Windows symlink test.
-test_command: "bun run test:windows-wsl-support"
+# This is intentionally feature-scoped for the windows-wsl-support desktop dev
+# path fix because the old test:windows-wsl-support script is no longer present.
+test_command: "bun run --filter t3 build"
