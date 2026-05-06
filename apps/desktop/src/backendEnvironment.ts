@@ -72,6 +72,24 @@ function makeWslEnvironment(
   };
 }
 
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function prepareOptionalWslServerBundle(input: {
+  readonly appRoot: string;
+  readonly cacheRoot: string;
+}) {
+  try {
+    return prepareWslServerBundle(input);
+  } catch (error) {
+    console.error(
+      `[desktop] Failed to prepare WSL server bundle; WSL managed environments disabled: ${formatErrorMessage(error)}`,
+    );
+    return undefined;
+  }
+}
+
 export function createDefaultBackendEnvironmentManager(
   options: CreateDefaultBackendEnvironmentManagerOptions,
 ): BackendEnvironmentManager {
@@ -80,7 +98,7 @@ export function createDefaultBackendEnvironmentManager(
   const wslEnvironments =
     process.platform === "win32" && isWslAvailable()
       ? (() => {
-          const bundle = prepareWslServerBundle({
+          const bundle = prepareOptionalWslServerBundle({
             appRoot: options.appRoot,
             cacheRoot: Path.join(OS.homedir(), ".t3", "wsl-server-bundles"),
           });
