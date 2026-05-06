@@ -151,6 +151,7 @@ vi.mock("../../environments/runtime", () => {
     resolveEnvironmentHttpUrl: (_environmentId: unknown, path: string) =>
       new URL(path, "http://localhost:3000").toString(),
     waitForSavedEnvironmentRegistryHydration: async () => undefined,
+    addDesktopManagedEnvironment: vi.fn(),
     addSavedEnvironment: vi.fn(),
     disconnectSavedEnvironment: vi.fn(),
     ensureEnvironmentConnectionBootstrapped: async () => undefined,
@@ -295,6 +296,21 @@ const createDesktopBridgeStub = (overrides?: {
     getSavedEnvironmentSecret: vi.fn().mockResolvedValue(null),
     setSavedEnvironmentSecret: vi.fn().mockResolvedValue(true),
     removeSavedEnvironmentSecret: vi.fn().mockResolvedValue(undefined),
+    listManagedEnvironments: vi.fn().mockResolvedValue([
+      {
+        key: "wsl:Ubuntu",
+        label: "Ubuntu",
+        kind: "wsl",
+      },
+    ]),
+    prepareManagedEnvironmentRegistration: vi.fn().mockResolvedValue({
+      key: "wsl:Ubuntu",
+      label: "Ubuntu",
+      kind: "wsl",
+      httpBaseUrl: "http://127.0.0.1:3881/",
+      wsBaseUrl: "ws://127.0.0.1:3881/",
+      bootstrapToken: "desktop-bootstrap-token",
+    }),
     getServerExposureState: vi.fn().mockResolvedValue(
       overrides?.serverExposureState ?? {
         mode: "local-only",
@@ -652,6 +668,26 @@ describe("GeneralSettingsPanel observability", () => {
     await expect.element(page.getByText("This Mac")).toBeInTheDocument();
     await expect.element(page.getByText("Julius iPhone")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("shows desktop-managed environment candidates in the add dialog", async () => {
+    const desktopBridge = createDesktopBridgeStub();
+    window.desktopBridge = desktopBridge;
+
+    setServerConfigSnapshot(createBaseServerConfig());
+
+    mounted = await render(
+      <AppAtomRegistryProvider>
+        <ConnectionsSettings />
+      </AppAtomRegistryProvider>,
+    );
+
+    await page.getByRole("button", { name: "Add environment", exact: true }).click();
+    await page.getByRole("button", { name: "Managed environments", exact: true }).click();
+
+    await expect.element(page.getByText("Ubuntu", { exact: true })).toBeInTheDocument();
+    await expect.element(page.getByText("WSL environment", { exact: true })).toBeInTheDocument();
+    expect(desktopBridge.listManagedEnvironments).toHaveBeenCalled();
   });
 
   it("shows a disabled network access toggle with guidance in desktop builds", async () => {

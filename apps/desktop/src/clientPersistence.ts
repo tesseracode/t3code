@@ -21,6 +21,17 @@ interface SavedEnvironmentRegistryDocument {
   readonly records: readonly PersistedSavedEnvironmentStorageRecord[];
 }
 
+function isPersistedSavedEnvironmentManagement(
+  value: unknown,
+): value is PersistedSavedEnvironmentStorageRecord["management"] {
+  return (
+    value === undefined ||
+    (Predicate.isObject(value) &&
+      value.kind === "desktop-managed" &&
+      typeof value.environmentKey === "string")
+  );
+}
+
 export interface DesktopSecretStorage {
   readonly isEncryptionAvailable: () => boolean;
   readonly encryptString: (value: string) => Buffer;
@@ -57,6 +68,7 @@ function isPersistedSavedEnvironmentStorageRecord(
     typeof value.wsBaseUrl === "string" &&
     typeof value.createdAt === "string" &&
     (value.lastConnectedAt === null || typeof value.lastConnectedAt === "string") &&
+    isPersistedSavedEnvironmentManagement(value.management) &&
     (value.encryptedBearerToken === undefined || typeof value.encryptedBearerToken === "string")
   );
 }
@@ -84,6 +96,7 @@ function toPersistedSavedEnvironmentRecord(
     wsBaseUrl: record.wsBaseUrl,
     createdAt: record.createdAt,
     lastConnectedAt: record.lastConnectedAt,
+    ...(record.management ? { management: record.management } : {}),
   };
 }
 
@@ -134,6 +147,7 @@ export function writeSavedEnvironmentRegistry(
             wsBaseUrl: record.wsBaseUrl,
             createdAt: record.createdAt,
             lastConnectedAt: record.lastConnectedAt,
+            ...(record.management ? { management: record.management } : {}),
             encryptedBearerToken,
           }
         : record;
@@ -189,7 +203,7 @@ export function writeSavedEnvironmentSecret(input: {
       const encryptedBearerToken = input.secretStorage
         .encryptString(input.secret)
         .toString("base64");
-      return {
+      const nextRecord: PersistedSavedEnvironmentStorageRecord = {
         environmentId: record.environmentId,
         label: record.label,
         httpBaseUrl: record.httpBaseUrl,
@@ -197,7 +211,11 @@ export function writeSavedEnvironmentSecret(input: {
         createdAt: record.createdAt,
         lastConnectedAt: record.lastConnectedAt,
         encryptedBearerToken,
-      } satisfies PersistedSavedEnvironmentStorageRecord;
+      };
+      if (record.management) {
+        nextRecord.management = record.management;
+      }
+      return nextRecord;
     }),
   } satisfies SavedEnvironmentRegistryDocument);
   return found;

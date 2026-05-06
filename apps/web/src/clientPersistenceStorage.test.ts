@@ -12,6 +12,18 @@ const savedRegistryRecord: PersistedSavedEnvironmentRecord = {
   lastConnectedAt: null,
 };
 
+const managedSavedRegistryRecord: PersistedSavedEnvironmentRecord = {
+  ...savedRegistryRecord,
+  environmentId: EnvironmentId.make("environment-managed"),
+  label: "Ubuntu",
+  httpBaseUrl: "http://127.0.0.1:3881/",
+  wsBaseUrl: "ws://127.0.0.1:3881/",
+  management: {
+    kind: "desktop-managed",
+    environmentKey: "wsl:Ubuntu",
+  },
+};
+
 function createLocalStorageStub(): Storage {
   const store = new Map<string, string>();
   return {
@@ -61,9 +73,12 @@ describe("clientPersistenceStorage", () => {
 
     writeBrowserSavedEnvironmentRegistry([savedRegistryRecord]);
     expect(writeBrowserSavedEnvironmentSecret(testEnvironmentId, "bearer-token")).toBe(true);
-    writeBrowserSavedEnvironmentRegistry([savedRegistryRecord]);
+    writeBrowserSavedEnvironmentRegistry([savedRegistryRecord, managedSavedRegistryRecord]);
 
-    expect(readBrowserSavedEnvironmentRegistry()).toEqual([savedRegistryRecord]);
+    expect(readBrowserSavedEnvironmentRegistry()).toEqual([
+      savedRegistryRecord,
+      managedSavedRegistryRecord,
+    ]);
     expect(readBrowserSavedEnvironmentSecret(testEnvironmentId)).toBe("bearer-token");
     expect(
       JSON.parse(testWindow.localStorage.getItem(SAVED_ENVIRONMENT_REGISTRY_STORAGE_KEY)!),
@@ -74,6 +89,7 @@ describe("clientPersistenceStorage", () => {
           ...savedRegistryRecord,
           bearerToken: "bearer-token",
         },
+        managedSavedRegistryRecord,
       ],
     });
   });

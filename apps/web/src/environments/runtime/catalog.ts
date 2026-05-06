@@ -3,6 +3,7 @@ import type {
   AuthSessionRole,
   EnvironmentId,
   ExecutionEnvironmentDescriptor,
+  PersistedSavedEnvironmentManagement,
   PersistedSavedEnvironmentRecord,
   ServerConfig,
 } from "@t3tools/contracts";
@@ -18,6 +19,7 @@ export interface SavedEnvironmentRecord {
   readonly httpBaseUrl: string;
   readonly createdAt: string;
   readonly lastConnectedAt: string | null;
+  readonly management?: PersistedSavedEnvironmentManagement;
 }
 
 interface SavedEnvironmentRegistryState {
@@ -44,6 +46,7 @@ function toPersistedSavedEnvironmentRecord(
     wsBaseUrl: record.wsBaseUrl,
     createdAt: record.createdAt,
     lastConnectedAt: record.lastConnectedAt,
+    ...(record.management ? { management: record.management } : {}),
   };
 }
 

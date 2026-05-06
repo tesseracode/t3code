@@ -17,6 +17,9 @@ const GET_APP_BRANDING_CHANNEL = "desktop:get-app-branding";
 const GET_LOCAL_ENVIRONMENT_BOOTSTRAP_CHANNEL = "desktop:get-local-environment-bootstrap";
 const GET_CLIENT_SETTINGS_CHANNEL = "desktop:get-client-settings";
 const SET_CLIENT_SETTINGS_CHANNEL = "desktop:set-client-settings";
+const LIST_MANAGED_ENVIRONMENTS_CHANNEL = "desktop:list-managed-environments";
+const PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL =
+  "desktop:prepare-managed-environment-registration";
 const GET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL = "desktop:get-saved-environment-registry";
 const SET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL = "desktop:set-saved-environment-registry";
 const GET_SAVED_ENVIRONMENT_SECRET_CHANNEL = "desktop:get-saved-environment-secret";
@@ -42,6 +45,9 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   },
   getClientSettings: () => ipcRenderer.invoke(GET_CLIENT_SETTINGS_CHANNEL),
   setClientSettings: (settings) => ipcRenderer.invoke(SET_CLIENT_SETTINGS_CHANNEL, settings),
+  listManagedEnvironments: () => ipcRenderer.invoke(LIST_MANAGED_ENVIRONMENTS_CHANNEL),
+  prepareManagedEnvironmentRegistration: (environmentKey) =>
+    ipcRenderer.invoke(PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL, environmentKey),
   getSavedEnvironmentRegistry: () => ipcRenderer.invoke(GET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL),
   setSavedEnvironmentRegistry: (records) =>
     ipcRenderer.invoke(SET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL, records),

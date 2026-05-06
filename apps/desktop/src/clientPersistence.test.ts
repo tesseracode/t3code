@@ -73,6 +73,18 @@ const savedRegistryRecord: PersistedSavedEnvironmentRecord = {
   lastConnectedAt: "2026-04-09T01:00:00.000Z",
 };
 
+const managedSavedRegistryRecord: PersistedSavedEnvironmentRecord = {
+  ...savedRegistryRecord,
+  environmentId: EnvironmentId.make("environment-managed"),
+  label: "Ubuntu",
+  httpBaseUrl: "http://127.0.0.1:3881/",
+  wsBaseUrl: "ws://127.0.0.1:3881/",
+  management: {
+    kind: "desktop-managed",
+    environmentKey: "wsl:Ubuntu",
+  },
+};
+
 describe("clientPersistence", () => {
   it("persists and reloads client settings", () => {
     const settingsPath = makeTempPath("client-settings.json");
@@ -85,9 +97,12 @@ describe("clientPersistence", () => {
   it("persists and reloads saved environment metadata", () => {
     const registryPath = makeTempPath("saved-environments.json");
 
-    writeSavedEnvironmentRegistry(registryPath, [savedRegistryRecord]);
+    writeSavedEnvironmentRegistry(registryPath, [savedRegistryRecord, managedSavedRegistryRecord]);
 
-    expect(readSavedEnvironmentRegistry(registryPath)).toEqual([savedRegistryRecord]);
+    expect(readSavedEnvironmentRegistry(registryPath)).toEqual([
+      savedRegistryRecord,
+      managedSavedRegistryRecord,
+    ]);
   });
 
   it("persists encrypted saved environment secrets when encryption is available", () => {

@@ -4,11 +4,10 @@ import * as FS from "node:fs";
 import * as OS from "node:os";
 import * as Path from "node:path";
 
-import {
-  createDefaultBackendTarget,
-  type BackendTarget,
-} from "./backendTarget.ts";
-import { createDefaultBackendEnvironmentManager, type ManagedBackendEnvironment } from "./backendEnvironment.ts";
+import { createDefaultBackendTarget, type BackendTarget } from "./backendTarget.ts";
+import { createDefaultBackendEnvironmentManager } from "./backendEnvironment.ts";
+import { createDesktopManagedEnvironmentController } from "./managedBackendEnvironment.ts";
+import { registerDesktopManagedEnvironmentIpc } from "./managedBackendEnvironmentIpc.ts";
 
 import {
   app,
@@ -108,8 +107,6 @@ const SET_SAVED_ENVIRONMENT_SECRET_CHANNEL = "desktop:set-saved-environment-secr
 const REMOVE_SAVED_ENVIRONMENT_SECRET_CHANNEL = "desktop:remove-saved-environment-secret";
 const GET_SERVER_EXPOSURE_STATE_CHANNEL = "desktop:get-server-exposure-state";
 const SET_SERVER_EXPOSURE_MODE_CHANNEL = "desktop:set-server-exposure-mode";
-const LIST_MANAGED_ENVIRONMENTS_CHANNEL = "desktop:list-managed-environments";
-const PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL = "desktop:prepare-managed-environment-registration";
 const BASE_DIR = process.env.T3CODE_HOME?.trim() || Path.join(OS.homedir(), ".t3");
 const STATE_DIR = Path.join(BASE_DIR, "userdata");
 const DESKTOP_SETTINGS_PATH = Path.join(STATE_DIR, "desktop-settings.json");
@@ -231,12 +228,6 @@ const backendEnvironmentManager = createDefaultBackendEnvironmentManager({
   rootBaseDir: BASE_DIR,
   appRoot: ROOT_DIR,
 });
-
-function listManagedBackendEnvironments(): readonly ManagedBackendEnvironment[] {
-  return backendEnvironmentManager
-    .listEnvironments()
-    .filter((environment) => environment.key !== backendEnvironmentManager.primaryEnvironment.key);
-}
 let desktopLogSink: RotatingFileSink | null = null;
 let backendLogSink: RotatingFileSink | null = null;
 let restoreStdIoCapture: (() => void) | null = null;
@@ -599,18 +590,38 @@ function initializePackagedLogging(): void {
   }
 }
 
-function captureBackendOutput(child: ChildProcess.ChildProcess): void {
+function captureBackendOutput(
+  child: ChildProcess.ChildProcess,
+  listeningDetector?: ServerListeningDetector | null,
+): void {
   const attachStream = (stream: NodeJS.ReadableStream | null | undefined): void => {
     stream?.on("data", (chunk: unknown) => {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
       backendLogSink?.write(buffer);
-      backendListeningDetector?.push(buffer);
+      (listeningDetector ?? backendListeningDetector)?.push(buffer);
     });
   };
 
   attachStream(child.stdout);
   attachStream(child.stderr);
 }
+
+const managedEnvironmentController = createDesktopManagedEnvironmentController({
+  backendEnvironmentManager,
+  primaryEnvironment: backendEnvironmentManager.primaryEnvironment,
+  loopbackHost: DESKTOP_LOOPBACK_HOST,
+  getPrimaryBackendPort: () => backendPort,
+  getBackendChildEnv: backendChildEnv,
+  getObservabilitySettings: () => backendObservabilitySettings,
+  getCaptureOutput: () => !isDevelopment,
+  captureBackendOutput: (child, listeningDetector) =>
+    captureBackendOutput(child, listeningDetector),
+  markExpectedExit: (child) => {
+    expectedBackendExitChildren.add(child);
+  },
+  isQuitting: () => isQuitting,
+  log: writeDesktopLogHeader,
+});
 
 initializePackagedLogging();
 
@@ -813,6 +824,7 @@ function handleFatalStartupError(stage: string, error: unknown): void {
     isQuitting = true;
     dialog.showErrorBox("T3 Code failed to start", `Stage: ${stage}\n${message}${detail}`);
   }
+  managedEnvironmentController.stopAll();
   stopBackend();
   restoreStdIoCapture?.();
   app.quit();
@@ -1570,7 +1582,7 @@ function registerIpcHandlers(): void {
   ipcMain.removeAllListeners(GET_LOCAL_ENVIRONMENT_BOOTSTRAP_CHANNEL);
   ipcMain.on(GET_LOCAL_ENVIRONMENT_BOOTSTRAP_CHANNEL, (event) => {
     event.returnValue = {
-      label: "Local environment",
+      label: backendEnvironmentManager.primaryEnvironment.displayLabel,
       httpBaseUrl: backendHttpUrl || null,
       wsBaseUrl: backendWsUrl || null,
       bootstrapToken: backendBootstrapToken || undefined,
@@ -1589,9 +1601,16 @@ function registerIpcHandlers(): void {
     writeClientSettings(CLIENT_SETTINGS_PATH, rawSettings as ClientSettings);
   });
 
+  registerDesktopManagedEnvironmentIpc({
+    ipcMain,
+    controller: managedEnvironmentController,
+  });
+
   ipcMain.removeHandler(GET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL);
   ipcMain.handle(GET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL, async () =>
-    readSavedEnvironmentRegistry(SAVED_ENVIRONMENT_REGISTRY_PATH),
+    managedEnvironmentController.readHydratedSavedEnvironmentRegistry(
+      readSavedEnvironmentRegistry(SAVED_ENVIRONMENT_REGISTRY_PATH),
+    ),
   );
 
   ipcMain.removeHandler(SET_SAVED_ENVIRONMENT_REGISTRY_CHANNEL);
@@ -1600,10 +1619,11 @@ function registerIpcHandlers(): void {
       throw new Error("Invalid saved environment registry payload.");
     }
 
-    writeSavedEnvironmentRegistry(
-      SAVED_ENVIRONMENT_REGISTRY_PATH,
-      rawRecords as readonly PersistedSavedEnvironmentRecord[],
-    );
+    const previousRecords = readSavedEnvironmentRegistry(SAVED_ENVIRONMENT_REGISTRY_PATH);
+    const nextRecords = rawRecords as readonly PersistedSavedEnvironmentRecord[];
+
+    writeSavedEnvironmentRegistry(SAVED_ENVIRONMENT_REGISTRY_PATH, nextRecords);
+    managedEnvironmentController.syncAfterRegistryWrite(previousRecords, nextRecords);
   });
 
   ipcMain.removeHandler(GET_SAVED_ENVIRONMENT_SECRET_CHANNEL);
@@ -1875,35 +1895,6 @@ function registerIpcHandlers(): void {
       state: updateState,
     } satisfies DesktopUpdateCheckResult;
   });
-
-  ipcMain.removeHandler(LIST_MANAGED_ENVIRONMENTS_CHANNEL);
-  ipcMain.handle(LIST_MANAGED_ENVIRONMENTS_CHANNEL, async () =>
-    listManagedBackendEnvironments().map((environment) => ({
-      key: environment.key,
-      displayLabel: environment.displayLabel,
-      kind: environment.kind,
-    })),
-  );
-
-  ipcMain.removeHandler(PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL);
-  ipcMain.handle(
-    PREPARE_MANAGED_ENVIRONMENT_REGISTRATION_CHANNEL,
-    async (_event, rawEnvironmentKey: string) => {
-      const environment = backendEnvironmentManager.getEnvironment(rawEnvironmentKey);
-      if (!environment) {
-        throw new Error(`Unknown managed environment: ${rawEnvironmentKey}`);
-      }
-      // Ensure the target is ready (e.g., WSL server bundle installed)
-      const ready = environment.target.ensureReady();
-      return {
-        key: environment.key,
-        displayLabel: environment.displayLabel,
-        kind: environment.kind,
-        ready,
-        baseDir: environment.baseDir,
-      };
-    },
-  );
 }
 
 function getIconOption(): { icon: string } | Record<string, never> {
@@ -2148,6 +2139,7 @@ app.on("before-quit", () => {
   writeDesktopLogHeader("before-quit received");
   clearUpdatePollTimer();
   cancelBackendReadinessWait();
+  managedEnvironmentController.stopAll();
   stopBackend();
   restoreStdIoCapture?.();
 });
@@ -2197,6 +2189,7 @@ if (process.platform !== "win32") {
     writeDesktopLogHeader("SIGINT received");
     clearUpdatePollTimer();
     cancelBackendReadinessWait();
+    managedEnvironmentController.stopAll();
     stopBackend();
     restoreStdIoCapture?.();
     app.quit();
@@ -2207,6 +2200,7 @@ if (process.platform !== "win32") {
     isQuitting = true;
     writeDesktopLogHeader("SIGTERM received");
     clearUpdatePollTimer();
+    managedEnvironmentController.stopAll();
     stopBackend();
     restoreStdIoCapture?.();
     app.quit();

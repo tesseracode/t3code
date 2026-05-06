@@ -19,6 +19,12 @@ const BrowserSavedEnvironmentRecordSchema = Schema.Struct({
   wsBaseUrl: Schema.String,
   createdAt: Schema.String,
   lastConnectedAt: Schema.NullOr(Schema.String),
+  management: Schema.optionalKey(
+    Schema.Struct({
+      kind: Schema.Literal("desktop-managed"),
+      environmentKey: Schema.String,
+    }),
+  ),
   bearerToken: Schema.optionalKey(Schema.String),
 });
 type BrowserSavedEnvironmentRecord = typeof BrowserSavedEnvironmentRecordSchema.Type;
@@ -44,6 +50,7 @@ function toPersistedSavedEnvironmentRecord(
     wsBaseUrl: record.wsBaseUrl,
     createdAt: record.createdAt,
     lastConnectedAt: record.lastConnectedAt,
+    ...(record.management ? { management: record.management } : {}),
   };
 }
 
@@ -135,6 +142,7 @@ export function writeBrowserSavedEnvironmentRegistry(
             wsBaseUrl: record.wsBaseUrl,
             createdAt: record.createdAt,
             lastConnectedAt: record.lastConnectedAt,
+            ...(record.management ? { management: record.management } : {}),
             bearerToken,
           }
         : toPersistedSavedEnvironmentRecord(record);
@@ -166,15 +174,18 @@ export function writeBrowserSavedEnvironmentSecret(
         return record;
       }
       found = true;
-      return {
-        environmentId: record.environmentId,
-        label: record.label,
-        httpBaseUrl: record.httpBaseUrl,
-        wsBaseUrl: record.wsBaseUrl,
-        createdAt: record.createdAt,
-        lastConnectedAt: record.lastConnectedAt,
-        bearerToken: secret,
-      } satisfies BrowserSavedEnvironmentRecord;
+      return Object.assign(
+        {
+          environmentId: record.environmentId,
+          label: record.label,
+          httpBaseUrl: record.httpBaseUrl,
+          wsBaseUrl: record.wsBaseUrl,
+          createdAt: record.createdAt,
+          lastConnectedAt: record.lastConnectedAt,
+          bearerToken: secret,
+        },
+        record.management ? { management: record.management } : {},
+      ) satisfies BrowserSavedEnvironmentRecord;
     }),
   });
   return found;
