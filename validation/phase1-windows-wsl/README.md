@@ -11,7 +11,7 @@ Phase 1 foundation. It is not intended to merge into `main` or
   `7032ad0c135d451554c552daa9178783a11b5cd7` or a descendant on
   `validation/phase1-windows-wsl`
 - Source branch: `phase1/foundation`
-- Source commit: `9ac52707e2756db13d92246e606c74fd7474b34d`
+- Source commit: `b8e2e0e8dc2d51f549224ed9c8ba815fd6eb4527`
 - Desktop version: `0.0.37`
 - Target: Windows x64 plus an x64 Ubuntu WSL2 distro
 

@@ -2,7 +2,7 @@
 param(
   [string]$Repository = "https://github.com/tesseracode/t3code.git",
   [string]$SourceBranch = "phase1/foundation",
-  [string]$ExpectedSourceCommit = "9ac52707e2756db13d92246e606c74fd7474b34d",
+  [string]$ExpectedSourceCommit = "b8e2e0e8dc2d51f549224ed9c8ba815fd6eb4527",
   [string]$ExpectedServerVersion = "t3 v0.0.37",
   [string]$SourceRoot = "$env:USERPROFILE\src\t3code-phase1-validation-source",
   [string]$WslDistro = "Ubuntu",
