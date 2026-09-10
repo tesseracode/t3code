@@ -5,7 +5,7 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-10T22:37:43Z",
-  "updated_at": "2026-09-10T22:38:50Z",
+  "updated_at": "2026-09-10T22:39:44Z",
   "last_command": "verify",
   "notes": "landed at 2026-09-10T22:39:18Z",
   "apply": {
@@ -17,16 +17,13 @@
   "depends_on": [
     {
       "slug": "wsl-runtime-executable-modes",
-      "kind": "hard"
+      "kind": "soft"
     }
   ],
   "verify": {
-    "verified_at": "2026-09-10T22:38:47Z",
-    "passed": false,
+    "verified_at": "2026-09-10T22:39:41Z",
+    "passed": true,
     "recipe_hash_at_verify": "3f7e02189e096f1c4f8c9f299bb551cbe4fda812fa100f54a6ba0428db3e275a",
-    "patch_hash_at_verify": "1022dfe77cab2940778e1bc2b552980e7ea474f95e238273b9d133ba12b65b4a",
-    "parent_snapshot": {
-      "wsl-runtime-executable-modes": "applied"
-    }
+    "patch_hash_at_verify": "1022dfe77cab2940778e1bc2b552980e7ea474f95e238273b9d133ba12b65b4a"
   }
 }
