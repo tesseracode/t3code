@@ -1,0 +1,8 @@
+{
+  "slug": "wsl-runtime-executable-modes",
+  "completed_at": "2026-09-10T00:45:07Z",
+  "base_commit": "3adf3566f162434ce963eb64298210e1d1d47005",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Focused WSL/runtime tests, packaging tests, desktop/scripts typechecks, lint, and Ubuntu installer execution passed."
+}

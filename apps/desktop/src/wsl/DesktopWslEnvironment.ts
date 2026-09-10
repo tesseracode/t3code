@@ -295,6 +295,55 @@ export const buildWslRuntimeInstallScript = (
     "  done",
     "  return 1",
     "}",
+    // Windows filesystems do not carry authoritative POSIX execute bits. A
+    // Windows-created tar can therefore contain valid Linux command payloads
+    // as 0666, which extract to 0644 on ext4. The target package is already
+    // architecture-filtered by packaging; require exactly one package and one
+    // copy of each command so layout drift fails closed.
+    "copilot_payload_present() {",
+    '  [ -f "$1/node_modules/@github/copilot-sdk/package.json" ] && return 0',
+    '  for package_dir in "$1"/node_modules/@github/copilot-linux-*; do',
+    '    [ -d "$package_dir" ] && return 0',
+    "  done",
+    "  return 1",
+    "}",
+    "copilot_executable_payload_ready() {",
+    '  copilot_payload_present "$1" || return 0',
+    "  package_count=0",
+    "  executable_count=0",
+    '  for package_dir in "$1"/node_modules/@github/copilot-linux-*; do',
+    '    [ -d "$package_dir" ] || continue',
+    "    package_count=$((package_count + 1))",
+    '    for executable in "$package_dir/copilot" "$package_dir"/ripgrep/bin/linux-*/rg "$package_dir"/tgrep/bin/linux-*/tgrep; do',
+    '      if [ ! -x "$executable" ]; then',
+    "        printf 'Linux Copilot command is not executable: %s\\n' \"$executable\" >&2",
+    "        return 1",
+    "      fi",
+    "      executable_count=$((executable_count + 1))",
+    "    done",
+    "  done",
+    '  if [ "$package_count" -ne 1 ] || [ "$executable_count" -ne 3 ]; then',
+    '    printf \'Linux Copilot payload has %s packages and %s executable commands; expected 1 and 3\\n\' "$package_count" "$executable_count" >&2',
+    "    return 1",
+    "  fi",
+    "}",
+    "normalize_copilot_executable_modes() {",
+    '  copilot_payload_present "$1" || return 0',
+    '  for package_dir in "$1"/node_modules/@github/copilot-linux-*; do',
+    '    [ -d "$package_dir" ] || continue',
+    '    for executable in "$package_dir/copilot" "$package_dir"/ripgrep/bin/linux-*/rg "$package_dir"/tgrep/bin/linux-*/tgrep; do',
+    '      if [ ! -f "$executable" ]; then',
+    "        printf 'Linux Copilot command is missing: %s\\n' \"$executable\" >&2",
+    "        return 1",
+    "      fi",
+    '      if ! chmod 0755 "$executable"; then',
+    "        printf 'Could not make Linux Copilot command executable: %s\\n' \"$executable\" >&2",
+    "        return 1",
+    "      fi",
+    "    done",
+    "  done",
+    '  copilot_executable_payload_ready "$1"',
+    "}",
     // Hashing the server entry is the only check that can tell a working cache
     // from one whose bin.mjs was truncated or half-written: the file is still
     // there, the native probe still passes, and launch then picks a server that
@@ -309,6 +358,7 @@ export const buildWslRuntimeInstallScript = (
     '    [ -f "$runtime_root/apps/server/dist/bin.mjs" ] &&',
     '    [ -f "$runtime_root/node_modules/node-pty/package.json" ] &&',
     '    node_pty_payload_present "$runtime_root" &&',
+    '    copilot_executable_payload_ready "$runtime_root" &&',
     // An empty or unreadable marker is a miss, not a pass: that is what a
     // runtime installed before the marker carried a digest looks like, and one
     // reinstall is the cheapest way to make it verifiable from then on.
@@ -380,6 +430,10 @@ export const buildWslRuntimeInstallScript = (
     // recoverable; promoting it would mark the defect ready and cache it.
     'if ! node_pty_payload_present "$runtime_tmp"; then',
     "  printf 'WSL runtime archive is missing its Linux node-pty binary\\n' >&2",
+    "  exit 1",
+    "fi",
+    'if ! normalize_copilot_executable_modes "$runtime_tmp"; then',
+    "  printf 'WSL runtime archive has an invalid Linux Copilot executable payload\\n' >&2",
     "  exit 1",
     "fi",
     // The archive's bytes were verified against archiveSha256 above, so the

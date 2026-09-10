@@ -1,0 +1,32 @@
+{
+  "id": "wsl-runtime-executable-modes",
+  "slug": "wsl-runtime-executable-modes",
+  "title": "Normalize and verify executable permissions for Linux command payloads after extracting Windows-built wsl-runtime.tar.gz. When Copilot SDK is present, require and chmod the target Linux Copilot, rg, and tgrep executables before promoting the runtime; reject missing or non-executable payloads and invalidate warm caches whose modes are broken.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-09-10T00:23:25Z",
+  "updated_at": "2026-09-10T00:45:34Z",
+  "last_command": "record",
+  "notes": "landed at 2026-09-10T00:45:34Z",
+  "apply": {
+    "completed_at": "2026-09-10T00:45:07Z",
+    "base_commit": "3adf3566f162434ce963eb64298210e1d1d47005",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-package-payload-pruning",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-09-10T00:45:08Z",
+    "passed": true,
+    "recipe_hash_at_verify": "04445f734b8dddf42e32e31e6f8a3cc1df42125fba45068a7733a5148404d38f",
+    "patch_hash_at_verify": "e67ad7d162beef58f2442351f9ee4ab1c33e5b5e90f7012fa3bf9e938814fcb3",
+    "parent_snapshot": {
+      "copilot-package-payload-pruning": "applied"
+    }
+  }
+}

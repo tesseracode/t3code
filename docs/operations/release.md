@@ -225,7 +225,11 @@ paths below `resources/server.asar.unpacked`. The Windows-native backend reads
 the archive in place through Electron. Packaged Windows builds also ship a
 Linux-only `resources/wsl-runtime.tar.gz` plus its SHA-256 sidecar. WSL verifies
 and extracts that archive into `~/.t3/wsl-runtime/sha256-<archive-digest>` inside
-the selected distro, then reuses it for later launches of the same update. The
+the selected distro. Because Windows archive creation cannot preserve
+authoritative POSIX execute bits, WSL normalizes and verifies the packaged
+Linux Copilot, `rg`, and `tgrep` commands before promoting the runtime. Warm
+cache reuse repeats that executable check, so a damaged or pre-fix cache is
+reinstalled. The runtime is then reused for later launches of the same update. The
 Windows-side `wsl-server-tree/<version>` extraction remains a fallback and is
 removed after the distro-local runtime passes preflight.
 
@@ -256,6 +260,8 @@ break:
 - A Windows build with a WSL node-pty prebuild omits the WSL archive or SHA-256
   sidecar, the sidecar digest does not match the emitted archive, or required
   Linux runtime members are absent.
+- A Copilot-bearing WSL runtime is missing its Linux Copilot, `rg`, or `tgrep`
+  executable, or WSL cannot normalize those commands to executable mode.
 - The emitted WSL archive contains Windows/Darwin node-pty payloads, ConPTY,
   pnpm install metadata, or Windows-only Copilot, Koffi, FFF, ffi-rs, or
   msgpackr bindings.

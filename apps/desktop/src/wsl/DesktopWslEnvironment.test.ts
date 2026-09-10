@@ -198,6 +198,7 @@ describe("WSL runtime cache", () => {
     expect(script).toContain('  [ -f "$runtime_root/apps/server/dist/bin.mjs" ] &&');
     expect(script).toContain('  [ -f "$runtime_root/node_modules/node-pty/package.json" ] &&');
     expect(script).toContain('    node_pty_payload_present "$runtime_root"');
+    expect(script).toContain('    copilot_executable_payload_ready "$runtime_root"');
     expect(script).not.toContain("node_modules/effect/package.json");
     expect(script).toContain("if runtime_is_ready; then");
     expect(script).toContain("trap 'exit 1' HUP INT TERM");
@@ -213,6 +214,8 @@ describe("WSL runtime cache", () => {
     );
     expect(script).toContain('test -f "$runtime_tmp/apps/server/dist/bin.mjs"');
     expect(script).toContain('test -f "$runtime_tmp/node_modules/node-pty/package.json"');
+    expect(script).toContain('      if ! chmod 0755 "$executable"; then');
+    expect(script).toContain('if ! normalize_copilot_executable_modes "$runtime_tmp"; then');
     expect(script).toContain('mv -T "$runtime_tmp" "$runtime_root"');
     expect(script).not.toContain('rm -rf "$runtime_root"');
 
@@ -439,7 +442,10 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
     fixtures.length = 0;
   });
 
-  const createFixture = () => {
+  const createFixture = (
+    options: { readonly copilot?: "valid" | "missing-tgrep" | "absent" } = {},
+  ) => {
+    const copilot = options.copilot ?? "valid";
     const result = runShell(
       [
         "set -eu",
@@ -450,6 +456,20 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         `printf '%s' '{"name":"node-pty","version":"0.0.0-test"}' > "$stage/node_modules/node-pty/package.json"`,
         `printf '%s' 'pty-native-payload' > "$stage/node_modules/node-pty/prebuilds/linux-x64/pty.node"`,
         `printf '%s' '{"arch":"x64"}' > "$stage/node_modules/node-pty/prebuilds/linux-x64/t3code-wsl-node-pty.json"`,
+        ...(copilot === "absent"
+          ? []
+          : [
+              'mkdir -p "$stage/node_modules/@github/copilot-sdk" "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64" "$stage/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64"',
+              `printf '%s' '{"name":"@github/copilot-sdk"}' > "$stage/node_modules/@github/copilot-sdk/package.json"`,
+              `printf '#!/bin/sh\\nprintf copilot\\n' > "$stage/node_modules/@github/copilot-linux-x64/copilot"`,
+              `printf '#!/bin/sh\\nprintf rg\\n' > "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg"`,
+              ...(copilot === "missing-tgrep"
+                ? []
+                : [
+                    `printf '#!/bin/sh\\nprintf tgrep\\n' > "$stage/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep"`,
+                  ]),
+              `chmod 0644 "$stage/node_modules/@github/copilot-linux-x64/copilot" "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg"`,
+            ]),
         `tar -czf "$work/wsl-runtime.tar.gz" -C "$stage" apps/server/dist node_modules`,
         `printf 'work:%s\\n' "$work"`,
         `printf 'archiveSha:%s\\n' "$(sha256sum "$work/wsl-runtime.tar.gz" | cut -d ' ' -f 1)"`,
@@ -478,6 +498,9 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
       runtimeParent: `${work}/home/.t3/wsl-runtime`,
       runtimeRoot: `${work}/home/.t3/wsl-runtime/${runtimeId}`,
       serverEntry: `${work}/home/.t3/wsl-runtime/${runtimeId}/apps/server/dist/bin.mjs`,
+      copilotExecutable: `${work}/home/.t3/wsl-runtime/${runtimeId}/node_modules/@github/copilot-linux-x64/copilot`,
+      rgExecutable: `${work}/home/.t3/wsl-runtime/${runtimeId}/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg`,
+      tgrepExecutable: `${work}/home/.t3/wsl-runtime/${runtimeId}/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep`,
       installScript,
       install: (archive?: string, sha?: string) => runShell(installScript(archive, sha)),
     };
@@ -494,6 +517,57 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
 
     expect(warm.status, warm.stderr).toBe(0);
     expect(parseWslRuntimeRoot(warm.stdout)).toBe(fixture.runtimeRoot);
+  });
+
+  it("restores executable modes lost by a Windows-created archive", () => {
+    const fixture = createFixture();
+
+    const installed = fixture.install();
+
+    expect(installed.status, installed.stderr).toBe(0);
+    const executableProbe = runShell(
+      [
+        "set -eu",
+        `test -x ${sh(fixture.copilotExecutable)}`,
+        `test -x ${sh(fixture.rgExecutable)}`,
+        `test -x ${sh(fixture.tgrepExecutable)}`,
+        sh(fixture.copilotExecutable),
+        sh(fixture.rgExecutable),
+        sh(fixture.tgrepExecutable),
+      ].join("\n"),
+    );
+    expect(executableProbe.status, executableProbe.stderr).toBe(0);
+    expect(executableProbe.stdout).toBe("copilot\nrg\ntgrep\n");
+  });
+
+  it("rejects a Copilot-bearing archive missing an executable helper", () => {
+    const fixture = createFixture({ copilot: "missing-tgrep" });
+
+    const failed = fixture.install();
+
+    expect(failed.status).not.toBe(0);
+    expect(failed.stderr).toContain("invalid Linux Copilot executable payload");
+    expect(parseWslRuntimeRoot(failed.stdout)).toBeNull();
+  });
+
+  it("keeps runtime installation compatible when Copilot is absent", () => {
+    const fixture = createFixture({ copilot: "absent" });
+
+    const installed = fixture.install();
+
+    expect(installed.status, installed.stderr).toBe(0);
+    expect(parseWslRuntimeRoot(installed.stdout)).toBe(fixture.runtimeRoot);
+  });
+
+  it("reinstalls a warm cache whose Copilot execute bit was removed", () => {
+    const fixture = createFixture();
+    expect(fixture.install().status).toBe(0);
+    expect(runShell(`set -eu\nchmod 0644 ${sh(fixture.copilotExecutable)}`).status).toBe(0);
+
+    const repaired = fixture.install();
+
+    expect(repaired.status, repaired.stderr).toBe(0);
+    expect(runShell(`set -eu\ntest -x ${sh(fixture.copilotExecutable)}`).status).toBe(0);
   });
 
   it("reinstalls a cache whose server entry was truncated", () => {

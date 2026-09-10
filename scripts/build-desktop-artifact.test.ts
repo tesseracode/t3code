@@ -18,6 +18,7 @@ import {
   BuildCommandFailedError,
   buildWslRuntimeArchiveArgs,
   parseWslRuntimeArchiveMembers,
+  resolveWslCopilotExecutableMembers,
   CopilotSdkServerPayloadPruneError,
   DesktopDmgBackgroundSourceMissingError,
   createStageWorkspaceConfig,
@@ -146,6 +147,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
   readonly copyUnpackedNatives: boolean;
   readonly serverEntrySource?: string;
   readonly wslRuntime?: "valid" | "forbidden" | "bad-digest";
+  readonly wslCopilot?: "valid" | "missing-tgrep" | "extra-rg";
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -200,6 +202,29 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
       path.join(linuxPrebuildDir, "t3code-wsl-node-pty.json"),
       '{"arch":"x64"}',
     );
+    if (input.wslCopilot !== undefined) {
+      const copilotFiles = resolveWslCopilotExecutableMembers("x64");
+      const sdkManifestPath = path.join(
+        wslSourceDir,
+        "node_modules/@github/copilot-sdk/package.json",
+      );
+      yield* fs.makeDirectory(path.dirname(sdkManifestPath), { recursive: true });
+      yield* fs.writeFileString(sdkManifestPath, '{"name":"@github/copilot-sdk"}');
+      for (const member of copilotFiles) {
+        if (input.wslCopilot === "missing-tgrep" && member.endsWith("/tgrep")) continue;
+        const memberPath = path.join(wslSourceDir, member);
+        yield* fs.makeDirectory(path.dirname(memberPath), { recursive: true });
+        yield* fs.writeFileString(memberPath, member);
+      }
+      if (input.wslCopilot === "extra-rg") {
+        const extraRg = path.join(
+          wslSourceDir,
+          "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-arm64/rg",
+        );
+        yield* fs.makeDirectory(path.dirname(extraRg), { recursive: true });
+        yield* fs.writeFileString(extraRg, "extra-rg");
+      }
+    }
     if (input.wslRuntime === "forbidden") {
       const windowsPrebuildDir = path.join(
         wslSourceDir,
@@ -1089,6 +1114,77 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ).pipe(Effect.provideService(HostProcessPlatform, "linux")),
   );
 
+  it.effect("validates Copilot executable members in the WSL archive", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fixture = yield* makeWindowsPayloadFixture({
+          copyUnpackedNatives: true,
+          wslRuntime: "valid",
+          wslCopilot: "valid",
+        });
+
+        const result = yield* validateWindowsPackagedPayload({
+          stageDistDir: fixture.stageDistDir,
+          appExecutableName: fixture.appExecutableName,
+          targetArch: "x64",
+          expectWslRuntime: true,
+        });
+
+        assert.equal(result.packagedAppDir, fixture.packagedAppDir);
+      }),
+    ).pipe(Effect.provideService(HostProcessPlatform, "linux")),
+  );
+
+  it.effect("rejects a Copilot-bearing WSL archive missing an executable member", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fixture = yield* makeWindowsPayloadFixture({
+          copyUnpackedNatives: true,
+          wslRuntime: "valid",
+          wslCopilot: "missing-tgrep",
+        });
+
+        const error = yield* validateWindowsPackagedPayload({
+          stageDistDir: fixture.stageDistDir,
+          appExecutableName: fixture.appExecutableName,
+          targetArch: "x64",
+          expectWslRuntime: true,
+        }).pipe(Effect.flip);
+
+        assert.instanceOf(error, WindowsPackagedPayloadValidationError);
+        assert.equal(error.reason, "wsl-runtime-invalid");
+        assert.isTrue(
+          error.missingFiles?.includes(
+            "node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep",
+          ),
+        );
+      }),
+    ),
+  );
+
+  it.effect("rejects an ambiguous Copilot executable layout in the WSL archive", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fixture = yield* makeWindowsPayloadFixture({
+          copyUnpackedNatives: true,
+          wslRuntime: "valid",
+          wslCopilot: "extra-rg",
+        });
+
+        const error = yield* validateWindowsPackagedPayload({
+          stageDistDir: fixture.stageDistDir,
+          appExecutableName: fixture.appExecutableName,
+          targetArch: "x64",
+          expectWslRuntime: true,
+        }).pipe(Effect.flip);
+
+        assert.instanceOf(error, WindowsPackagedPayloadValidationError);
+        assert.equal(error.reason, "wsl-runtime-invalid");
+        assert.match(String(error.cause), /Copilot layout is ambiguous/);
+      }),
+    ),
+  );
+
   it.effect("rejects a Windows package missing its expected WSL runtime", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -1705,6 +1801,12 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.isTrue(bundlesWslRuntime({ arch: "arm64", prebuildPath: "/tmp/pty.node" }));
     assert.isFalse(bundlesWslRuntime({ arch: "x64", prebuildPath: undefined }));
     assert.isFalse(bundlesWslRuntime({ arch: "universal", prebuildPath: "/tmp/pty.node" }));
+    assert.deepStrictEqual(resolveWslCopilotExecutableMembers("x64"), [
+      "node_modules/@github/copilot-linux-x64/copilot",
+      "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg",
+      "node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep",
+    ]);
+    assert.deepStrictEqual(resolveWslCopilotExecutableMembers("universal"), []);
 
     assert.deepStrictEqual(buildWslRuntimeArchiveArgs(), [
       "-czf",

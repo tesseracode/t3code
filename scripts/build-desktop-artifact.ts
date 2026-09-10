@@ -922,6 +922,19 @@ export const WSL_RUNTIME_ARCHIVE_EXCLUDED_PREFIXES = [
 export const resolveWslPrebuildArch = (arch: typeof BuildArch.Type): "x64" | "arm64" | undefined =>
   arch === "x64" ? "x64" : arch === "arm64" ? "arm64" : undefined;
 
+export function resolveWslCopilotExecutableMembers(
+  arch: typeof BuildArch.Type,
+): ReadonlyArray<string> {
+  const wslArch = resolveWslPrebuildArch(arch);
+  if (wslArch === undefined) return [];
+  const packageRoot = `node_modules/@github/copilot-linux-${wslArch}`;
+  return [
+    `${packageRoot}/copilot`,
+    `${packageRoot}/ripgrep/bin/linux-${wslArch}/rg`,
+    `${packageRoot}/tgrep/bin/linux-${wslArch}/tgrep`,
+  ];
+}
+
 // A packaged WSL runtime is only usable when a Linux pty.node is bundled with
 // it, so this one predicate decides both whether the archive is built and
 // whether the packaging config ships it. Without it the build would produce an
@@ -2322,39 +2335,36 @@ const COPILOT_PRUNED_RUNTIME_VERSION = "1.0.75";
 const COPILOT_GENERIC_CLIPBOARD_NATIVE_PATTERN = /^clipboard\..+\.node$/u;
 const SERVER_NATIVE_FILE_PATTERN = /\.(?:node|dll|exe|dylib|so(?:\..*)?)$/u;
 
-const collectNativePayloadFiles = Effect.fn("desktopArtifact.collectNativePayloadFiles")(
-  function* (root: string) {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    if (!(yield* fs.exists(root).pipe(Effect.orElseSucceed(() => false)))) {
-      return [] as string[];
-    }
+const collectNativePayloadFiles = Effect.fn("desktopArtifact.collectNativePayloadFiles")(function* (
+  root: string,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  if (!(yield* fs.exists(root).pipe(Effect.orElseSucceed(() => false)))) {
+    return [] as string[];
+  }
 
-    const pendingDirectories = [root];
-    const files: string[] = [];
-    while (pendingDirectories.length > 0) {
-      const directory = pendingDirectories.pop();
-      if (directory === undefined) break;
-      for (const entry of yield* fs.readDirectory(directory)) {
-        const entryPath = path.join(directory, entry);
-        const stat = yield* fs.stat(entryPath);
-        if (stat.type === "Directory") {
-          pendingDirectories.push(entryPath);
-        } else if (stat.type === "File" && SERVER_NATIVE_FILE_PATTERN.test(entry)) {
-          files.push(entryPath);
-        }
+  const pendingDirectories = [root];
+  const files: string[] = [];
+  while (pendingDirectories.length > 0) {
+    const directory = pendingDirectories.pop();
+    if (directory === undefined) break;
+    for (const entry of yield* fs.readDirectory(directory)) {
+      const entryPath = path.join(directory, entry);
+      const stat = yield* fs.stat(entryPath);
+      if (stat.type === "Directory") {
+        pendingDirectories.push(entryPath);
+      } else if (stat.type === "File" && SERVER_NATIVE_FILE_PATTERN.test(entry)) {
+        files.push(entryPath);
       }
     }
-    return files;
-  },
-);
+  }
+  return files;
+});
 
 export const pruneCopilotSdkServerPayload = Effect.fn(
   "desktopArtifact.pruneCopilotSdkServerPayload",
-)(function* (input: {
-  readonly stageDir: string;
-  readonly arch: "x64" | "arm64";
-}) {
+)(function* (input: { readonly stageDir: string; readonly arch: "x64" | "arm64" }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const nodeModulesDir = path.join(input.stageDir, "node_modules");
@@ -2425,13 +2435,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn(
         target.platformTarget,
         target.searchExecutableNames[0],
       ),
-      path.join(
-        packageDir,
-        "tgrep",
-        "bin",
-        target.platformTarget,
-        target.searchExecutableNames[1],
-      ),
+      path.join(packageDir, "tgrep", "bin", target.platformTarget, target.searchExecutableNames[1]),
       path.join(
         nodeModulesDir,
         "@koromix",
@@ -3092,9 +3096,17 @@ export const validateWindowsPackagedPayload = Effect.fn(
       );
     }
     const wslArch = resolveWslPrebuildArch(input.targetArch);
+    const copilotPackagePrefix = "node_modules/@github/copilot-linux-";
+    const hasCopilotPayload =
+      members.includes("node_modules/@github/copilot-sdk/package.json") ||
+      members.some((member) => member.startsWith(copilotPackagePrefix));
+    const copilotExecutableMembers = hasCopilotPayload
+      ? resolveWslCopilotExecutableMembers(input.targetArch)
+      : [];
     const requiredMembers = [
       "apps/server/dist/bin.mjs",
       "node_modules/node-pty/package.json",
+      ...copilotExecutableMembers,
       ...(wslArch === undefined
         ? []
         : [
@@ -3110,6 +3122,30 @@ export const validateWindowsPackagedPayload = Effect.fn(
         missingFiles: missingMembers,
         cause: new Error("WSL runtime archive is incomplete"),
       });
+    }
+    if (hasCopilotPayload) {
+      const copilotPackageRoots = new Set(
+        members.flatMap((member) => {
+          const match = /^(node_modules\/@github\/copilot-linux-[^/]+)\//.exec(member);
+          return match?.[1] === undefined ? [] : [match[1]];
+        }),
+      );
+      const actualCopilotExecutables = members.filter((member) =>
+        /^node_modules\/@github\/copilot-linux-[^/]+\/(?:copilot|ripgrep\/bin\/linux-[^/]+\/rg|tgrep\/bin\/linux-[^/]+\/tgrep)$/.test(
+          member,
+        ),
+      );
+      if (
+        copilotPackageRoots.size !== 1 ||
+        actualCopilotExecutables.length !== copilotExecutableMembers.length ||
+        actualCopilotExecutables.some((member) => !copilotExecutableMembers.includes(member))
+      ) {
+        return yield* invalidWslRuntime(
+          new Error(
+            `WSL runtime Copilot layout is ambiguous (${String(copilotPackageRoots.size)} packages, ${String(actualCopilotExecutables.length)} executable commands)`,
+          ),
+        );
+      }
     }
   }
 
