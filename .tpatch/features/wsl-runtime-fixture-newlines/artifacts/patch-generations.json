@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "feature": "wsl-runtime-fixture-newlines",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_7e5391f772b4",
+      "kind": "record",
+      "patch_sha256": "1022dfe77cab2940778e1bc2b552980e7ea474f95e238273b9d133ba12b65b4a",
+      "git_patch_id": "05880f83d249d793a693ac9e84038b4acac5c2c7",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "3f7e02189e096f1c4f8c9f299bb551cbe4fda812fa100f54a6ba0428db3e275a",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "9ac52707e2756db13d92246e606c74fd7474b34d",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": ["apps/desktop/src/wsl/DesktopWslEnvironment.test.ts"],
+        "claim_ids": []
+      },
+      "touched_paths": ["apps/desktop/src/wsl/DesktopWslEnvironment.test.ts"],
+      "dependencies": [
+        {
+          "slug": "wsl-runtime-executable-modes",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "e67ad7d162beef58f2442351f9ee4ab1c33e5b5e90f7012fa3bf9e938814fcb3",
+          "parent_recipe_sha256": "04445f734b8dddf42e32e31e6f8a3cc1df42125fba45068a7733a5148404d38f"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "wsl-runtime-fixture-newlines",
+  "slug": "wsl-runtime-fixture-newlines",
+  "title": "Correct the WSL executable-mode test fixture so its Copilot, rg, and tgrep stub commands explicitly emit the newline-delimited output asserted by the executed-shell test.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-09-10T22:37:43Z",
+  "updated_at": "2026-09-10T22:38:50Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-09-10T22:39:18Z",
+  "apply": {
+    "completed_at": "2026-09-10T22:38:38Z",
+    "base_commit": "9ac52707e2756db13d92246e606c74fd7474b34d",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "wsl-runtime-executable-modes",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-09-10T22:38:47Z",
+    "passed": false,
+    "recipe_hash_at_verify": "3f7e02189e096f1c4f8c9f299bb551cbe4fda812fa100f54a6ba0428db3e275a",
+    "patch_hash_at_verify": "1022dfe77cab2940778e1bc2b552980e7ea474f95e238273b9d133ba12b65b4a",
+    "parent_snapshot": {
+      "wsl-runtime-executable-modes": "applied"
+    }
+  }
+}

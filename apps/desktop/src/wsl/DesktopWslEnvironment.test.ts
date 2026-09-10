@@ -461,12 +461,12 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
           : [
               'mkdir -p "$stage/node_modules/@github/copilot-sdk" "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64" "$stage/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64"',
               `printf '%s' '{"name":"@github/copilot-sdk"}' > "$stage/node_modules/@github/copilot-sdk/package.json"`,
-              `printf '#!/bin/sh\\nprintf copilot\\n' > "$stage/node_modules/@github/copilot-linux-x64/copilot"`,
-              `printf '#!/bin/sh\\nprintf rg\\n' > "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg"`,
+              `printf '#!/bin/sh\\nprintf "copilot\\\\n"\\n' > "$stage/node_modules/@github/copilot-linux-x64/copilot"`,
+              `printf '#!/bin/sh\\nprintf "rg\\\\n"\\n' > "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg"`,
               ...(copilot === "missing-tgrep"
                 ? []
                 : [
-                    `printf '#!/bin/sh\\nprintf tgrep\\n' > "$stage/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep"`,
+                    `printf '#!/bin/sh\\nprintf "tgrep\\\\n"\\n' > "$stage/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep"`,
                   ]),
               `chmod 0644 "$stage/node_modules/@github/copilot-linux-x64/copilot" "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg"`,
             ]),
