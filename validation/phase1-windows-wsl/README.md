@@ -11,7 +11,7 @@ Phase 1 foundation. It is not intended to merge into `main` or
   `7032ad0c135d451554c552daa9178783a11b5cd7` or a descendant on
   `validation/phase1-windows-wsl`
 - Source branch: `phase1/foundation`
-- Source commit: `3adf3566f162434ce963eb64298210e1d1d47005`
+- Source commit: `9ac52707e2756db13d92246e606c74fd7474b34d`
 - Desktop version: `0.0.37`
 - Target: Windows x64 plus an x64 Ubuntu WSL2 distro
 
@@ -116,14 +116,18 @@ The runner:
    the runner clears ambient desktop/Vite overrides, refuses root `.env` files,
    and forces a fresh unsigned non-mock build;
 7. validates `server.asar`, smart-unpacked native files, the resource monitor,
-   the WSL archive and digest, the 80-file payload budget, and exact
-   Copilot/Koffi versions;
+   the WSL archive and digest, the packaged desktop installer behavior, the
+   80-file payload budget, and exact Copilot/Koffi versions;
 8. starts and restarts the packaged Windows backend against disposable state;
 9. runs one packaged Copilot tool approval, resumes the same session with the
    packaged native CLI, verifies the CLI turn landed in the original persisted
    event history, resumes it again with a fresh packaged SDK client, verifies
    continuity again, then deletes it;
-10. starts and restarts the packaged Linux backend inside WSL;
+10. generates the real WSL runtime installer from the frozen product source,
+    uses it to normalize and verify Linux Copilot, `rg`, and `tgrep` executable
+    modes, verifies the exact installer hash inside WSL, then starts and
+    restarts the packaged Linux backend; each readiness request has a bounded
+    wall-clock timeout;
 11. keeps Windows and WSL backends live together on different ports and
     confirms distinct environment IDs;
 12. writes from Windows into the Linux filesystem and requires a native

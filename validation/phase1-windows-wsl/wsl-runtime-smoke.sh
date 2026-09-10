@@ -6,6 +6,7 @@ run_id=${2:?run id is required}
 port=${3:?port is required}
 archive=${4:-}
 expected_hash=${5:-}
+install_script=${6:-}
 
 real_home=$(getent passwd "$(id -u)" | cut -d: -f6)
 if [[ -z "$real_home" || "$real_home" == /mnt/* ]]; then
@@ -13,7 +14,11 @@ if [[ -z "$real_home" || "$real_home" == /mnt/* ]]; then
   exit 6
 fi
 isolated_home="$real_home/.local/share/t3code-phase1-validation/$run_id/home"
-runtime_root="$isolated_home/runtime"
+runtime_path_file="$isolated_home/runtime.path"
+runtime_root=""
+if [[ -f "$runtime_path_file" ]]; then
+  runtime_root=$(<"$runtime_path_file")
+fi
 pid_file="$isolated_home/server.pid"
 start_file="$isolated_home/server.start"
 log_file="$isolated_home/server.log"
@@ -43,6 +48,7 @@ stop_server() {
   fi
   expected_start=$(cat "$start_file")
   process_matches() {
+    [[ -n "$runtime_root" ]] || return 1
     [[ -r "/proc/$pid/stat" ]] || return 1
     [[ "$(awk '{print $22}' "/proc/$pid/stat")" == "$expected_start" ]] || return 1
     tr '\0' ' ' <"/proc/$pid/cmdline" | grep -qF -- "$runtime_root/apps/server/dist/bin.mjs"
@@ -83,8 +89,8 @@ start_server() {
   fi
   mkdir -p "$isolated_home/.local/bin"
   ln -sfn "$node_path" "$isolated_home/.local/bin/node"
-  if [[ -z "$archive" || -z "$expected_hash" ]]; then
-    printf 'Archive and expected hash are required for start/restart.\n' >&2
+  if [[ -z "$archive" || -z "$expected_hash" || -z "$install_script" ]]; then
+    printf 'Archive, expected hash, and product install script are required for start/restart.\n' >&2
     exit 2
   fi
   mkdir -p "$isolated_home"
@@ -93,10 +99,19 @@ start_server() {
     printf 'WSL archive SHA-256 mismatch.\n' >&2
     exit 4
   fi
-  if [[ ! -f "$runtime_root/apps/server/dist/bin.mjs" ]]; then
-    mkdir -p "$runtime_root"
-    tar -xzf "$archive" -C "$runtime_root"
+  if [[ ! -f "$install_script" ]]; then
+    printf 'Product WSL runtime install script was not found at %s\n' "$install_script" >&2
+    exit 2
   fi
+  install_script_sha=$(sha256sum "$install_script" | cut -d ' ' -f 1)
+  install_output=$(bash "$install_script")
+  runtime_root=$(sed -n 's/^runtimeRoot://p' <<<"$install_output")
+  expected_runtime_root="$isolated_home/.t3/wsl-runtime/sha256-$expected_hash"
+  if [[ "$runtime_root" != "$expected_runtime_root" ]]; then
+    printf 'Product installer returned unexpected runtime root: %s\n' "$runtime_root" >&2
+    exit 5
+  fi
+  printf '%s\n' "$runtime_root" >"$runtime_path_file"
 
   test -f "$runtime_root/apps/server/dist/bin.mjs"
   test -f "$runtime_root/node_modules/node-pty/package.json"
@@ -126,11 +141,12 @@ start_server() {
 
   pid=$(cat "$pid_file")
   ready=0
-  for _ in $(seq 1 120); do
+  deadline=$((SECONDS + 60))
+  while ((SECONDS < deadline)); do
     if ! kill -0 "$pid" 2>/dev/null; then
       break
     fi
-    if curl -fsS "http://127.0.0.1:$port/" >/dev/null 2>&1; then
+    if curl --connect-timeout 2 --max-time 3 -fsS "http://127.0.0.1:$port/" >/dev/null 2>&1; then
       ready=1
       break
     fi
@@ -143,7 +159,14 @@ start_server() {
 
   environment_id=$(tr -d '[:space:]' <"$isolated_home/.t3/userdata/environment-id")
   server_version=$("$node_path" "$runtime_root/apps/server/dist/bin.mjs" --version)
-  copilot_version=$("$runtime_root/node_modules/@github/copilot-linux-x64/copilot" --version)
+  copilot="$runtime_root/node_modules/@github/copilot-linux-x64/copilot"
+  rg="$runtime_root/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg"
+  tgrep="$runtime_root/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep"
+  copilot_version=$("$copilot" --no-auto-update --version)
+  copilot_version=${copilot_version%%$'\n'*}
+  copilot_mode=$(stat -c '%a' "$copilot")
+  rg_mode=$(stat -c '%a' "$rg")
+  tgrep_mode=$(stat -c '%a' "$tgrep")
 
   printf 'pid=%s\n' "$pid"
   printf 'isolatedHome=%s\n' "$isolated_home"
@@ -153,6 +176,10 @@ start_server() {
   printf 'environmentId=%s\n' "$environment_id"
   printf 'serverVersion=%s\n' "$server_version"
   printf 'copilotVersion=%s\n' "$copilot_version"
+  printf 'copilotMode=%s\n' "$copilot_mode"
+  printf 'rgMode=%s\n' "$rg_mode"
+  printf 'tgrepMode=%s\n' "$tgrep_mode"
+  printf 'installScriptSha256=%s\n' "$install_script_sha"
   printf 'nodePath=%s\n' "$node_path"
   trap - ERR
 }

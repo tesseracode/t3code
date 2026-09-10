@@ -31,6 +31,7 @@
 | Packaged native forced restart/crash recovery | NOT RUN | |
 | Packaged Copilot approval | NOT RUN | |
 | SDK → native CLI → SDK persisted continuity | NOT RUN | |
+| Product WSL installer restores Copilot/`rg`/`tgrep` executable modes | NOT RUN | |
 | Packaged WSL server HTTP/migrations | NOT RUN | |
 | Packaged WSL server restart/persistence | NOT RUN | |
 | Concurrent Windows and WSL backends | NOT RUN | |

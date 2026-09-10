@@ -2,7 +2,7 @@
 param(
   [string]$Repository = "https://github.com/tesseracode/t3code.git",
   [string]$SourceBranch = "phase1/foundation",
-  [string]$ExpectedSourceCommit = "3adf3566f162434ce963eb64298210e1d1d47005",
+  [string]$ExpectedSourceCommit = "9ac52707e2756db13d92246e606c74fd7474b34d",
   [string]$ExpectedServerVersion = "t3 v0.0.37",
   [string]$SourceRoot = "$env:USERPROFILE\src\t3code-phase1-validation-source",
   [string]$WslDistro = "Ubuntu",
@@ -61,6 +61,7 @@ $cleanupErrors = [Collections.Generic.List[string]]::new()
 $nativeHandle = $null
 $wslStarted = $false
 $wslRuntimeScript = $null
+$wslInstallScriptPath = $null
 $wslArchivePath = $null
 $wslArchiveHash = $null
 $originalWslEnv = $env:WSLENV
@@ -435,6 +436,31 @@ try {
   }
   $env:PATH = "$(Split-Path $vp);$env:PATH"
 
+  $installGenerator = Join-Path $runRoot "generate-wsl-runtime-install.mjs"
+  $sourceWslEnvironmentModule = Join-Path $SourceRoot "apps\desktop\src\wsl\DesktopWslEnvironment.ts"
+  @'
+import { pathToFileURL } from "node:url";
+
+const [sourceModule, archivePath, runtimeId, sha256] = process.argv.slice(2);
+if (!sourceModule || !archivePath || !runtimeId || !sha256) {
+  throw new Error("source module, archive path, runtime id, and SHA-256 are required");
+}
+const module = await import(pathToFileURL(sourceModule).href);
+process.stdout.write(module.buildWslRuntimeInstallScript(archivePath, runtimeId, sha256));
+'@ | Set-Content $installGenerator -Encoding utf8
+  $installerPreflight = Invoke-Captured $node @(
+    $installGenerator,
+    $sourceWslEnvironmentModule,
+    "/tmp/t3code-validation-preflight.tar.gz",
+    "sha256-preflight",
+    "0000000000000000000000000000000000000000000000000000000000000000"
+  )
+  if ($installerPreflight -notmatch "normalize_copilot_executable_modes") {
+    throw "The frozen product source did not generate executable-mode normalization."
+  }
+  $summary.source["wslRuntimeInstallerGenerator"] = "passed"
+  Save-Summary
+
   Write-Step "Ensuring the Electron runtime before parallel tests"
   Invoke-Checked $corepack @(
     "pnpm", "--filter", "@t3tools/desktop", "exec", "install-electron"
@@ -564,6 +590,7 @@ try {
   $packagedApp = Join-Path $stage.FullName "app\dist\win-unpacked"
   $appExecutable = Join-Path $packagedApp "T3 Code (Alpha).exe"
   $resources = Join-Path $packagedApp "resources"
+  $appAsar = Join-Path $resources "app.asar"
   $serverAsar = Join-Path $resources "server.asar"
   $serverAsarUnpacked = Join-Path $resources "server.asar.unpacked"
   $copilotExecutable = Join-Path $serverAsarUnpacked "node_modules\@github\copilot-win32-x64\copilot.exe"
@@ -572,6 +599,7 @@ try {
   $wslHashFile = "$wslArchive.sha256"
   foreach ($required in @(
     $appExecutable,
+    $appAsar,
     $serverAsar,
     $copilotExecutable,
     $resourceMonitor,
@@ -582,6 +610,11 @@ try {
       throw "Required packaged file is missing: $required"
     }
   }
+  $packagedDesktopBundle = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($appAsar))
+  if (-not $packagedDesktopBundle.Contains("normalize_copilot_executable_modes")) {
+    throw "The packaged desktop bundle does not carry WSL executable-mode normalization."
+  }
+  $packagedDesktopBundle = $null
   $payloadFileCount = @(
     Get-ChildItem -LiteralPath $packagedApp -Recurse -File
   ).Count
@@ -649,8 +682,9 @@ try {
     appExecutable = $appExecutable
     serverAsar = $serverAsar
     serverVersion = $packagedServerVersion
+    packagedInstallerNormalizesModes = $true
     copilotExecutable = $copilotExecutable
-    copilotVersion = (Invoke-Captured $copilotExecutable @("--version"))
+    copilotVersion = (Invoke-Captured $copilotExecutable @("--no-auto-update", "--version"))
     resourceMonitor = $resourceMonitor
     wslRuntime = $wslArchive
     wslRuntimeSha256 = $actualWslHash
@@ -659,6 +693,25 @@ try {
   $wslRuntimeScript = Convert-ToWslPath (Join-Path $PSScriptRoot "wsl-runtime-smoke.sh")
   $wslArchivePath = Convert-ToWslPath $wslArchive
   $wslArchiveHash = $actualWslHash
+  $wslRuntimeId = "sha256-$actualWslHash"
+  $generatedInstallScript = Invoke-Captured $node @(
+    $installGenerator,
+    $sourceWslEnvironmentModule,
+    $wslArchivePath,
+    $wslRuntimeId,
+    $wslArchiveHash
+  )
+  if ($generatedInstallScript -notmatch "normalize_copilot_executable_modes") {
+    throw "The frozen product source did not generate executable-mode normalization."
+  }
+  $wslInstallScriptWindows = Join-Path $runRoot "wsl-runtime-install.sh"
+  "$generatedInstallScript`n" | Set-Content $wslInstallScriptWindows -Encoding utf8 -NoNewline
+  $wslInstallScriptPath = Convert-ToWslPath $wslInstallScriptWindows
+  $wslInstallScriptHash = (
+    Get-FileHash $wslInstallScriptWindows -Algorithm SHA256
+  ).Hash.ToLowerInvariant()
+  $summary.artifact["wslRuntimeInstallScript"] = $wslInstallScriptWindows
+  $summary.artifact["wslRuntimeInstallScriptSha256"] = $wslInstallScriptHash
   Save-Summary
 
   Write-Step "Starting packaged native Windows backend"
@@ -779,7 +832,8 @@ try {
   $wslStarted = $true
   $wslOutput = Invoke-Captured "wsl.exe" @(
     "-d", $WslDistro, "--exec", "bash", $wslRuntimeScript,
-    "start", $runId, [string]$WslPort, $wslArchivePath, $wslArchiveHash
+    "start", $runId, [string]$WslPort, $wslArchivePath, $wslArchiveHash,
+    $wslInstallScriptPath
   )
   $wslMetadata = Convert-KeyValueOutput $wslOutput
   if (-not $wslMetadata.environmentId) {
@@ -790,6 +844,14 @@ try {
   }
   if ($wslMetadata.serverVersion -ne $packagedServerVersion) {
     throw "Windows and WSL packaged server versions differ."
+  }
+  foreach ($modeName in @("copilotMode", "rgMode", "tgrepMode")) {
+    if ($wslMetadata[$modeName] -ne "755") {
+      throw "Expected packaged WSL $modeName 755, found '$($wslMetadata[$modeName])'."
+    }
+  }
+  if ($wslMetadata.installScriptSha256 -ne $wslInstallScriptHash) {
+    throw "WSL did not execute the exact product-generated runtime installer."
   }
   $wslUrl = "http://127.0.0.1:$WslPort/"
   try {
@@ -817,6 +879,10 @@ try {
     environmentId = $wslMetadata.environmentId
     serverVersion = $wslMetadata.serverVersion
     copilotVersion = $wslMetadata.copilotVersion
+    copilotMode = $wslMetadata.copilotMode
+    rgMode = $wslMetadata.rgMode
+    tgrepMode = $wslMetadata.tgrepMode
+    installScriptSha256 = $wslMetadata.installScriptSha256
     nodePath = $wslMetadata.nodePath
     restartStatus = "not-run"
   }
@@ -902,7 +968,8 @@ try {
 
   $wslRestartOutput = Invoke-Captured "wsl.exe" @(
     "-d", $WslDistro, "--exec", "bash", $wslRuntimeScript,
-    "restart", $runId, [string]$WslPort, $wslArchivePath, $wslArchiveHash
+    "restart", $runId, [string]$WslPort, $wslArchivePath, $wslArchiveHash,
+    $wslInstallScriptPath
   )
   $wslRestartMetadata = Convert-KeyValueOutput $wslRestartOutput
   if ($wslRestartMetadata.environmentId -ne $wslMetadata.environmentId) {
