@@ -1,0 +1,598 @@
+diff --git a/docs/operations/release.md b/docs/operations/release.md
+index 1b95c9522..f3d6ee8c1 100644
+--- a/docs/operations/release.md
++++ b/docs/operations/release.md
+@@ -244,14 +244,19 @@ runtime forms stay aligned and the upstream 80-file installation budget is
+ preserved. The WSL archive then omits the retained Windows Copilot and Koffi
+ packages because its extracted runtime uses only their glibc-Linux counterparts;
+ `server.asar` keeps both platforms for the native Windows backend and mounted
+-WSL fallback.
++WSL fallback. Because these stages use generated manifests rather than the
++monorepo lockfile, the SDK's external runtime closure is pinned to the
++source-tested Copilot, Koffi, vscode-jsonrpc, Zod, and detect-libc resolutions.
++Every Copilot-bearing stage resolves and verifies that closure before
++packaging.
+ 
+ The artifact builder rejects a Windows package when any of these invariants
+ break:
+ 
+ - `resources/server.asar` is absent or does not contain the server entry.
+ - A staged Copilot SDK payload is missing a reviewed target executable,
+-  runtime native, search helper, clipboard binding, or Koffi binding.
++  runtime native, search helper, clipboard binding, or Koffi binding, or its
++  external runtime dependency versions differ from the source-tested closure.
+ - Any file marked unpacked in the ASAR header is absent from
+   `resources/server.asar.unpacked`.
+ - On same-architecture Windows builds, the packaged primary cannot load the fff
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 08845e7f5..25051c94d 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -47,6 +47,10 @@ overrides:
+   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-arm64': '-'
+   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-x64': '-'
+   '@github/copilot-sdk@1.0.8>@github/copilot': 1.0.75
++  '@github/copilot-sdk@1.0.8>koffi': 3.1.6
++  '@github/copilot-sdk@1.0.8>vscode-jsonrpc': 8.2.1
++  '@github/copilot-sdk@1.0.8>zod': 4.4.3
++  '@github/copilot@1.0.75>detect-libc': 2.1.2
+   '@clerk/backend': 3.14.0
+   '@clerk/clerk-js': 6.30.1
+   '@clerk/clerk-js>@base-org/account': '-'
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index 6f68676e4..be2f6951f 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -100,6 +100,12 @@ overrides:
+   # Copilot SDK 1.0.8 loads the platform package's ./sdk export. Copilot CLI
+   # 1.0.82 removed that export, so keep the SDK on its compatible runtime.
+   "@github/copilot-sdk@1.0.8>@github/copilot": 1.0.75
++  # Desktop stages use generated manifests without the monorepo lockfile.
++  # Keep its external runtime closure on source-tested resolutions.
++  "@github/copilot-sdk@1.0.8>koffi": 3.1.6
++  "@github/copilot-sdk@1.0.8>vscode-jsonrpc": 8.2.1
++  "@github/copilot-sdk@1.0.8>zod": 4.4.3
++  "@github/copilot@1.0.75>detect-libc": 2.1.2
+   "@clerk/backend": "catalog:"
+   "@clerk/clerk-js": "catalog:"
+   "@clerk/clerk-js>@base-org/account": "-"
+diff --git a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts
+index 28ac28980..8ef5e81b0 100644
+--- a/scripts/build-desktop-artifact.test.ts
++++ b/scripts/build-desktop-artifact.test.ts
+@@ -19,6 +19,8 @@ import {
+   buildWslRuntimeArchiveArgs,
+   parseWslRuntimeArchiveMembers,
+   resolveWslCopilotExecutableMembers,
++  CopilotStageDependencyOverrideError,
++  CopilotStageDependencyVersionError,
+   CopilotSdkServerPayloadPruneError,
+   DesktopDmgBackgroundSourceMissingError,
+   createStageWorkspaceConfig,
+@@ -64,6 +66,9 @@ import {
+   STAGE_INSTALL_ARGS,
+   ancestorNodeModulesPaths,
+   copyDirectoryPreservingSymlinks,
++  readWorkspaceConfig,
++  validateCopilotStageDependencyOverrides,
++  validateCopilotStageDependencyVersions,
+   validateWindowsPackagedPayload,
+   WindowsPrimaryNativeProbeError,
+   WindowsPackagedPayloadValidationError,
+@@ -106,6 +111,39 @@ const stageWslRuntimeTreeFixture = Effect.fn("stageWslRuntimeTreeFixture")(funct
+   );
+ });
+ 
++const stageCopilotDependencyFixture = Effect.fn("test.stageCopilotDependencyFixture")(function* (
++  stageDir: string,
++  versions: Partial<Record<string, string>> = {},
++) {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const packages = {
++    "@github/copilot-sdk": "1.0.8",
++    "@github/copilot": "1.0.75",
++    koffi: "3.1.6",
++    "vscode-jsonrpc": "8.2.1",
++    zod: "4.4.3",
++    "detect-libc": "2.1.2",
++    ...versions,
++  };
++  for (const [packageName, version] of Object.entries(packages)) {
++    const manifestPath = path.join(stageDir, "node_modules", packageName, "package.json");
++    yield* fs.makeDirectory(path.dirname(manifestPath), { recursive: true });
++    yield* fs.writeFileString(
++      manifestPath,
++      packageName === "koffi"
++        ? `{"name":"koffi","version":"${version}","exports":{".":"./index.cjs"}}`
++        : `{"name":"${packageName}","version":"${version}"}`,
++    );
++    if (packageName === "koffi") {
++      yield* fs.writeFileString(
++        path.join(path.dirname(manifestPath), "index.cjs"),
++        "module.exports={}",
++      );
++    }
++  }
++});
++
+ function mockProcess(exitCode: number) {
+   return ChildProcessSpawner.makeHandle({
+     pid: ChildProcessSpawner.ProcessId(1),
+@@ -321,27 +359,24 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+         }
+         nativeFiles.push("node_modules/@koromix/koffi-linux-x64/musl_x64/koffi.node");
+ 
+-        const sdkManifestPath = path.join(
+-          stageDir,
+-          "node_modules/@github/copilot-sdk/package.json",
+-        );
+-        yield* fs.makeDirectory(path.dirname(sdkManifestPath), { recursive: true });
+-        yield* fs.writeFileString(sdkManifestPath, '{"name":"@github/copilot-sdk"}');
+-        const copilotManifestPath = path.join(
+-          stageDir,
+-          "node_modules/@github/copilot/package.json",
+-        );
+-        yield* fs.makeDirectory(path.dirname(copilotManifestPath), { recursive: true });
+-        yield* fs.writeFileString(
+-          copilotManifestPath,
+-          '{"name":"@github/copilot","version":"1.0.75"}',
+-        );
++        yield* stageCopilotDependencyFixture(stageDir);
+         for (const nativeFile of nativeFiles) {
+           const filePath = path.join(stageDir, nativeFile);
+           yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
+           yield* fs.writeFileString(filePath, nativeFile);
+         }
+ 
++        assert.deepStrictEqual(yield* validateCopilotStageDependencyVersions(stageDir), {
++          validated: true,
++          versions: {
++            "@github/copilot-sdk": "1.0.8",
++            "@github/copilot": "1.0.75",
++            koffi: "3.1.6",
++            "vscode-jsonrpc": "8.2.1",
++            zod: "4.4.3",
++            "detect-libc": "2.1.2",
++          },
++        });
+         const result = yield* pruneCopilotSdkServerPayload({ stageDir, arch: "x64" });
+ 
+         assert.isTrue(result.pruned);
+@@ -409,19 +444,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+           "node_modules/@github/copilot-win32-arm64/pvrecorder/native-pvrecorder.node",
+         );
+ 
+-        for (const manifest of [
+-          "node_modules/@github/copilot-sdk/package.json",
+-          "node_modules/@github/copilot/package.json",
+-        ]) {
+-          const manifestPath = path.join(stageDir, manifest);
+-          yield* fs.makeDirectory(path.dirname(manifestPath), { recursive: true });
+-          yield* fs.writeFileString(
+-            manifestPath,
+-            manifest.includes("copilot-sdk")
+-              ? '{"name":"@github/copilot-sdk"}'
+-              : '{"name":"@github/copilot","version":"1.0.75"}',
+-          );
+-        }
++        yield* stageCopilotDependencyFixture(stageDir);
+         for (const file of [...retainedFiles, ...removableFiles]) {
+           const filePath = path.join(stageDir, file);
+           yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
+@@ -461,25 +484,10 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+     Effect.scoped(
+       Effect.gen(function* () {
+         const fs = yield* FileSystem.FileSystem;
+-        const path = yield* Path.Path;
+         const stageDir = yield* fs.makeTempDirectoryScoped({
+           prefix: "t3-incomplete-copilot-server-payload-",
+         });
+-        const sdkManifestPath = path.join(
+-          stageDir,
+-          "node_modules/@github/copilot-sdk/package.json",
+-        );
+-        yield* fs.makeDirectory(path.dirname(sdkManifestPath), { recursive: true });
+-        yield* fs.writeFileString(sdkManifestPath, '{"name":"@github/copilot-sdk"}');
+-        const copilotManifestPath = path.join(
+-          stageDir,
+-          "node_modules/@github/copilot/package.json",
+-        );
+-        yield* fs.makeDirectory(path.dirname(copilotManifestPath), { recursive: true });
+-        yield* fs.writeFileString(
+-          copilotManifestPath,
+-          '{"name":"@github/copilot","version":"1.0.75"}',
+-        );
++        yield* stageCopilotDependencyFixture(stageDir);
+ 
+         const error = yield* pruneCopilotSdkServerPayload({
+           stageDir,
+@@ -493,6 +501,79 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+     ),
+   );
+ 
++  it.effect("rejects an unreviewed staged Copilot Koffi version", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stageDir = yield* fs.makeTempDirectoryScoped({
++          prefix: "t3-unreviewed-koffi-server-payload-",
++        });
++        yield* stageCopilotDependencyFixture(stageDir, { koffi: "3.2.0" });
++
++        const error = yield* pruneCopilotSdkServerPayload({
++          stageDir,
++          arch: "x64",
++        }).pipe(Effect.flip);
++
++        assert.instanceOf(error, CopilotStageDependencyVersionError);
++        assert.equal(error.reason, "unsupported");
++        assert.equal(error.packageName, "koffi");
++        assert.equal(error.actualVersion, "3.2.0");
++        assert.equal(
++          error.message,
++          "The staged Copilot dependency koffi@3.2.0 does not match the source-tested 3.1.6.",
++        );
++      }),
++    ),
++  );
++
++  it.effect("rejects a Copilot stage with a missing reviewed dependency", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const path = yield* Path.Path;
++        const stageDir = yield* fs.makeTempDirectoryScoped({
++          prefix: "t3-missing-copilot-stage-dependency-",
++        });
++        const sdkManifestPath = path.join(
++          stageDir,
++          "node_modules/@github/copilot-sdk/package.json",
++        );
++        yield* fs.makeDirectory(path.dirname(sdkManifestPath), { recursive: true });
++        yield* fs.writeFileString(
++          sdkManifestPath,
++          '{"name":"@github/copilot-sdk","version":"1.0.8"}',
++        );
++
++        const error = yield* validateCopilotStageDependencyVersions(stageDir).pipe(Effect.flip);
++
++        assert.instanceOf(error, CopilotStageDependencyVersionError);
++        assert.equal(error.reason, "missing");
++        assert.equal(error.packageName, "@github/copilot");
++        assert.equal(
++          error.message,
++          "The staged Copilot SDK cannot resolve @github/copilot@1.0.75.",
++        );
++      }),
++    ),
++  );
++
++  it.effect("leaves stages without the Copilot SDK unvalidated", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stageDir = yield* fs.makeTempDirectoryScoped({
++          prefix: "t3-stage-without-copilot-sdk-",
++        });
++
++        assert.deepStrictEqual(yield* validateCopilotStageDependencyVersions(stageDir), {
++          validated: false,
++          versions: {},
++        });
++      }),
++    ),
++  );
++
+   it("resolves the dedicated nightly updater channel from nightly versions", () => {
+     assert.equal(resolveDesktopUpdateChannel("0.0.17-nightly.20260413.42"), "nightly");
+     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");
+@@ -717,6 +798,27 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+     });
+   });
+ 
++  it.effect("keeps Copilot stage overrides aligned with enforced versions", () =>
++    Effect.gen(function* () {
++      const workspace = yield* readWorkspaceConfig();
++      const overrides = workspace.overrides ?? {};
++      yield* validateCopilotStageDependencyOverrides(overrides);
++
++      const selector = "@github/copilot-sdk@1.0.8>koffi";
++      const error = yield* validateCopilotStageDependencyOverrides({
++        ...overrides,
++        [selector]: "3.2.0",
++      }).pipe(Effect.flip);
++
++      assert.instanceOf(error, CopilotStageDependencyOverrideError);
++      assert.equal(error.selector, selector);
++      assert.equal(
++        error.message,
++        "The Copilot stage override @github/copilot-sdk@1.0.8>koffi must resolve to 3.1.6, found 3.2.0.",
++      );
++    }),
++  );
++
+   it("stages pnpm 11 allowBuilds and patchedDependencies in the workspace yaml", () => {
+     assert.deepStrictEqual(
+       createStageWorkspaceConfig({
+diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
+index 70074bc5d..128993c71 100644
+--- a/scripts/build-desktop-artifact.ts
++++ b/scripts/build-desktop-artifact.ts
+@@ -90,9 +90,12 @@ const decodeWorkspaceConfig = Schema.decodeEffect(fromYaml(WorkspaceConfig));
+ const decodePackageVersionManifest = Schema.decodeUnknownEffect(
+   Schema.fromJsonString(Schema.Struct({ version: Schema.String })),
+ );
++const decodePackageIdentityManifest = Schema.decodeUnknownEffect(
++  Schema.fromJsonString(Schema.Struct({ name: Schema.String, version: Schema.String })),
++);
+ const encodeStageWorkspaceConfig = Schema.encodeEffect(fromYaml(StageWorkspaceConfig));
+ 
+-const readWorkspaceConfig = Effect.fn("readWorkspaceConfig")(function* () {
++export const readWorkspaceConfig = Effect.fn("readWorkspaceConfig")(function* () {
+   const fs = yield* FileSystem.FileSystem;
+   const path = yield* Path.Path;
+   const repoRoot = yield* RepoRoot;
+@@ -380,6 +383,19 @@ export class DesktopBuildDependencyResolutionError extends Schema.TaggedErrorCla
+   }
+ }
+ 
++export class CopilotStageDependencyOverrideError extends Schema.TaggedErrorClass<CopilotStageDependencyOverrideError>()(
++  "CopilotStageDependencyOverrideError",
++  {
++    selector: Schema.String,
++    expectedVersion: Schema.String,
++    actualVersion: Schema.optionalKey(Schema.String),
++  },
++) {
++  override get message(): string {
++    return `The Copilot stage override ${this.selector} must resolve to ${this.expectedVersion}, found ${this.actualVersion ?? "missing"}.`;
++  }
++}
++
+ export class MissingServerProductionDependenciesError extends Schema.TaggedErrorClass<MissingServerProductionDependenciesError>()(
+   "MissingServerProductionDependenciesError",
+   {
+@@ -554,6 +570,24 @@ export class CopilotSdkServerPayloadPruneError extends Schema.TaggedErrorClass<C
+   }
+ }
+ 
++export class CopilotStageDependencyVersionError extends Schema.TaggedErrorClass<CopilotStageDependencyVersionError>()(
++  "CopilotStageDependencyVersionError",
++  {
++    reason: Schema.Literals(["missing", "unsupported"]),
++    stageDir: Schema.String,
++    packageName: Schema.String,
++    expectedVersion: Schema.String,
++    actualVersion: Schema.optionalKey(Schema.String),
++  },
++) {
++  override get message(): string {
++    if (this.reason === "missing") {
++      return `The staged Copilot SDK cannot resolve ${this.packageName}@${this.expectedVersion}.`;
++    }
++    return `The staged Copilot dependency ${this.packageName}@${this.actualVersion ?? "unknown"} does not match the source-tested ${this.expectedVersion}.`;
++  }
++}
++
+ export class WindowsServerSidecarPackError extends Schema.TaggedErrorClass<WindowsServerSidecarPackError>()(
+   "WindowsServerSidecarPackError",
+   {
+@@ -2332,9 +2366,185 @@ const COPILOT_SDK_INTERACTIVE_RUNTIME_DIRECTORIES = [
+   "webview",
+ ] as const;
+ const COPILOT_PRUNED_RUNTIME_VERSION = "1.0.75";
++const COPILOT_PRUNED_KOFFI_VERSION = "3.1.6";
++const COPILOT_SDK_VERSION = "1.0.8";
++export const COPILOT_STAGE_DEPENDENCY_OVERRIDES = {
++  "@github/copilot-sdk@1.0.8>@github/copilot": COPILOT_PRUNED_RUNTIME_VERSION,
++  "@github/copilot-sdk@1.0.8>koffi": COPILOT_PRUNED_KOFFI_VERSION,
++  "@github/copilot-sdk@1.0.8>vscode-jsonrpc": "8.2.1",
++  "@github/copilot-sdk@1.0.8>zod": "4.4.3",
++  "@github/copilot@1.0.75>detect-libc": "2.1.2",
++} as const;
++const COPILOT_STAGE_DEPENDENCY_VERSIONS = {
++  "@github/copilot-sdk": COPILOT_SDK_VERSION,
++  "@github/copilot": COPILOT_PRUNED_RUNTIME_VERSION,
++  koffi: COPILOT_PRUNED_KOFFI_VERSION,
++  "vscode-jsonrpc": "8.2.1",
++  zod: "4.4.3",
++  "detect-libc": "2.1.2",
++} as const;
+ const COPILOT_GENERIC_CLIPBOARD_NATIVE_PATTERN = /^clipboard\..+\.node$/u;
+ const SERVER_NATIVE_FILE_PATTERN = /\.(?:node|dll|exe|dylib|so(?:\..*)?)$/u;
+ 
++const resolveStagePackageManifest = Effect.fn("desktopArtifact.resolveStagePackageManifest")(
++  function* (input: {
++    readonly stageDir: string;
++    readonly packageName: string;
++    readonly packageRequire: ReturnType<typeof NodeModule.createRequire>;
++  }) {
++    const fs = yield* FileSystem.FileSystem;
++    const path = yield* Path.Path;
++    const realStageDir = yield* fs
++      .realPath(input.stageDir)
++      .pipe(Effect.orElseSucceed(() => input.stageDir));
++    const resolvedPath = yield* Effect.try({
++      try: () => {
++        try {
++          return input.packageRequire.resolve(`${input.packageName}/package.json`);
++        } catch {
++          return input.packageRequire.resolve(input.packageName);
++        }
++      },
++      catch: () => null,
++    }).pipe(Effect.orElseSucceed(() => null));
++    if (resolvedPath === null) return null;
++
++    let directory = path.dirname(resolvedPath);
++    while (true) {
++      const relativeDirectory = path.relative(realStageDir, directory);
++      if (
++        relativeDirectory === ".." ||
++        relativeDirectory.startsWith("../") ||
++        relativeDirectory.startsWith("..\\") ||
++        path.isAbsolute(relativeDirectory)
++      ) {
++        return null;
++      }
++      const manifestPath = path.join(directory, "package.json");
++      const manifestSource = yield* fs
++        .readFileString(manifestPath)
++        .pipe(Effect.orElseSucceed(() => ""));
++      const manifest =
++        manifestSource === ""
++          ? null
++          : yield* decodePackageIdentityManifest(manifestSource).pipe(
++              Effect.orElseSucceed(() => null),
++            );
++      if (manifest?.name === input.packageName) {
++        return { manifestPath, version: manifest.version } as const;
++      }
++      const parent = path.dirname(directory);
++      if (parent === directory) return null;
++      directory = parent;
++    }
++  },
++);
++
++const validateResolvedStagePackage = Effect.fn("desktopArtifact.validateResolvedStagePackage")(
++  function* (input: {
++    readonly stageDir: string;
++    readonly packageName: string;
++    readonly expectedVersion: string;
++    readonly packageRequire: ReturnType<typeof NodeModule.createRequire>;
++  }) {
++    const manifest = yield* resolveStagePackageManifest(input);
++    if (manifest === null) {
++      return yield* new CopilotStageDependencyVersionError({
++        reason: "missing",
++        stageDir: input.stageDir,
++        packageName: input.packageName,
++        expectedVersion: input.expectedVersion,
++      });
++    }
++    if (manifest.version !== input.expectedVersion) {
++      return yield* new CopilotStageDependencyVersionError({
++        reason: "unsupported",
++        stageDir: input.stageDir,
++        packageName: input.packageName,
++        expectedVersion: input.expectedVersion,
++        actualVersion: manifest.version,
++      });
++    }
++    return manifest;
++  },
++);
++
++export const validateCopilotStageDependencyVersions = Effect.fn(
++  "desktopArtifact.validateCopilotStageDependencyVersions",
++)(function* (stageDir: string) {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const sdkManifestPath = path.join(
++    stageDir,
++    "node_modules",
++    "@github",
++    "copilot-sdk",
++    "package.json",
++  );
++  if (!(yield* fs.exists(sdkManifestPath).pipe(Effect.orElseSucceed(() => false)))) {
++    return { validated: false, versions: {} } as const;
++  }
++
++  const realSdkManifestPath = yield* fs
++    .realPath(sdkManifestPath)
++    .pipe(Effect.orElseSucceed(() => sdkManifestPath));
++  const sdkManifestSource = yield* fs.readFileString(realSdkManifestPath);
++  const sdkManifest = yield* decodePackageIdentityManifest(sdkManifestSource).pipe(
++    Effect.orElseSucceed(() => null),
++  );
++  if (sdkManifest?.name !== "@github/copilot-sdk" || sdkManifest.version !== COPILOT_SDK_VERSION) {
++    return yield* new CopilotStageDependencyVersionError({
++      reason: sdkManifest === null ? "missing" : "unsupported",
++      stageDir,
++      packageName: "@github/copilot-sdk",
++      expectedVersion: COPILOT_SDK_VERSION,
++      ...(sdkManifest === null ? {} : { actualVersion: sdkManifest.version }),
++    });
++  }
++  const requireFromSdk = NodeModule.createRequire(realSdkManifestPath);
++  const versions: Record<string, string> = {
++    "@github/copilot-sdk": sdkManifest.version,
++  };
++  for (const packageName of ["@github/copilot", "koffi", "vscode-jsonrpc", "zod"] as const) {
++    const manifest = yield* validateResolvedStagePackage({
++      stageDir,
++      packageName,
++      expectedVersion: COPILOT_STAGE_DEPENDENCY_VERSIONS[packageName],
++      packageRequire: requireFromSdk,
++    });
++    versions[packageName] = manifest.version;
++  }
++  const copilotManifestPath = yield* resolveStagePackageManifest({
++    stageDir,
++    packageName: "@github/copilot",
++    packageRequire: requireFromSdk,
++  }).pipe(Effect.map((manifest) => manifest?.manifestPath ?? sdkManifestPath));
++  const detectLibcManifest = yield* validateResolvedStagePackage({
++    stageDir,
++    packageName: "detect-libc",
++    expectedVersion: COPILOT_STAGE_DEPENDENCY_VERSIONS["detect-libc"],
++    packageRequire: NodeModule.createRequire(copilotManifestPath),
++  });
++  versions["detect-libc"] = detectLibcManifest.version;
++
++  return { validated: true, versions } as const;
++});
++
++export const validateCopilotStageDependencyOverrides = Effect.fn(
++  "desktopArtifact.validateCopilotStageDependencyOverrides",
++)(function* (overrides: Readonly<Record<string, string>>) {
++  for (const [selector, expectedVersion] of Object.entries(COPILOT_STAGE_DEPENDENCY_OVERRIDES)) {
++    const actualVersion = overrides[selector];
++    if (actualVersion !== expectedVersion) {
++      return yield* new CopilotStageDependencyOverrideError({
++        selector,
++        expectedVersion,
++        ...(actualVersion === undefined ? {} : { actualVersion }),
++      });
++    }
++  }
++});
++
+ const collectNativePayloadFiles = Effect.fn("desktopArtifact.collectNativePayloadFiles")(function* (
+   root: string,
+ ) {
+@@ -2372,6 +2582,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn(
+   if (!(yield* fs.exists(sdkManifestPath).pipe(Effect.orElseSucceed(() => false)))) {
+     return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> } as const;
+   }
++  yield* validateCopilotStageDependencyVersions(input.stageDir);
+   const copilotManifestPath = path.join(nodeModulesDir, "@github", "copilot", "package.json");
+   const copilotManifestSource = yield* fs
+     .readFileString(copilotManifestPath)
+@@ -2390,7 +2601,6 @@ export const pruneCopilotSdkServerPayload = Effect.fn(
+       ...(copilotManifest === null ? {} : { runtimeVersion: copilotManifest.version }),
+     });
+   }
+-
+   const targetPackages = [
+     {
+       packageName: `copilot-win32-${input.arch}`,
+@@ -3216,6 +3426,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
+         cause,
+       }),
+   });
++  yield* validateCopilotStageDependencyOverrides(resolvedOverrides);
+ 
+   const resolvedServerDependencies = yield* Effect.try({
+     try: () => resolveCatalogDependencies(serverDependencies, workspaceCatalog, "apps/server"),
+@@ -3519,6 +3730,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
+     }),
+     { label: "vp install --prod", verbose: options.verbose },
+   );
++  yield* validateCopilotStageDependencyVersions(stageAppDir);
+   yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
+ 
+   // WSL is Windows-only, so only the Windows artifact carries the server

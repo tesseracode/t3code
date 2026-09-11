@@ -100,6 +100,12 @@ overrides:
   # Copilot SDK 1.0.8 loads the platform package's ./sdk export. Copilot CLI
   # 1.0.82 removed that export, so keep the SDK on its compatible runtime.
   "@github/copilot-sdk@1.0.8>@github/copilot": 1.0.75
+  # Desktop stages use generated manifests without the monorepo lockfile.
+  # Keep its external runtime closure on source-tested resolutions.
+  "@github/copilot-sdk@1.0.8>koffi": 3.1.6
+  "@github/copilot-sdk@1.0.8>vscode-jsonrpc": 8.2.1
+  "@github/copilot-sdk@1.0.8>zod": 4.4.3
+  "@github/copilot@1.0.75>detect-libc": 2.1.2
   "@clerk/backend": "catalog:"
   "@clerk/clerk-js": "catalog:"
   "@clerk/clerk-js>@base-org/account": "-"

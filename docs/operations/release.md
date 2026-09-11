@@ -244,14 +244,19 @@ runtime forms stay aligned and the upstream 80-file installation budget is
 preserved. The WSL archive then omits the retained Windows Copilot and Koffi
 packages because its extracted runtime uses only their glibc-Linux counterparts;
 `server.asar` keeps both platforms for the native Windows backend and mounted
-WSL fallback.
+WSL fallback. Because these stages use generated manifests rather than the
+monorepo lockfile, the SDK's external runtime closure is pinned to the
+source-tested Copilot, Koffi, vscode-jsonrpc, Zod, and detect-libc resolutions.
+Every Copilot-bearing stage resolves and verifies that closure before
+packaging.
 
 The artifact builder rejects a Windows package when any of these invariants
 break:
 
 - `resources/server.asar` is absent or does not contain the server entry.
 - A staged Copilot SDK payload is missing a reviewed target executable,
-  runtime native, search helper, clipboard binding, or Koffi binding.
+  runtime native, search helper, clipboard binding, or Koffi binding, or its
+  external runtime dependency versions differ from the source-tested closure.
 - Any file marked unpacked in the ASAR header is absent from
   `resources/server.asar.unpacked`.
 - On same-architecture Windows builds, the packaged primary cannot load the fff
