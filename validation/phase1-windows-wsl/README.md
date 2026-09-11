@@ -11,7 +11,7 @@ Phase 1 foundation. It is not intended to merge into `main` or
   `7032ad0c135d451554c552daa9178783a11b5cd7` or a descendant on
   `validation/phase1-windows-wsl`
 - Source branch: `phase1/foundation`
-- Source commit: `b8e2e0e8dc2d51f549224ed9c8ba815fd6eb4527`
+- Source commit: `cfed6d76aa9028a7611a35b3d3397bf0eb6e4c29`
 - Desktop version: `0.0.37`
 - Target: Windows x64 plus an x64 Ubuntu WSL2 distro
 
@@ -117,7 +117,8 @@ The runner:
    and forces a fresh unsigned non-mock build;
 7. validates `server.asar`, smart-unpacked native files, the resource monitor,
    the WSL archive and digest, the packaged desktop installer behavior, the
-   80-file payload budget, and exact Copilot/Koffi versions;
+   80-file payload budget, and the exact source-tested Copilot SDK/runtime
+   dependency closure;
 8. starts and restarts the packaged Windows backend against disposable state;
 9. runs one packaged Copilot tool approval, resumes the same session with the
    packaged native CLI, verifies the CLI turn landed in the original persisted

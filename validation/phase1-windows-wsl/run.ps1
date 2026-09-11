@@ -2,7 +2,7 @@
 param(
   [string]$Repository = "https://github.com/tesseracode/t3code.git",
   [string]$SourceBranch = "phase1/foundation",
-  [string]$ExpectedSourceCommit = "b8e2e0e8dc2d51f549224ed9c8ba815fd6eb4527",
+  [string]$ExpectedSourceCommit = "cfed6d76aa9028a7611a35b3d3397bf0eb6e4c29",
   [string]$ExpectedServerVersion = "t3 v0.0.37",
   [string]$SourceRoot = "$env:USERPROFILE\src\t3code-phase1-validation-source",
   [string]$WslDistro = "Ubuntu",
@@ -663,6 +663,9 @@ process.stdout.write(module.buildWslRuntimeInstallScript(archivePath, runtimeId,
     "@github/copilot" = "1.0.75"
     "@github/copilot-win32-x64" = "1.0.75"
     "koffi" = "3.1.6"
+    "vscode-jsonrpc" = "8.2.1"
+    "zod" = "4.4.3"
+    "detect-libc" = "2.1.2"
   }
   foreach ($name in $expectedVersions.Keys) {
     if ($packagedVersions[$name] -ne $expectedVersions[$name]) {

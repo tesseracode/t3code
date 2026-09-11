@@ -11,6 +11,9 @@ const packageNames = [
   "@github/copilot",
   "@github/copilot-win32-x64",
   "koffi",
+  "vscode-jsonrpc",
+  "zod",
+  "detect-libc",
 ];
 
 const versions = Object.fromEntries(
