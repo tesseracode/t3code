@@ -342,7 +342,7 @@ try {
   }
   Invoke-Checked "wsl.exe" @(
     "-d", $WslDistro, "--exec", "bash", "-lc",
-    "for tool in bash curl file flock g++ git inotifywait make python3 sha256sum tar; do command -v `"`$tool`" >/dev/null || { printf 'Missing WSL tool: %s\n' `"`$tool`" >&2; exit 3; }; done"
+    "for tool in bash curl file flock g++ git inotifywait make python3 setsid sha256sum tar; do command -v `"`$tool`" >/dev/null || { printf 'Missing WSL tool: %s\n' `"`$tool`" >&2; exit 3; }; done"
   )
   $wslAccountHome = Invoke-Captured "wsl.exe" @(
     "-d", $WslDistro, "--exec", "bash", "-lc",

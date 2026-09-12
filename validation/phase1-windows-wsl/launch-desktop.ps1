@@ -65,6 +65,8 @@ home=$1
 shift
 runtime_in_use() {
   for cmdline in /proc/[0-9]*/cmdline; do
+    # The sh -c body contains the process-matching patterns below.
+    [ "$cmdline" != "/proc/$$/cmdline" ] || continue
     [ -r "$cmdline" ] || continue
     command=$(tr '\0' ' ' <"$cmdline" 2>/dev/null || true)
     case "$command" in
@@ -123,10 +125,10 @@ if ($Stop) {
   $process = Get-Process -Id $launch.pid -ErrorAction SilentlyContinue
   if ($null -ne $process) {
     $actualPath = $process.Path
-    $actualStartTime = $process.StartTime.ToUniversalTime().ToString("o")
+    $actualStartTime = $process.StartTime.ToUniversalTime()
     if (
       $actualPath -ne $launch.appExecutable -or
-      $actualStartTime -ne $launch.processStartTime
+      $actualStartTime -ne ([DateTimeOffset]$launch.processStartTime).UtcDateTime
     ) {
       throw "PID $($launch.pid) no longer matches the recorded T3 process."
     }

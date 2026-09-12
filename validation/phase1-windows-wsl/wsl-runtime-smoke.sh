@@ -123,13 +123,13 @@ start_server() {
   stop_server
   (
     cd "$runtime_root"
-    nohup "$node_path" "$runtime_root/apps/server/dist/bin.mjs" start \
+    nohup setsid "$node_path" "$runtime_root/apps/server/dist/bin.mjs" start \
       --mode desktop \
       --base-dir "$isolated_home/.t3" \
       --host 0.0.0.0 \
       --port "$port" \
       --no-browser \
-      >>"$log_file" 2>&1 &
+      </dev/null >>"$log_file" 2>&1 &
     candidate_pid=$!
     if [[ ! -r "/proc/$candidate_pid/stat" ]]; then
       printf 'The WSL backend exited before its identity could be recorded.\n' >&2

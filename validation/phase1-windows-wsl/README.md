@@ -77,7 +77,7 @@ The agent should inspect these before installing anything:
 
 - An x64 WSL2 distro, normally `Ubuntu`
 - `bash`, `git`, `curl`, `file`, `tar`, `make`, `g++`, `python3`,
-  `sha256sum`, `flock`, and `inotifywait`
+  `sha256sum`, `flock`, `setsid`, and `inotifywait`
 
 On Ubuntu, the usual package command is:
 
@@ -90,8 +90,20 @@ sudo apt-get install -y \
 The helper installs Node `24.20.0` below the current WSL user's home when no
 compatible Node 24 is available. It does not use `sudo` for Node.
 
+The integrated desktop resolves Node from the selected distro's login `PATH`.
+If the helper installed a private Node copy, make a verified Node 24
+installation available on the normal login `PATH` before the desktop checks;
+the helper's explicit Node path alone does not satisfy desktop preflight.
+
 The harness uses `wsl.exe --exec` for direct argument forwarding. This avoids
 the extra shell interpretation that `--` produced on the validated host.
+The automated smoke backend uses `setsid` with closed stdin so it survives
+the launching WSL command's session exit; `nohup` alone is insufficient on
+this host. Its exact PID and start identity remain recorded for cleanup.
+Desktop cleanup compares start-time instants rather than formatted strings,
+because newer PowerShell versions deserialize JSON timestamps as `DateTime`.
+Its WSL process scan excludes the cleanup shell itself: the `sh -c` command
+body contains the same patterns used to detect active backends.
 
 ## Automated validation
 
