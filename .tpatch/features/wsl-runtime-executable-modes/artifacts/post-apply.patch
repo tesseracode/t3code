@@ -1,0 +1,520 @@
+diff --git a/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
+index 1c6b64464..3c5c207a0 100644
+--- a/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
++++ b/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
+@@ -198,6 +198,7 @@ describe("WSL runtime cache", () => {
+     expect(script).toContain('  [ -f "$runtime_root/apps/server/dist/bin.mjs" ] &&');
+     expect(script).toContain('  [ -f "$runtime_root/node_modules/node-pty/package.json" ] &&');
+     expect(script).toContain('    node_pty_payload_present "$runtime_root"');
++    expect(script).toContain('    copilot_executable_payload_ready "$runtime_root"');
+     expect(script).not.toContain("node_modules/effect/package.json");
+     expect(script).toContain("if runtime_is_ready; then");
+     expect(script).toContain("trap 'exit 1' HUP INT TERM");
+@@ -213,6 +214,8 @@ describe("WSL runtime cache", () => {
+     );
+     expect(script).toContain('test -f "$runtime_tmp/apps/server/dist/bin.mjs"');
+     expect(script).toContain('test -f "$runtime_tmp/node_modules/node-pty/package.json"');
++    expect(script).toContain('      if ! chmod 0755 "$executable"; then');
++    expect(script).toContain('if ! normalize_copilot_executable_modes "$runtime_tmp"; then');
+     expect(script).toContain('mv -T "$runtime_tmp" "$runtime_root"');
+     expect(script).not.toContain('rm -rf "$runtime_root"');
+ 
+@@ -439,7 +442,10 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
+     fixtures.length = 0;
+   });
+ 
+-  const createFixture = () => {
++  const createFixture = (
++    options: { readonly copilot?: "valid" | "missing-tgrep" | "absent" } = {},
++  ) => {
++    const copilot = options.copilot ?? "valid";
+     const result = runShell(
+       [
+         "set -eu",
+@@ -450,6 +456,20 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
+         `printf '%s' '{"name":"node-pty","version":"0.0.0-test"}' > "$stage/node_modules/node-pty/package.json"`,
+         `printf '%s' 'pty-native-payload' > "$stage/node_modules/node-pty/prebuilds/linux-x64/pty.node"`,
+         `printf '%s' '{"arch":"x64"}' > "$stage/node_modules/node-pty/prebuilds/linux-x64/t3code-wsl-node-pty.json"`,
++        ...(copilot === "absent"
++          ? []
++          : [
++              'mkdir -p "$stage/node_modules/@github/copilot-sdk" "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64" "$stage/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64"',
++              `printf '%s' '{"name":"@github/copilot-sdk"}' > "$stage/node_modules/@github/copilot-sdk/package.json"`,
++              `printf '#!/bin/sh\\nprintf copilot\\n' > "$stage/node_modules/@github/copilot-linux-x64/copilot"`,
++              `printf '#!/bin/sh\\nprintf rg\\n' > "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg"`,
++              ...(copilot === "missing-tgrep"
++                ? []
++                : [
++                    `printf '#!/bin/sh\\nprintf tgrep\\n' > "$stage/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep"`,
++                  ]),
++              `chmod 0644 "$stage/node_modules/@github/copilot-linux-x64/copilot" "$stage/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg"`,
++            ]),
+         `tar -czf "$work/wsl-runtime.tar.gz" -C "$stage" apps/server/dist node_modules`,
+         `printf 'work:%s\\n' "$work"`,
+         `printf 'archiveSha:%s\\n' "$(sha256sum "$work/wsl-runtime.tar.gz" | cut -d ' ' -f 1)"`,
+@@ -478,6 +498,9 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
+       runtimeParent: `${work}/home/.t3/wsl-runtime`,
+       runtimeRoot: `${work}/home/.t3/wsl-runtime/${runtimeId}`,
+       serverEntry: `${work}/home/.t3/wsl-runtime/${runtimeId}/apps/server/dist/bin.mjs`,
++      copilotExecutable: `${work}/home/.t3/wsl-runtime/${runtimeId}/node_modules/@github/copilot-linux-x64/copilot`,
++      rgExecutable: `${work}/home/.t3/wsl-runtime/${runtimeId}/node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg`,
++      tgrepExecutable: `${work}/home/.t3/wsl-runtime/${runtimeId}/node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep`,
+       installScript,
+       install: (archive?: string, sha?: string) => runShell(installScript(archive, sha)),
+     };
+@@ -496,6 +519,57 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
+     expect(parseWslRuntimeRoot(warm.stdout)).toBe(fixture.runtimeRoot);
+   });
+ 
++  it("restores executable modes lost by a Windows-created archive", () => {
++    const fixture = createFixture();
++
++    const installed = fixture.install();
++
++    expect(installed.status, installed.stderr).toBe(0);
++    const executableProbe = runShell(
++      [
++        "set -eu",
++        `test -x ${sh(fixture.copilotExecutable)}`,
++        `test -x ${sh(fixture.rgExecutable)}`,
++        `test -x ${sh(fixture.tgrepExecutable)}`,
++        sh(fixture.copilotExecutable),
++        sh(fixture.rgExecutable),
++        sh(fixture.tgrepExecutable),
++      ].join("\n"),
++    );
++    expect(executableProbe.status, executableProbe.stderr).toBe(0);
++    expect(executableProbe.stdout).toBe("copilot\nrg\ntgrep\n");
++  });
++
++  it("rejects a Copilot-bearing archive missing an executable helper", () => {
++    const fixture = createFixture({ copilot: "missing-tgrep" });
++
++    const failed = fixture.install();
++
++    expect(failed.status).not.toBe(0);
++    expect(failed.stderr).toContain("invalid Linux Copilot executable payload");
++    expect(parseWslRuntimeRoot(failed.stdout)).toBeNull();
++  });
++
++  it("keeps runtime installation compatible when Copilot is absent", () => {
++    const fixture = createFixture({ copilot: "absent" });
++
++    const installed = fixture.install();
++
++    expect(installed.status, installed.stderr).toBe(0);
++    expect(parseWslRuntimeRoot(installed.stdout)).toBe(fixture.runtimeRoot);
++  });
++
++  it("reinstalls a warm cache whose Copilot execute bit was removed", () => {
++    const fixture = createFixture();
++    expect(fixture.install().status).toBe(0);
++    expect(runShell(`set -eu\nchmod 0644 ${sh(fixture.copilotExecutable)}`).status).toBe(0);
++
++    const repaired = fixture.install();
++
++    expect(repaired.status, repaired.stderr).toBe(0);
++    expect(runShell(`set -eu\ntest -x ${sh(fixture.copilotExecutable)}`).status).toBe(0);
++  });
++
+   it("reinstalls a cache whose server entry was truncated", () => {
+     const fixture = createFixture();
+     expect(fixture.install().status).toBe(0);
+diff --git a/apps/desktop/src/wsl/DesktopWslEnvironment.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.ts
+index b0c9f5ffe..2c600085c 100644
+--- a/apps/desktop/src/wsl/DesktopWslEnvironment.ts
++++ b/apps/desktop/src/wsl/DesktopWslEnvironment.ts
+@@ -295,6 +295,55 @@ export const buildWslRuntimeInstallScript = (
+     "  done",
+     "  return 1",
+     "}",
++    // Windows filesystems do not carry authoritative POSIX execute bits. A
++    // Windows-created tar can therefore contain valid Linux command payloads
++    // as 0666, which extract to 0644 on ext4. The target package is already
++    // architecture-filtered by packaging; require exactly one package and one
++    // copy of each command so layout drift fails closed.
++    "copilot_payload_present() {",
++    '  [ -f "$1/node_modules/@github/copilot-sdk/package.json" ] && return 0',
++    '  for package_dir in "$1"/node_modules/@github/copilot-linux-*; do',
++    '    [ -d "$package_dir" ] && return 0',
++    "  done",
++    "  return 1",
++    "}",
++    "copilot_executable_payload_ready() {",
++    '  copilot_payload_present "$1" || return 0',
++    "  package_count=0",
++    "  executable_count=0",
++    '  for package_dir in "$1"/node_modules/@github/copilot-linux-*; do',
++    '    [ -d "$package_dir" ] || continue',
++    "    package_count=$((package_count + 1))",
++    '    for executable in "$package_dir/copilot" "$package_dir"/ripgrep/bin/linux-*/rg "$package_dir"/tgrep/bin/linux-*/tgrep; do',
++    '      if [ ! -x "$executable" ]; then',
++    "        printf 'Linux Copilot command is not executable: %s\\n' \"$executable\" >&2",
++    "        return 1",
++    "      fi",
++    "      executable_count=$((executable_count + 1))",
++    "    done",
++    "  done",
++    '  if [ "$package_count" -ne 1 ] || [ "$executable_count" -ne 3 ]; then',
++    '    printf \'Linux Copilot payload has %s packages and %s executable commands; expected 1 and 3\\n\' "$package_count" "$executable_count" >&2',
++    "    return 1",
++    "  fi",
++    "}",
++    "normalize_copilot_executable_modes() {",
++    '  copilot_payload_present "$1" || return 0',
++    '  for package_dir in "$1"/node_modules/@github/copilot-linux-*; do',
++    '    [ -d "$package_dir" ] || continue',
++    '    for executable in "$package_dir/copilot" "$package_dir"/ripgrep/bin/linux-*/rg "$package_dir"/tgrep/bin/linux-*/tgrep; do',
++    '      if [ ! -f "$executable" ]; then',
++    "        printf 'Linux Copilot command is missing: %s\\n' \"$executable\" >&2",
++    "        return 1",
++    "      fi",
++    '      if ! chmod 0755 "$executable"; then',
++    "        printf 'Could not make Linux Copilot command executable: %s\\n' \"$executable\" >&2",
++    "        return 1",
++    "      fi",
++    "    done",
++    "  done",
++    '  copilot_executable_payload_ready "$1"',
++    "}",
+     // Hashing the server entry is the only check that can tell a working cache
+     // from one whose bin.mjs was truncated or half-written: the file is still
+     // there, the native probe still passes, and launch then picks a server that
+@@ -309,6 +358,7 @@ export const buildWslRuntimeInstallScript = (
+     '    [ -f "$runtime_root/apps/server/dist/bin.mjs" ] &&',
+     '    [ -f "$runtime_root/node_modules/node-pty/package.json" ] &&',
+     '    node_pty_payload_present "$runtime_root" &&',
++    '    copilot_executable_payload_ready "$runtime_root" &&',
+     // An empty or unreadable marker is a miss, not a pass: that is what a
+     // runtime installed before the marker carried a digest looks like, and one
+     // reinstall is the cheapest way to make it verifiable from then on.
+@@ -382,6 +432,10 @@ export const buildWslRuntimeInstallScript = (
+     "  printf 'WSL runtime archive is missing its Linux node-pty binary\\n' >&2",
+     "  exit 1",
+     "fi",
++    'if ! normalize_copilot_executable_modes "$runtime_tmp"; then',
++    "  printf 'WSL runtime archive has an invalid Linux Copilot executable payload\\n' >&2",
++    "  exit 1",
++    "fi",
+     // The archive's bytes were verified against archiveSha256 above, so the
+     // digest recorded here describes content this install proved. Every later
+     // warm reuse checks the entry against it.
+diff --git a/docs/operations/release.md b/docs/operations/release.md
+index 14fb11144..1b95c9522 100644
+--- a/docs/operations/release.md
++++ b/docs/operations/release.md
+@@ -225,7 +225,11 @@ paths below `resources/server.asar.unpacked`. The Windows-native backend reads
+ the archive in place through Electron. Packaged Windows builds also ship a
+ Linux-only `resources/wsl-runtime.tar.gz` plus its SHA-256 sidecar. WSL verifies
+ and extracts that archive into `~/.t3/wsl-runtime/sha256-<archive-digest>` inside
+-the selected distro, then reuses it for later launches of the same update. The
++the selected distro. Because Windows archive creation cannot preserve
++authoritative POSIX execute bits, WSL normalizes and verifies the packaged
++Linux Copilot, `rg`, and `tgrep` commands before promoting the runtime. Warm
++cache reuse repeats that executable check, so a damaged or pre-fix cache is
++reinstalled. The runtime is then reused for later launches of the same update. The
+ Windows-side `wsl-server-tree/<version>` extraction remains a fallback and is
+ removed after the distro-local runtime passes preflight.
+ 
+@@ -256,6 +260,8 @@ break:
+ - A Windows build with a WSL node-pty prebuild omits the WSL archive or SHA-256
+   sidecar, the sidecar digest does not match the emitted archive, or required
+   Linux runtime members are absent.
++- A Copilot-bearing WSL runtime is missing its Linux Copilot, `rg`, or `tgrep`
++  executable, or WSL cannot normalize those commands to executable mode.
+ - The emitted WSL archive contains Windows/Darwin node-pty payloads, ConPTY,
+   pnpm install metadata, or Windows-only Copilot, Koffi, FFF, ffi-rs, or
+   msgpackr bindings.
+diff --git a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts
+index 6b707aa23..28ac28980 100644
+--- a/scripts/build-desktop-artifact.test.ts
++++ b/scripts/build-desktop-artifact.test.ts
+@@ -18,6 +18,7 @@ import {
+   BuildCommandFailedError,
+   buildWslRuntimeArchiveArgs,
+   parseWslRuntimeArchiveMembers,
++  resolveWslCopilotExecutableMembers,
+   CopilotSdkServerPayloadPruneError,
+   DesktopDmgBackgroundSourceMissingError,
+   createStageWorkspaceConfig,
+@@ -146,6 +147,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
+   readonly copyUnpackedNatives: boolean;
+   readonly serverEntrySource?: string;
+   readonly wslRuntime?: "valid" | "forbidden" | "bad-digest";
++  readonly wslCopilot?: "valid" | "missing-tgrep" | "extra-rg";
+ }) {
+   const fs = yield* FileSystem.FileSystem;
+   const path = yield* Path.Path;
+@@ -200,6 +202,29 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
+       path.join(linuxPrebuildDir, "t3code-wsl-node-pty.json"),
+       '{"arch":"x64"}',
+     );
++    if (input.wslCopilot !== undefined) {
++      const copilotFiles = resolveWslCopilotExecutableMembers("x64");
++      const sdkManifestPath = path.join(
++        wslSourceDir,
++        "node_modules/@github/copilot-sdk/package.json",
++      );
++      yield* fs.makeDirectory(path.dirname(sdkManifestPath), { recursive: true });
++      yield* fs.writeFileString(sdkManifestPath, '{"name":"@github/copilot-sdk"}');
++      for (const member of copilotFiles) {
++        if (input.wslCopilot === "missing-tgrep" && member.endsWith("/tgrep")) continue;
++        const memberPath = path.join(wslSourceDir, member);
++        yield* fs.makeDirectory(path.dirname(memberPath), { recursive: true });
++        yield* fs.writeFileString(memberPath, member);
++      }
++      if (input.wslCopilot === "extra-rg") {
++        const extraRg = path.join(
++          wslSourceDir,
++          "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-arm64/rg",
++        );
++        yield* fs.makeDirectory(path.dirname(extraRg), { recursive: true });
++        yield* fs.writeFileString(extraRg, "extra-rg");
++      }
++    }
+     if (input.wslRuntime === "forbidden") {
+       const windowsPrebuildDir = path.join(
+         wslSourceDir,
+@@ -1089,6 +1114,77 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+     ).pipe(Effect.provideService(HostProcessPlatform, "linux")),
+   );
+ 
++  it.effect("validates Copilot executable members in the WSL archive", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fixture = yield* makeWindowsPayloadFixture({
++          copyUnpackedNatives: true,
++          wslRuntime: "valid",
++          wslCopilot: "valid",
++        });
++
++        const result = yield* validateWindowsPackagedPayload({
++          stageDistDir: fixture.stageDistDir,
++          appExecutableName: fixture.appExecutableName,
++          targetArch: "x64",
++          expectWslRuntime: true,
++        });
++
++        assert.equal(result.packagedAppDir, fixture.packagedAppDir);
++      }),
++    ).pipe(Effect.provideService(HostProcessPlatform, "linux")),
++  );
++
++  it.effect("rejects a Copilot-bearing WSL archive missing an executable member", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fixture = yield* makeWindowsPayloadFixture({
++          copyUnpackedNatives: true,
++          wslRuntime: "valid",
++          wslCopilot: "missing-tgrep",
++        });
++
++        const error = yield* validateWindowsPackagedPayload({
++          stageDistDir: fixture.stageDistDir,
++          appExecutableName: fixture.appExecutableName,
++          targetArch: "x64",
++          expectWslRuntime: true,
++        }).pipe(Effect.flip);
++
++        assert.instanceOf(error, WindowsPackagedPayloadValidationError);
++        assert.equal(error.reason, "wsl-runtime-invalid");
++        assert.isTrue(
++          error.missingFiles?.includes(
++            "node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep",
++          ),
++        );
++      }),
++    ),
++  );
++
++  it.effect("rejects an ambiguous Copilot executable layout in the WSL archive", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fixture = yield* makeWindowsPayloadFixture({
++          copyUnpackedNatives: true,
++          wslRuntime: "valid",
++          wslCopilot: "extra-rg",
++        });
++
++        const error = yield* validateWindowsPackagedPayload({
++          stageDistDir: fixture.stageDistDir,
++          appExecutableName: fixture.appExecutableName,
++          targetArch: "x64",
++          expectWslRuntime: true,
++        }).pipe(Effect.flip);
++
++        assert.instanceOf(error, WindowsPackagedPayloadValidationError);
++        assert.equal(error.reason, "wsl-runtime-invalid");
++        assert.match(String(error.cause), /Copilot layout is ambiguous/);
++      }),
++    ),
++  );
++
+   it.effect("rejects a Windows package missing its expected WSL runtime", () =>
+     Effect.scoped(
+       Effect.gen(function* () {
+@@ -1705,6 +1801,12 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+     assert.isTrue(bundlesWslRuntime({ arch: "arm64", prebuildPath: "/tmp/pty.node" }));
+     assert.isFalse(bundlesWslRuntime({ arch: "x64", prebuildPath: undefined }));
+     assert.isFalse(bundlesWslRuntime({ arch: "universal", prebuildPath: "/tmp/pty.node" }));
++    assert.deepStrictEqual(resolveWslCopilotExecutableMembers("x64"), [
++      "node_modules/@github/copilot-linux-x64/copilot",
++      "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg",
++      "node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep",
++    ]);
++    assert.deepStrictEqual(resolveWslCopilotExecutableMembers("universal"), []);
+ 
+     assert.deepStrictEqual(buildWslRuntimeArchiveArgs(), [
+       "-czf",
+diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
+index d4ee2e875..70074bc5d 100644
+--- a/scripts/build-desktop-artifact.ts
++++ b/scripts/build-desktop-artifact.ts
+@@ -922,6 +922,19 @@ export const WSL_RUNTIME_ARCHIVE_EXCLUDED_PREFIXES = [
+ export const resolveWslPrebuildArch = (arch: typeof BuildArch.Type): "x64" | "arm64" | undefined =>
+   arch === "x64" ? "x64" : arch === "arm64" ? "arm64" : undefined;
+ 
++export function resolveWslCopilotExecutableMembers(
++  arch: typeof BuildArch.Type,
++): ReadonlyArray<string> {
++  const wslArch = resolveWslPrebuildArch(arch);
++  if (wslArch === undefined) return [];
++  const packageRoot = `node_modules/@github/copilot-linux-${wslArch}`;
++  return [
++    `${packageRoot}/copilot`,
++    `${packageRoot}/ripgrep/bin/linux-${wslArch}/rg`,
++    `${packageRoot}/tgrep/bin/linux-${wslArch}/tgrep`,
++  ];
++}
++
+ // A packaged WSL runtime is only usable when a Linux pty.node is bundled with
+ // it, so this one predicate decides both whether the archive is built and
+ // whether the packaging config ships it. Without it the build would produce an
+@@ -2322,39 +2335,36 @@ const COPILOT_PRUNED_RUNTIME_VERSION = "1.0.75";
+ const COPILOT_GENERIC_CLIPBOARD_NATIVE_PATTERN = /^clipboard\..+\.node$/u;
+ const SERVER_NATIVE_FILE_PATTERN = /\.(?:node|dll|exe|dylib|so(?:\..*)?)$/u;
+ 
+-const collectNativePayloadFiles = Effect.fn("desktopArtifact.collectNativePayloadFiles")(
+-  function* (root: string) {
+-    const fs = yield* FileSystem.FileSystem;
+-    const path = yield* Path.Path;
+-    if (!(yield* fs.exists(root).pipe(Effect.orElseSucceed(() => false)))) {
+-      return [] as string[];
+-    }
++const collectNativePayloadFiles = Effect.fn("desktopArtifact.collectNativePayloadFiles")(function* (
++  root: string,
++) {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  if (!(yield* fs.exists(root).pipe(Effect.orElseSucceed(() => false)))) {
++    return [] as string[];
++  }
+ 
+-    const pendingDirectories = [root];
+-    const files: string[] = [];
+-    while (pendingDirectories.length > 0) {
+-      const directory = pendingDirectories.pop();
+-      if (directory === undefined) break;
+-      for (const entry of yield* fs.readDirectory(directory)) {
+-        const entryPath = path.join(directory, entry);
+-        const stat = yield* fs.stat(entryPath);
+-        if (stat.type === "Directory") {
+-          pendingDirectories.push(entryPath);
+-        } else if (stat.type === "File" && SERVER_NATIVE_FILE_PATTERN.test(entry)) {
+-          files.push(entryPath);
+-        }
++  const pendingDirectories = [root];
++  const files: string[] = [];
++  while (pendingDirectories.length > 0) {
++    const directory = pendingDirectories.pop();
++    if (directory === undefined) break;
++    for (const entry of yield* fs.readDirectory(directory)) {
++      const entryPath = path.join(directory, entry);
++      const stat = yield* fs.stat(entryPath);
++      if (stat.type === "Directory") {
++        pendingDirectories.push(entryPath);
++      } else if (stat.type === "File" && SERVER_NATIVE_FILE_PATTERN.test(entry)) {
++        files.push(entryPath);
+       }
+     }
+-    return files;
+-  },
+-);
++  }
++  return files;
++});
+ 
+ export const pruneCopilotSdkServerPayload = Effect.fn(
+   "desktopArtifact.pruneCopilotSdkServerPayload",
+-)(function* (input: {
+-  readonly stageDir: string;
+-  readonly arch: "x64" | "arm64";
+-}) {
++)(function* (input: { readonly stageDir: string; readonly arch: "x64" | "arm64" }) {
+   const fs = yield* FileSystem.FileSystem;
+   const path = yield* Path.Path;
+   const nodeModulesDir = path.join(input.stageDir, "node_modules");
+@@ -2425,13 +2435,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn(
+         target.platformTarget,
+         target.searchExecutableNames[0],
+       ),
+-      path.join(
+-        packageDir,
+-        "tgrep",
+-        "bin",
+-        target.platformTarget,
+-        target.searchExecutableNames[1],
+-      ),
++      path.join(packageDir, "tgrep", "bin", target.platformTarget, target.searchExecutableNames[1]),
+       path.join(
+         nodeModulesDir,
+         "@koromix",
+@@ -3092,9 +3096,17 @@ export const validateWindowsPackagedPayload = Effect.fn(
+       );
+     }
+     const wslArch = resolveWslPrebuildArch(input.targetArch);
++    const copilotPackagePrefix = "node_modules/@github/copilot-linux-";
++    const hasCopilotPayload =
++      members.includes("node_modules/@github/copilot-sdk/package.json") ||
++      members.some((member) => member.startsWith(copilotPackagePrefix));
++    const copilotExecutableMembers = hasCopilotPayload
++      ? resolveWslCopilotExecutableMembers(input.targetArch)
++      : [];
+     const requiredMembers = [
+       "apps/server/dist/bin.mjs",
+       "node_modules/node-pty/package.json",
++      ...copilotExecutableMembers,
+       ...(wslArch === undefined
+         ? []
+         : [
+@@ -3111,6 +3123,30 @@ export const validateWindowsPackagedPayload = Effect.fn(
+         cause: new Error("WSL runtime archive is incomplete"),
+       });
+     }
++    if (hasCopilotPayload) {
++      const copilotPackageRoots = new Set(
++        members.flatMap((member) => {
++          const match = /^(node_modules\/@github\/copilot-linux-[^/]+)\//.exec(member);
++          return match?.[1] === undefined ? [] : [match[1]];
++        }),
++      );
++      const actualCopilotExecutables = members.filter((member) =>
++        /^node_modules\/@github\/copilot-linux-[^/]+\/(?:copilot|ripgrep\/bin\/linux-[^/]+\/rg|tgrep\/bin\/linux-[^/]+\/tgrep)$/.test(
++          member,
++        ),
++      );
++      if (
++        copilotPackageRoots.size !== 1 ||
++        actualCopilotExecutables.length !== copilotExecutableMembers.length ||
++        actualCopilotExecutables.some((member) => !copilotExecutableMembers.includes(member))
++      ) {
++        return yield* invalidWslRuntime(
++          new Error(
++            `WSL runtime Copilot layout is ambiguous (${String(copilotPackageRoots.size)} packages, ${String(actualCopilotExecutables.length)} executable commands)`,
++          ),
++        );
++      }
++    }
+   }
+ 
+   const fileCount = yield* countPayloadFiles(packagedAppDir);

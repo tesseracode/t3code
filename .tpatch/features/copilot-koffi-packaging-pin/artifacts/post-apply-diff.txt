@@ -1,0 +1,6 @@
+ docs/operations/release.md             |   9 +-
+ pnpm-lock.yaml                         |   4 +
+ pnpm-workspace.yaml                    |   6 +
+ scripts/build-desktop-artifact.test.ts | 190 ++++++++++++++++++++++-------
+ scripts/build-desktop-artifact.ts      | 216 ++++++++++++++++++++++++++++++++-
+ 5 files changed, 377 insertions(+), 48 deletions(-)

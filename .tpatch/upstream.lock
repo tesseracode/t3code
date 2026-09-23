@@ -1,0 +1,6 @@
+# Upstream Lock
+# Stable v0.0.42 target; pass --upstream-ref v0.0.42 when reconciling.
+remote: "upstream"
+branch: "main"
+commit: "719a76ca1dbf5490f1aa33ffb9966301e02be9a9"
+url: "https://github.com/pingdotgg/t3code.git"

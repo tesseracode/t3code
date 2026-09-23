@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "feature": "copilot-koffi-packaging-pin",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_9364ce82b83c",
+      "kind": "record",
+      "patch_sha256": "203f456a1cae64c1d26e4d3faab8558ba61aa9120c153b83e5e5744976a68548",
+      "git_patch_id": "50224dc8b0833ea8d3b6b32621cc599d9bc55658",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "19993702bf1cc11eeb0cee3e5aa32a1a0787b127fb8c663757ab49caa553d2c9",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "b8e2e0e8dc2d51f549224ed9c8ba815fd6eb4527",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/operations/release.md",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "scripts/build-desktop-artifact.test.ts",
+          "scripts/build-desktop-artifact.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/operations/release.md",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "a9135c35e2158a5a813dd57261e2da99d4a543a27e4f941f1a3066600c843dc5",
+          "parent_recipe_sha256": "99cbab8aa05211acf6d270e642f6189c2e8780f402d621db3f77d41df14fd1c7"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

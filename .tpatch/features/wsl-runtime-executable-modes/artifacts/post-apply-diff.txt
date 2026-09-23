@@ -1,0 +1,6 @@
+ apps/desktop/src/wsl/DesktopWslEnvironment.test.ts |  76 ++++++++++++++-
+ apps/desktop/src/wsl/DesktopWslEnvironment.ts      |  54 +++++++++++
+ docs/operations/release.md                         |   8 +-
+ scripts/build-desktop-artifact.test.ts             | 102 ++++++++++++++++++++
+ scripts/build-desktop-artifact.ts                  | 104 ++++++++++++++-------
+ 5 files changed, 308 insertions(+), 36 deletions(-)

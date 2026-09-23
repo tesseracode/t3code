@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-koffi-packaging-pin",
+  "completed_at": "2026-09-11T17:12:56Z",
+  "base_commit": "b8e2e0e8dc2d51f549224ed9c8ba815fd6eb4527",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Seven focused files passed (183 assertions, 14 host skips); scripts typecheck/lint, frozen lockfile, and fresh strict/hoisted stage closure proofs passed."
+}
