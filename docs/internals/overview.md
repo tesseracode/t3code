@@ -69,6 +69,25 @@ Persisted events must remain decodable on replay. Changing a schema affects old 
 startup as well as live RPC traffic. Compatibility work must account for stored history, not just
 what the newest client sends.
 
+### Fork migration history
+
+Fork migrations use `t3code_fork_migrations`, separate from upstream's
+`effect_sql_migrations`; do not allocate new fork IDs in the upstream sequence.
+The original foundation used shared IDs 44/45, which upstream later assigned
+to different changes. Renumbering the files alone would silently skip the
+upstream work because the migrator uses a numeric high-water mark.
+
+[The bridge](../../apps/server/src/persistence/ForkMigrations.ts) accepts only
+known history with the expected foundation schema. It preserves original
+fork IDs, names and timestamps in the fork ledger and actually executes the
+collided upstream migrations before replacing their shared-ledger entries.
+The bridge and both migrators share one transaction, including the final
+history/schema checks. Unknown, incomplete or conflicting provenance stops
+startup rather than adopting whatever tables happen to exist.
+Keep this upgrade path when reconciling future releases; never remove old
+records just to satisfy a newer manifest. Explicit migration bounds used by
+tests build upstream-only fixtures; normal startup also runs fork migrations.
+
 ## Turn completion and checkpoints
 
 A turn ending and its follow-up work settling are separate milestones. The

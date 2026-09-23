@@ -10,6 +10,8 @@ The consolidated patch contains exactly:
 - GitHub Issue / Azure Boards provider-neutral contracts;
 - environment-scoped TWS workspace/project/feature/stack-node bindings,
   persistence, and ambiguity-safe locator matching.
+- a data-preserving bridge from the original shared 44/45 migration IDs to
+  separate upstream and fork migration histories.
 
 ## Dependency model
 
@@ -35,16 +37,27 @@ Superseded historical Copilot children already covered by the Copilot root:
 
 ## Acceptance criteria
 
-1. The patch is generated from the verified Phase 0 tip and contains only the
-   30 reviewed Phase 1 source/test files.
-2. Applying it recreates the current integrated non-tpatch tree byte-for-byte.
-3. All 173 combined focused tests pass.
-4. Contracts and server typechecks pass.
-5. Changed-file lint is clean.
-6. The single-parent landing and recipe replay verify.
-7. The superseder is active and healthy, removing granular/covered child
+1. Preserve the four existing foundation capabilities on the current stable
+   architecture without replaying granular superseded recipes.
+2. Keep upstream migration IDs/names unchanged. New fork history uses its own
+   ledger; fresh databases and upstream-only upgrades install the same schema.
+3. Recognize exact legacy fork 44/45 history, including the audit-only checkpoint,
+   only when its prerequisite ledger and table/key/foreign-key/index schema match.
+4. Preserve original fork migration IDs/names/timestamps, attention rows/cursors,
+   TWS bindings and native session references. Actually execute missing upstream
+   44/45 changes, including collisions beneath an advanced upstream head.
+5. Commit history transfer, upstream changes and fork changes atomically.
+   Later failures roll back earlier effects; corrected input retries cleanly.
+6. Unknown/gapped history, missing schema, conflicting provenance and incomplete
+   migration runs fail explicitly rather than masquerading as success.
+7. File-backed restart and focused regression tests prove preservation,
+   idempotency, rejection and compatibility with the existing upstream migrations.
+8. Server/contracts/web/mobile typechecks, scoped lint and integration builds pass.
+9. The single-parent landing and regenerated recipe verify on current parents.
+10. The superseder is active and healthy, removing granular/covered child
    records from default replay without deleting audit history.
-8. No new UI, RPC, relay, push, provider, TWS mutation, or target-platform
+11. No new attention inbox/current reducer, UI, RPC, relay, push, provider,
+   TWS mutation, hosting implementation or target-platform
    behavior is claimed.
 
 ## External gates

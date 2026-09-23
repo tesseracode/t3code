@@ -1,9 +1,7 @@
- .../Layers/ProjectionPipeline.test.ts              | 185 +++++++++++++++++++++
- .../src/orchestration/Layers/ProjectionPipeline.ts |  43 +++--
- apps/server/src/persistence/Migrations.ts          |   4 +
- packages/contracts/src/environment.test.ts         |  13 ++
- packages/contracts/src/environment.ts              |   2 +
- packages/contracts/src/index.ts                    |   2 +
- packages/contracts/src/orchestration.test.ts       |  42 +++++
- packages/contracts/src/orchestration.ts            |  25 +++
- 8 files changed, 305 insertions(+), 11 deletions(-)
+ .tpatch/features/phase1-foundation/analysis.md     | 37 ++++++---
+ .../phase1-foundation/artifacts/apply-session.json |  7 +-
+ .../artifacts/post-apply-diff.txt                  | 13 +--
+ .tpatch/features/phase1-foundation/exploration.md  | 96 ++++++++++++----------
+ .tpatch/features/phase1-foundation/spec.md         | 31 +++++--
+ .tpatch/features/phase1-foundation/status.json     | 10 +--
+ 6 files changed, 110 insertions(+), 84 deletions(-)

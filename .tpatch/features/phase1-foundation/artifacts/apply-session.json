@@ -1,8 +1,9 @@
 {
   "slug": "phase1-foundation",
-  "completed_at": "2026-09-03T10:13:55Z",
-  "base_commit": "4b9584b1bfdf5803e41fbc262cda573fdd4ec803",
+  "completed_at": "2026-09-23T15:14:40Z",
+  "base_commit": "7b5f4af3501d89b42b840f875917c09db4f786ce",
   "has_patch": true,
+  "operator_notes": "Manual stable-v0.0.42 port after the CLI refused stale hard-parent generation snapshots. Existing parent code is already landed. Preserve the four foundation capabilities; fork migrations use their own ledger with validated legacy 44/45 transfer, real collided upstream operations and atomic rollback. No historical generation evidence edited or automatic attempt fabricated.",
   "validation_status": "passed",
-  "validation_notes": "tpatch test — command: /Users/jdbencardinop/Documents/Proyectos/tesserabox/t3code/node_modules/.bin/vp test run packages/contracts/src/orchestration.test.ts apps/server/src/persistence/Migrations/044_ProjectionThreadAttentionAudit.test.ts apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts apps/server/src/orchestration/ThreadAttentionAudit.test.ts apps/server/src/orchestration/Layers/ProjectionPipeline.test.ts apps/server/src/orchestration/Layers/ProjectionSnapshotQuery.test.ts apps/server/src/tws/TwsCliDecoder.test.ts apps/server/src/tws/TwsCliAdapter.test.ts apps/server/src/processRunner.test.ts packages/contracts/src/workItem.test.ts packages/contracts/src/environment.test.ts packages/contracts/src/pullRequest.test.ts packages/contracts/src/twsBindings.test.ts apps/server/src/tws/TwsBindingMatch.test.ts apps/server/src/persistence/Migrations/045_TwsBindings.test.ts apps/server/src/persistence/Layers/TwsBindings.test.ts"
+  "validation_notes": "32 focused files / 178 cases pass, including 20 bridge scenarios and a final file-backed/native-runtime preservation rerun. Server/contracts/web/mobile typechecks, server bundle/help and web production build pass. Changed-file lint retains one untouched upstream warning. All databases were disposable; no live migration, browser, provider inference or packaged target-platform qualification is claimed."
 }
