@@ -1,7 +1,7 @@
 # Tessera Patch configuration
 provider:
   type: openai-compatible
-  base_url: "http://localhost:4141"
+  base_url: ""
   model: gpt-6-astra
   auth_env: GITHUB_TOKEN
 
