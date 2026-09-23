@@ -153,6 +153,16 @@
   ],
   "packageOverrides": [
     {
+      "name": "@github/copilot-sdk",
+      "version": "1.0.8",
+      "license": "MIT",
+      "sourceUrl": "https://github.com/github/copilot-sdk/blob/a54b0b5885534ba5ad073cfe99c7f0085b1be11c/LICENSE",
+      "generatedNotice": {
+        "licenseId": "MIT",
+        "copyrights": ["Copyright GitHub, Inc."]
+      }
+    },
+    {
       "license": "MIT",
       "name": "@react-grab/cli",
       "sourceUrl": "https://github.com/aidenybai/react-grab/tree/main/packages/cli",
