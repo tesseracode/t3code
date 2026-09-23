@@ -1,6 +1,6 @@
 # Spec: session-search
 
-## Phase 0 acceptance criteria on v0.0.38
+## Retained acceptance criteria on v0.0.42
 
 1. `Cmd+F` / `Ctrl+F` dispatches `chat.search` in the chat surface. The default
    binding is disabled while the terminal or in-app preview owns focus.
@@ -30,8 +30,16 @@
    labels partial results as loaded-turn-only. No full-history claim is made.
 10. Pure tests cover row types, Unicode/case behavior, multiple occurrences,
     wrap, query changes, no results, thread switch/close, and targeted reveal.
+11. Preserve upstream incremental projection and nested virtualized tool groups;
+    reveal a matching member without replacing the group with unbounded DOM rows.
+12. Scoped requests cannot open a previous paint-only timeline during navigation.
+    Thread changes, close and newer citation requests cancel pending search
+    positioning. Search dismissal of an older citation uses its existing cleanup.
+13. Dynamic interaction tests cover scoped command acceptance, palette close/focus
+    coordination, user-message reveal, navigation, manual history loading,
+    held-thread cancellation, environment collisions and competing citation focus.
 
-## Out of scope for Phase 0
+## Out of scope
 
 - A new server search contract or full-history occurrence index.
 - Regex, case toggles, or persistent search history.

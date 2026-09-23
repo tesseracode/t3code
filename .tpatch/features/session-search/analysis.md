@@ -2,20 +2,29 @@
 
 ## Summary
 
-Add Cmd/Ctrl+F in-session search to find text within the current chat thread. Currently there's no way to search through conversation history — users have to scroll manually or rely on browser find (which doesn't work well in the desktop app since messages are virtualized/lazy-rendered).
+Restore Cmd/Ctrl+F search within the currently loaded conversation on stable
+v0.0.42 (`719a76ca1dbf5490f1aa33ffb9966301e02be9a9`), after the Copilot landing.
+Upstream cross-thread and project-content search remain unchanged. Browser find
+cannot reliably reveal virtualized or folded conversation rows.
 
 ## Compatibility
 
-- **Compatible** — additive UI feature, no provider or server changes needed
-- **Scope**: Web app only (`apps/web/`)
-- **Risk**: Low — new component + keybinding, no existing behavior modified
+- Semantic adaptation is required; the old recipe and exploration are not safe replay instructions.
+- Scope is web/desktop presentation and the shared typed keybinding registry.
+- Main constraints are palette focus handoff, held-thread identity, incremental
+  row reuse, nested virtualized tool lists and competing citation navigation.
+- No provider or new server search API is introduced.
 
 ## Technical Notes
 
-- Messages are stored as `ChatMessage[]` with `text` field containing the searchable content
-- Work log entries have `label`, `detail`, and `command` fields
-- The app already has search UI patterns: `ModelPickerContent.tsx` uses `searchQuery` state + filtered list
-- Keybinding system supports `mod+f` registration (currently unbound)
-- `MessagesTimeline.tsx` renders all visible messages — search highlighting would go here
-- Electron's `webContents.findInPage()` exists but would search the entire page, not scoped to the thread
-- A custom search is better — can scope to thread content, highlight within message bubbles, and navigate between matches
+- Search projects eligible activity rows through the current timeline logic;
+  it does not maintain a competing lifecycle/visibility algorithm.
+- Search-only projection unfolds data without mounting rows. The actual renderer
+  reveals only the selected turn/group, retaining upstream nested virtualization.
+- Scoped search requests are accepted only by the current interactive timeline;
+  paint-only held timelines reject them. Closing, thread changes and newer
+  citations cancel pending search reveal work.
+- No indexing runs while search is closed or the query is empty. Queries are
+  bounded and history is extended only through the existing user-triggered loader.
+- User/plan expansion is temporary; row-level highlighting does not promise exact
+  inline marks inside Markdown, hidden tool outputs or binary resources.

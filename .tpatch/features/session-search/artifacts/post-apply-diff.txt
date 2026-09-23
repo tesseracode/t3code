@@ -1,20 +1,14 @@
- .../artifacts/patch-generations.json               | 127 +++-
- .../session-search/artifacts/post-apply-diff.txt   |  28 +-
- .../session-search/artifacts/post-apply.patch      | 707 ++++++---------------
- .tpatch/features/session-search/record.md          |  45 +-
- .tpatch/features/session-search/spec.md            |  83 ++-
- .tpatch/features/session-search/status.json        |   8 +-
- .../src/components/CommandPalette.logic.test.ts    |  31 +
- apps/web/src/components/CommandPalette.logic.ts    |  36 ++
- apps/web/src/components/CommandPalette.tsx         |  72 ++-
- .../components/chat/MessagesTimeline.logic.test.ts | 184 ++++++
- .../src/components/chat/MessagesTimeline.logic.ts  | 205 ++++--
- apps/web/src/components/chat/MessagesTimeline.tsx  | 181 ++++--
- apps/web/src/components/chat/ProposedPlanCard.tsx  |  13 +-
- .../settings/KeybindingsSettings.logic.test.ts     |   1 +
- apps/web/src/keybindings.test.ts                   |  40 ++
- apps/web/src/routes/_chat.tsx                      |  11 +
- packages/contracts/src/keybindings.test.ts         |   7 +
- packages/contracts/src/keybindings.ts              |   1 +
- packages/shared/src/keybindings.ts                 |   1 +
- 19 files changed, 1097 insertions(+), 684 deletions(-)
+ .tpatch/features/session-search/analysis.md        |   31 +-
+ .../session-search/artifacts/apply-recipe.json     |  114 +-
+ .../session-search/artifacts/apply-session.json    |    9 +-
+ .../artifacts/patch-generations.json               |   57 +-
+ .../session-search/artifacts/post-apply-diff.txt   |   30 +-
+ .../session-search/artifacts/post-apply.patch      | 1608 ++++++++++++--------
+ .../artifacts/reconcile-evidence.jsonl             |    4 +
+ .../artifacts/reconcile-session.json               |  257 +++-
+ .../features/session-search/artifacts/reconcile.md |   48 +-
+ .tpatch/features/session-search/exploration.md     |  112 +-
+ .tpatch/features/session-search/record.md          |   43 +-
+ .tpatch/features/session-search/spec.md            |   12 +-
+ .tpatch/features/session-search/status.json        |   23 +-
+ 13 files changed, 1472 insertions(+), 876 deletions(-)

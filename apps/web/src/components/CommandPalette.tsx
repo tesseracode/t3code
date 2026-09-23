@@ -3,7 +3,11 @@
 import { threadPullRequestLinkMode } from "@t3tools/client-runtime/thread-pull-request-compatibility";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 
-import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import {
+  scopeProjectRef,
+  scopeThreadRef,
+  scopedThreadKey,
+} from "@t3tools/client-runtime/environment";
 import {
   canCreateProjectInEnvironment,
   getCloneDestinationBrowsePath,
@@ -99,6 +103,7 @@ import {
   resolveProjectPathForDispatch,
 } from "../lib/projectPaths";
 import { onOpenCommandPalette } from "../commandPaletteBus";
+import { openSessionSearch } from "../sessionSearchBus";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import {
@@ -132,6 +137,7 @@ import {
   buildRootGroups,
   buildThreadActionItems,
   buildLinkedThreadActionItems,
+  createCommandPaletteCloseCoordinator,
   enumerateCommandPaletteItems,
   type CommandPaletteActionItem,
   type CommandPaletteOpenIntent,
@@ -455,6 +461,19 @@ export function CommandPalette({ children }: { children: ReactNode }) {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { theme, themeHalves, resolvedTheme } = useTheme();
   const composerHandleRef = useRef<ChatComposerHandle | null>(null);
+  const [closeCoordinator] = useState(createCommandPaletteCloseCoordinator);
+  const deferActionUntilClose = useCallback(
+    (action: () => void) => {
+      closeCoordinator.deferUntilClosed(action);
+      setOpen(false);
+    },
+    [closeCoordinator, setOpen],
+  );
+  useEffect(() => {
+    if (state.open) {
+      closeCoordinator.reset();
+    }
+  }, [closeCoordinator, state.open]);
   const routeTarget = useParams({
     strict: false,
     select: (params) => resolveThreadRouteTarget(params),
@@ -550,6 +569,11 @@ export function CommandPalette({ children }: { children: ReactNode }) {
           }
           setOpen(open);
         }}
+        onOpenChangeComplete={(open) => {
+          if (!open) {
+            closeCoordinator.takeDeferredAction()?.();
+          }
+        }}
       >
         {/* Block background focus calls for the entire time the palette is open. */}
         <div className="contents" inert={state.open}>
@@ -561,6 +585,8 @@ export function CommandPalette({ children }: { children: ReactNode }) {
           setOpen={setOpen}
           openOverlayMode={toggleMode}
           clearOpenIntent={clearOpenIntent}
+          deferActionUntilClose={deferActionUntilClose}
+          shouldRestoreComposerFocus={closeCoordinator.consumeShouldRestoreFocus}
         />
       </CommandDialog>
     </ComposerHandleContext>
@@ -573,6 +599,8 @@ function CommandPaletteDialog(props: {
   readonly setOpen: (open: boolean) => void;
   readonly openOverlayMode: (mode: SearchOverlayMode) => void;
   readonly clearOpenIntent: () => void;
+  readonly deferActionUntilClose: (action: () => void) => void;
+  readonly shouldRestoreComposerFocus: () => boolean;
 }) {
   const composerHandleRef = useComposerHandleContext();
 
@@ -590,7 +618,9 @@ function CommandPaletteDialog(props: {
       data-palette-mode={props.mode}
       data-testid="command-palette"
       finalFocus={() => {
-        composerHandleRef?.current?.focusAtEnd();
+        if (props.shouldRestoreComposerFocus()) {
+          composerHandleRef?.current?.focusAtEnd();
+        }
         return false;
       }}
       onBackdropPointerDown={() => {
@@ -607,6 +637,7 @@ function CommandPaletteDialog(props: {
           setOpen={props.setOpen}
           openOverlayMode={props.openOverlayMode}
           clearOpenIntent={props.clearOpenIntent}
+          deferActionUntilClose={props.deferActionUntilClose}
         />
       )}
     </CommandDialogPopup>
@@ -618,6 +649,7 @@ function OpenCommandPaletteDialog(props: {
   readonly setOpen: (open: boolean) => void;
   readonly openOverlayMode: (mode: SearchOverlayMode) => void;
   readonly clearOpenIntent: () => void;
+  readonly deferActionUntilClose: (action: () => void) => void;
 }) {
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
@@ -1732,6 +1764,26 @@ function OpenCommandPaletteDialog(props: {
     }
   }
 
+  if (activeThread !== null || activeDraftThread !== null) {
+    const searchThread = activeThread
+      ? scopeThreadRef(activeThread.environmentId, activeThread.id)
+      : activeDraftThread
+        ? scopeThreadRef(activeDraftThread.environmentId, activeDraftThread.threadId)
+        : null;
+    actionItems.push({
+      kind: "action",
+      value: "action:search-current-thread",
+      searchTerms: ["search current thread", "find in conversation", "chat messages"],
+      title: "Search current thread",
+      icon: <TextSearchIcon className={ITEM_ICON_CLASS} />,
+      shortcutCommand: "chat.search",
+      deferRunUntilClosed: true,
+      run: async () => {
+        if (searchThread) openSessionSearch(scopedThreadKey(searchThread));
+      },
+    });
+  }
+
   actionItems.push({
     kind: "action",
     value: "action:open-file-picker",
@@ -2511,19 +2563,26 @@ function OpenCommandPaletteDialog(props: {
       return;
     }
 
+    const runItem = () => {
+      void item.run().catch((error: unknown) => {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Unable to run command",
+            description: error instanceof Error ? error.message : "An unexpected error occurred.",
+          }),
+        );
+      });
+    };
+
+    if (!item.keepOpen && item.deferRunUntilClosed) {
+      props.deferActionUntilClose(runItem);
+      return;
+    }
     if (!item.keepOpen) {
       setOpen(false);
     }
-
-    void item.run().catch((error: unknown) => {
-      toastManager.add(
-        stackedThreadToast({
-          type: "error",
-          title: "Unable to run command",
-          description: error instanceof Error ? error.message : "An unexpected error occurred.",
-        }),
-      );
-    });
+    runItem();
   }
 
   const handleOpenProjectFromFileManager = useCallback(async () => {

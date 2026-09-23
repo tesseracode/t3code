@@ -3,6 +3,7 @@ import {
   CheckpointRef,
   EnvironmentId,
   MessageId,
+  ThreadId,
   TurnId,
   type ComposerContextRecord,
 } from "@t3tools/contracts";
@@ -13,6 +14,7 @@ import { beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import type { LegendListRef, MaintainScrollAtEndOptions } from "@legendapp/list/react";
 import { shouldUseRestingComposerLayout } from "../composerFooterLayout";
 import { useComposerFocusState } from "./useComposerFocusState";
+import { openSessionSearch } from "../../sessionSearchBus";
 
 vi.mock("@legendapp/list/react", async () => {
   const legendListTestId = "legend-list";
@@ -2061,6 +2063,11 @@ describe("MessagesTimeline", () => {
   });
 
   it("only withholds an expanded tool-call label click while text is selected", async () => {
+    vi.stubGlobal("window", {
+      matchMedia,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal("requestAnimationFrame", () => 0);
     vi.stubGlobal("cancelAnimationFrame", () => {});
@@ -2106,6 +2113,276 @@ describe("MessagesTimeline", () => {
       expect(stopPropagation).toHaveBeenCalledTimes(1);
     } finally {
       await act(() => renderer?.unmount());
+    }
+  });
+});
+
+describe("session search interactions", () => {
+  function setup() {
+    const events = new EventTarget();
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    const schedule = (callback: FrameRequestCallback) => {
+      frames.set(++nextFrame, callback);
+      return nextFrame;
+    };
+    const cancel = (id: number) => frames.delete(id);
+    class FocusElement {
+      isConnected = true;
+      focus = vi.fn();
+      select = vi.fn();
+    }
+    const previousFocus = new FocusElement();
+    const input = new FocusElement();
+    const testDocument = {
+      activeElement: previousFocus,
+      documentElement: { classList: { contains: () => false } },
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
+    };
+    input.focus.mockImplementation(() => {
+      testDocument.activeElement = input;
+    });
+    const container = { contains: (node: unknown) => node === input };
+    class TestElement {
+      nodeType = 1;
+    }
+    vi.stubGlobal("Element", TestElement);
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+    });
+    vi.stubGlobal("HTMLElement", FocusElement);
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("requestAnimationFrame", schedule);
+    vi.stubGlobal("cancelAnimationFrame", cancel);
+    vi.stubGlobal("window", {
+      matchMedia,
+      Element: TestElement,
+      HTMLElement: FocusElement,
+      localStorage,
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
+      dispatchEvent: events.dispatchEvent.bind(events),
+      requestAnimationFrame: schedule,
+      cancelAnimationFrame: cancel,
+    });
+    vi.stubGlobal("document", testDocument);
+    const props = buildProps();
+    const scrollToIndex = vi.fn();
+    const list: Partial<LegendListRef> = {
+      getState: vi.fn(),
+      getScrollableNode: vi.fn(),
+      scrollToIndex,
+    };
+    props.listRef.current = list as LegendListRef;
+    return {
+      props,
+      input,
+      previousFocus,
+      scrollToIndex,
+      createNodeMock: (element: { type: unknown; props: unknown }) => {
+        if (typeof element.props !== "object" || element.props === null) return null;
+        if ("aria-label" in element.props && element.props["aria-label"] === "Search in thread")
+          return input;
+        if ("role" in element.props && element.props.role === "search") return container;
+        return null;
+      },
+      flush: () =>
+        act(() => {
+          const pending = [...frames.values()];
+          frames.clear();
+          pending.forEach((callback) => callback(0));
+        }),
+    };
+  }
+
+  it("opens the scoped search, reveals a collapsed user match, wraps, and loads history only on demand", async () => {
+    const test = setup();
+    const onLoadEarlier = vi.fn();
+    const onManualNavigation = vi.fn();
+    let renderer: ReactTestRenderer | undefined;
+    try {
+      await act(() => {
+        renderer = create(
+          <MessagesTimeline
+            {...test.props}
+            onManualNavigation={onManualNavigation}
+            timelineEntries={[buildUserTimelineEntry(buildLongUserMessageText("needle needle"))]}
+            loadEarlier={{ loading: false, cursor: "older", onLoadEarlier }}
+          />,
+          { createNodeMock: test.createNodeMock },
+        );
+      });
+      expect(
+        renderer!.root.findByProps({ "data-user-message-body": "true" }).props[
+          "data-user-message-collapsed"
+        ],
+      ).toBe("true");
+      act(() => {
+        expect(openSessionSearch("other-environment:thread-1")).toBe(false);
+      });
+      expect(renderer!.root.findAllByProps({ role: "search" })).toHaveLength(0);
+      act(() => {
+        expect(openSessionSearch(test.props.routeThreadKey)).toBe(true);
+      });
+      expect(test.input.focus).toHaveBeenCalled();
+      act(() =>
+        renderer!.root
+          .findByProps({ "aria-label": "Search in thread" })
+          .props.onChange({ target: { value: "needle" } }),
+      );
+      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["1 of 2"]);
+      expect(
+        renderer!.root.findByProps({ "data-user-message-body": "true" }).props[
+          "data-user-message-collapsed"
+        ],
+      ).toBe("false");
+      expect(onLoadEarlier).not.toHaveBeenCalled();
+      await test.flush();
+      expect(test.scrollToIndex).toHaveBeenLastCalledWith({
+        index: 0,
+        animated: false,
+        viewOffset: 56,
+      });
+      const focusCalls = test.input.focus.mock.calls.length;
+      act(() => {
+        openSessionSearch(test.props.routeThreadKey);
+      });
+      expect(test.input.focus.mock.calls.length).toBeGreaterThan(focusCalls);
+      expect(renderer!.root.findByProps({ "aria-label": "Search in thread" }).props.value).toBe(
+        "needle",
+      );
+      act(() => renderer!.root.findByProps({ "aria-label": "Previous match" }).props.onClick());
+      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["2 of 2"]);
+      act(() => renderer!.root.findByProps({ "aria-label": "Next match" }).props.onClick());
+      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["1 of 2"]);
+      act(() =>
+        renderer!.root
+          .findByProps({ "aria-label": "Load earlier turns to include them in search" })
+          .props.onClick(),
+      );
+      expect(onLoadEarlier).toHaveBeenCalledOnce();
+      const callsBeforeClose = test.scrollToIndex.mock.calls.length;
+      act(() => renderer!.root.findByProps({ "aria-label": "Close search" }).props.onClick());
+      await test.flush();
+      expect(test.scrollToIndex).toHaveBeenCalledTimes(callsBeforeClose);
+      expect(renderer!.root.findAllByProps({ role: "search" })).toHaveLength(0);
+      expect(
+        renderer!.root.findByProps({ "data-user-message-body": "true" }).props[
+          "data-user-message-collapsed"
+        ],
+      ).toBe("true");
+      expect(test.previousFocus.focus).toHaveBeenCalled();
+      expect(onManualNavigation).toHaveBeenCalled();
+    } finally {
+      act(() => renderer?.unmount());
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("gives new citation navigation priority and does not restore focus over another control", async () => {
+    const test = setup();
+    let renderer: ReactTestRenderer | undefined;
+    const entry = buildUserTimelineEntry("needle");
+    try {
+      act(() => {
+        renderer = create(<MessagesTimeline {...test.props} timelineEntries={[entry]} />, {
+          createNodeMock: test.createNodeMock,
+        });
+      });
+      act(() => {
+        openSessionSearch(test.props.routeThreadKey);
+      });
+      act(() =>
+        renderer!.root
+          .findByProps({ "aria-label": "Search in thread" })
+          .props.onChange({ target: { value: "needle" } }),
+      );
+      Object.defineProperty(document, "activeElement", { value: {}, configurable: true });
+      act(() =>
+        renderer!.update(
+          <MessagesTimeline
+            {...test.props}
+            timelineEntries={[entry]}
+            citationRequest={{
+              key: "new-citation",
+              citation: {
+                version: 1,
+                environmentId: ACTIVE_THREAD_ENVIRONMENT_ID,
+                threadId: ThreadId.make("thread-1"),
+                messageId: MessageId.make("cited-message"),
+                text: "quoted",
+                start: 0,
+                end: 6,
+                prefix: "",
+                suffix: "",
+              },
+            }}
+          />,
+        ),
+      );
+      await test.flush();
+      expect(renderer!.root.findAllByProps({ role: "search" })).toHaveLength(0);
+      expect(test.scrollToIndex).not.toHaveBeenCalled();
+      expect(test.previousFocus.focus).not.toHaveBeenCalled();
+      act(() => {
+        expect(openSessionSearch(test.props.routeThreadKey)).toBe(true);
+      });
+      expect(renderer!.root.findByProps({ "aria-label": "Search in thread" }).props.value).toBe("");
+    } finally {
+      act(() => renderer?.unmount());
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("cancels pending reveals during a held-thread transition and isolates identical thread IDs across environments", async () => {
+    const test = setup();
+    let renderer: ReactTestRenderer | undefined;
+    const render = (threadKey: string, allowSessionSearch = true) => (
+      <MessagesTimeline
+        {...test.props}
+        routeThreadKey={threadKey}
+        displayThreadKey={threadKey}
+        allowSessionSearch={allowSessionSearch}
+        timelineEntries={[buildUserTimelineEntry("needle")]}
+      />
+    );
+    try {
+      act(() => {
+        renderer = create(render(test.props.routeThreadKey), {
+          createNodeMock: test.createNodeMock,
+        });
+      });
+      act(() => {
+        openSessionSearch(test.props.routeThreadKey);
+      });
+      act(() =>
+        renderer!.root
+          .findByProps({ "aria-label": "Search in thread" })
+          .props.onChange({ target: { value: "needle" } }),
+      );
+      act(() => renderer!.update(render(test.props.routeThreadKey, false)));
+      await test.flush();
+      expect(test.scrollToIndex).not.toHaveBeenCalled();
+      expect(renderer!.root.findAllByProps({ role: "search" })).toHaveLength(0);
+      act(() => {
+        expect(openSessionSearch(test.props.routeThreadKey)).toBe(false);
+      });
+      act(() => renderer!.update(render("remote:thread-1")));
+      act(() => {
+        expect(openSessionSearch(test.props.routeThreadKey)).toBe(false);
+      });
+      act(() => {
+        expect(openSessionSearch("remote:thread-1")).toBe(true);
+      });
+      expect(renderer!.root.findByProps({ "aria-label": "Search in thread" }).props.value).toBe("");
+      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["Type to search"]);
+    } finally {
+      act(() => renderer?.unmount());
+      vi.unstubAllGlobals();
     }
   });
 });

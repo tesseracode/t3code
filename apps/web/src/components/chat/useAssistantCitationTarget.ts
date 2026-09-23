@@ -136,11 +136,10 @@ export function useAssistantCitationTarget({
     viewport,
   ]);
 
-  useEffect(() => {
-    if (!request) return;
-    const dismiss = (onlyPending: boolean) => {
+  const dismiss = useCallback(
+    (onlyPending = false) => {
       const navigation = navigationRef.current;
-      if (!navigation || navigation.target.key !== request.key) return;
+      if (!request || !navigation || navigation.target.key !== request.key) return;
       const activation = navigation.target.activationRef.current;
       if (activation.dismissed || (onlyPending && (activation.scrolled || navigation.done))) return;
       activation.dismissed = true;
@@ -149,7 +148,12 @@ export function useAssistantCitationTarget({
       navigation.done = true;
       setReady(null);
       setFinishedKey(request.key);
-    };
+    },
+    [onManualNavigation, request],
+  );
+
+  useEffect(() => {
+    if (!request) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         dismiss(false);
@@ -174,7 +178,7 @@ export function useAssistantCitationTarget({
       viewport?.removeEventListener("wheel", onWheel);
       viewport?.removeEventListener("touchmove", onNavigation);
     };
-  }, [onManualNavigation, request, viewport]);
+  }, [dismiss, request, viewport]);
 
   const target = ready?.key === request?.key ? ready : null;
   const positioning = request !== null && finishedKey !== request.key;
@@ -186,6 +190,7 @@ export function useAssistantCitationTarget({
     target,
     positioning,
     onListLoad,
+    dismiss,
     alwaysRender: sourceRow ? { keys: [sourceRow.id] } : undefined,
   };
 }

@@ -418,6 +418,46 @@ export interface StableMessagesTimelineRowsState {
   result: MessagesTimelineRow[];
 }
 
+export function messagesTimelineRowContainsEntry(
+  row: MessagesTimelineRow,
+  entryId: string,
+): boolean {
+  switch (row.kind) {
+    case "message":
+    case "proposed-plan":
+      return row.id === entryId;
+    case "work":
+      return row.groupedEntries.some((entry) => entry.id === entryId);
+    default:
+      return false;
+  }
+}
+
+export function findMessagesTimelineRowIndex(
+  rows: ReadonlyArray<MessagesTimelineRow>,
+  entryId: string,
+): number {
+  return rows.findIndex((row) => messagesTimelineRowContainsEntry(row, entryId));
+}
+
+/** Project searchable rows without mounting them or changing the user's disclosure state. */
+export function deriveSearchableTimelineRows(
+  input: Parameters<typeof deriveMessagesTimelineRows>[0],
+): MessagesTimelineRow[] {
+  const turns = new Set<TurnId>();
+  const groups = new Set<string>();
+  for (const entry of input.timelineEntries) {
+    const turnId = timelineEntryTurnId(entry);
+    if (turnId) turns.add(turnId);
+    if (entry.kind === "work") groups.add(workGroupId(entry.id, entry.entry));
+  }
+  return deriveMessagesTimelineRows({
+    ...input,
+    expandedTurnIds: turns,
+    expandedWorkGroupIds: groups,
+  });
+}
+
 export function computeMessageDurationStart(
   messages: ReadonlyArray<TimelineDurationMessage>,
 ): Map<string, string> {
@@ -873,6 +913,7 @@ export function deriveMessagesTimelineRows(input: {
   runningTurnId?: TurnId | null;
   expandedTurnIds?: ReadonlySet<TurnId>;
   expandedWorkGroupIds?: ReadonlySet<string>;
+  revealedEntryId?: string | null;
   isWorking: boolean;
   activeTurnStartedAt: string | null;
   turnDiffSummaries: ReadonlyArray<TurnDiffSummary>;
@@ -919,8 +960,12 @@ export function deriveMessagesTimelineRows(input: {
     unfoldedTurnIds: activeVisualResponseTurnIds,
   });
   const collapsedEntryIds = new Set<string>();
+  const expandedTurnIds = new Set(input.expandedTurnIds);
   for (const fold of foldsByAnchorEntryId.values()) {
-    if (!input.expandedTurnIds?.has(fold.turnId)) {
+    if (input.revealedEntryId && fold.hiddenEntryIds.has(input.revealedEntryId)) {
+      expandedTurnIds.add(fold.turnId);
+    }
+    if (!expandedTurnIds.has(fold.turnId)) {
       for (const entryId of fold.hiddenEntryIds) {
         collapsedEntryIds.add(entryId);
       }
@@ -995,7 +1040,9 @@ export function deriveMessagesTimelineRows(input: {
             entry: (latestRunningToolEntry ?? latestVisibleToolEntry).entry,
             groupedEntries: visibleActiveToolEntries.map((entry) => entry.entry),
             groupId,
-            expanded: input.expandedWorkGroupIds?.has(groupId) ?? false,
+            expanded:
+              (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
+              visibleActiveToolEntries.some((entry) => entry.id === input.revealedEntryId),
             active: latestToolKeepsActivityLive,
           };
         })()
@@ -1054,7 +1101,7 @@ export function deriveMessagesTimelineRows(input: {
         createdAt: anchoredTurnFold.createdAt,
         turnId: anchoredTurnFold.turnId,
         label: anchoredTurnFold.label,
-        expanded: input.expandedTurnIds?.has(anchoredTurnFold.turnId) ?? false,
+        expanded: expandedTurnIds.has(anchoredTurnFold.turnId),
       });
     }
 
@@ -1130,7 +1177,9 @@ export function deriveMessagesTimelineRows(input: {
         const activeInProgressToolEntries = visibleGroupedEntries.filter(workEntryIsInActiveRun);
         if (activeInProgressToolEntries.length > 0) {
           const groupId = workGroupId(timelineEntry.id, timelineEntry.entry);
-          const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
+          const expanded =
+            (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
+            visibleGroupedEntries.some((entry) => entry.id === input.revealedEntryId);
           const latestActiveToolEntry = activeInProgressToolEntries.at(-1)!;
           nextRows.push({
             kind: "work-live",
@@ -1166,7 +1215,9 @@ export function deriveMessagesTimelineRows(input: {
           });
         } else {
           const groupId = workGroupId(timelineEntry.id, timelineEntry.entry);
-          const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
+          const expanded =
+            (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
+            visibleGroupedEntries.some((entry) => entry.id === input.revealedEntryId);
           const summaryKind = toolGroupSummaryKind(visibleGroupedEntries);
           const primarySourceEntry = visibleGroupedEntries.find(
             (entry) => entry.toolSource !== undefined,
