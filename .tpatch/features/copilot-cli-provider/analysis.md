@@ -2,7 +2,7 @@
 
 ## Summary
 
-Port GitHub Copilot to the v0.0.38 provider-instance architecture using the official
+Port GitHub Copilot to the v0.0.42 provider-instance architecture using the official
 `@github/copilot-sdk` `1.0.8` in `mode: "copilot-cli"`. The SDK shares its session store with the
 native Copilot CLI, so T3 Code can persist and resume the native session ID instead of emulating a
 conversation around the retired `gh copilot suggest/explain` extension.
@@ -15,7 +15,8 @@ canonicalizes the driver.
 
 **Status: compatible with semantic adaptation.**
 
-The old generation-2 patch was useful only as an implementation and test seed. v0.0.38 now uses:
+The verified v0.0.38 canonical patch is the implementation/test seed, not an old recipe to replay.
+The selected stable target is v0.0.42 at `719a76ca1dbf5490f1aa33ffb9966301e02be9a9`. It uses:
 
 - `ProviderDriver`/`ProviderInstance` closures and a mutable instance registry
 - `ProviderRuntimeEvent` v2
@@ -24,8 +25,19 @@ The old generation-2 patch was useful only as an implementation and test seed. v
 - provider-owned text-generation services
 - provider-neutral task, MCP, attachment, activity, and usage contracts
 - target-aware desktop dependency staging
+- shared driver identity stamping and dynamic maintenance resolution
+- structured custom model settings and linked-context title refinement
+- standalone Node single-executable CLI archives used by WSL and remote installs
 
 The historical full-file recipe and lockfile hunks must not be replayed.
+
+The SDK/runtime pair remains `1.0.8` / `1.0.75`. External SDK loading uses
+`createRequire` (including explicit type-only imports to avoid side-effect ESM
+imports), and single-executable hosts launch the native Copilot executable rather
+than respawning T3 as Node. Explicit CLI/connection overrides retain precedence.
+Constructor and resolution failures use typed driver/status/text-generation errors.
+Full stage-closure enforcement, payload pruning and target-platform packaging
+remain dependent maintenance roots, not claims established by the driver port.
 
 ## Phase 0 Scope
 

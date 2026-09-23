@@ -17,10 +17,10 @@
   attachment and T3 MCP contracts
 - `apps/server/src/textGeneration/*` — provider-owned text-generation interface and prompt schemas
 - `apps/web/src/components/settings/providerDriverMeta.ts`,
-  `apps/web/src/components/chat/providerIconUtils.ts`, and `apps/web/src/session-logic.ts` — active
+  `apps/web/src/components/chat/providerIconUtils.ts` — active
   provider metadata
 - `apps/mobile/src/components/ProviderIcon.tsx` — mobile provider glyphs
-- `scripts/lib/cli-external-packages.ts` and `scripts/build-desktop-artifact.ts` — target runtime
+- `scripts/lib/cli-external-packages.ts`, `scripts/build-cli-archive.ts`, and `scripts/build-desktop-artifact.ts` — target runtime
   dependency staging
 
 ## Historical Seeds
@@ -45,8 +45,27 @@ events, task/usage contracts, text generation, UI metadata, and packaging. The h
 - session RPCs for mode, reasoning effort, plan read, skills list, task list, and queued-command
   response
 
-The selected SDK is `1.0.8`; the regenerated lock currently resolves its compatible Copilot runtime
-to `1.0.82`.
+The selected SDK is `1.0.8`; its scoped override and regenerated lock resolve the compatible
+Copilot runtime to `1.0.75`. The historical `1.0.82` runtime removed the platform
+`./sdk` export that this SDK still requires; do not restore that old exploratory choice.
+
+## Stable v0.0.42 Adaptation
+
+Use `Drivers/instanceIdentity.ts` and `resolveMaintenance` instead of duplicating
+identity stamping or handing a static maintenance object to the managed provider.
+Upstream no longer exports the old `PROVIDER_OPTIONS` list from session logic;
+active provider settings metadata is the current registration surface.
+Preserve Antigravity and the refactored dialogs/project-settings migration.
+
+`CustomModelSetting` now includes named entries with capabilities. Copilot uses
+that schema and the shared model builder. Text generation passes linked context
+and preserves the new `needsRefinement` result.
+
+The SDK has a CommonJS export. All production imports from it are type-only;
+`copilotClientOptions.ts` loads the implementation through `createRequire`.
+Electron and Node SEA hosts resolve the native binary using the SDK's package
+context. Ordinary Node retains the SDK's default transport. This avoids both
+unresolvable ESM imports inside SEA and recursively launching the T3 executable.
 
 Review fixes reuse the existing `thread.state.changed` compaction ingestion path, SDK
 `deleteSession`, per-session event semaphores, provider snapshot enrichment, and the settings

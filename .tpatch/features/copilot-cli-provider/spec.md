@@ -47,6 +47,18 @@
     dependency closure outside the bundle so target platform packages remain resolvable.
 14. Focused tests cover client options, provider/model status, migration, create/resume/stop,
     permissions/user input/plans, critical runtime events, text generation, and packaging closure.
+15. On v0.0.42, the driver uses shared identity stamping and maintenance resolution,
+    accepts current structured custom model settings, and preserves linked-context
+    title generation/refinement and upstream project-settings folding.
+16. Node single-executables load the external SDK through `createRequire` with no
+    file-backed ESM imports. Electron and standalone hosts resolve the native target
+    executable without respawning T3; explicit runtime/connection overrides win.
+    Missing SDK/runtime payloads produce typed initialization/status failures.
+
+Full packaged Windows/Linux/WSL qualification, exact all-stage dependency closure
+and payload pruning remain integration gates on the dependent maintenance roots.
+Focused mocked session tests and a no-inference runtime handshake do not substitute
+for the later real SDK/native-CLI session-continuity gate.
 
 ## Non-Goals
 

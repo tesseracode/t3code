@@ -78,6 +78,30 @@ const recordProviderUsage = (provider: string, instanceId: string | null = provi
   });
 
 it.layer(NodeServices.layer)("server settings", (it) => {
+  it.effect(
+    "migrates persisted Copilot defaults and preserves disabled custom instance identity",
+    () =>
+      Effect.gen(function* () {
+        const serverConfig = yield* ServerConfig.ServerConfig;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const service = yield* ServerSettingsModule.ServerSettingsService;
+        yield* fileSystem.writeFileString(
+          serverConfig.settingsPath,
+          '{"providers":{"copilot":{"enabled":true,"homePath":"/legacy/copilot"}},"providerInstances":{"copilot_work":{"driver":"copilot","enabled":true,"config":{"enabled":false,"homePath":"/work/copilot","customFlag":"keep"}}}}',
+        );
+        const settings = yield* service.getSettings;
+        const legacyDefault = settings.providerInstances[ProviderInstanceId.make("copilot")];
+        assert.equal(legacyDefault?.driver, ProviderDriverKind.make("githubCopilot"));
+        assert.isTrue(legacyDefault?.enabled);
+        assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("copilot_work")], {
+          driver: ProviderDriverKind.make("githubCopilot"),
+          enabled: false,
+          config: { homePath: "/work/copilot", customFlag: "keep" },
+        });
+        assert.isUndefined(settings.providerInstances[ProviderInstanceId.make("githubCopilot")]);
+      }).pipe(Effect.provide(makeServerSettingsLayer())),
+  );
+
   it.effect("preserves context when reading a provider environment secret fails", () => {
     const platformCause = PlatformError.systemError({
       _tag: "PermissionDenied",
@@ -1038,6 +1062,9 @@ it.layer(NodeServices.layer)("server settings", (it) => {
             binaryPath: "/opt/homebrew/bin/codex",
           },
           cursor: {
+            enabled: false,
+          },
+          githubCopilot: {
             enabled: false,
           },
           grok: {
