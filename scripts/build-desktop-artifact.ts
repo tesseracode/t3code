@@ -29,6 +29,7 @@ import {
   type WebAssetBrand,
 } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
+import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
 import {
   findInlinedExternalPackages,
   selectCliRuntimeExternalDependencies,
@@ -2957,6 +2958,12 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
   );
 
   yield* Effect.log("[desktop-artifact] Packing server.asar...");
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: serverStageDir,
+    platform: "win",
+    arch: input.arch,
+    dependencies: sidecarDependencies,
+  });
   yield* fs.makeDirectory(path.dirname(input.asarPath), { recursive: true });
   yield* packWindowsServerAsar({
     sourceDir: serverStageDir,
@@ -3705,6 +3712,12 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   );
   yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
   yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: stageAppDir,
+    platform: options.platform,
+    arch: options.arch,
+    dependencies: stageDependencies,
+  });
 
   // Only the Windows artifact carries the server sidecar and the WSL runtime;
   // other platforms ignore the --wsl-runtime input.

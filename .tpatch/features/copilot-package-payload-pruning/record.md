@@ -1,27 +1,30 @@
 # Implementation Record: copilot-package-payload-pruning
 
-**Recorded**: 2026-09-09T02:40:53Z
-**Files changed**: 3
-**Patch size**: 26603 bytes
-**Capture mode**: working-tree-all
-**Pathspecs**: scripts/build-desktop-artifact.ts,scripts/build-desktop-artifact.test.ts,docs/operations/release.md
+**Recorded**: 2026-09-23T18:23:06Z
+**Files changed**: 5
+**Patch size**: 32838 bytes
+**Capture mode**: staged-index
 
 ## Change Summary
 
 ```
- docs/operations/release.md             |  18 ++-
- scripts/build-desktop-artifact.test.ts | 225 +++++++++++++++++++++++++++++
- scripts/build-desktop-artifact.ts      | 254 ++++++++++++++++++++++++++++++++-
- 3 files changed, 494 insertions(+), 3 deletions(-)
+ .../copilot-package-payload-pruning/analysis.md    | 28 ++++++++---
+ .../artifacts/apply-session.json                   |  9 ++--
+ .../artifacts/post-apply-diff.txt                  |  9 ++--
+ .../copilot-package-payload-pruning/exploration.md | 58 +++++++++++++++++-----
+ .../copilot-package-payload-pruning/spec.md        | 36 ++++++++++----
+ .../copilot-package-payload-pruning/status.json    | 20 +++++---
+ 6 files changed, 117 insertions(+), 43 deletions(-)
 ```
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: scripts/build-desktop-artifact.ts, scripts/build-desktop-artifact.test.ts, docs/operations/release.md
+- **capture_mode**: `staged-index`
+- **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `ee3377d45c2895073315d4135ef104e53d8cb1ca`
+- **base_commit**: `acd69601918506de8a86754cb2aee73cc7afb085`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 5 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 

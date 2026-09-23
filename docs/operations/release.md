@@ -276,6 +276,29 @@ available.
   - `electron-updater` reads `latest-mac.yml` on stable and `nightly-mac.yml` on nightly, for both Intel and Apple Silicon.
   - The workflow merges the per-arch mac manifests into one channel-specific mac manifest before publishing the GitHub Release.
 
+### Copilot SDK payloads
+
+Copilot-bearing desktop stages and standalone CLI archives use the same
+reviewed SDK-server payload pruning before packing. Each stage contains only
+its target platform (both target CPUs for a universal macOS desktop build),
+not the old combined Windows/Linux tree. Windows embeds the already-built
+Linux CLI archive verbatim for WSL; it never prunes or repacks that archive.
+
+The current layout review covers SDK `1.0.8`, CLI `1.0.75` and Koffi `3.3.1`.
+The stage resolves packages from their actual owning dependency contexts and
+rejects paths outside the stage, unexpected native layouts and version drift
+before removing anything. Keep the CLI, core natives, target `rg`/`tgrep`,
+specialized clipboard bindings/loaders, target Koffi and Windows computer-use
+executables. Only duplicate generic clipboard natives, non-target search
+binaries, glibc-inapplicable Koffi musl bindings and the reviewed interactive
+voice/webview/Foundry directories are removed. No-Copilot stages are untouched.
+
+Source lock resolution is not proof that a fresh generated stage resolves
+the same transitive versions. The separate dependency-closure gate must pin
+and validate every Copilot-bearing stage. Real target-host execution and the
+complete Windows file-count gate remain required; a fixture, cross-platform
+file inspection or Copilot-only ASAR count does not replace them.
+
 ### Windows payload topology and update validation
 
 Windows packages the bundled server and only its runtime-external/native

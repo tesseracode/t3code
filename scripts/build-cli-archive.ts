@@ -41,6 +41,7 @@ import {
   STAGE_INSTALL_ARGS,
 } from "./build-desktop-artifact.ts";
 import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
+import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -218,6 +219,12 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     }),
     "vp install --prod (cli archive runtime externals)",
   );
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: input.stageDir,
+    platform: input.platform,
+    arch: input.arch,
+    dependencies,
+  });
 
   // pnpm's bookkeeping and the manifest only matter to pnpm; the runtime
   // resolves packages by directory. node-pty ships every platform's prebuilds

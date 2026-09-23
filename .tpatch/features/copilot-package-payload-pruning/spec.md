@@ -2,15 +2,33 @@
 
 ## Acceptance criteria
 
-1. X64 removes 19 unused loose natives; arm64 removes 20 plus non-target
-   extensionless search tools.
-2. Target executables, core runtime, search, specialized clipboard, Koffi, and
-   Windows computer-use remain.
-3. No-Copilot stages are unchanged.
-4. Unsupported versions, missing target files, and layout drift fail.
-5. Windows-only Copilot/Koffi packages do not enter the WSL archive.
-6. The upstream 80-file limit remains unchanged.
-7. Real packaged Windows and WSL runtime gates pass.
+1. One helper is wired before packing every Copilot-bearing desktop/server
+   stage and standalone CLI archive. WSL receives the Linux archive verbatim.
+2. For the reviewed versions, remove only generic clipboard duplicates,
+   interactive voice/webview/Foundry payloads, non-target search binaries and
+   Koffi musl bindings from glibc Linux targets.
+3. Preserve required native CLI/core/search, specialized clipboard and its
+   loaders, SDK entry, target Koffi, and both Windows computer-use executables.
+4. Verify package ownership/version, all required files, native layout and stage
+   containment before any deletion. Reject external/internal unexpected symlinks,
+   foreign staged platforms and partial/unreviewed layouts explicitly.
+5. Repeated pruning of an already-complete pruned stage is a no-op. Stages that
+   do not declare Copilot are untouched; declared missing packages fail.
+6. Review all x64/arm64 Windows, Linux/glibc and macOS targets. Universal macOS
+   preserves both CPU payloads. Expected removed-native counts are 9/11 for
+   Windows x64/arm64, 10/11 for Linux x64/arm64, 10/9 for macOS x64/arm64 and
+   19 for universal macOS. Counts do not replace required-file validation.
+7. The upstream 80-file complete Windows artifact limit remains unchanged.
+8. Focused tests cover preservation, idempotency, no-Copilot stages, version and
+   layout drift, foreign packages, symlink escapes and preflight-before-delete.
+   Real isolated staging demonstrates retained bytes and runnable local payloads.
+
+## External gates
+
+Complete target-host Windows/WSL/Linux packaging and native session execution
+remain required on the assembled stack. A Copilot-only ASAR count is not proof
+that the entire Windows application fits its 80-file limit. Exact generated
+stage closure validation is the next dependent packaging concern.
 
 ## Dependency
 
