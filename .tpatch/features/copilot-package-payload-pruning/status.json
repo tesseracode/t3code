@@ -17,7 +17,8 @@
   "depends_on": [
     {
       "slug": "windows-portable-packaging-tests",
-      "kind": "hard"
+      "kind": "hard",
+      "satisfied_by": "0a590fa01af66ec135d2ebf2d5542b08a37dc275"
     }
   ],
   "verify": {
