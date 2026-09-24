@@ -5,12 +5,12 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-10T00:23:25Z",
-  "updated_at": "2026-09-10T00:46:03Z",
+  "updated_at": "2026-09-24T16:58:54Z",
   "last_command": "verify",
-  "notes": "landed at 2026-09-10T00:45:34Z",
+  "notes": "landed at 2026-09-24T16:59:26Z",
   "apply": {
-    "completed_at": "2026-09-10T00:45:07Z",
-    "base_commit": "3adf3566f162434ce963eb64298210e1d1d47005",
+    "completed_at": "2026-09-24T16:58:48Z",
+    "base_commit": "7e207cbdaf060ce9f3400d22ad59bcc17bbfe7cb",
     "has_patch": true
   },
   "reconcile": {},
@@ -21,10 +21,10 @@
     }
   ],
   "verify": {
-    "verified_at": "2026-09-10T00:46:00Z",
+    "verified_at": "2026-09-24T16:58:49Z",
     "passed": true,
-    "recipe_hash_at_verify": "04445f734b8dddf42e32e31e6f8a3cc1df42125fba45068a7733a5148404d38f",
-    "patch_hash_at_verify": "e67ad7d162beef58f2442351f9ee4ab1c33e5b5e90f7012fa3bf9e938814fcb3",
+    "recipe_hash_at_verify": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d",
+    "patch_hash_at_verify": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
     "parent_snapshot": {
       "copilot-package-payload-pruning": "applied"
     }

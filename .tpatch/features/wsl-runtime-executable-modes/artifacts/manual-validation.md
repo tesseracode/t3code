@@ -1,8 +1,8 @@
 # Manual Validation
 
-**Status**: passed
-**Timestamp**: 2026-09-10T00:45:07Z
+**Status**: needs_review
+**Timestamp**: 2026-09-24T16:58:48Z
 
 ## Notes
 
-Focused WSL/runtime tests, packaging tests, desktop/scripts typechecks, lint, and Ubuntu installer execution passed.
+118 focused cases passed; 14 full installer cases skipped on macOS. Shared/desktop/scripts typechecks and touched-source lint pass. Real Windows/WSL qualification remains pending.

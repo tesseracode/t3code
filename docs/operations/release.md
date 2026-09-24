@@ -284,6 +284,14 @@ its target platform (both target CPUs for a universal macOS desktop build),
 not the old combined Windows/Linux tree. Windows embeds the already-built
 Linux CLI archive verbatim for WSL; it never prunes or repacks that archive.
 
+WSL validates the SDK/runtime manifests and one matching Linux platform
+payload, then normalizes `copilot`, `rg` and `tgrep` to `0755` after verified
+extraction and before promotion. Warm reuse checks their executability and
+remembers Copilot presence in the ready marker, including when the whole
+payload has disappeared. Non-Copilot caches retain upstream behavior. Run the
+executed installer suite on Linux/WSL and the packaged Windows/WSL gate;
+portable shell checks alone do not qualify the full installer.
+
 The current layout review covers SDK `1.0.8`, CLI `1.0.75` and Koffi `3.3.1`.
 The stage resolves packages from their actual owning dependency contexts and
 rejects paths outside the stage, unexpected native layouts and version drift

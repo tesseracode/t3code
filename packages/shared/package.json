@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./copilotRuntime": {
+      "types": "./src/copilotRuntime.ts",
+      "import": "./src/copilotRuntime.ts"
+    },
     "./legacyCliLauncher": {
       "types": "./src/legacyCliLauncher.ts",
       "import": "./src/legacyCliLauncher.ts"

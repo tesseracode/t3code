@@ -1,29 +1,32 @@
 # Implementation Record: wsl-runtime-executable-modes
 
-**Recorded**: 2026-09-10T00:45:34Z
-**Files changed**: 5
-**Patch size**: 24456 bytes
-**Capture mode**: working-tree-all
-**Pathspecs**: apps/desktop/src/wsl/DesktopWslEnvironment.ts,apps/desktop/src/wsl/DesktopWslEnvironment.test.ts,scripts/build-desktop-artifact.ts,scripts/build-desktop-artifact.test.ts,docs/operations/release.md
+**Recorded**: 2026-09-24T16:58:48Z
+**Files changed**: 8
+**Patch size**: 29549 bytes
+**Capture mode**: staged-index
 
 ## Change Summary
 
 ```
- apps/desktop/src/wsl/DesktopWslEnvironment.test.ts |  76 ++++++++++++++-
- apps/desktop/src/wsl/DesktopWslEnvironment.ts      |  54 +++++++++++
- docs/operations/release.md                         |   8 +-
- scripts/build-desktop-artifact.test.ts             | 102 ++++++++++++++++++++
- scripts/build-desktop-artifact.ts                  | 104 ++++++++++++++-------
- 5 files changed, 308 insertions(+), 36 deletions(-)
+ .../wsl-runtime-executable-modes/analysis.md       |   7 +-
+ .../artifacts/apply-session.json                   |   9 +-
+ .../artifacts/manual-validation.md                 |   6 +-
+ .../artifacts/post-apply-diff.txt                  |  16 +-
+ .../artifacts/post-apply.patch                     | 995 +++++++++++----------
+ .../wsl-runtime-executable-modes/exploration.md    |  14 +-
+ .../features/wsl-runtime-executable-modes/spec.md  |  24 +-
+ .../wsl-runtime-executable-modes/status.json       |  10 +-
+ 8 files changed, 598 insertions(+), 483 deletions(-)
 ```
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: apps/desktop/src/wsl/DesktopWslEnvironment.ts, apps/desktop/src/wsl/DesktopWslEnvironment.test.ts, scripts/build-desktop-artifact.ts, scripts/build-desktop-artifact.test.ts, docs/operations/release.md
+- **capture_mode**: `staged-index`
+- **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `3adf3566f162434ce963eb64298210e1d1d47005`
+- **base_commit**: `7e207cbdaf060ce9f3400d22ad59bcc17bbfe7cb`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 8 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
@@ -33,3 +36,4 @@ To re-apply this feature to a clean checkout:
 # From the feature's artifacts directory:
 git apply .tpatch/features/wsl-runtime-executable-modes/artifacts/post-apply.patch
 ```
+

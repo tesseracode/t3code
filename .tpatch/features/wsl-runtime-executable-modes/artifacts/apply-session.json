@@ -1,8 +1,9 @@
 {
   "slug": "wsl-runtime-executable-modes",
-  "completed_at": "2026-09-10T00:45:07Z",
-  "base_commit": "3adf3566f162434ce963eb64298210e1d1d47005",
+  "completed_at": "2026-09-24T16:58:48Z",
+  "base_commit": "7e207cbdaf060ce9f3400d22ad59bcc17bbfe7cb",
   "has_patch": true,
-  "validation_status": "passed",
-  "validation_notes": "Focused WSL/runtime tests, packaging tests, desktop/scripts typechecks, lint, and Ubuntu installer execution passed."
+  "operator_notes": "Manual v0.0.42 semantic port against landed pruning parent; read-only reconcile refused parent-generation-stale. Linux CLI archive topology preserved; fixture newlines folded.",
+  "validation_status": "needs_review",
+  "validation_notes": "118 focused cases passed; 14 full installer cases skipped on macOS. Shared/desktop/scripts typechecks and touched-source lint pass. Real Windows/WSL qualification remains pending."
 }

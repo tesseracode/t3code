@@ -29,6 +29,7 @@ import {
   type WebAssetBrand,
 } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
+import { validateCopilotLinuxArchiveMembers } from "@t3tools/shared/copilotRuntime";
 import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
 import {
   findInlinedExternalPackages,
@@ -3298,6 +3299,13 @@ export const validateWindowsPackagedPayload = Effect.fn(
         cause: new Error("WSL runtime archive is not a Linux CLI release archive"),
       });
     }
+    const copilotProblem = validateCopilotLinuxArchiveMembers(
+      members
+        .filter((member) => member.startsWith(`${stem}/`))
+        .map((member) => member.slice(stem.length + 1)),
+      input.targetArch === "arm64" ? "arm64" : "x64",
+    );
+    if (copilotProblem !== null) return yield* invalidWslRuntime(new Error(copilotProblem));
     // The CLI archive runs the single-executable, never a loose server bundle.
     const bundleEntry = members.find((member) => member.endsWith("/bin.mjs"));
     if (bundleEntry !== undefined) {
