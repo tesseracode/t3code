@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-koffi-packaging-pin",
-  "current_generation": 3,
+  "current_generation": 4,
   "generations": [
     {
       "generation": 1,
@@ -109,7 +109,7 @@
       "git_patch_id": "82e8c60c503f9bdca2c166a42b45a377c4691faf",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "ba3684eb82b6c1ecf8bb91f7ef9ddf97b19c6a68884eee9b22d47f7cdc1051f4",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/003-record.patch",
       "base_commit": "fc01e75770e4b92c4a72d29cc58d612894a5a995",
       "upper": {
@@ -124,6 +124,61 @@
       },
       "touched_paths": [
         "pnpm-workspace.yaml"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 4,
+      "generation_id": "pg_0272ad6d4fb5",
+      "kind": "amend-refresh",
+      "patch_sha256": "c499b0c371f121301b51cf955b137373a3262f15f4a6694edfd004913d408654",
+      "git_patch_id": "e43bff19761b4047ee51780787f93f7edd576d83",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "2282bdba04fdd3f03c35bcbdc9ce27da6e402ecef363eea840ef5c2ee7dcbb0e",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/004-record.patch",
+      "base_commit": "47556adef",
+      "upper": {
+        "kind": "commit",
+        "ref": "HEAD",
+        "commit": "b06224b6a9b6d4a40841482ba4540146c38c14f3"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          "docs/operations/release.md",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "scripts/build-cli-archive.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/operations/release.md",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts"
       ],
       "dependencies": [
         {
