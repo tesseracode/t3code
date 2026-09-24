@@ -5,8 +5,8 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-11T16:37:15Z",
-  "updated_at": "2026-09-24T17:09:35Z",
-  "last_command": "record",
+  "updated_at": "2026-09-24T17:10:09Z",
+  "last_command": "verify",
   "notes": "landed at 2026-09-24T17:09:38Z",
   "apply": {
     "completed_at": "2026-09-24T17:06:48Z",
@@ -21,9 +21,9 @@
     }
   ],
   "verify": {
-    "verified_at": "2026-09-24T17:08:35Z",
-    "passed": false,
-    "recipe_hash_at_verify": "2282bdba04fdd3f03c35bcbdc9ce27da6e402ecef363eea840ef5c2ee7dcbb0e",
-    "patch_hash_at_verify": "c499b0c371f121301b51cf955b137373a3262f15f4a6694edfd004913d408654"
+    "verified_at": "2026-09-24T17:10:05Z",
+    "passed": true,
+    "recipe_hash_at_verify": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8",
+    "patch_hash_at_verify": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306"
   }
 }
