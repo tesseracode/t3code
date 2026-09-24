@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-09-24T19:11:15Z
+**Timestamp**: 2026-09-24T19:14:16Z
 
 ## Notes
 
-Product bytes unchanged; focused packaging regression: 163 passed, 14 complete Linux/WSL installer cases skipped. Complete target-host qualification is separate and remains pending.
+Exact product-tree equivalence to the integrated source that passed 163 focused cases (14 platform skips). This is replay/metadata proof, not target-platform execution.
