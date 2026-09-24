@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-koffi-packaging-pin",
-  "current_generation": 2,
+  "current_generation": 3,
   "generations": [
     {
       "generation": 1,
@@ -62,7 +62,7 @@
       "git_patch_id": "bc9acd5a653b36b1ae79c70e2576894ff589be4b",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "3a20577073b589b3b688e9eebe17675a4d668c79232a417fb0f0ba003d7237a1",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "47556adef3f46f5720869c423032ba0abba3c445",
       "upper": {
@@ -83,6 +83,47 @@
         "scripts/build-desktop-artifact.ts",
         "scripts/lib/copilot-payload.test.ts",
         "scripts/lib/copilot-payload.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 3,
+      "generation_id": "pg_4707e94555a6",
+      "kind": "amend-refresh",
+      "patch_sha256": "c696d6d2f030c86652154e8c813c13e187ba54f1fbf9fe45f9a51d99fc1d0ca5",
+      "git_patch_id": "82e8c60c503f9bdca2c166a42b45a377c4691faf",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "ba3684eb82b6c1ecf8bb91f7ef9ddf97b19c6a68884eee9b22d47f7cdc1051f4",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/003-record.patch",
+      "base_commit": "fc01e75770e4b92c4a72d29cc58d612894a5a995",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "pnpm-workspace.yaml"
       ],
       "dependencies": [
         {

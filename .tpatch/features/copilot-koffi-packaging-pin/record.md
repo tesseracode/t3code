@@ -1,22 +1,15 @@
 # Implementation Record: copilot-koffi-packaging-pin
 
-**Recorded**: 2026-09-24T17:06:48Z
-**Files changed**: 7
-**Patch size**: 21512 bytes
+**Recorded**: 2026-09-24T17:08:05Z
+**Files changed**: 1
+**Patch size**: 1004 bytes
 **Capture mode**: staged-index
 
 ## Change Summary
 
 ```
- .../copilot-koffi-packaging-pin/analysis.md        |  12 +-
- .../artifacts/apply-session.json                   |   9 +-
- .../artifacts/manual-validation.md                 |   6 +-
- .../artifacts/post-apply-diff.txt                  |  17 +-
- .../artifacts/post-apply.patch                     | 935 +++++++++------------
- .../copilot-koffi-packaging-pin/exploration.md     |  12 +-
- .../features/copilot-koffi-packaging-pin/spec.md   |  29 +-
- .../copilot-koffi-packaging-pin/status.json        |  10 +-
- 8 files changed, 463 insertions(+), 567 deletions(-)
+ .tpatch/features/copilot-cli-provider/status.json | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 ```
 
 ## Capture Provenance
@@ -24,9 +17,9 @@
 - **capture_mode**: `staged-index`
 - **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `47556adef3f46f5720869c423032ba0abba3c445`
+- **base_commit**: `fc01e75770e4b92c4a72d29cc58d612894a5a995`
 - **upper_commit**: `working-tree`
-- **dirty_state**: 7 staged paths, 0 unrelated unstaged paths
+- **dirty_state**: 1 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
