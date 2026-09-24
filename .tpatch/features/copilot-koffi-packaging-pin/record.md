@@ -1,20 +1,25 @@
 # Implementation Record: copilot-koffi-packaging-pin
 
-**Recorded**: 2026-09-24T17:08:35Z
-**Files changed**: 7
-**Patch size**: 21303 bytes
-**Capture mode**: committed-range
-**Base commit**: 47556adef
-**Upper bound**: HEAD
-**Pathspecs**: pnpm-workspace.yaml,pnpm-lock.yaml,scripts/build-cli-archive.ts,scripts/build-desktop-artifact.ts,scripts/lib/copilot-payload.ts,scripts/lib/copilot-payload.test.ts,docs/operations/release.md
+**Recorded**: 2026-09-24T17:09:31Z
+**Files changed**: 1
+**Patch size**: 1045 bytes
+**Capture mode**: staged-index
+
+## Change Summary
+
+```
+ .tpatch/features/copilot-cli-provider/status.json | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+```
 
 ## Capture Provenance
 
-- **capture_mode**: `committed-range`
-- **pathspecs**: pnpm-workspace.yaml, pnpm-lock.yaml, scripts/build-cli-archive.ts, scripts/build-desktop-artifact.ts, scripts/lib/copilot-payload.ts, scripts/lib/copilot-payload.test.ts, docs/operations/release.md
+- **capture_mode**: `staged-index`
+- **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `47556adef`
-- **upper_commit**: `HEAD`
+- **base_commit**: `05855c535208a3ec527cb05064b97a0c4438d5c6`
+- **upper_commit**: `working-tree`
+- **dirty_state**: 1 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
@@ -25,4 +30,3 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-koffi-packaging-pin/artifacts/post-apply.patch
 ```
 
-*Patch was captured as a committed diff from `47556adef` to `HEAD`.*

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-koffi-packaging-pin",
-  "current_generation": 4,
+  "current_generation": 5,
   "generations": [
     {
       "generation": 1,
@@ -150,7 +150,7 @@
       "git_patch_id": "e43bff19761b4047ee51780787f93f7edd576d83",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "2282bdba04fdd3f03c35bcbdc9ce27da6e402ecef363eea840ef5c2ee7dcbb0e",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/004-record.patch",
       "base_commit": "47556adef",
       "upper": {
@@ -179,6 +179,47 @@
         "scripts/build-desktop-artifact.ts",
         "scripts/lib/copilot-payload.test.ts",
         "scripts/lib/copilot-payload.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 5,
+      "generation_id": "pg_848ceb88b28d",
+      "kind": "amend-refresh",
+      "patch_sha256": "8ac5c6cd33fe10c25fb98faebcadf344b4724d8f8d502959e0d21d153d651c03",
+      "git_patch_id": "4b009a125f839c3b9191378942d514596e9ad794",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "1f0f0693290422d99f680e40b7355bf677f7136a4bcd3b572453527f8f9ff15e",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/005-record.patch",
+      "base_commit": "05855c535208a3ec527cb05064b97a0c4438d5c6",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "pnpm-lock.yaml"
       ],
       "dependencies": [
         {
