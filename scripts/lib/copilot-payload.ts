@@ -12,7 +12,21 @@ export const COPILOT_PAYLOAD_VERSIONS = {
   sdk: "1.0.8",
   runtime: "1.0.75",
   koffi: "3.3.1",
+  jsonrpc: "8.2.1",
+  zod: "4.4.3",
+  detectLibc: "2.1.2",
 } as const;
+
+export const COPILOT_DEPENDENCY_OVERRIDES = {
+  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`]:
+    COPILOT_PAYLOAD_VERSIONS.runtime,
+  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>koffi`]: COPILOT_PAYLOAD_VERSIONS.koffi,
+  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>vscode-jsonrpc`]:
+    COPILOT_PAYLOAD_VERSIONS.jsonrpc,
+  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>zod`]: COPILOT_PAYLOAD_VERSIONS.zod,
+  [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>detect-libc`]:
+    COPILOT_PAYLOAD_VERSIONS.detectLibc,
+};
 
 const PackageManifest = Schema.Struct({
   name: Schema.optional(Schema.String),
@@ -111,20 +125,15 @@ function targetLayout(platform: BuildPlatform, arch: "x64" | "arm64") {
   return { target, os, arch, required, removed, foreignSearchTarget };
 }
 
-/**
- * Prune only a reviewed SDK-server payload in an isolated production stage.
- * Validate every target before deleting anything; never prune a package store
- * reached outside the stage through Node resolution or a symlink.
- */
-export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayload")(
+/** Read-only closure validation shared with payload pruning, resolved from each package owner. */
+export const resolveCopilotDependencyClosure = Effect.fn("resolveCopilotDependencyClosure")(
   function* (input: {
     readonly stageDir: string;
-    readonly platform: BuildPlatform;
-    readonly arch: BuildArch;
     readonly dependencies: Readonly<Record<string, string>>;
+    readonly overrides: Readonly<Record<string, string>>;
   }) {
     if (input.dependencies["@github/copilot-sdk"] === undefined) {
-      return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> };
+      return null;
     }
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -134,8 +143,13 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
         detail,
         ...(cause === undefined ? {} : { cause }),
       });
-    if (input.arch === "universal" && input.platform !== "mac") {
-      return yield* failure("universal Copilot payloads are supported only on macOS");
+    if (input.dependencies["@github/copilot-sdk"] !== COPILOT_PAYLOAD_VERSIONS.sdk) {
+      return yield* failure(`SDK dependency must be exactly ${COPILOT_PAYLOAD_VERSIONS.sdk}`);
+    }
+    for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
+      if (input.overrides[selector] !== version) {
+        return yield* failure(`workspace override ${selector} must be exactly ${version}`);
+      }
     }
     const root = yield* fs.realPath(input.stageDir);
     const contained = (candidate: string) => {
@@ -198,6 +212,33 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
       COPILOT_PAYLOAD_VERSIONS.runtime,
     );
     const koffi = yield* resolvePackage(sdk.loader, "koffi", COPILOT_PAYLOAD_VERSIONS.koffi);
+    yield* resolvePackage(sdk.loader, "vscode-jsonrpc", COPILOT_PAYLOAD_VERSIONS.jsonrpc);
+    yield* resolvePackage(sdk.loader, "zod", COPILOT_PAYLOAD_VERSIONS.zod);
+    yield* resolvePackage(runtime.loader, "detect-libc", COPILOT_PAYLOAD_VERSIONS.detectLibc);
+    return { fs, path, root, contained, realInside, resolvePackage, failure, sdk, runtime, koffi };
+  },
+);
+
+/**
+ * Prune only a reviewed SDK-server payload in an isolated production stage.
+ * Validate every target before deleting anything; never prune a package store
+ * reached outside the stage through Node resolution or a symlink.
+ */
+export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayload")(
+  function* (input: {
+    readonly stageDir: string;
+    readonly platform: BuildPlatform;
+    readonly arch: BuildArch;
+    readonly dependencies: Readonly<Record<string, string>>;
+    readonly overrides: Readonly<Record<string, string>>;
+  }) {
+    const closure = yield* resolveCopilotDependencyClosure(input);
+    if (closure === null) return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> };
+    const { fs, path, root, contained, realInside, resolvePackage, failure, runtime, koffi } =
+      closure;
+    if (input.arch === "universal" && input.platform !== "mac") {
+      return yield* failure("universal Copilot payloads are supported only on macOS");
+    }
     const layouts = (input.arch === "universal" ? (["arm64", "x64"] as const) : [input.arch]).map(
       (arch) => targetLayout(input.platform, arch),
     );
@@ -337,6 +378,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
         platform: input.platform,
         arch: input.arch,
         removedNativeFiles: removedNativeFiles.length,
+        closureVersions: COPILOT_PAYLOAD_VERSIONS,
       }),
     );
     return { pruned: true, removedNativeFiles };

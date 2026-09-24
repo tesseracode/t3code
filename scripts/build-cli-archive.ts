@@ -161,6 +161,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     yield* fs.readFileString(path.join(input.repoRoot, "pnpm-workspace.yaml")),
   );
   const catalog = workspace.catalog ?? {};
+  const overrides = resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server");
   const serverDependencies = resolveCatalogDependencies(
     serverPackageJson.dependencies,
     catalog,
@@ -200,7 +201,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
         arch: input.arch,
         ...(workspace.allowBuilds ? { allowBuilds: workspace.allowBuilds } : {}),
         patchedDependencies,
-        overrides: resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server"),
+        overrides,
       }),
       nodeLinker: "hoisted",
     }),
@@ -224,6 +225,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     platform: input.platform,
     arch: input.arch,
     dependencies,
+    overrides,
   });
 
   // pnpm's bookkeeping and the manifest only matter to pnpm; the runtime

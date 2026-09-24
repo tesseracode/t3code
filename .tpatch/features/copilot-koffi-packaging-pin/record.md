@@ -1,29 +1,32 @@
 # Implementation Record: copilot-koffi-packaging-pin
 
-**Recorded**: 2026-09-11T17:13:13Z
-**Files changed**: 5
-**Patch size**: 24511 bytes
-**Capture mode**: working-tree-all
-**Pathspecs**: pnpm-workspace.yaml,pnpm-lock.yaml,scripts/build-desktop-artifact.ts,scripts/build-desktop-artifact.test.ts,docs/operations/release.md
+**Recorded**: 2026-09-24T17:06:48Z
+**Files changed**: 7
+**Patch size**: 21512 bytes
+**Capture mode**: staged-index
 
 ## Change Summary
 
 ```
- docs/operations/release.md             |   9 +-
- pnpm-lock.yaml                         |   4 +
- pnpm-workspace.yaml                    |   6 +
- scripts/build-desktop-artifact.test.ts | 190 ++++++++++++++++++++++-------
- scripts/build-desktop-artifact.ts      | 216 ++++++++++++++++++++++++++++++++-
- 5 files changed, 377 insertions(+), 48 deletions(-)
+ .../copilot-koffi-packaging-pin/analysis.md        |  12 +-
+ .../artifacts/apply-session.json                   |   9 +-
+ .../artifacts/manual-validation.md                 |   6 +-
+ .../artifacts/post-apply-diff.txt                  |  17 +-
+ .../artifacts/post-apply.patch                     | 935 +++++++++------------
+ .../copilot-koffi-packaging-pin/exploration.md     |  12 +-
+ .../features/copilot-koffi-packaging-pin/spec.md   |  29 +-
+ .../copilot-koffi-packaging-pin/status.json        |  10 +-
+ 8 files changed, 463 insertions(+), 567 deletions(-)
 ```
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: pnpm-workspace.yaml, pnpm-lock.yaml, scripts/build-desktop-artifact.ts, scripts/build-desktop-artifact.test.ts, docs/operations/release.md
+- **capture_mode**: `staged-index`
+- **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `b8e2e0e8dc2d51f549224ed9c8ba815fd6eb4527`
+- **base_commit**: `47556adef3f46f5720869c423032ba0abba3c445`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 7 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
@@ -33,3 +36,4 @@ To re-apply this feature to a clean checkout:
 # From the feature's artifacts directory:
 git apply .tpatch/features/copilot-koffi-packaging-pin/artifacts/post-apply.patch
 ```
+

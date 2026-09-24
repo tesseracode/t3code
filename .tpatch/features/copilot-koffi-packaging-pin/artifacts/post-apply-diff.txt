@@ -1,6 +1,9 @@
- docs/operations/release.md             |   9 +-
- pnpm-lock.yaml                         |   4 +
- pnpm-workspace.yaml                    |   6 +
- scripts/build-desktop-artifact.test.ts | 190 ++++++++++++++++++++++-------
- scripts/build-desktop-artifact.ts      | 216 ++++++++++++++++++++++++++++++++-
- 5 files changed, 377 insertions(+), 48 deletions(-)
+ .../copilot-koffi-packaging-pin/analysis.md        |  12 +-
+ .../artifacts/apply-session.json                   |   9 +-
+ .../artifacts/manual-validation.md                 |   6 +-
+ .../artifacts/post-apply-diff.txt                  |  17 +-
+ .../artifacts/post-apply.patch                     | 935 +++++++++------------
+ .../copilot-koffi-packaging-pin/exploration.md     |  12 +-
+ .../features/copilot-koffi-packaging-pin/spec.md   |  29 +-
+ .../copilot-koffi-packaging-pin/status.json        |  10 +-
+ 8 files changed, 463 insertions(+), 567 deletions(-)

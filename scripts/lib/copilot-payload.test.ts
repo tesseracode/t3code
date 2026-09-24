@@ -6,8 +6,15 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+import { fromYaml } from "@t3tools/shared/schemaYaml";
+import serverPackageJson from "../../apps/server/package.json" with { type: "json" };
+import { createStageWorkspaceConfig } from "../build-desktop-artifact.ts";
 import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
-import { pruneCopilotSdkServerPayload } from "./copilot-payload.ts";
+import {
+  COPILOT_DEPENDENCY_OVERRIDES,
+  pruneCopilotSdkServerPayload,
+  resolveCopilotDependencyClosure,
+} from "./copilot-payload.ts";
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 const dependencies = { "@github/copilot-sdk": "1.0.8" };
@@ -85,6 +92,9 @@ const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
     ["@github/copilot-sdk", "1.0.8"],
     ["@github/copilot", "1.0.75"],
     ["koffi", "3.3.1"],
+    ["vscode-jsonrpc", "8.2.1"],
+    ["zod", "4.4.3"],
+    ["detect-libc", "2.1.2"],
   ]) {
     yield* write(
       `node_modules/${name}/package.json`,
@@ -170,10 +180,145 @@ const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
     if (platform === "linux")
       removed.push(yield* write(`${binding}/musl_${target.arch}/koffi.node`));
   }
-  return { stageDir, retained, removed, write };
+  return { stageDir, retained, removed, write, overrides: COPILOT_DEPENDENCY_OVERRIDES };
 });
 
 it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+  it.effect("keeps source SDK and generated stage overrides on the reviewed closure", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const file = yield* path.fromFileUrl(new URL("../../pnpm-workspace.yaml", import.meta.url));
+      const workspace = yield* Schema.decodeEffect(
+        fromYaml(
+          Schema.Struct({
+            overrides: Schema.Record(Schema.String, Schema.String),
+          }),
+        ),
+      )(yield* fs.readFileString(file));
+      assert.equal(serverPackageJson.dependencies["@github/copilot-sdk"], "1.0.8");
+      for (const target of [...targets, { platform: "mac", arch: "universal" }] as const) {
+        const staged = createStageWorkspaceConfig({
+          platform: target.platform,
+          arch: target.arch,
+          overrides: { ...workspace.overrides },
+        });
+        for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
+          assert.equal(staged.overrides?.[selector], version, selector);
+        }
+        for (const arch of ["x64", "arm64"]) {
+          const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${arch}`;
+          assert.equal(staged.overrides?.[selector], target.platform === "linux" ? "-" : undefined);
+          assert.isUndefined(workspace.overrides[selector]);
+        }
+      }
+    }),
+  );
+
+  it.effect("rejects missing overrides and SDK anchor drift before pruning", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const stage = yield* makeStage("win", "x64");
+        for (const selector of Object.keys(COPILOT_DEPENDENCY_OVERRIDES)) {
+          for (const drift of [undefined, "99.0.0"]) {
+            const overrides: Record<string, string> = { ...stage.overrides };
+            if (drift === undefined) delete overrides[selector];
+            else overrides[selector] = drift;
+            const error = yield* pruneCopilotSdkServerPayload({
+              ...stage,
+              platform: "win",
+              arch: "x64",
+              dependencies,
+              overrides,
+            }).pipe(Effect.flip);
+            assert.include(error.message, `workspace override ${selector}`);
+          }
+        }
+        const error = yield* resolveCopilotDependencyClosure({
+          ...stage,
+          dependencies: { "@github/copilot-sdk": "^1.0.8" },
+        }).pipe(Effect.flip);
+        assert.include(error.message, "SDK dependency must be exactly");
+        for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
+      }),
+    ),
+  );
+
+  for (const [name, version, owner] of [
+    ["koffi", "3.3.1", "@github/copilot-sdk"],
+    ["vscode-jsonrpc", "8.2.1", "@github/copilot-sdk"],
+    ["zod", "4.4.3", "@github/copilot-sdk"],
+    ["detect-libc", "2.1.2", "@github/copilot"],
+  ] as const) {
+    it.effect(`refuses missing or owner-local drift in ${name}, despite a correct root copy`, () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const stage = yield* makeStage("win", "x64");
+          const ownerPath = `node_modules/${owner}/node_modules/${name}`;
+          yield* stage.write(`${ownerPath}/package.json`, encodeJson({ name, version: "99.0.0" }));
+          const drift = yield* pruneCopilotSdkServerPayload({
+            ...stage,
+            platform: "win",
+            arch: "x64",
+            dependencies,
+          }).pipe(Effect.flip);
+          assert.include(drift.message, `unreviewed ${name} version 99.0.0`);
+          yield* stage.write(`${ownerPath}/package.json`, encodeJson({ name, version }));
+          assert.isNotNull(yield* resolveCopilotDependencyClosure({ ...stage, dependencies }));
+          yield* fs.remove(`${stage.stageDir}/${ownerPath}`, { recursive: true });
+          yield* fs.remove(`${stage.stageDir}/node_modules/${name}`, { recursive: true });
+          const missing = yield* resolveCopilotDependencyClosure({ ...stage, dependencies }).pipe(
+            Effect.flip,
+          );
+          assert.include(missing.message, name);
+          assert.match(missing.message, /cannot resolve|missing or unreadable/);
+          for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
+        }),
+      ),
+    );
+  }
+
+  it.effect.skipIf(!symlinksSupported)(
+    "resolves strict in-stage owner links and refuses escaping transitives",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          for (const escape of [false, true]) {
+            const stage = yield* makeStage("win", "x64");
+            const sdk = path.join(stage.stageDir, "node_modules/@github/copilot-sdk");
+            const physical = path.join(
+              stage.stageDir,
+              "node_modules/.pnpm/sdk/node_modules/@github/copilot-sdk",
+            );
+            yield* fs.makeDirectory(path.dirname(physical), { recursive: true });
+            yield* fs.rename(sdk, physical);
+            yield* fs.symlink(physical, sdk);
+            if (escape) {
+              const outside = yield* fs.makeTempDirectoryScoped({
+                prefix: "t3-copilot-transitive-",
+              });
+              yield* fs.writeFileString(
+                path.join(outside, "package.json"),
+                encodeJson({ name: "zod", version: "4.4.3" }),
+              );
+              yield* fs.makeDirectory(path.join(physical, "node_modules"), { recursive: true });
+              yield* fs.symlink(outside, path.join(physical, "node_modules/zod"));
+              const error = yield* resolveCopilotDependencyClosure({ ...stage, dependencies }).pipe(
+                Effect.flip,
+              );
+              assert.include(error.message, "outside the stage");
+            } else {
+              assert.isNotNull(yield* resolveCopilotDependencyClosure({ ...stage, dependencies }));
+            }
+          }
+        }),
+      ),
+  );
+
   for (const target of targets) {
     it.effect(
       `preserves ${target.target} runtime bytes and removes exactly ${target.removed} unreachable natives`,
@@ -233,6 +378,7 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
           platform: "win",
           arch: "x64",
           dependencies: {},
+          overrides: {},
         });
         assert.deepEqual(result, { pruned: false, removedNativeFiles: [] });
         for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
@@ -240,6 +386,7 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
     ),
   );
   for (const fault of [
+    "sdk-version",
     "runtime-version",
     "platform-version",
     "koffi-version",
@@ -257,6 +404,12 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
           const fs = yield* FileSystem.FileSystem;
           const stage = yield* makeStage("win", "x64");
           switch (fault) {
+            case "sdk-version":
+              yield* stage.write(
+                "node_modules/@github/copilot-sdk/package.json",
+                encodeJson({ name: "@github/copilot-sdk", version: "1.0.9", main: "index.js" }),
+              );
+              break;
             case "runtime-version":
               yield* stage.write(
                 "node_modules/@github/copilot/package.json",

@@ -293,6 +293,16 @@ executed installer suite on Linux/WSL and the packaged Windows/WSL gate;
 portable shell checks alone do not qualify the full installer.
 
 The current layout review covers SDK `1.0.8`, CLI `1.0.75` and Koffi `3.3.1`.
+The exact external closure also pins `vscode-jsonrpc` `8.2.1`, Zod `4.4.3`
+and `detect-libc` `2.1.2`. Generated stages do not reuse the source lockfile's
+importers: preserve the five owner-scoped overrides when emitting their
+workspace configurations. Every Copilot-bearing stage checks the SDK anchor,
+those overrides and installed owner-resolved versions before pruning. A
+root-level copy of the right version cannot mask a different SDK/runtime
+dependency. CLI archives perform this check before removing install metadata.
+Generated glibc stages additionally exclude the CLI's musl optional packages:
+cross-host pnpm resolution can retain both despite `supportedArchitectures.libc`.
+These exclusions are stage-only, not a change to source installation.
 The stage resolves packages from their actual owning dependency contexts and
 rejects paths outside the stage, unexpected native layouts and version drift
 before removing anything. Keep the CLI, core natives, target `rg`/`tgrep`,
