@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "feature": "copilot-runtime-packaging",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_6d95b3488861",
+      "kind": "record",
+      "patch_sha256": "1e5fb19b859bc64ecd32c8cd01ae01185035ad25cc61e85b4e8b1a97ebd8e653",
+      "git_patch_id": "c7068d68c0266253bacab2e1e04e58a4217f787b",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "a168abdd1c839ecc0dcfe8f37b20aa0f7d1d53f691f1b2d3846660c67a341849",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "acd69601918506de8a86754cb2aee73cc7afb085",
+      "upper": {
+        "kind": "commit",
+        "ref": "692b356e54ca8fc9c39641733ef417bc3e683202",
+        "commit": "692b356e54ca8fc9c39641733ef417bc3e683202"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+          "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+          "docs/operations/release.md",
+          "packages/shared/package.json",
+          "packages/shared/src/copilotRuntime.test.ts",
+          "packages/shared/src/copilotRuntime.ts",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "scripts/build-cli-archive.ts",
+          "scripts/build-desktop-artifact.test.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+        "docs/operations/release.md",
+        "packages/shared/package.json",
+        "packages/shared/src/copilotRuntime.test.ts",
+        "packages/shared/src/copilotRuntime.ts",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 13,
+          "parent_patch_sha256": "0dcdce60954b58a5947da226696102b97faeb0d6d8dc9f1cf814b77596ff9b16",
+          "parent_recipe_sha256": "97814b0dab001d4711a4f4c578cf4575727f6e13dfa6da864101feaee124d236"
+        },
+        {
+          "slug": "windows-portable-packaging-tests",
+          "kind": "hard",
+          "satisfied_by": "0a590fa01af66ec135d2ebf2d5542b08a37dc275",
+          "parent_generation": 1,
+          "parent_patch_sha256": "23c8db1aebbae84fa3971f607ef0bdcf0f7962495f2eff786798c3afe9fa7faa",
+          "parent_recipe_sha256": "5a531c8a1456697b19931438b9a14804c8998f95da3ed82ddd9758310fd8572e"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}
