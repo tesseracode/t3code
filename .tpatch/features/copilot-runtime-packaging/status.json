@@ -5,7 +5,7 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-24T19:06:30Z",
-  "updated_at": "2026-09-24T19:14:22Z",
+  "updated_at": "2026-09-24T19:16:54Z",
   "last_command": "verify",
   "notes": "landed at 2026-09-24T19:14:17Z",
   "apply": {
@@ -23,10 +23,22 @@
       "slug": "windows-portable-packaging-tests",
       "kind": "hard",
       "satisfied_by": "0a590fa01af66ec135d2ebf2d5542b08a37dc275"
+    },
+    {
+      "slug": "copilot-package-payload-pruning",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "wsl-runtime-executable-modes",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-koffi-packaging-pin",
+      "kind": "supersedes"
     }
   ],
   "verify": {
-    "verified_at": "2026-09-24T19:14:17Z",
+    "verified_at": "2026-09-24T19:16:49Z",
     "passed": true,
     "recipe_hash_at_verify": "a168abdd1c839ecc0dcfe8f37b20aa0f7d1d53f691f1b2d3846660c67a341849",
     "patch_hash_at_verify": "1e5fb19b859bc64ecd32c8cd01ae01185035ad25cc61e85b4e8b1a97ebd8e653",

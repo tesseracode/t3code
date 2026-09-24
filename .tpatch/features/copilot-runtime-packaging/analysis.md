@@ -33,7 +33,18 @@ The combined source range contains exactly 13 paths. Generate preimage-bearing
 operations from their real committed baseline bytes, adopt through every
 manual lifecycle phase, then record the complete committed range and land it.
 Only after the replacement verifies, declare explicit supersedes edges to
-the three packaging records and the historical newline-fixture child.
+the three packaging records. Retain the existing WSL-to-newline supersession
+edge; a second active superseder for the newline child is forbidden.
+
+The initial metadata-only landing had exact trailers but no usable same-slug
+historical replay anchor. A real isolated replay resolved that limitation:
+metadata preparation commit `187e91eb870209e770c6eb7901f7feeee831c9d6` has the
+unchanged pre-packaging source tree; all 13 recipe operations executed there.
+The resulting product tree equals the adopted tip exactly. Source replay
+landing `8400fe53cd5208d033b01a07f347b8b3a104ab0a` supplies the genuine
+single-parent anchor. A non-rewriting merge preserves its ancestry and leaves
+the main product tree unchanged. Earlier unsuccessful adoption evidence stays
+in history rather than being replaced with a fabricated anchor.
 
 ## Dependency and coverage
 

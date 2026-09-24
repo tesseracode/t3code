@@ -51,3 +51,20 @@ Add supersession only after the replacement's integrity passes. Keep existing
 historical dependency relationships and append resolution reviews rather than
 editing unsuccessful old verification evidence. Validate default next/replay
 dispositions for all four historical records.
+
+Committed-range capture and a metadata-only landing do not create a same-slug
+replay anchor on v0.16.0. Execute the recorded recipe in an isolated worktree
+whose product tree is the real baseline, record and land the source replay,
+then merge that reachable anchor without changing the integrated product tree.
+Use the actual successful replay evidence for new-root merge conflicts.
+Retain the newline child's existing superseder instead of introducing a
+second active superseder.
+
+On v0.16.0, use `tpatch status --dag` for the composed supersession labels.
+Flat status and explicit `tpatch next <historical-slug>` still display the
+historical lifecycle. Do not treat those explicit requests as the maintained
+root list, or refresh old patches merely to clear their historical failures.
+
+The independently landed overlap and consolidation migration gap is tracked
+in https://github.com/tesseracode/tesserapatch/issues/25 with an executed,
+clean two-feature reproduction and comparison against related issues.
