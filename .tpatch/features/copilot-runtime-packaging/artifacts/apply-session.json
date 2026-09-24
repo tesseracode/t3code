@@ -1,0 +1,9 @@
+{
+  "slug": "copilot-runtime-packaging",
+  "completed_at": "2026-09-24T19:11:15Z",
+  "base_commit": "692b356e54ca8fc9c39641733ef417bc3e683202",
+  "has_patch": false,
+  "operator_notes": "Adopt existing committed implementation, not recipe re-execution. Full source range acd69601918506de8a86754cb2aee73cc7afb085..692b356e54ca8fc9c39641733ef417bc3e683202 contains exactly 13 packaging paths. Historical roots remain intact pending healthy supersession.",
+  "validation_status": "passed",
+  "validation_notes": "Product bytes unchanged; focused packaging regression: 163 passed, 14 complete Linux/WSL installer cases skipped. Complete target-host qualification is separate and remains pending."
+}
