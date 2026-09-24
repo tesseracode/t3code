@@ -5,7 +5,7 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-10T00:23:25Z",
-  "updated_at": "2026-09-24T16:58:54Z",
+  "updated_at": "2026-09-24T16:59:59Z",
   "last_command": "verify",
   "notes": "landed at 2026-09-24T16:59:26Z",
   "apply": {
@@ -18,10 +18,14 @@
     {
       "slug": "copilot-package-payload-pruning",
       "kind": "hard"
+    },
+    {
+      "slug": "wsl-runtime-fixture-newlines",
+      "kind": "supersedes"
     }
   ],
   "verify": {
-    "verified_at": "2026-09-24T16:58:49Z",
+    "verified_at": "2026-09-24T16:59:54Z",
     "passed": true,
     "recipe_hash_at_verify": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d",
     "patch_hash_at_verify": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
