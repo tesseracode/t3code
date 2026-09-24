@@ -82,6 +82,10 @@ overrides:
   tailwindcss: 4.3.3
   vite: npm:@voidzero-dev/vite-plus-core@0.3.0
   yaml: ^2.9.0
+  '@github/copilot-sdk@1.0.8>koffi': 3.3.1
+  '@github/copilot-sdk@1.0.8>vscode-jsonrpc': 8.2.1
+  '@github/copilot-sdk@1.0.8>zod': 4.4.3
+  '@github/copilot@1.0.75>detect-libc': 2.1.2
 
 packageExtensionsChecksum: sha256-k/dT9NFDl5hihRPaoFKeY11hzyutMFs5psfZLFiKJic=
 

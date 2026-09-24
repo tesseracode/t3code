@@ -2,6 +2,10 @@
 import { describe, it } from "@effect/vitest";
 import { afterAll, expect } from "vite-plus/test";
 import * as NodeChildProcess from "node:child_process";
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
+import { copilotLinuxExecutableMembers } from "@t3tools/shared/copilotRuntime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -78,6 +82,59 @@ const readField = (stdout: string, field: string) => {
 // Stands in for the release's self-contained `t3` executable: the install
 // script only asks it for `--version`.
 const SERVER_ENTRY_SOURCE = '#!/bin/sh\necho "t3code wsl runtime test server 0.0.0"\n';
+
+describe.skipIf(NodeChildProcess.spawnSync("bash", ["-c", "command -v sha256sum"]).status !== 0)(
+  "WSL cache readiness functions (executed without Linux installation)",
+  () => {
+    it("remembers a Copilot-bearing archive when its entire payload disappears", () => {
+      const home = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-wsl-readiness-"));
+      try {
+        const root = NodePath.join(home, ".t3/wsl-runtime/test");
+        const arch = ["arm64", "aarch64"].includes(
+          NodeChildProcess.spawnSync("uname", ["-m"], { encoding: "utf8" }).stdout.trim(),
+        )
+          ? "arm64"
+          : "x64";
+        const write = (relative: string, content: string) => {
+          const file = NodePath.join(root, relative);
+          NodeFS.mkdirSync(NodePath.dirname(file), { recursive: true });
+          NodeFS.writeFileSync(file, content, { mode: 0o755 });
+        };
+        write("t3", SERVER_ENTRY_SOURCE);
+        const prefix = buildWslRuntimeInstallScript("/unused", "test", "0".repeat(64)).split(
+          'mkdir -p "$runtime_parent"',
+        )[0]!;
+        const run = (action: string) =>
+          NodeChildProcess.spawnSync("bash", ["-s"], {
+            input: `${prefix}\n${action}`,
+            encoding: "utf8",
+            env: { ...process.env, HOME: home },
+          });
+        const markReady =
+          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"\nruntime_is_ready';
+        expect(run(markReady).status).toBe(0);
+        for (const name of ["copilot", "copilot-sdk", `copilot-linux-${arch}`]) {
+          write(`node_modules/@github/${name}/package.json`, "{}");
+        }
+        for (const file of copilotLinuxExecutableMembers(arch)) write(file, "#!/bin/sh\nexit 0\n");
+        const installed = run(markReady);
+        expect(installed.status, installed.stderr).toBe(0);
+        expect(
+          NodeFS.readFileSync(NodePath.join(root, ".t3code-wsl-runtime-ready"), "utf8"),
+        ).toMatch(/^[a-f0-9]{64}:copilot\n$/);
+        NodeFS.chmodSync(NodePath.join(root, copilotLinuxExecutableMembers(arch)[1]!), 0o644);
+        expect(run("runtime_is_ready").status).not.toBe(0);
+        expect(
+          run('normalize_copilot_executable_modes "$runtime_root"\nruntime_is_ready').status,
+        ).toBe(0);
+        NodeFS.rmSync(NodePath.join(root, "node_modules/@github"), { recursive: true });
+        expect(run("runtime_is_ready").status).not.toBe(0);
+      } finally {
+        NodeFS.rmSync(home, { recursive: true, force: true });
+      }
+    });
+  },
+);
 
 const makeDistroListSpawner = (result: { readonly stdout?: string; readonly exitCode?: number }) =>
   ChildProcessSpawner.make(() =>
@@ -284,7 +341,8 @@ describe("WSL runtime cache", () => {
       "b".repeat(64),
     );
 
-    expect(script).toContain(`  sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1`);
+    expect(script).toContain(`entry_digest=$(sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1)`);
+    expect(script).toContain("printf '%s:copilot\\n'");
     expect(script).toContain(
       '    [ "$recorded_entry_digest" = "$(runtime_server_entry_digest "$runtime_root")" ]',
     );
@@ -402,7 +460,7 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
     fixtures.length = 0;
   });
 
-  const createFixture = () => {
+  const createFixture = (copilot = false) => {
     const result = runShell(
       [
         "set -eu",
@@ -414,6 +472,20 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$stage/t3"`,
         'chmod +x "$stage/t3"',
         `printf '%s' 'pty-native-payload' > "$stage/node_modules/node-pty/build/Release/pty.node"`,
+        ...(copilot
+          ? [
+              'case "$(uname -m)" in x86_64|amd64) copilot_arch=x64 ;; *) copilot_arch=arm64 ;; esac',
+              'copilot_root="$stage/node_modules/@github/copilot-linux-$copilot_arch"',
+              'mkdir -p "$stage/node_modules/@github/copilot-sdk" "$stage/node_modules/@github/copilot" "$copilot_root/ripgrep/bin/linux-$copilot_arch" "$copilot_root/tgrep/bin/linux-$copilot_arch"',
+              'printf "{}" > "$stage/node_modules/@github/copilot-sdk/package.json"',
+              'printf "{}" > "$stage/node_modules/@github/copilot/package.json"',
+              'printf "{}" > "$copilot_root/package.json"',
+              `printf '%s' ${sh("#!/bin/sh\nprintf 'copilot\\n'\n")} > "$copilot_root/copilot"`,
+              `printf '%s' ${sh("#!/bin/sh\nprintf 'rg\\n'\n")} > "$copilot_root/ripgrep/bin/linux-$copilot_arch/rg"`,
+              `printf '%s' ${sh("#!/bin/sh\nprintf 'tgrep\\n'\n")} > "$copilot_root/tgrep/bin/linux-$copilot_arch/tgrep"`,
+              'chmod 0644 "$copilot_root/copilot" "$copilot_root/ripgrep/bin/linux-$copilot_arch/rg" "$copilot_root/tgrep/bin/linux-$copilot_arch/tgrep"',
+            ]
+          : []),
         `tar -czf "$work/wsl-runtime.tar.gz" -C "$work/stage" t3-0.0.0-linux-x64`,
         `printf 'work:%s\\n' "$work"`,
         `printf 'archiveSha:%s\\n' "$(sha256sum "$work/wsl-runtime.tar.gz" | cut -d ' ' -f 1)"`,
@@ -466,6 +538,34 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         buildWslRuntimeProbeScript(fixture.runtimeRoot),
       ].join("\n"),
     );
+
+  it("repairs Copilot command modes and detects a warm cache that lost its whole Copilot payload", () => {
+    const fixture = createFixture(true);
+    const installed = fixture.install();
+    expect(installed.status, installed.stderr).toBe(0);
+    const commands = (prefix: string) =>
+      runShell(
+        [
+          "set -eu",
+          `root=${sh(fixture.runtimeRoot)}`,
+          'for package in "$root"/node_modules/@github/copilot-linux-*; do',
+          `${prefix} "$package/copilot"`,
+          'for tool in "$package"/ripgrep/bin/linux-*/rg "$package"/tgrep/bin/linux-*/tgrep; do',
+          `${prefix} "$tool"`,
+          "done",
+          "done",
+        ].join("\n"),
+      );
+    expect(commands("test -x").status).toBe(0);
+    expect(commands("chmod 0644").status).toBe(0);
+    expect(fixture.install().status).toBe(0);
+    expect(commands("test -x").status).toBe(0);
+    expect(
+      runShell(`set -eu\nrm -r ${sh(`${fixture.runtimeRoot}/node_modules/@github`)}`).status,
+    ).toBe(0);
+    expect(fixture.install().status).toBe(0);
+    expect(commands("test -x").status).toBe(0);
+  });
 
   it("discovers version-managed Node for providers with a standalone runtime", () => {
     const fixture = createFixture();

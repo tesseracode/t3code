@@ -175,6 +175,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
   readonly copyUnpackedNatives: boolean;
   readonly serverEntrySource?: string;
   readonly wslRuntime?: "valid" | "loose-server-tree" | "missing-pty" | "bad-digest";
+  readonly wslExtraMembers?: ReadonlyArray<string>;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -226,6 +227,9 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
         : yield* makeLinuxCliArchiveFixture({
             root: path.join(tempDir, "wsl-runtime"),
             stem,
+            ...(input.wslExtraMembers
+              ? { extraMembers: input.wslExtraMembers.map((member) => `${stem}/${member}`) }
+              : {}),
             ...(input.wslRuntime === "missing-pty"
               ? { omitMembers: [`${stem}/node_modules/node-pty/build/Release/pty.node`] }
               : {}),
@@ -1202,6 +1206,54 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         });
 
         assert.equal(result.packagedAppDir, fixture.packagedAppDir);
+      }),
+    ).pipe(Effect.provideService(HostProcessPlatform, "linux")),
+  );
+
+  it.effect("validates Copilot commands in the embedded Linux CLI archive", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const required = [
+          "node_modules/@github/copilot-sdk/package.json",
+          "node_modules/@github/copilot/package.json",
+          "node_modules/@github/copilot-linux-x64/package.json",
+          "node_modules/@github/copilot-linux-x64/copilot",
+          "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg",
+          "node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep",
+        ];
+        const cases = [
+          { members: required, valid: true },
+          ...required.map((missing) => ({
+            members: required.filter((file) => file !== missing),
+            valid: false,
+          })),
+          ...[
+            "node_modules/@github/copilot-linux-arm64/package.json",
+            "node_modules/@github/copilot-win32-x64/copilot.exe",
+            "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-arm64/rg",
+          ].map((extra) => ({ members: [...required, extra], valid: false })),
+        ];
+        for (const testCase of cases) {
+          const fixture = yield* makeWindowsPayloadFixture({
+            copyUnpackedNatives: true,
+            wslRuntime: "valid",
+            wslExtraMembers: testCase.members,
+          });
+          const validation = validateWindowsPackagedPayload({
+            stageDistDir: fixture.stageDistDir,
+            appExecutableName: fixture.appExecutableName,
+            targetArch: "x64",
+            appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
+            expectWslRuntime: true,
+          });
+          if (testCase.valid) {
+            assert.equal((yield* validation).packagedAppDir, fixture.packagedAppDir);
+          } else {
+            const error = yield* validation.pipe(Effect.flip);
+            assert.instanceOf(error, WindowsPackagedPayloadValidationError);
+            assert.equal(error.reason, "wsl-runtime-invalid");
+          }
+        }
       }),
     ).pipe(Effect.provideService(HostProcessPlatform, "linux")),
   );

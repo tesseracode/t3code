@@ -41,6 +41,7 @@ import {
   STAGE_INSTALL_ARGS,
 } from "./build-desktop-artifact.ts";
 import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
+import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -160,6 +161,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     yield* fs.readFileString(path.join(input.repoRoot, "pnpm-workspace.yaml")),
   );
   const catalog = workspace.catalog ?? {};
+  const overrides = resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server");
   const serverDependencies = resolveCatalogDependencies(
     serverPackageJson.dependencies,
     catalog,
@@ -199,7 +201,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
         arch: input.arch,
         ...(workspace.allowBuilds ? { allowBuilds: workspace.allowBuilds } : {}),
         patchedDependencies,
-        overrides: resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server"),
+        overrides,
       }),
       nodeLinker: "hoisted",
     }),
@@ -218,6 +220,13 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     }),
     "vp install --prod (cli archive runtime externals)",
   );
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: input.stageDir,
+    platform: input.platform,
+    arch: input.arch,
+    dependencies,
+    overrides,
+  });
 
   // pnpm's bookkeeping and the manifest only matter to pnpm; the runtime
   // resolves packages by directory. node-pty ships every platform's prebuilds

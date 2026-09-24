@@ -29,6 +29,8 @@ import {
   type WebAssetBrand,
 } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
+import { validateCopilotLinuxArchiveMembers } from "@t3tools/shared/copilotRuntime";
+import { COPILOT_PAYLOAD_VERSIONS, pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
 import {
   findInlinedExternalPackages,
   selectCliRuntimeExternalDependencies,
@@ -1480,6 +1482,19 @@ export function createStageWorkspaceConfig(input: {
   readonly overrides?: Record<string, string>;
 }): StageWorkspaceConfig {
   const { platform, arch, allowBuilds, patchedDependencies, overrides } = input;
+  // pnpm's cross-host install can include both libc variants despite the
+  // glibc target below. Exclude musl only in generated glibc stages, not source.
+  const stageOverrides =
+    platform === "linux" &&
+    overrides?.[`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`] !== undefined
+      ? {
+          ...overrides,
+          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-x64`]:
+            "-",
+          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-arm64`]:
+            "-",
+        }
+      : overrides;
   const hostOs = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
   const hostCpu = arch === "universal" ? ["arm64", "x64"] : [arch];
   // Linux AppImages execute a Linux/glibc Node process that loads
@@ -1503,7 +1518,9 @@ export function createStageWorkspaceConfig(input: {
     ...(patchedDependencies && Object.keys(patchedDependencies).length > 0
       ? { patchedDependencies }
       : {}),
-    ...(overrides && Object.keys(overrides).length > 0 ? { overrides } : {}),
+    ...(stageOverrides && Object.keys(stageOverrides).length > 0
+      ? { overrides: stageOverrides }
+      : {}),
   };
 }
 
@@ -2957,6 +2974,13 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
   );
 
   yield* Effect.log("[desktop-artifact] Packing server.asar...");
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: serverStageDir,
+    platform: "win",
+    arch: input.arch,
+    dependencies: sidecarDependencies,
+    overrides: input.overrides,
+  });
   yield* fs.makeDirectory(path.dirname(input.asarPath), { recursive: true });
   yield* packWindowsServerAsar({
     sourceDir: serverStageDir,
@@ -3291,6 +3315,13 @@ export const validateWindowsPackagedPayload = Effect.fn(
         cause: new Error("WSL runtime archive is not a Linux CLI release archive"),
       });
     }
+    const copilotProblem = validateCopilotLinuxArchiveMembers(
+      members
+        .filter((member) => member.startsWith(`${stem}/`))
+        .map((member) => member.slice(stem.length + 1)),
+      input.targetArch === "arm64" ? "arm64" : "x64",
+    );
+    if (copilotProblem !== null) return yield* invalidWslRuntime(new Error(copilotProblem));
     // The CLI archive runs the single-executable, never a loose server bundle.
     const bundleEntry = members.find((member) => member.endsWith("/bin.mjs"));
     if (bundleEntry !== undefined) {
@@ -3705,6 +3736,13 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   );
   yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
   yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: stageAppDir,
+    platform: options.platform,
+    arch: options.arch,
+    dependencies: stageDependencies,
+    overrides: resolvedOverrides,
+  });
 
   // Only the Windows artifact carries the server sidecar and the WSL runtime;
   // other platforms ignore the --wsl-runtime input.
