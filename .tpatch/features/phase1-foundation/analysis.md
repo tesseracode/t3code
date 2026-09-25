@@ -26,7 +26,10 @@ history, missing schema and false concurrent-lock success are rejected.
   references survive upgrade. Fresh/upstream installs create the same foundation.
 - The return shape of `runMigrations` remains upstream migration tuples; fork
   execution has a separate history and is logged only after transaction commit.
-- Phase 0 Copilot and search remain hard parents.
+- Copilot remains a hard parent. Search is a soft ordering dependency: its
+  disjoint client/command scope is not consumed by Foundation. The maintainer
+  approved correcting the historical hard ordering edge after an independent
+  search dismissal repair invalidated Foundation's historical parent replay.
 - Granular Phase 1 features remain available as review/provenance records but
   are superseded for future replay.
 - Five historical Copilot child records are also superseded because their

@@ -18,7 +18,15 @@ The consolidated patch contains exactly:
 Hard parents:
 
 - `copilot-cli-provider`
+
+Soft ordering dependency:
+
 - `session-search`
+
+Search and Foundation have disjoint source scopes. Foundation does not consume
+the search UI, command or matching implementation; the former hard edge
+represented implementation order, not a runtime dependency. The maintainer
+approved retaining that order as a soft edge during packaged qualification.
 
 Superseded granular Phase 1 records:
 
