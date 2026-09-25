@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "session-search",
-  "current_generation": 7,
+  "current_generation": 8,
   "generations": [
     {
       "generation": 1,
@@ -270,7 +270,7 @@
       "git_patch_id": "43edfc75d75c4cfb3024fead12513f0d5ba3cc3a",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "f329ca796b86f6d0007de797b7796ba588608458bb0f9de5d7f04d19386f7b81",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/010-record.patch",
       "base_commit": "afe09c3c9cd523c0c80388a7e73c9c0ad1cc6e32",
       "upper": {
@@ -306,6 +306,40 @@
         "packages/contracts/src/keybindings.test.ts",
         "packages/contracts/src/keybindings.ts",
         "packages/shared/src/keybindings.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 8,
+      "generation_id": "pg_8a8692b6ff03",
+      "kind": "amend-refresh",
+      "patch_sha256": "db136317d8e095f856ffc645e24d40a1dfd55ccb80edff02c97db994e7eb4dde",
+      "git_patch_id": "0354655c87ad4ace2f69fae6929a9801f2782376",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "1e1c516780d85df5a7bd7fe418a4fbff0b604718da17229120cc83765d8bf7b0",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "6f4f49189cad1ac4dd9fb817053760248e1f092f",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/web/src/components/chat/MessagesTimeline.test.tsx",
+        "apps/web/src/components/chat/SessionSearchBar.tsx",
+        "docs/user/keybindings.md"
       ],
       "dependencies": [],
       "refs": {

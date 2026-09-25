@@ -25,7 +25,8 @@ in Settings.
 
 On web and desktop, use `Cmd+F` on macOS or `Ctrl+F` on Windows/Linux, or choose
 **Search current thread** in the command palette. Enter and Shift+Enter move
-between matches; Escape closes search. Terminal and preview focus keep their
+between matches in the search field; Escape closes search even when one of its
+buttons has focus. Terminal and preview focus keep their
 own shortcuts. Customize the binding in **Settings → Keybindings**.
 
 Results cover loaded messages, proposed plans and visible activity labels.

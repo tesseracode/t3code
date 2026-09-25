@@ -11,7 +11,9 @@
 4. Matching is case-insensitive, applies Unicode NFKC normalization, counts
    every non-overlapping occurrence, and navigates deterministically with
    next/previous wrap.
-5. Enter and Shift+Enter navigate while Escape closes. Re-running the command
+5. Enter and Shift+Enter navigate in the input while Escape closes from any
+   focused search control, including navigation/history buttons. Preserve native
+   Enter activation on those buttons. Re-running the command
    focuses the existing search input. Closing or switching threads clears the
    query and active result.
 6. Navigation reveals only the settled turn, activity group, long user

@@ -46,7 +46,7 @@ export const SessionSearchBar = memo(function SessionSearchBar(props: SessionSea
   }, [props.focusRequestId]);
 
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
+    (event: React.KeyboardEvent<HTMLElement>) => {
       handleSessionSearchKeyDown(event, {
         close: props.onClose,
         next: props.onNext,
@@ -69,6 +69,9 @@ export const SessionSearchBar = memo(function SessionSearchBar(props: SessionSea
       ref={containerRef}
       role="search"
       aria-label="Search current thread"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") handleKeyDown(event);
+      }}
       className="absolute top-2 right-3 left-3 z-40 flex max-w-full flex-wrap items-center justify-end gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-lg sm:left-auto"
     >
       <input

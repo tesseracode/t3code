@@ -2134,6 +2134,7 @@ describe("session search interactions", () => {
     }
     const previousFocus = new FocusElement();
     const input = new FocusElement();
+    const nextButton = new FocusElement();
     const testDocument = {
       activeElement: previousFocus,
       documentElement: { classList: { contains: () => false } },
@@ -2143,7 +2144,10 @@ describe("session search interactions", () => {
     input.focus.mockImplementation(() => {
       testDocument.activeElement = input;
     });
-    const container = { contains: (node: unknown) => node === input };
+    nextButton.focus.mockImplementation(() => {
+      testDocument.activeElement = nextButton;
+    });
+    const container = { contains: (node: unknown) => node === input || node === nextButton };
     class TestElement {
       nodeType = 1;
     }
@@ -2181,6 +2185,7 @@ describe("session search interactions", () => {
     return {
       props,
       input,
+      nextButton,
       previousFocus,
       scrollToIndex,
       createNodeMock: (element: { type: unknown; props: unknown }) => {
@@ -2198,6 +2203,64 @@ describe("session search interactions", () => {
         }),
     };
   }
+
+  it("dismisses and clears search from a focused navigation button without intercepting Enter", async () => {
+    const test = setup();
+    let renderer: ReactTestRenderer | undefined;
+    try {
+      await act(() => {
+        renderer = create(
+          <MessagesTimeline
+            {...test.props}
+            timelineEntries={[buildUserTimelineEntry(buildLongUserMessageText("needle needle"))]}
+          />,
+          { createNodeMock: test.createNodeMock },
+        );
+      });
+      act(() => {
+        openSessionSearch(test.props.routeThreadKey);
+      });
+      act(() =>
+        renderer!.root.findByProps({ "aria-label": "Search in thread" }).props.onChange({
+          target: { value: "needle" },
+        }),
+      );
+      act(() => {
+        test.nextButton.focus();
+        renderer!.root.findByProps({ "aria-label": "Next match" }).props.onClick();
+      });
+      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["2 of 2"]);
+      const event = {
+        key: "Enter",
+        keyCode: 13,
+        shiftKey: false,
+        nativeEvent: { isComposing: false },
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      };
+      act(() => renderer!.root.findByProps({ role: "search" }).props.onKeyDown(event));
+      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["2 of 2"]);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      act(() =>
+        renderer!.root.findByProps({ role: "search" }).props.onKeyDown({
+          ...event,
+          key: "Escape",
+          keyCode: 27,
+        }),
+      );
+      await test.flush();
+      expect(renderer!.root.findAllByProps({ role: "search" })).toHaveLength(0);
+      expect(test.previousFocus.focus).toHaveBeenCalled();
+      act(() => {
+        openSessionSearch(test.props.routeThreadKey);
+      });
+      expect(renderer!.root.findByProps({ "aria-label": "Search in thread" }).props.value).toBe("");
+      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["Type to search"]);
+    } finally {
+      act(() => renderer?.unmount());
+      vi.unstubAllGlobals();
+    }
+  });
 
   it("opens the scoped search, reveals a collapsed user match, wraps, and loads history only on demand", async () => {
     const test = setup();
