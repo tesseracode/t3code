@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "session-search",
-  "current_generation": 8,
+  "current_generation": 9,
   "generations": [
     {
       "generation": 1,
@@ -323,7 +323,7 @@
       "git_patch_id": "0354655c87ad4ace2f69fae6929a9801f2782376",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "1e1c516780d85df5a7bd7fe418a4fbff0b604718da17229120cc83765d8bf7b0",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "6f4f49189cad1ac4dd9fb817053760248e1f092f",
       "upper": {
@@ -340,6 +340,82 @@
         "apps/web/src/components/chat/MessagesTimeline.test.tsx",
         "apps/web/src/components/chat/SessionSearchBar.tsx",
         "docs/user/keybindings.md"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 9,
+      "generation_id": "pg_441252230682",
+      "kind": "amend-refresh",
+      "patch_sha256": "38333be0dcb886cdac0f24e44ce4756611fe1e4ab82c584820a5554f5f9eae01",
+      "git_patch_id": "49153269d5c4fe02b51af2bdaa3f3b9808a04874",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/012-record.patch",
+      "base_commit": "4ab45ef49c4a670e4cff10a13983c190e489de4b",
+      "upper": {
+        "kind": "commit",
+        "ref": "HEAD",
+        "commit": "720d938f8687b347001717b77aae1854e79debe7"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          "apps/web/src/components/ChatView.tsx",
+          "apps/web/src/components/CommandPalette.logic.test.ts",
+          "apps/web/src/components/CommandPalette.logic.ts",
+          "apps/web/src/components/CommandPalette.tsx",
+          "apps/web/src/components/chat/MessagesTimeline.logic.test.ts",
+          "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+          "apps/web/src/components/chat/MessagesTimeline.test.tsx",
+          "apps/web/src/components/chat/MessagesTimeline.tsx",
+          "apps/web/src/components/chat/ProposedPlanCard.tsx",
+          "apps/web/src/components/chat/SessionSearchBar.tsx",
+          "apps/web/src/components/chat/sessionSearch.test.ts",
+          "apps/web/src/components/chat/sessionSearch.ts",
+          "apps/web/src/components/chat/useAssistantCitationTarget.ts",
+          "apps/web/src/components/settings/KeybindingsSettings.logic.test.ts",
+          "apps/web/src/keybindings.test.ts",
+          "apps/web/src/routes/_chat.tsx",
+          "apps/web/src/sessionSearchBus.ts",
+          "docs/user/keybindings.md",
+          "docs/user/thread-sidebar.md",
+          "packages/contracts/src/keybindings.test.ts",
+          "packages/contracts/src/keybindings.ts",
+          "packages/shared/src/keybindings.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/web/src/components/ChatView.tsx",
+        "apps/web/src/components/CommandPalette.logic.test.ts",
+        "apps/web/src/components/CommandPalette.logic.ts",
+        "apps/web/src/components/CommandPalette.tsx",
+        "apps/web/src/components/chat/MessagesTimeline.logic.test.ts",
+        "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+        "apps/web/src/components/chat/MessagesTimeline.test.tsx",
+        "apps/web/src/components/chat/MessagesTimeline.tsx",
+        "apps/web/src/components/chat/ProposedPlanCard.tsx",
+        "apps/web/src/components/chat/SessionSearchBar.tsx",
+        "apps/web/src/components/chat/sessionSearch.test.ts",
+        "apps/web/src/components/chat/sessionSearch.ts",
+        "apps/web/src/components/chat/useAssistantCitationTarget.ts",
+        "apps/web/src/components/settings/KeybindingsSettings.logic.test.ts",
+        "apps/web/src/keybindings.test.ts",
+        "apps/web/src/routes/_chat.tsx",
+        "apps/web/src/sessionSearchBus.ts",
+        "docs/user/keybindings.md",
+        "docs/user/thread-sidebar.md",
+        "packages/contracts/src/keybindings.test.ts",
+        "packages/contracts/src/keybindings.ts",
+        "packages/shared/src/keybindings.ts"
       ],
       "dependencies": [],
       "refs": {
