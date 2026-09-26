@@ -5,12 +5,17 @@ x64 Ubuntu 24.04 under WSL2.
 
 - Clone `https://github.com/tesseracode/t3code.git`.
 - Checkout `validation/v0.0.42-platform-qualification`.
-- Confirm `06fb8876807cd02fce21e49295515ad2f0aebfd7` is an ancestor of HEAD.
+- Confirm `02abd6f050e22cb872dafa64806cba698beab7c5` is an ancestor of HEAD.
 - Read `AGENTS.md` and this directory's `README.md` completely.
 - The immutable product source is exactly
-  `06fb8876807cd02fce21e49295515ad2f0aebfd7`; the runner checks it out separately.
+  `02abd6f050e22cb872dafa64806cba698beab7c5`; the runner checks it out separately.
 - The release version is 0.0.42. The runner's four version-manifest changes
   are the standard release transform, not permission for other source edits.
+
+This is the fresh no-skip rerun after the previous Windows run stopped on two
+source fixture portability failures. Those fixtures and the Rustup PATH
+handoff mismatch are repaired. Read the README's rerun notes; do not downgrade
+Koffi, bypass TLS/lockfile checks or treat the old failed run as a package pass.
 
 Use **OpenAI/MAI models only**, including subagents and reviewers. Confirm model
 selection explicitly; never assume inheritance. The native continuity probe

@@ -7,7 +7,7 @@ merge into the maintained fork.
 
 - Repository: `https://github.com/tesseracode/t3code.git`
 - Handoff branch: `validation/v0.0.42-platform-qualification`
-- Product source: `06fb8876807cd02fce21e49295515ad2f0aebfd7`
+- Product source: `02abd6f050e22cb872dafa64806cba698beab7c5`
 - Upstream base: v0.0.42, `719a76ca1dbf5490f1aa33ffb9966301e02be9a9`
 - Release version: `0.0.42`
 - Windows target: x64 Windows 11 and x64 Ubuntu 24.04 under WSL2
@@ -21,6 +21,38 @@ The source includes the packaged-search Escape fix. Packaging is maintained
 by `copilot-runtime-packaging`; do not replay superseded historical roots.
 The former Windows-created Linux node_modules archive no longer exists:
 Windows embeds an independently built, complete Linux SEA CLI archive unchanged.
+
+## Rerun after the first Windows report
+
+The no-skip run `20260926T041608Z-35dc5f` on the previous source stopped at
+the focused-test gate: 222 passed, two fixture failures and seven capability
+skips. No package, backend or integrated-desktop gate ran. Its verdict remains
+`VALIDATION_INCOMPLETE`, not a demonstrated runtime defect.
+
+This source fixes resolved Windows Cargo-path handling and keeps readiness
+fixtures wholly inside the selected native Bash/WSL filesystem. It retains
+exact arguments, payload bytes, chmod requests and POSIX mode checks where
+supported. A packaging consistency test moved to its owning suite to avoid
+crossing the desktop composite TypeScript boundary; coverage was retained.
+Runtime source and dependency pins are unchanged.
+
+Use a fresh run and the new source pin; do not skip either repaired test or
+reuse the old failed run as approval to launch the integrated desktop.
+The complete nine-file gate passed locally on macOS (217 passed, 14 capability
+skips) and native Linux (231 passed, no skips). A native Windows rerun is
+still required.
+
+The reported Rustup fixes are included: Windows prepends the standard Rustup
+bin directory before its prerequisite checks and restores the original PATH
+afterward; the non-login WSL builder loads `$HOME/.cargo/env`.
+
+The previous dependency-route issue was resolved by the receiving host without
+changing package versions. Keep Koffi and native bindings at 3.3.1. Do not
+downgrade, disable TLS verification or change persistent registry settings.
+If the same already-approved temporary route is required again, preserve
+lockfile integrity and exact process ownership/cleanup. pnpm 11 process-local
+settings use `pnpm_config_registry` and `pnpm_config_https_proxy`; the harness
+does not configure or launch a proxy itself.
 
 ## Safety and model policy
 
@@ -64,6 +96,8 @@ Studio C++ Build Tools with x64 Spectre libraries
 WSL: an x64 WSL2 Ubuntu 24.04 distro, `bash`, `cargo`, `rustc`, `curl`, `file`,
 `git`, `g++`, `make`, `python3`, `tar`, `sha256sum`, `flock` and `inotifywait`.
 Rust must be recent enough for the committed Cargo lockfiles.
+The non-login archive-build shell loads Rustup's standard `$HOME/.cargo/env`
+when present, matching the Rust tools available during login-shell preflight.
 
 Typical Ubuntu system packages:
 

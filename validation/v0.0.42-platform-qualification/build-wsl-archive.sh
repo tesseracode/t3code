@@ -14,6 +14,9 @@ harness=$(cd "$(dirname "$0")" && pwd)
 account_home=$(getent passwd "$(id -u)" | cut -d: -f6)
 [[ -n "$account_home" && "$account_home" != /mnt/* ]]
 export HOME=$account_home
+if [[ -f "$HOME/.cargo/env" ]]; then
+  source "$HOME/.cargo/env"
+fi
 unset T3CODE_HOME COPILOT_HOME VITE_HTTP_URL VITE_WS_URL VITE_DEV_SERVER_URL
 export NODE_OPTIONS=--max-old-space-size=3072
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0

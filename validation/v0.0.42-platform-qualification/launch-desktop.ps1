@@ -24,7 +24,7 @@ if ($summary.status -ne "passed") {
   throw "The automated run must pass before integrated desktop validation."
 }
 if (
-  $summary.source.actualCommit -ne "06fb8876807cd02fce21e49295515ad2f0aebfd7" -or
+  $summary.source.actualCommit -ne "02abd6f050e22cb872dafa64806cba698beab7c5" -or
   $summary.artifact.serverVersion -ne "t3 v0.0.42"
 ) {
   throw "The run does not qualify the frozen v0.0.42 source."

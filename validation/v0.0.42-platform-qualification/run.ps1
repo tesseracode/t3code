@@ -2,7 +2,7 @@
 param(
   [string]$Repository = "https://github.com/tesseracode/t3code.git",
   [string]$SourceBranch = "validation/v0.0.42-platform-qualification",
-  [string]$ExpectedSourceCommit = "06fb8876807cd02fce21e49295515ad2f0aebfd7",
+  [string]$ExpectedSourceCommit = "02abd6f050e22cb872dafa64806cba698beab7c5",
   [string]$ExpectedServerVersion = "t3 v0.0.42",
   [string]$BuildVersion = "0.0.42",
   [string]$CopilotModel = "gpt-5-mini",
@@ -81,6 +81,7 @@ $wslArchiveHash = $null
 $originalWslEnv = $env:WSLENV
 $originalT3CodeHome = $env:T3CODE_HOME
 $originalCopilotHome = $env:COPILOT_HOME
+$originalPath = $env:PATH
 
 $sanitizedWslEnvParts = @(
   $originalWslEnv -split ":" |
@@ -328,6 +329,7 @@ try {
   Save-Summary
 
   Write-Step "Checking host prerequisites"
+  $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
   $git = Assert-Command "git.exe" "Install Git for Windows."
   $gh = Assert-Command "gh.exe" "Install GitHub CLI and authenticate it for Copilot."
   $node = Assert-Command "node.exe" "Install Node.js 24.x."
@@ -438,7 +440,6 @@ try {
   $summary.source.actualCommit = $actualSourceCommit
   Save-Summary
 
-  $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
   $env:COREPACK_ENABLE_DOWNLOAD_PROMPT = "0"
   Invoke-Checked $rustup @("toolchain", "install", "stable", "--profile", "minimal")
   Invoke-Checked $rustup @("target", "add", "x86_64-pc-windows-msvc")
@@ -1153,6 +1154,7 @@ process.stdout.write(module.buildWslRuntimeInstallScript(archivePath, runtimeId,
   $env:WSLENV = $originalWslEnv
   $env:T3CODE_HOME = $originalT3CodeHome
   $env:COPILOT_HOME = $originalCopilotHome
+  $env:PATH = $originalPath
   Save-Summary
 }
 
