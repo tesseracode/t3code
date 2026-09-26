@@ -1,6 +1,7 @@
- .tpatch/FEATURES.md                                            |  1 +
- .../copilot-runtime-packaging/artifacts/apply-session.json     | 10 +++++-----
- .../copilot-runtime-packaging/artifacts/manual-validation.md   |  4 ++--
- .../copilot-runtime-packaging/artifacts/post-apply-diff.txt    |  5 +++--
- .tpatch/features/copilot-runtime-packaging/status.json         | 10 +++++-----
- 5 files changed, 16 insertions(+), 14 deletions(-)
+ .../artifacts/apply-session.json                   |    8 +-
+ .../artifacts/manual-validation.md                 |    4 +-
+ .../artifacts/post-apply-diff.txt                  |   11 +-
+ .../artifacts/post-apply.patch                     | 2041 ++++----------------
+ .tpatch/features/copilot-runtime-packaging/spec.md |    6 +
+ .../features/copilot-runtime-packaging/status.json |   10 +-
+ 6 files changed, 410 insertions(+), 1670 deletions(-)

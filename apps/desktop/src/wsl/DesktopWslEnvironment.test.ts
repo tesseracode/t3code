@@ -2,10 +2,6 @@
 import { describe, it } from "@effect/vitest";
 import { afterAll, expect } from "vite-plus/test";
 import * as NodeChildProcess from "node:child_process";
-import * as NodeFS from "node:fs";
-import * as NodeOS from "node:os";
-import * as NodePath from "node:path";
-import { copilotLinuxExecutableMembers } from "@t3tools/shared/copilotRuntime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -38,17 +34,13 @@ const encoder = new TextEncoder();
 // else the executed suite skips and the generated-text assertions stand alone.
 const REQUIRED_SHELL_TOOLS = ["flock", "sha256sum", "tar", "mktemp"] as const;
 
-const posixShellRunner = (() => {
+const findShellRunner = (probe: string) => {
   // Candidates rather than a platform switch: wsl.exe simply fails to spawn
   // where it does not exist, which is the same answer as a shell missing flock.
   const candidates = [
     { file: "bash", args: [] as ReadonlyArray<string> },
     { file: "wsl.exe", args: ["-e", "bash"] as ReadonlyArray<string> },
   ];
-  const probe = [
-    "[ -d /proc/1 ] || exit 1",
-    ...REQUIRED_SHELL_TOOLS.map((tool) => `command -v ${tool} >/dev/null || exit 1`),
-  ].join("\n");
   return (
     candidates.find((candidate) => {
       const result = NodeChildProcess.spawnSync(candidate.file, [...candidate.args, "-c", probe], {
@@ -57,17 +49,30 @@ const posixShellRunner = (() => {
       return result.status === 0;
     }) ?? null
   );
-})();
+};
 
-const runShell = (script: string) => {
-  if (posixShellRunner === null) throw new Error("no POSIX shell runner available");
+const posixShellRunner = findShellRunner(
+  [
+    "[ -d /proc/1 ] || exit 1",
+    ...REQUIRED_SHELL_TOOLS.map((tool) => `command -v ${tool} >/dev/null || exit 1`),
+  ].join("\n"),
+);
+const readinessShellRunner = findShellRunner(
+  [
+    'case "$(uname -s)" in Linux|Darwin) ;; *) exit 1 ;; esac',
+    'case "$(uname -m)" in x86_64|amd64|aarch64|arm64) ;; *) exit 1 ;; esac',
+    "command -v sha256sum >/dev/null && command -v mktemp >/dev/null",
+  ].join("\n"),
+);
+
+const runShell = (script: string, runner = posixShellRunner) => {
+  if (runner === null) throw new Error("no POSIX shell runner available");
   // The install script arrives on stdin in production too, which is what lets
   // its own /proc scan not match itself.
-  const result = NodeChildProcess.spawnSync(
-    posixShellRunner.file,
-    [...posixShellRunner.args, "-s"],
-    { input: script, encoding: "utf8" },
-  );
+  const result = NodeChildProcess.spawnSync(runner.file, [...runner.args, "-s"], {
+    input: script,
+    encoding: "utf8",
+  });
   return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 };
 
@@ -83,55 +88,53 @@ const readField = (stdout: string, field: string) => {
 // script only asks it for `--version`.
 const SERVER_ENTRY_SOURCE = '#!/bin/sh\necho "t3code wsl runtime test server 0.0.0"\n';
 
-describe.skipIf(NodeChildProcess.spawnSync("bash", ["-c", "command -v sha256sum"]).status !== 0)(
+describe.skipIf(readinessShellRunner === null)(
   "WSL cache readiness functions (executed without Linux installation)",
   () => {
     it("remembers a Copilot-bearing archive when its entire payload disappears", () => {
-      const home = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-wsl-readiness-"));
-      try {
-        const root = NodePath.join(home, ".t3/wsl-runtime/test");
-        const arch = ["arm64", "aarch64"].includes(
-          NodeChildProcess.spawnSync("uname", ["-m"], { encoding: "utf8" }).stdout.trim(),
-        )
-          ? "arm64"
-          : "x64";
-        const write = (relative: string, content: string) => {
-          const file = NodePath.join(root, relative);
-          NodeFS.mkdirSync(NodePath.dirname(file), { recursive: true });
-          NodeFS.writeFileSync(file, content, { mode: 0o755 });
-        };
-        write("t3", SERVER_ENTRY_SOURCE);
-        const prefix = buildWslRuntimeInstallScript("/unused", "test", "0".repeat(64)).split(
-          'mkdir -p "$runtime_parent"',
-        )[0]!;
-        const run = (action: string) =>
-          NodeChildProcess.spawnSync("bash", ["-s"], {
-            input: `${prefix}\n${action}`,
-            encoding: "utf8",
-            env: { ...process.env, HOME: home },
-          });
-        const markReady =
-          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"\nruntime_is_ready';
-        expect(run(markReady).status).toBe(0);
-        for (const name of ["copilot", "copilot-sdk", `copilot-linux-${arch}`]) {
-          write(`node_modules/@github/${name}/package.json`, "{}");
-        }
-        for (const file of copilotLinuxExecutableMembers(arch)) write(file, "#!/bin/sh\nexit 0\n");
-        const installed = run(markReady);
-        expect(installed.status, installed.stderr).toBe(0);
-        expect(
-          NodeFS.readFileSync(NodePath.join(root, ".t3code-wsl-runtime-ready"), "utf8"),
-        ).toMatch(/^[a-f0-9]{64}:copilot\n$/);
-        NodeFS.chmodSync(NodePath.join(root, copilotLinuxExecutableMembers(arch)[1]!), 0o644);
-        expect(run("runtime_is_ready").status).not.toBe(0);
-        expect(
-          run('normalize_copilot_executable_modes "$runtime_root"\nruntime_is_ready').status,
-        ).toBe(0);
-        NodeFS.rmSync(NodePath.join(root, "node_modules/@github"), { recursive: true });
-        expect(run("runtime_is_ready").status).not.toBe(0);
-      } finally {
-        NodeFS.rmSync(home, { recursive: true, force: true });
-      }
+      const prefix = buildWslRuntimeInstallScript("/unused", "test", "0".repeat(64)).split(
+        'mkdir -p "$runtime_parent"',
+      )[0]!;
+      // Create, inspect and execute inside the same selected shell/filesystem,
+      // including when Windows reaches that shell through wsl.exe.
+      const result = runShell(
+        [
+          "set -eu",
+          "fixture_home=$(mktemp -d)",
+          `trap 'rm -rf "$fixture_home"' EXIT`,
+          'export HOME="$fixture_home"',
+          'case "$(uname -m)" in x86_64|amd64) arch=x64 ;; aarch64|arm64) arch=arm64 ;; *) exit 1 ;; esac',
+          prefix,
+          'mkdir -p "$runtime_root"',
+          `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$runtime_root/t3"`,
+          'chmod 0755 "$runtime_root/t3"',
+          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"',
+          "runtime_is_ready",
+          'for name in copilot copilot-sdk "copilot-linux-$arch"; do',
+          '  mkdir -p "$runtime_root/node_modules/@github/$name"',
+          "  printf '{}\\n' > \"$runtime_root/node_modules/@github/$name/package.json\"",
+          "done",
+          'platform_root="$runtime_root/node_modules/@github/copilot-linux-$arch"',
+          'mkdir -p "$platform_root/ripgrep/bin/linux-$arch" "$platform_root/tgrep/bin/linux-$arch"',
+          'for command in "$platform_root/copilot" "$platform_root/ripgrep/bin/linux-$arch/rg" "$platform_root/tgrep/bin/linux-$arch/tgrep"; do',
+          `  printf '#!/bin/sh\\nexit 0\\n' > "$command"`,
+          '  chmod 0755 "$command"',
+          "done",
+          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"',
+          "runtime_is_ready",
+          "grep -Eq '^[a-f0-9]{64}:copilot$' \"$ready_marker\"",
+          'chmod 0644 "$platform_root/ripgrep/bin/linux-$arch/rg"',
+          'if runtime_is_ready; then printf "Damaged mode was accepted\\n" >&2; exit 1; fi',
+          'normalize_copilot_executable_modes "$runtime_root"',
+          "runtime_is_ready",
+          'rm -r "$runtime_root/node_modules/@github"',
+          'if runtime_is_ready; then printf "Missing Copilot payload was accepted\\n" >&2; exit 1; fi',
+          'printf "cache-readiness:passed\\n"',
+        ].join("\n"),
+        readinessShellRunner,
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toBe("cache-readiness:passed\n");
     });
   },
 );

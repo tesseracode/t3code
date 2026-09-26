@@ -50,6 +50,12 @@
    mounted fallback and non-Copilot behavior.
 6. Preserve newline-delimited executable fixtures: copilot, rg and tgrep
    each explicitly emit a trailing newline.
+7. Execute readiness fixtures entirely in the selected native POSIX shell,
+   including temporary files and architecture detection when reached through
+   WSL. Do not assume Windows can directly launch `uname` or enforce POSIX modes.
+8. Capture-helper fixtures exercise both bare POSIX Cargo and resolved Windows
+   executable paths while retaining exact arguments, staged bytes, chmod
+   requests and native-POSIX mode checks.
 
 ## Consolidation acceptance
 
