@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
@@ -93,6 +94,10 @@ import {
 import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+import { SpawnExecutableResolution } from "@t3tools/shared/shell";
+import { fromYaml } from "@t3tools/shared/schemaYaml";
+import serverPackageJson from "../apps/server/package.json" with { type: "json" };
+import { COPILOT_DEPENDENCY_OVERRIDES } from "./lib/copilot-payload.ts";
 
 // A minimal stand-in for the Linux CLI release archive: one top-level
 // directory named after the archive stem holding the executable, the web
@@ -252,6 +257,39 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
 });
 
 it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+  it.effect("keeps source SDK and generated stage overrides on the reviewed closure", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const file = yield* path.fromFileUrl(new URL("../pnpm-workspace.yaml", import.meta.url));
+      const workspace = yield* Schema.decodeEffect(
+        fromYaml(Schema.Struct({ overrides: Schema.Record(Schema.String, Schema.String) })),
+      )(yield* fs.readFileString(file));
+      assert.equal(serverPackageJson.dependencies["@github/copilot-sdk"], "1.0.8");
+      for (const platform of ["win", "linux", "mac"] as const) {
+        const arches =
+          platform === "mac"
+            ? (["x64", "arm64", "universal"] as const)
+            : (["x64", "arm64"] as const);
+        for (const arch of arches) {
+          const staged = createStageWorkspaceConfig({
+            platform,
+            arch,
+            overrides: { ...workspace.overrides },
+          });
+          for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
+            assert.equal(staged.overrides?.[selector], version, selector);
+          }
+          for (const cpu of ["x64", "arm64"]) {
+            const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${cpu}`;
+            assert.equal(staged.overrides?.[selector], platform === "linux" ? "-" : undefined);
+            assert.isUndefined(workspace.overrides[selector]);
+          }
+        }
+      }
+    }),
+  );
+
   it("resolves the dedicated nightly updater channel from nightly versions", () => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17-nightly.20260413.42"), "nightly");
     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");
@@ -1091,64 +1129,90 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
+        const actualHost = yield* HostProcessPlatform;
         const repoRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-kde-stage-test-" });
         const protocols = path.join(repoRoot, "native/hyprland-snap-shot/protocols");
         yield* fs.makeDirectory(protocols, { recursive: true });
         yield* fs.writeFileString(path.join(protocols, "capture.xml"), "BSD protocol notice");
-        for (const backend of ["kde", "hyprland"] as const) {
-          for (const [arch, target] of [
-            ["x64", "x86_64-unknown-linux-gnu"],
-            ["arm64", "aarch64-unknown-linux-gnu"],
-          ] as const) {
-            const binary = path.join(
-              repoRoot,
-              `native/${backend}-snap-shot/target`,
-              target,
-              `release/t3-${backend}-snap-shot`,
-            );
-            const stageResourcesDir = path.join(repoRoot, "stage", backend, arch);
-            const spawner = Layer.succeed(
-              ChildProcessSpawner.ChildProcessSpawner,
-              ChildProcessSpawner.make((command) =>
-                Effect.gen(function* () {
-                  assert.equal(command._tag, "StandardCommand");
-                  if (command._tag !== "StandardCommand") return mockProcess(1);
-                  assert.equal(command.command, "cargo");
-                  assert.deepEqual(command.args, [
-                    "build",
-                    "--locked",
-                    "--release",
-                    "--manifest-path",
-                    path.join(repoRoot, `native/${backend}-snap-shot/Cargo.toml`),
-                    "--target",
-                    target,
-                  ]);
-                  yield* fs.makeDirectory(path.dirname(binary), { recursive: true });
-                  yield* fs.writeFileString(binary, `helper-${arch}`);
-                  return mockProcess(0);
-                }),
-              ),
-            );
-            yield* stageLinuxCaptureHelper({
-              backend,
-              repoRoot,
-              stageResourcesDir,
-              arch,
-              verbose: false,
-            }).pipe(Effect.provide(spawner));
-            const installed = path.join(
-              stageResourcesDir,
-              `${backend}-capture/t3-${backend}-snap-shot`,
-            );
-            assert.equal(yield* fs.readFileString(installed), `helper-${arch}`);
-            assert.equal((yield* fs.stat(installed)).mode & 0o777, 0o755);
-            if (backend === "hyprland")
-              assert.equal(
-                yield* fs.readFileString(
-                  path.join(stageResourcesDir, "hyprland-capture/protocols/capture.xml"),
-                ),
-                "BSD protocol notice",
+        for (const hostPlatform of ["linux", "win32"] as const) {
+          for (const backend of ["kde", "hyprland"] as const) {
+            for (const [arch, target] of [
+              ["x64", "x86_64-unknown-linux-gnu"],
+              ["arm64", "aarch64-unknown-linux-gnu"],
+            ] as const) {
+              const binary = path.join(
+                repoRoot,
+                `native/${backend}-snap-shot/target`,
+                target,
+                `release/t3-${backend}-snap-shot`,
               );
+              const stageResourcesDir = path.join(repoRoot, "stage", hostPlatform, backend, arch);
+              const cargo = hostPlatform === "win32" ? "C:\\Rustup Tools\\bin\\cargo.EXE" : "cargo";
+              const chmodCalls: Array<{ file: string; mode: number }> = [];
+              const spawner = Layer.succeed(
+                ChildProcessSpawner.ChildProcessSpawner,
+                ChildProcessSpawner.make((command) =>
+                  Effect.gen(function* () {
+                    assert.equal(command._tag, "StandardCommand");
+                    if (command._tag !== "StandardCommand") return mockProcess(1);
+                    assert.equal(command.command, cargo);
+                    assert.deepEqual(command.args, [
+                      "build",
+                      "--locked",
+                      "--release",
+                      "--manifest-path",
+                      path.join(repoRoot, `native/${backend}-snap-shot/Cargo.toml`),
+                      "--target",
+                      target,
+                    ]);
+                    yield* fs.makeDirectory(path.dirname(binary), { recursive: true });
+                    yield* fs.writeFileString(binary, `helper-${arch}`);
+                    return mockProcess(0);
+                  }),
+                ),
+              );
+              yield* stageLinuxCaptureHelper({
+                backend,
+                repoRoot,
+                stageResourcesDir,
+                arch,
+                verbose: false,
+              }).pipe(
+                Effect.provide(spawner),
+                Effect.provideService(HostProcessPlatform, hostPlatform),
+                Effect.provideService(SpawnExecutableResolution, (name) => {
+                  assert.equal(name, "cargo");
+                  return cargo;
+                }),
+                Effect.provideService(FileSystem.FileSystem, {
+                  ...fs,
+                  chmod: (file, mode) =>
+                    fs.chmod(file, mode).pipe(
+                      Effect.tap(() =>
+                        Effect.sync(() => {
+                          chmodCalls.push({ file, mode });
+                        }),
+                      ),
+                    ),
+                }),
+                Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }))),
+              );
+              const installed = path.join(
+                stageResourcesDir,
+                `${backend}-capture/t3-${backend}-snap-shot`,
+              );
+              assert.equal(yield* fs.readFileString(installed), `helper-${arch}`);
+              assert.deepEqual(chmodCalls, [{ file: installed, mode: 0o755 }]);
+              if (actualHost !== "win32")
+                assert.equal((yield* fs.stat(installed)).mode & 0o777, 0o755);
+              if (backend === "hyprland")
+                assert.equal(
+                  yield* fs.readFileString(
+                    path.join(stageResourcesDir, "hyprland-capture/protocols/capture.xml"),
+                  ),
+                  "BSD protocol notice",
+                );
+            }
           }
         }
       }),

@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-09-24T19:14:16Z
+**Timestamp**: 2026-09-26T04:58:56Z
 
 ## Notes
 
-Exact product-tree equivalence to the integrated source that passed 163 focused cases (14 platform skips). This is replay/metadata proof, not target-platform execution.
+Complete nine-file gate: macOS217 pass/14 capability skips; native Linux231 pass/0 skips. Desktop/scripts typechecks and targeted lint pass. Windows full no-skip execution remains required; no packaged runtime result is inferred.

@@ -6,9 +6,6 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
-import { fromYaml } from "@t3tools/shared/schemaYaml";
-import serverPackageJson from "../../apps/server/package.json" with { type: "json" };
-import { createStageWorkspaceConfig } from "../build-desktop-artifact.ts";
 import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
 import {
   COPILOT_DEPENDENCY_OVERRIDES,
@@ -184,37 +181,6 @@ const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
 });
 
 it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
-  it.effect("keeps source SDK and generated stage overrides on the reviewed closure", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const file = yield* path.fromFileUrl(new URL("../../pnpm-workspace.yaml", import.meta.url));
-      const workspace = yield* Schema.decodeEffect(
-        fromYaml(
-          Schema.Struct({
-            overrides: Schema.Record(Schema.String, Schema.String),
-          }),
-        ),
-      )(yield* fs.readFileString(file));
-      assert.equal(serverPackageJson.dependencies["@github/copilot-sdk"], "1.0.8");
-      for (const target of [...targets, { platform: "mac", arch: "universal" }] as const) {
-        const staged = createStageWorkspaceConfig({
-          platform: target.platform,
-          arch: target.arch,
-          overrides: { ...workspace.overrides },
-        });
-        for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
-          assert.equal(staged.overrides?.[selector], version, selector);
-        }
-        for (const arch of ["x64", "arm64"]) {
-          const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${arch}`;
-          assert.equal(staged.overrides?.[selector], target.platform === "linux" ? "-" : undefined);
-          assert.isUndefined(workspace.overrides[selector]);
-        }
-      }
-    }),
-  );
-
   it.effect("rejects missing overrides and SDK anchor drift before pruning", () =>
     Effect.scoped(
       Effect.gen(function* () {
