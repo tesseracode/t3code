@@ -1,30 +1,20 @@
 # Implementation Record: copilot-runtime-packaging
 
-**Recorded**: 2026-09-26T04:58:56Z
-**Files changed**: 3
-**Patch size**: 20644 bytes
-**Capture mode**: staged-index
-
-## Change Summary
-
-```
- .../artifacts/apply-session.json                   |    8 +-
- .../artifacts/manual-validation.md                 |    4 +-
- .../artifacts/post-apply-diff.txt                  |   11 +-
- .../artifacts/post-apply.patch                     | 2041 ++++----------------
- .tpatch/features/copilot-runtime-packaging/spec.md |    6 +
- .../features/copilot-runtime-packaging/status.json |   10 +-
- 6 files changed, 410 insertions(+), 1670 deletions(-)
-```
+**Recorded**: 2026-09-26T04:59:04Z
+**Files changed**: 13
+**Patch size**: 84443 bytes
+**Capture mode**: committed-range
+**Base commit**: 187e91eb870209e770c6eb7901f7feeee831c9d6
+**Upper bound**: HEAD
+**Pathspecs**: apps/desktop/src/wsl/DesktopWslEnvironment.test.ts,apps/desktop/src/wsl/DesktopWslEnvironment.ts,docs/operations/release.md,packages/shared/package.json,packages/shared/src/copilotRuntime.test.ts,packages/shared/src/copilotRuntime.ts,pnpm-lock.yaml,pnpm-workspace.yaml,scripts/build-cli-archive.ts,scripts/build-desktop-artifact.test.ts,scripts/build-desktop-artifact.ts,scripts/lib/copilot-payload.test.ts,scripts/lib/copilot-payload.ts
 
 ## Capture Provenance
 
-- **capture_mode**: `staged-index`
-- **pathspecs**: (none)
+- **capture_mode**: `committed-range`
+- **pathspecs**: apps/desktop/src/wsl/DesktopWslEnvironment.test.ts, apps/desktop/src/wsl/DesktopWslEnvironment.ts, docs/operations/release.md, packages/shared/package.json, packages/shared/src/copilotRuntime.test.ts, packages/shared/src/copilotRuntime.ts, pnpm-lock.yaml, pnpm-workspace.yaml, scripts/build-cli-archive.ts, scripts/build-desktop-artifact.test.ts, scripts/build-desktop-artifact.ts, scripts/lib/copilot-payload.test.ts, scripts/lib/copilot-payload.ts
 - **claim_ids**: (none)
-- **base_commit**: `06fb8876807cd02fce21e49295515ad2f0aebfd7`
-- **upper_commit**: `working-tree`
-- **dirty_state**: 3 staged paths, 0 unrelated unstaged paths
+- **base_commit**: `187e91eb870209e770c6eb7901f7feeee831c9d6`
+- **upper_commit**: `HEAD`
 
 ## Replay Instructions
 
@@ -35,3 +25,4 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/copilot-runtime-packaging/artifacts/post-apply.patch
 ```
 
+*Patch was captured as a committed diff from `187e91eb870209e770c6eb7901f7feeee831c9d6` to `HEAD`.*

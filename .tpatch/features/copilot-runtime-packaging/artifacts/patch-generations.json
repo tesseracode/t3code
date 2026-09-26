@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-runtime-packaging",
-  "current_generation": 2,
+  "current_generation": 3,
   "generations": [
     {
       "generation": 1,
@@ -86,7 +86,7 @@
       "git_patch_id": "316d0eee55d97e04d4ac45945e2da1a58016cc7f",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "ff5fd84c56e0bd7a2ba201899a6a3164609c1d063f06d3741def6a2a8cc08735",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "06fb8876807cd02fce21e49295515ad2f0aebfd7",
       "upper": {
@@ -103,6 +103,105 @@
         "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
         "scripts/build-desktop-artifact.test.ts",
         "scripts/lib/copilot-payload.test.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 13,
+          "parent_patch_sha256": "0dcdce60954b58a5947da226696102b97faeb0d6d8dc9f1cf814b77596ff9b16",
+          "parent_recipe_sha256": "97814b0dab001d4711a4f4c578cf4575727f6e13dfa6da864101feaee124d236"
+        },
+        {
+          "slug": "copilot-koffi-packaging-pin",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 6,
+          "parent_patch_sha256": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306",
+          "parent_recipe_sha256": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8"
+        },
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        },
+        {
+          "slug": "windows-portable-packaging-tests",
+          "kind": "hard",
+          "satisfied_by": "0a590fa01af66ec135d2ebf2d5542b08a37dc275",
+          "parent_generation": 1,
+          "parent_patch_sha256": "23c8db1aebbae84fa3971f607ef0bdcf0f7962495f2eff786798c3afe9fa7faa",
+          "parent_recipe_sha256": "5a531c8a1456697b19931438b9a14804c8998f95da3ed82ddd9758310fd8572e"
+        },
+        {
+          "slug": "wsl-runtime-executable-modes",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
+          "parent_recipe_sha256": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 3,
+      "generation_id": "pg_b20accd4af32",
+      "kind": "amend-refresh",
+      "patch_sha256": "3f51a1f25e686222d2b0dd55b16cc4430cc78245fa4ecb2e87b3413ce10265a8",
+      "git_patch_id": "27f6560f2b935a4d320ab4e281b5ae2405720beb",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "156db0ea524462f25e5e961f38daa5ace56ba6501d6c06d1dfb5e31342ceafd2",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/003-record.patch",
+      "base_commit": "187e91eb870209e770c6eb7901f7feeee831c9d6",
+      "upper": {
+        "kind": "commit",
+        "ref": "HEAD",
+        "commit": "642486ef32d9f4ddfce9ac99cdce056d6d22fd6f"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+          "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+          "docs/operations/release.md",
+          "packages/shared/package.json",
+          "packages/shared/src/copilotRuntime.test.ts",
+          "packages/shared/src/copilotRuntime.ts",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "scripts/build-cli-archive.ts",
+          "scripts/build-desktop-artifact.test.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+        "docs/operations/release.md",
+        "packages/shared/package.json",
+        "packages/shared/src/copilotRuntime.test.ts",
+        "packages/shared/src/copilotRuntime.ts",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts"
       ],
       "dependencies": [
         {
