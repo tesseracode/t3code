@@ -44,3 +44,9 @@
 | `windows-wsl-support` | Add Windows and WSL support for T3 Code. Support running projects from both Windows filesystem and WSL distros in the same desktop instance, with desktop-managed environment registration, isolated per-environment state, wsl.exe server spawning, wslpath translation, auto-install of the server binary inside WSL, and native file watching via inotify. | upstream_merged | unknown |
 | `wsl-runtime-executable-modes` | Normalize and verify executable permissions for Linux command payloads after extracting Windows-built wsl-runtime.tar.gz. When Copilot SDK is present, require and chmod the target Linux Copilot, rg, and tgrep executables before promoting the runtime; reject missing or non-executable payloads and invalidate warm caches whose modes are broken. | applied | unknown |
 | `wsl-runtime-fixture-newlines` | Correct the WSL executable-mode test fixture so its Copilot, rg, and tgrep stub commands explicitly emit the newline-delimited output asserted by the executed-shell test. | applied | unknown |
+
+## Rejected
+
+| Slug | Reason | Evidence | Note |
+|------|--------|----------|------|
+| `current-request-attention` | superseded | `.tpatch/features/phase1-foundation/spec.md` | Maintainer explicitly approved ATT-01 ownership in the existing phase1-foundation maintenance root; retain this unimplemented request as history instead of a second overlapping active root. |
