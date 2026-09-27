@@ -1,5 +1,32 @@
 # Exploration: phase1-foundation on stable v0.0.42
 
+## ATT-01 extension
+
+Issue #3 adds `RequestAttentionItem` contracts, fork migration 46 and the
+`ProjectionThreadAttentionCurrentRepository` participant. It shares the
+existing pipeline transaction/cursor machinery, with no new publication path.
+The maintainer chose this root because both the migration registry and
+projection pipeline are already Foundation-owned.
+
+The current projector replays a small private thread-incarnation context
+instead of reading a different projector's final state during catch-up.
+Request identity is a deterministic hash of incarnation/kind/request/turn.
+Resolved candidates remain in lookup history so an unscoped late reply cannot
+resolve a newer request reusing the same provider ID. Source event identity
+is deliberately nonunique across rows updated by one revert.
+
+Normal runtime cursor batches are monotonic; explicit single-projector
+bootstrap/reset semantics are retained. The legacy migration bridge recognizes
+only its real historical 44/45 collisions, not every future fork ID.
+Current-state reset and rebuild leave audit data and cursor unchanged.
+
+Focused proof lives in `CurrentRequestAttention.test.ts`, `attention.test.ts`
+and the existing migration/pipeline/engine suites. Coverage includes material
+idempotence, request/kind/thread/turn isolation, ambiguous late replies,
+one-event/multiple-row resolution, project deletion, recreation, import,
+transaction rollback/retry, disk reopen and independent-cursor catch-up.
+No frontend, RPC or ATT-02 lifecycle-awareness behavior is added. on stable v0.0.42
+
 ## Target and retained seams
 
 - Stable target: `719a76ca1dbf5490f1aa33ffb9966301e02be9a9`.

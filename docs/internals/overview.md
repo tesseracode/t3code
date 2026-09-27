@@ -88,6 +88,28 @@ Keep this upgrade path when reconciling future releases; never remove old
 records just to satisfy a newer manifest. Explicit migration bounds used by
 tests build upstream-only fixtures; normal startup also runs fork migrations.
 
+### Current request attention
+
+Current approval/input attention is separate from the compact audit. Rebuild
+it from persisted orchestration events, not audit rows or the latest thread
+shell: independent projector cursors can be at different points during
+bootstrap. Its thread context tracks project ownership and creation
+incarnations so replay never consults another projection's future state.
+
+Sending a response is intent, not resolution. Canonical resolution closes
+the matching request; response failure leaves it open with a bounded reason.
+Resolved identities stay closed. Turn-scoped identities distinguish reused
+request IDs; an unscoped reply is ignored with a warning when history makes
+its target ambiguous. Revert resolves remaining requests; deletion removes
+current rows, recreation starts a new incarnation, and imported history never
+creates actionable requests. Completion, failure and disconnect awareness
+are separate follow-up work.
+
+Rows and the internal projection cursor share the existing event/receipt
+transaction. Replay emits no notification; future delivery must publish only
+after commit with its own delivery cursor. Ordinary streaming events do no
+attention lookup beyond the existing batched cursor write.
+
 ## Turn completion and checkpoints
 
 A turn ending and its follow-up work settling are separate milestones. The

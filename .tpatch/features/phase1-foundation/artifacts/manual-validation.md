@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-09-23T15:14:40Z
+**Timestamp**: 2026-09-27T09:30:39Z
 
 ## Notes
 
-32 focused files / 178 cases pass, including 20 bridge scenarios and a final file-backed/native-runtime preservation rerun. Server/contracts/web/mobile typechecks, server bundle/help and web production build pass. Changed-file lint retains one untouched upstream warning. All databases were disposable; no live migration, browser, provider inference or packaged target-platform qualification is claimed.
+97 focused contract/current-state/pipeline/engine/audit/migration tests pass; server/contracts typechecks, changed-source lint and server bundle pass. Includes file-backed restart, atomic rollback, multiple requests, stale replies and independent rebuild. No live data, UI/RPC or platform qualification claim.

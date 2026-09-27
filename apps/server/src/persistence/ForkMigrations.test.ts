@@ -132,6 +132,7 @@ it.effect("fresh installs keep upstream and fork histories in separate namespace
       [
         { migration_id: 44, name: attentionName },
         { migration_id: 45, name: twsName },
+        { migration_id: 46, name: "ProjectionThreadAttentionCurrent" },
       ],
     );
     assert.deepEqual(yield* runMigrations(), []);
@@ -148,7 +149,49 @@ it.effect("upstream-only databases add fork state without rerunning upstream mig
       yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`,
       original,
     );
-    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 2);
+
+    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 3);
+  }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+);
+
+it.effect(
+  "upgrades the established fork ledger additively without changing the audit or its cursor",
+  () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* runMigrations({ toMigrationInclusive: 52 });
+      yield* AttentionAudit;
+      yield* TwsBindings;
+      yield* sql`INSERT INTO t3code_fork_migrations (migration_id, name, created_at)
+        VALUES (44, ${attentionName}, ${originalTimestamp}), (45, ${twsName}, ${originalTimestamp})`;
+      yield* sql`INSERT INTO projection_thread_attention_audit
+        (event_id, thread_id, kind, sequence, occurred_at)
+        VALUES ('audit', 'thread', 'approval.requested', 3, '2026-09-27T00:00:00Z')`;
+      yield* sql`INSERT INTO projection_state (projector, last_applied_sequence, updated_at)
+        VALUES ('projection.thread-attention-audit', 3, '2026-09-27T00:00:00Z')`;
+      const before = yield* snapshotPreservedRows;
+      const upstream = yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`;
+      yield* runMigrations();
+      assert.deepEqual(yield* snapshotPreservedRows, before);
+      assert.deepEqual(
+        yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`,
+        upstream,
+      );
+      assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_current`, []);
+      assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_context`, []);
+      assert.deepEqual(yield* runMigrations(), []);
+    }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+);
+
+it.effect("does not reinterpret new fork migration IDs as historical upstream collisions", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* runMigrations({ toMigrationInclusive: 52 });
+    yield* sql`UPDATE effect_sql_migrations SET name = 'ProjectionThreadAttentionCurrent' WHERE migration_id = 46`;
+    const before = yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`;
+    assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
+    assert.deepEqual(yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`, before);
+    assert.deepEqual(yield* sql`SELECT * FROM t3code_fork_migrations`, []);
   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
 );
 
@@ -165,7 +208,7 @@ it.effect(
       yield* runMigrations();
       assert.deepEqual(yield* snapshotPreservedRows, saved);
       assert.deepEqual(
-        yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`,
+        yield* sql`SELECT * FROM t3code_fork_migrations WHERE migration_id <= 45 ORDER BY migration_id`,
         provenance,
       );
       yield* assertUpstreamState;

@@ -1,9 +1,9 @@
 {
   "slug": "phase1-foundation",
-  "completed_at": "2026-09-23T15:14:40Z",
-  "base_commit": "7b5f4af3501d89b42b840f875917c09db4f786ce",
+  "completed_at": "2026-09-27T09:30:39Z",
+  "base_commit": "a170ef4dda155a5bd208a71b13c32854621e5f53",
   "has_patch": true,
-  "operator_notes": "Manual stable-v0.0.42 port after the CLI refused stale hard-parent generation snapshots. Existing parent code is already landed. Preserve the four foundation capabilities; fork migrations use their own ledger with validated legacy 44/45 transfer, real collided upstream operations and atomic rollback. No historical generation evidence edited or automatic attempt fabricated.",
+  "operator_notes": "Implement ATT-01 current request attention in the existing Foundation root, as approved. Add fork migration46, typed private request projection and cursor-atomic replay, preserving audit behavior and current clients. Canonical provider responses—not response intent—resolve requests. Import/revert/delete and ambiguous late-reply policies are explicit.",
   "validation_status": "passed",
-  "validation_notes": "32 focused files / 178 cases pass, including 20 bridge scenarios and a final file-backed/native-runtime preservation rerun. Server/contracts/web/mobile typechecks, server bundle/help and web production build pass. Changed-file lint retains one untouched upstream warning. All databases were disposable; no live migration, browser, provider inference or packaged target-platform qualification is claimed."
+  "validation_notes": "97 focused contract/current-state/pipeline/engine/audit/migration tests pass; server/contracts typechecks, changed-source lint and server bundle pass. Includes file-backed restart, atomic rollback, multiple requests, stale replies and independent rebuild. No live data, UI/RPC or platform qualification claim."
 }

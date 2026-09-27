@@ -12,6 +12,8 @@ The consolidated patch contains exactly:
   persistence, and ambiguity-safe locator matching.
 - a data-preserving bridge from the original shared 44/45 migration IDs to
   separate upstream and fork migration histories.
+- ATT-01 (#3): current approval/input attention, fork migration 46 and a
+  separate replayable projector/cursor, without changing the compact audit.
 
 ## Dependency model
 
@@ -64,9 +66,40 @@ Superseded historical Copilot children already covered by the Copilot root:
 9. The single-parent landing and regenerated recipe verify on current parents.
 10. The superseder is active and healthy, removing granular/covered child
    records from default replay without deleting audit history.
-11. No new attention inbox/current reducer, UI, RPC, relay, push, provider,
+11. No new attention inbox, UI, RPC, relay, push, provider,
    TWS mutation, hosting implementation or target-platform
    behavior is claimed.
+
+## ATT-01 request state
+
+The maintainer approved extending this maintenance root instead of adding an
+overlapping independent patch. `current-request-attention` remains
+pre-implementation request history, superseded by this work.
+
+- Identity is an opaque digest of thread-creation event, kind, request ID and
+  turn ID. Environment scoping remains the authenticated transport boundary.
+- Opening creates revision 1. Duplicate/materially unchanged events do not
+  change revisions; reason/status changes do. Source metadata identifies the
+  last material change, separately from the durable replay cursor.
+- Response intent does not resolve. Canonical resolution closes only a
+  matching request; failures keep open requests open with `response_failed`.
+  Resolved identities cannot reopen after a late failure or duplicate open.
+- Turn evidence isolates reused request IDs. Without it, multiple historical
+  candidates are ambiguous and ignored with a bounded warning.
+- Revert resolves all open requests with one source event. Event IDs are not
+  unique across rows. Thread/project deletion purges rows; recreation starts
+  a new identity incarnation. Imported requests never become live attention.
+- Rebuild derives rows/context from canonical events, not only the audit.
+  Runtime duplicates cannot rewind the batched cursor; bootstrap/reset keeps
+  the existing explicit single-cursor semantics.
+- Reads are bounded to 100 with deterministic keyset paging. No RPC or client
+  delivery cursor is introduced. Publication/notifications are not added.
+- Preserve old fork/upstream upgrades and audit data. Cover disk reopen,
+  projection rollback/retry, duplicates/stale replies, multiple requests,
+  import, deletion and rebuild with focused tests.
+- All seven providers continue to supply normalized request events. Missing
+  capabilities produce no invented requests, provider branches or raw text.
+- Completion/failure/disconnect awareness belongs to ATT-02, not this slice.
 
 ## External gates
 

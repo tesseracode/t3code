@@ -6,3 +6,5 @@
 ## Description
 
 Consolidate the completed Phase 1 local-first foundation into one upstream-maintenance root. Capture the durable thread attention audit, read-only TWS v1.2.14 adapter, opaque environment-scoped TWS bindings, and GitHub Issue/Azure Boards contracts as one integrated patch on the verified Phase 0 base. Preserve granular child features as audit history but supersede them, and fold the five Copilot child records already provided by the verified Copilot root. Do not add UI, RPC, relay, push, TWS mutation, hosting provider implementations, or target-platform claims.
+
+ATT-01 / GitHub #3: add mutable current approval/input attention using fork migration 46 and an independent orchestration projector/cursor. Preserve the compact audit unchanged; implement only request state, replay, atomicity and explicit revert/import/delete policies, not ATT-02 awareness or ATT-03 RPC delivery. The maintainer approved extending this existing backend maintenance root to avoid invalidating it with an overlapping independent root.

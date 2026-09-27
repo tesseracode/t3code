@@ -4,6 +4,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.ts";
 import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
+import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
 import Upstream0044 from "./Migrations/044_ClearAutomaticProjectModelDefaults.ts";
 import Upstream0045 from "./Migrations/045_ProjectionProjectsAutoPull.ts";
 
@@ -11,6 +12,7 @@ const FORK_MIGRATIONS_TABLE = "t3code_fork_migrations";
 const forkEntries = [
   [44, "ProjectionThreadAttentionAudit", AttentionAudit],
   [45, "TwsBindings", TwsBindings],
+  [46, "ProjectionThreadAttentionCurrent", CurrentAttention],
 ] as const;
 const run = Migrator.make({});
 
@@ -39,6 +41,44 @@ const locatorColumns = [
 ];
 const lifecycleColumns = ["first_seen_at", "last_seen_at", "retired_at"];
 const tables: ReadonlyArray<TableShape> = [
+  {
+    name: "projection_thread_attention_context",
+    migration: 46,
+    columns: ["thread_id", "project_id", "incarnation_event_id", "is_deleted"],
+    nullable: [],
+    primaryKey: ["thread_id"],
+    integerColumns: ["is_deleted"],
+    indexes: ["idx_attention_context_project"],
+  },
+  {
+    name: "projection_thread_attention_current",
+    migration: 46,
+    columns: [
+      "attention_id",
+      "project_id",
+      "thread_id",
+      "turn_id",
+      "request_id",
+      "kind",
+      "status",
+      "reason_code",
+      "revision",
+      "source_event_id",
+      "source_sequence",
+      "opened_at",
+      "updated_at",
+      "resolved_at",
+    ],
+    nullable: ["turn_id", "resolved_at"],
+    primaryKey: ["attention_id"],
+    integerColumns: ["revision", "source_sequence"],
+    indexes: [
+      "idx_attention_current_thread",
+      "idx_attention_current_request",
+      "idx_attention_current_sequence",
+      "idx_attention_current_project",
+    ],
+  },
   {
     name: "projection_thread_attention_audit",
     migration: 44,
@@ -276,8 +316,10 @@ export const bridgeLegacyForkMigrations = Effect.fn("bridgeLegacyForkMigrations"
     ledger.length === 0
       ? []
       : yield* sql<MigrationRow>`SELECT migration_id, name, created_at FROM effect_sql_migrations ORDER BY migration_id`;
-  const legacy = sharedHistory.filter((row) =>
-    forkEntries.some(([id, name]) => row.migration_id === id && row.name === name),
+  const legacy = sharedHistory.filter(
+    (row) =>
+      (row.migration_id === 44 || row.migration_id === 45) &&
+      forkEntries.some(([id, name]) => row.migration_id === id && row.name === name),
   );
   if (
     toMigrationInclusive !== undefined &&
