@@ -5,6 +5,7 @@ import {
   type OrchestrationEvent,
   ProjectId,
   ProviderInstanceId,
+  type ProviderLifecycleEvidence,
   ThreadId,
   TurnId,
 } from "@t3tools/contracts";
@@ -95,6 +96,7 @@ const fixture = Effect.gen(function* () {
       turnId?: TurnId | null;
       historyImport?: boolean;
       project?: boolean;
+      responseMode?: "message";
     } = {},
   ) {
     const threadId = options.threadId ?? ThreadId.make("thread");
@@ -113,6 +115,7 @@ const fixture = Effect.gen(function* () {
             summary: "private original summary",
             payload: {
               requestId,
+              ...(options.responseMode ? { responseMode: options.responseMode } : {}),
               detail: "private command/error",
               questions: ["private question"],
             },
@@ -126,10 +129,427 @@ const fixture = Effect.gen(function* () {
   });
   const list = (threadId = ThreadId.make("thread")) =>
     attention.listByThreadId({ threadId, limit: 100 });
-  return { sql, store, pipeline, attention, projectionState, append, thread, activity, list, base };
+  const lifecycle = Effect.fn("test.attentionLifecycle")(function* (
+    transition: ProviderLifecycleEvidence["transition"],
+    options: {
+      turnId?: TurnId | null;
+      providerKey?: string;
+      project?: boolean;
+      historyImport?: boolean;
+      occurredAt?: string;
+      providerEventId?: EventId;
+    } = {},
+  ) {
+    const threadId = ThreadId.make("thread");
+    const event = base(threadId);
+    const turnId = options.turnId === undefined ? TurnId.make("turn") : options.turnId;
+    const providerKey = options.providerKey ?? "githubCopilot";
+    return yield* append(
+      {
+        ...event,
+        ...(options.occurredAt ? { occurredAt: options.occurredAt } : {}),
+        type: "thread.session-set",
+        metadata: options.historyImport ? { historyImport: true } : {},
+        payload: {
+          threadId,
+          session: {
+            threadId,
+            status:
+              transition === "failed"
+                ? "error"
+                : transition === "disconnected"
+                  ? "stopped"
+                  : transition === "interrupted"
+                    ? "interrupted"
+                    : transition === "completed"
+                      ? "ready"
+                      : transition,
+            providerName: "githubCopilot",
+            providerInstanceId: ProviderInstanceId.make(providerKey),
+            runtimeMode: "approval-required",
+            activeTurnId: transition === "running" ? turnId : null,
+            lastError: transition === "failed" ? "private provider failure text" : null,
+            updatedAt: event.occurredAt,
+          },
+          lifecycle: {
+            providerEventId: options.providerEventId ?? event.eventId,
+            providerKey,
+            turnId,
+            transition,
+            ...(transition === "failed" ? { failureReason: "provider_failed" as const } : {}),
+          },
+        },
+      },
+      options.project ?? true,
+    );
+  });
+  const summary = () =>
+    attention.getSummary(ThreadId.make("thread")).pipe(Effect.map(Option.getOrThrow));
+  return {
+    sql,
+    store,
+    pipeline,
+    attention,
+    projectionState,
+    append,
+    thread,
+    activity,
+    list,
+    base,
+    lifecycle,
+    summary,
+  };
 });
 
 describe("current request attention", () => {
+  it.effect(
+    "persists a disconnect across disk reopen and resolves it after explicit same-turn recovery",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-awareness-restart-" });
+        const dbPath = path.join(directory, "state.sqlite");
+        const before = yield* Effect.gen(function* () {
+          const f = yield* fixture;
+          yield* f.thread();
+          yield* f.lifecycle("running");
+          yield* f.lifecycle("disconnected");
+          return { rows: yield* f.list(), summary: yield* f.summary() };
+        }).pipe(Effect.provide(Layer.fresh(makeLayer(dbPath))));
+        yield* Effect.gen(function* () {
+          const f = yield* fixture;
+          assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, before);
+          yield* f.pipeline.bootstrap;
+          assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, before);
+          const threadId = ThreadId.make("thread");
+          yield* f.append({
+            eventId: EventId.make("recovered-after-restart"),
+            commandId: CommandId.make("restart-command"),
+            aggregateKind: "thread",
+            aggregateId: threadId,
+            occurredAt: "2026-09-27T00:00:01Z",
+            causationEventId: null,
+            correlationId: null,
+            metadata: {},
+            type: "thread.session-set",
+            payload: {
+              threadId,
+              session: {
+                threadId,
+                status: "running",
+                providerName: "githubCopilot",
+                runtimeMode: "approval-required",
+                activeTurnId: TurnId.make("turn"),
+                lastError: null,
+                updatedAt: "2026-09-27T00:00:01Z",
+              },
+              lifecycle: {
+                providerEventId: EventId.make("running-after-restart"),
+                providerKey: "githubCopilot",
+                turnId: TurnId.make("turn"),
+                transition: "running",
+              },
+            },
+          });
+          const recovered = { rows: yield* f.list(), summary: yield* f.summary() };
+          assert.equal(recovered.summary.disconnectCount, 0);
+          assert.equal(recovered.summary.phase, "running");
+          assert.equal(recovered.rows[0]?.reasonCode, "provider_recovered");
+          yield* f.attention.reset;
+          yield* f.pipeline.bootstrap;
+          assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, recovered);
+        }).pipe(Effect.provide(Layer.fresh(makeLayer(dbPath))));
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("keeps message-mode questions actionable after native turn completion", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      yield* f.thread();
+      yield* f.lifecycle("running");
+      yield* f.activity("user-input.requested", "callback");
+      yield* f.activity("user-input.requested", "message", { responseMode: "message" });
+      yield* f.lifecycle("completed");
+      assert.equal(
+        (yield* f.list()).find((row) => row.requestId === "callback")?.status,
+        "resolved",
+      );
+      assert.equal((yield* f.list()).find((row) => row.requestId === "message")?.status, "open");
+      assert.equal((yield* f.summary()).phase, "waiting_for_input");
+      yield* f.activity("user-input.requested", "late-message", { responseMode: "message" });
+      assert.equal((yield* f.summary()).inputCount, 2);
+      yield* f.activity("user-input.resolved", "message");
+      yield* f.activity("user-input.resolved", "late-message");
+      assert.equal((yield* f.summary()).phase, "completed");
+      const expected = { rows: yield* f.list(), summary: yield* f.summary() };
+      yield* f.attention.reset;
+      yield* f.pipeline.bootstrap;
+      assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, expected);
+    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
+  );
+
+  it.effect("bounds summary output and counts overflow without limiting the detail set", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      yield* f.thread();
+      yield* f.sql`WITH RECURSIVE requests(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM requests WHERE n < 1001)
+        INSERT INTO projection_thread_attention_current
+          (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code, revision,
+           source_event_id, source_sequence, opened_at, updated_at, resolved_at)
+        SELECT printf('%064x', n), 'project', 'thread', 'turn', printf('req-%d',n),
+          'approval', 'open', 'approval_requested', 1, printf('event-%d',n), n,
+          '2026-09-27T00:00:00.000Z', '2026-09-27T00:00:00.000Z', NULL FROM requests`;
+      yield* f.lifecycle("running");
+      const saturated = yield* f.summary();
+      assert.equal(saturated.approvalCount, 999);
+      assert.isTrue(saturated.countsOverflowed);
+      assert.lengthOf(yield* f.list(), 100);
+      yield* f.sql`UPDATE projection_thread_attention_current
+        SET status = 'resolved', reason_code = 'request_resolved', resolved_at = updated_at
+        WHERE request_id IN ('req-1', 'req-2')`;
+      yield* f.lifecycle("running");
+      const exact = yield* f.summary();
+      assert.equal(exact.approvalCount, 999);
+      assert.isFalse(exact.countsOverflowed);
+      assert.equal(exact.revision, saturated.revision + 1);
+      yield* f.lifecycle("completed");
+      assert.equal((yield* f.summary()).approvalCount, 0);
+    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
+  );
+
+  it.effect("ignores replayed provider observations and late pre-recovery errors", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      yield* f.thread();
+      yield* f.lifecycle("running", { occurredAt: "2026-09-27T00:00:01Z" });
+      const eventId = EventId.make("failed-observation");
+      yield* f.lifecycle("failed", {
+        providerEventId: eventId,
+        occurredAt: "2026-09-27T00:00:02Z",
+      });
+      yield* f.lifecycle("running", { occurredAt: "2026-09-27T00:00:03Z" });
+      const recovered = { rows: yield* f.list(), summary: yield* f.summary() };
+      yield* f.lifecycle("failed", {
+        providerEventId: eventId,
+        occurredAt: "2026-09-27T00:00:04Z",
+      });
+      yield* f.lifecycle("disconnected", { occurredAt: "2026-09-27T00:00:01Z" });
+      assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, recovered);
+      yield* f.lifecycle("running", {
+        turnId: TurnId.make("other"),
+        providerKey: "other",
+        occurredAt: "2026-09-27T00:00:04Z",
+      });
+      yield* f.lifecycle("failed", {
+        turnId: TurnId.make("other"),
+        providerKey: "other",
+        occurredAt: "2026-09-27T00:00:05Z",
+      });
+      assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, recovered);
+      yield* f.attention.reset;
+      yield* f.pipeline.bootstrap;
+      assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, recovered);
+    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
+  );
+
+  it.effect("projects bounded phases and completes only the matching turn's requests", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      yield* f.thread();
+      assert.equal((yield* f.summary()).phase, null);
+      yield* f.lifecycle("starting");
+      assert.equal((yield* f.summary()).phase, "starting");
+      yield* f.lifecycle("running");
+      assert.equal((yield* f.summary()).phase, "running");
+      yield* f.activity("approval.requested", "approve");
+      yield* f.activity("user-input.requested", "input");
+      yield* f.activity("approval.requested", "other-turn", { turnId: TurnId.make("other") });
+      const waiting = yield* f.summary();
+      assert.equal(waiting.phase, "waiting_for_approval");
+      assert.equal(waiting.approvalCount, 2);
+      assert.equal(waiting.inputCount, 1);
+      yield* f.activity("provider.approval.respond.failed", "approve");
+      assert.deepEqual(yield* f.summary(), waiting);
+      yield* f.lifecycle("completed");
+      const rows = yield* f.list();
+      assert.equal(rows.find((row) => row.requestId === "other-turn")?.status, "open");
+      assert.isTrue(
+        rows.filter((row) => row.turnId === "turn").every((row) => row.status === "resolved"),
+      );
+      assert.equal((yield* f.summary()).approvalCount, 1);
+      yield* f.activity("approval.resolved", "other-turn", { turnId: TurnId.make("other") });
+      assert.equal((yield* f.summary()).phase, "completed");
+      assert.equal((yield* f.summary()).failureCount, 0);
+      const completed = yield* f.summary();
+      yield* f.lifecycle("starting");
+      yield* f.lifecycle("running");
+      yield* f.lifecycle("failed");
+      yield* f.activity("approval.requested", "late");
+      assert.deepEqual(yield* f.summary(), completed);
+      assert.isFalse((yield* f.list()).some((row) => row.requestId === "late"));
+    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
+  );
+
+  it.effect(
+    "opens scoped failures and resolves them only on matching recovery, never unrelated work or seen state",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* fixture;
+        yield* f.thread();
+        yield* f.lifecycle("running");
+        yield* f.activity("approval.requested");
+        const failedEvent = yield* f.lifecycle("failed");
+        const failure = (yield* f.list()).find((row) => row.kind === "failure")!;
+        assert.equal(failure.status, "open");
+        assert.equal(failure.reasonCode, "provider_failed");
+        assert.notMatch(Object.values(failure).join(" "), /private/);
+        assert.equal((yield* f.summary()).phase, "failed");
+        assert.equal((yield* f.summary()).approvalCount, 0);
+        yield* f.pipeline.projectEvent(failedEvent);
+        yield* f.lifecycle("failed");
+        assert.deepEqual(
+          (yield* f.list()).find((row) => row.kind === "failure"),
+          failure,
+        );
+        yield* f.lifecycle("ready");
+        yield* f.activity("client.attention.seen");
+        assert.equal((yield* f.list()).find((row) => row.kind === "failure")?.status, "open");
+        yield* f.lifecycle("running");
+        assert.equal(
+          (yield* f.list()).find((row) => row.kind === "failure")?.reasonCode,
+          "provider_recovered",
+        );
+        yield* f.lifecycle("failed");
+        const secondFailure = (yield* f.list()).find(
+          (row) => row.kind === "failure" && row.status === "open",
+        )!;
+        assert.notEqual(secondFailure.attentionId, failure.attentionId);
+        yield* f.lifecycle("running", { turnId: TurnId.make("new") });
+        yield* f.lifecycle("completed", { turnId: TurnId.make("new") });
+        assert.equal((yield* f.summary()).phase, "completed");
+        assert.equal((yield* f.summary()).failureCount, 1);
+        assert.equal(
+          (yield* f.list()).find((row) => row.attentionId === secondFailure.attentionId)?.status,
+          "open",
+        );
+      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
+  );
+
+  it.effect(
+    "distinguishes active provider loss, matching reconnect, client network loss and intentional stop",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* fixture;
+        yield* f.thread();
+        yield* f.lifecycle("disconnected");
+        assert.equal((yield* f.summary()).disconnectCount, 0);
+        yield* f.lifecycle("running");
+        const running = yield* f.summary();
+        yield* f.activity("client.connection.lost");
+        assert.deepEqual(yield* f.summary(), running);
+        yield* f.activity("user-input.requested");
+        yield* f.lifecycle("disconnected");
+        const stale = yield* f.summary();
+        assert.equal(stale.phase, "stale");
+        assert.equal(stale.disconnectCount, 1);
+        assert.equal(stale.inputCount, 1);
+        yield* f.lifecycle("ready");
+        yield* f.lifecycle("running", { turnId: null });
+        assert.deepEqual(yield* f.summary(), stale);
+        yield* f.lifecycle("running");
+        assert.equal((yield* f.summary()).disconnectCount, 0);
+        assert.equal((yield* f.summary()).phase, "waiting_for_input");
+        const threadId = ThreadId.make("thread");
+        yield* f.append({
+          ...f.base(threadId),
+          type: "thread.session-stop-requested",
+          payload: { threadId, createdAt: "2026-09-27T00:00:00.000Z" },
+        });
+        yield* f.lifecycle("disconnected", { turnId: null });
+        assert.equal((yield* f.summary()).disconnectCount, 0);
+        assert.equal((yield* f.summary()).phase, null);
+        assert.equal((yield* f.summary()).inputCount, 0);
+      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
+  );
+
+  it.effect(
+    "rolls back failure rows, turn evidence, summary and cursor together and rebuilds deterministically",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* fixture;
+        yield* f.thread();
+        yield* f.lifecycle("running");
+        const before = yield* f.summary();
+        const event = yield* f.lifecycle("failed", { project: false });
+        yield* f.sql`CREATE TRIGGER fail_summary BEFORE UPDATE ON projection_thread_awareness
+        WHEN NEW.phase = 'failed' BEGIN SELECT RAISE(ABORT, 'test rollback'); END`;
+        assert.equal((yield* f.pipeline.projectEvent(event).pipe(Effect.result))._tag, "Failure");
+        assert.deepEqual(yield* f.summary(), before);
+        assert.deepEqual(yield* f.list(), []);
+        const cursor = yield* f.projectionState.getByProjector({
+          projector: CURRENT_ATTENTION_PROJECTOR,
+        });
+        assert.isTrue(Option.isSome(cursor) && cursor.value.lastAppliedSequence < event.sequence);
+        yield* f.sql`DROP TRIGGER fail_summary`;
+        yield* f.pipeline.projectEvent(event);
+        const state = { summary: yield* f.summary(), rows: yield* f.list() };
+        yield* f.attention.reset;
+        yield* f.pipeline.bootstrap;
+        assert.deepEqual({ summary: yield* f.summary(), rows: yield* f.list() }, state);
+        yield* f.lifecycle("completed", { historyImport: true });
+        assert.deepEqual({ summary: yield* f.summary(), rows: yield* f.list() }, state);
+        const threadId = ThreadId.make("thread");
+        yield* f.append({
+          ...f.base(threadId),
+          type: "thread.reverted",
+          payload: { threadId, turnCount: 0 },
+        });
+        assert.equal((yield* f.summary()).failureCount, 0);
+        yield* f.lifecycle("failed");
+        assert.equal((yield* f.summary()).failureCount, 0);
+      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
+  );
+
+  it.effect(
+    "clears lifecycle state on deletion/recreation without recreating a prior failure",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* fixture;
+        const threadId = ThreadId.make("thread");
+        yield* f.thread();
+        yield* f.lifecycle("running");
+        yield* f.lifecycle("failed");
+        const oldFailure = (yield* f.list())[0]!;
+        yield* f.append({
+          ...f.base(threadId),
+          type: "thread.deleted",
+          payload: { threadId, deletedAt: "2026-09-27T00:00:00.000Z" },
+        });
+        yield* f.lifecycle("failed");
+        assert.isTrue(Option.isNone(yield* f.attention.getSummary(threadId)));
+        assert.deepEqual(yield* f.list(), []);
+        yield* f.thread();
+        assert.equal((yield* f.summary()).phase, null);
+        yield* f.lifecycle("running");
+        yield* f.lifecycle("failed");
+        assert.notEqual((yield* f.list())[0]?.attentionId, oldFailure.attentionId);
+        const projectId = ProjectId.make("project");
+        yield* f.append({
+          ...f.base(threadId),
+          aggregateKind: "project",
+          aggregateId: projectId,
+          type: "project.deleted",
+          payload: { projectId, deletedAt: "2026-09-27T00:00:00.000Z" },
+        });
+        assert.isTrue(Option.isNone(yield* f.attention.getSummary(threadId)));
+        yield* f.attention.reset;
+        yield* f.pipeline.bootstrap;
+        assert.isTrue(Option.isNone(yield* f.attention.getSummary(threadId)));
+        assert.deepEqual(yield* f.list(), []);
+      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
+  );
+
   it.effect("isolates multiple kinds, threads and turns; revisions change only materially", () =>
     Effect.gen(function* () {
       const f = yield* fixture;

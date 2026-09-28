@@ -1,9 +1,9 @@
  .../phase1-foundation/artifacts/apply-session.json |    8 +-
  .../artifacts/manual-validation.md                 |    4 +-
- .../artifacts/post-apply-diff.txt                  |   17 +-
- .../phase1-foundation/artifacts/post-apply.patch   | 6492 ++++----------------
- .tpatch/features/phase1-foundation/exploration.md  |   27 +
+ .../artifacts/post-apply-diff.txt                  |   26 +-
+ .../phase1-foundation/artifacts/post-apply.patch   | 8047 +++++---------------
+ .tpatch/features/phase1-foundation/exploration.md  |   35 +-
  .tpatch/features/phase1-foundation/request.md      |    2 +
- .tpatch/features/phase1-foundation/spec.md         |   35 +-
+ .tpatch/features/phase1-foundation/spec.md         |   47 +-
  .tpatch/features/phase1-foundation/status.json     |   10 +-
- 8 files changed, 1120 insertions(+), 5475 deletions(-)
+ 8 files changed, 1811 insertions(+), 6368 deletions(-)

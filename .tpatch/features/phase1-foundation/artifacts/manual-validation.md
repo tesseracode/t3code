@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-09-27T09:30:39Z
+**Timestamp**: 2026-09-28T08:05:45Z
 
 ## Notes
 
-97 focused contract/current-state/pipeline/engine/audit/migration tests pass; server/contracts typechecks, changed-source lint and server bundle pass. Includes file-backed restart, atomic rollback, multiple requests, stale replies and independent rebuild. No live data, UI/RPC or platform qualification claim.
+258 focused cases across9 files passed. Server/contracts/shared typechecks, targeted lint and server bundle passed. Covers actual ingestion/decider/projection, all7 normalized provider mappings, counts overflow, response failure, stale/duplicate events, same-turn recovery, file reopen/rebuild, deletion and migration rollback. No UI/RPC, notifications, live-data access or new platform qualification claim.

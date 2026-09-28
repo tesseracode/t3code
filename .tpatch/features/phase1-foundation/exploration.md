@@ -25,7 +25,40 @@ and the existing migration/pipeline/engine suites. Coverage includes material
 idempotence, request/kind/thread/turn isolation, ambiguous late replies,
 one-event/multiple-row resolution, project deletion, recreation, import,
 transaction rollback/retry, disk reopen and independent-cursor catch-up.
-No frontend, RPC or ATT-02 lifecycle-awareness behavior is added. on stable v0.0.42
+ATT-01 added no frontend, RPC or lifecycle-awareness behavior.
+
+## ATT-02 extension
+
+Reuse `ProviderRuntimeIngestion`'s existing accepted-lifecycle guard. Preserve a
+small typed evidence object before terminal events clear the session turn ID;
+the decider carries it to persisted `thread.session-set`. Client commands cannot
+submit this server-only command. The new mapper uses canonical events, not
+provider-specific strings or raw reason/error text.
+
+| Provider adapter | Existing normalized signals consumed |
+|---|---|
+| Codex | turn.started/completed, runtime.error, session lifecycle |
+| Claude | turn.completed/aborted, runtime.error, graceful session exit |
+| Cursor | ACP turn completion and normalized session exit |
+| Grok | normalized turn completion/failure and session exit |
+| OpenCode | turn completion/failure, runtime.error and session exit |
+| Antigravity | ACP turn completion and normalized session exit |
+| Copilot | SDK-derived turn completion, runtime.error and context exit |
+
+Absent signals and turnless legacy events stay unknown. The shared phase type
+is reused, but existing relay/client projection behavior is not replaced here.
+
+Extend the current projector rather than reading another projection's final
+state during replay. Failure/disconnect rows, thread summaries, lifecycle
+tombstones and provider-observation deduplication all share its transaction
+and cursor. Repeated provider events cannot reopen a recovered item. Summary
+count queries read at most 1000 rows per kind, and only material visible changes
+increment summary revisions. Ordinary content deltas still bypass this work.
+
+Preserve upstream message-mode questions across completion. Migration 47 adds
+the private request resolution policy and rebuilds only derived attention from
+the event store; original migration 46 bytes and the immutable audit are retained.
+The migration tests verify rollback before ledger commit and idempotent reruns.
 
 ## Target and retained seams
 

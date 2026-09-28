@@ -4,6 +4,7 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as Struct from "effect/Struct";
 import { OrchestrationMessageContext } from "./composerContext.ts";
+import { ProviderLifecycleEvidence } from "./attention.ts";
 import { ProviderOptionSelections } from "./model.ts";
 import { RepositoryIdentity, ThreadEnvMode } from "./environment.ts";
 import {
@@ -1438,6 +1439,7 @@ const ThreadSessionSetCommand = Schema.Struct({
   commandId: CommandId,
   threadId: ThreadId,
   session: OrchestrationSession,
+  lifecycle: Schema.optional(ProviderLifecycleEvidence),
   createdAt: IsoDateTime,
 });
 
@@ -1889,6 +1891,7 @@ export const ThreadSessionStopRequestedPayload = Schema.Struct({
 export const ThreadSessionSetPayload = Schema.Struct({
   threadId: ThreadId,
   session: OrchestrationSession,
+  lifecycle: Schema.optional(ProviderLifecycleEvidence),
 });
 
 export const ThreadProposedPlanUpsertedPayload = Schema.Struct({

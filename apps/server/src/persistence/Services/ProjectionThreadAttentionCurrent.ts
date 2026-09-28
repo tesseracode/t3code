@@ -2,11 +2,13 @@ import {
   AttentionId,
   type OrchestrationEvent,
   PositiveInt,
-  type RequestAttentionItem,
+  type ThreadAttentionItem,
+  type ThreadAwarenessSummary,
   ThreadId,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
+import type * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type { ProjectionRepositoryError } from "../Errors.ts";
 
@@ -24,7 +26,10 @@ export class ProjectionThreadAttentionCurrentRepository extends Context.Service<
     readonly project: (event: OrchestrationEvent) => Effect.Effect<void, ProjectionRepositoryError>;
     readonly listByThreadId: (
       input: typeof ListCurrentAttentionInput.Type,
-    ) => Effect.Effect<ReadonlyArray<RequestAttentionItem>, ProjectionRepositoryError>;
+    ) => Effect.Effect<ReadonlyArray<ThreadAttentionItem>, ProjectionRepositoryError>;
+    readonly getSummary: (
+      threadId: ThreadId,
+    ) => Effect.Effect<Option.Option<ThreadAwarenessSummary>, ProjectionRepositoryError>;
     /** Clears only this projection and its cursor; pipeline bootstrap replays the durable event store. */
     readonly reset: Effect.Effect<void, ProjectionRepositoryError>;
   }

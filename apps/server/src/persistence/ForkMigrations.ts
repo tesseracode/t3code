@@ -5,6 +5,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.ts";
 import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
 import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
+import ThreadAwareness from "./ForkMigrations/047_ProjectionThreadAwareness.ts";
 import Upstream0044 from "./Migrations/044_ClearAutomaticProjectModelDefaults.ts";
 import Upstream0045 from "./Migrations/045_ProjectionProjectsAutoPull.ts";
 
@@ -13,6 +14,7 @@ const forkEntries = [
   [44, "ProjectionThreadAttentionAudit", AttentionAudit],
   [45, "TwsBindings", TwsBindings],
   [46, "ProjectionThreadAttentionCurrent", CurrentAttention],
+  [47, "ProjectionThreadAwareness", ThreadAwareness],
 ] as const;
 const run = Migrator.make({});
 
@@ -41,6 +43,97 @@ const locatorColumns = [
 ];
 const lifecycleColumns = ["first_seen_at", "last_seen_at", "retired_at"];
 const tables: ReadonlyArray<TableShape> = [
+  {
+    name: "projection_thread_attention_lifecycle",
+    migration: 47,
+    columns: [
+      "attention_id",
+      "project_id",
+      "thread_id",
+      "turn_id",
+      "provider_key",
+      "kind",
+      "status",
+      "reason_code",
+      "revision",
+      "source_event_id",
+      "source_sequence",
+      "opened_at",
+      "updated_at",
+      "resolved_at",
+    ],
+    nullable: ["resolved_at"],
+    primaryKey: ["attention_id"],
+    integerColumns: ["revision", "source_sequence"],
+    indexes: [
+      "idx_attention_lifecycle_thread",
+      "idx_attention_lifecycle_open",
+      "idx_attention_lifecycle_project",
+    ],
+  },
+  {
+    name: "projection_thread_awareness",
+    migration: 47,
+    columns: [
+      "thread_id",
+      "project_id",
+      "turn_id",
+      "reported_turn_id",
+      "provider_key",
+      "base_phase",
+      "pending_start",
+      "stop_requested",
+      "lifecycle_observed_at",
+      "phase",
+      "approval_count",
+      "input_count",
+      "failure_count",
+      "disconnect_count",
+      "counts_overflowed",
+      "revision",
+      "source_event_id",
+      "source_sequence",
+      "updated_at",
+    ],
+    nullable: [
+      "turn_id",
+      "reported_turn_id",
+      "provider_key",
+      "base_phase",
+      "phase",
+      "lifecycle_observed_at",
+    ],
+    primaryKey: ["thread_id"],
+    integerColumns: [
+      "pending_start",
+      "stop_requested",
+      "approval_count",
+      "input_count",
+      "failure_count",
+      "disconnect_count",
+      "counts_overflowed",
+      "revision",
+      "source_sequence",
+    ],
+    indexes: ["idx_thread_awareness_project"],
+  },
+  {
+    name: "projection_thread_attention_turns",
+    migration: 47,
+    columns: ["thread_id", "provider_key", "turn_id", "phase", "source_sequence"],
+    nullable: [],
+    primaryKey: ["thread_id", "provider_key", "turn_id"],
+    integerColumns: ["source_sequence"],
+    indexes: [],
+  },
+  {
+    name: "projection_thread_attention_observations",
+    migration: 47,
+    columns: ["thread_id", "provider_key", "provider_event_id"],
+    nullable: [],
+    primaryKey: ["thread_id", "provider_key", "provider_event_id"],
+    indexes: [],
+  },
   {
     name: "projection_thread_attention_context",
     migration: 46,
@@ -171,13 +264,17 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   for (const table of tables) {
+    const indexes =
+      table.name === "projection_thread_attention_current" && applied.has(47)
+        ? [...table.indexes, "idx_attention_current_open_counts"]
+        : table.indexes;
     const objects = yield* sql<{
       readonly name: string;
       readonly type: string;
       readonly tbl_name: string;
     }>`
       SELECT name, type, tbl_name FROM sqlite_master
-      WHERE name = ${table.name} OR ${sql.in("name", table.indexes)}
+      WHERE name = ${table.name} OR ${sql.in("name", indexes)}
     `;
     if (!applied.has(table.migration)) {
       if (objects.length > 0) return yield* badState(`unrecorded objects for ${table.name}`);
@@ -192,12 +289,18 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
       readonly notnull: number;
       readonly pk: number;
     }>`SELECT name, type, "notnull", pk FROM pragma_table_info(${table.name}) ORDER BY cid`;
+    const turnPolicyColumns =
+      table.name === "projection_thread_attention_current" && applied.has(47)
+        ? ["resolves_with_turn"]
+        : [];
+    const expectedColumns = [...table.columns, ...turnPolicyColumns];
+    const integerColumns = new Set([...(table.integerColumns ?? []), ...turnPolicyColumns]);
     if (
-      columns.length !== table.columns.length ||
+      columns.length !== expectedColumns.length ||
       columns.some(
         (column, index) =>
-          column.name !== table.columns[index] ||
-          column.type !== (table.integerColumns?.includes(column.name) ? "INTEGER" : "TEXT") ||
+          column.name !== expectedColumns[index] ||
+          column.type !== (integerColumns.has(column.name) ? "INTEGER" : "TEXT") ||
           column.notnull !== (table.nullable.includes(column.name) ? 0 : 1) ||
           column.pk !== Math.max(0, table.primaryKey.indexOf(column.name) + 1),
       )
@@ -232,7 +335,7 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
       return yield* badState(`foreign-key mismatch in ${table.name}`);
     }
     if (
-      table.indexes.some(
+      indexes.some(
         (name) =>
           !objects.some(
             (object) =>

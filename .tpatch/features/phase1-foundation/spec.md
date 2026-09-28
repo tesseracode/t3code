@@ -14,6 +14,8 @@ The consolidated patch contains exactly:
   separate upstream and fork migration histories.
 - ATT-01 (#3): current approval/input attention, fork migration 46 and a
   separate replayable projector/cursor, without changing the compact audit.
+- ATT-02 (#4): authoritative lifecycle evidence, failure/disconnect attention
+  and bounded thread awareness through fork migration 47.
 
 ## Dependency model
 
@@ -99,7 +101,50 @@ pre-implementation request history, superseded by this work.
   import, deletion and rebuild with focused tests.
 - All seven providers continue to supply normalized request events. Missing
   capabilities produce no invented requests, provider branches or raw text.
-- Completion/failure/disconnect awareness belongs to ATT-02, not this slice.
+- ATT-01 itself does not infer completion/failure/disconnect; ATT-02 below
+  handles those transitions through explicit provider evidence.
+
+## ATT-02 awareness and lifecycle
+
+The maintainer approved conservative, turn-scoped lifecycle authority and
+saturated counts with an overflow flag.
+
+- Preserve accepted normalized provider event identity, provider instance,
+  turn and bounded transition on the existing server-only session-set command
+  and persisted event. No new client RPC, raw error or prompt field.
+- All seven provider mappings share this boundary: Codex, Claude, Cursor,
+  Grok, OpenCode, Antigravity and Copilot. Do not invent observations when a
+  provider emits none; legacy session statuses alone remain unknown.
+- Phases are starting/running/waiting-for-approval/waiting-for-input/
+  completed/failed/stale, with null for insufficient evidence. Summaries
+  carry four counts capped at 999, an overflow flag and material revision,
+  not an attention-ID array. Counts do not cap paginated details.
+- Completion creates no unresolved item and affects only its turn. Preserve
+  message-mode questions that remain answerable after provider completion.
+- Failure/disconnect identity includes the thread incarnation, provider,
+  turn, kind and opening source event. Repeated material state is idempotent.
+  Deduplicate originating provider observations even across separate persisted
+  events, and ignore delayed pre-recovery observations.
+- Resolve failure/disconnect on accepted same-provider/same-turn running
+  recovery or completion; unrelated turns and seen/ack state never clear them.
+  Ready alone is not recovery. Historical terminal turns reject late reopen.
+- Provider exit or transport error opens disconnect only while the attributed
+  turn is active. Explicit stop/interruption is not unexpected loss.
+  Frontend connection loss is never server-owned attention.
+- Explicit interruption closes matching callback/disconnect items but not
+  failure items; revert resolves all open items, deletion purges them, and
+  recreation cannot revive the prior incarnation.
+- Migration 47 resets only derived attention and its cursor for deterministic
+  bootstrap. Legacy shared-ledger, upstream-only and ATT-01 upgrades remain
+  atomic and preserve audit/history. Failure rolls back schema and reset.
+- Tests cover the ingestion/decider/projector path, all provider mappings,
+  scope/recovery, callback versus message-mode questions, duplicates, late
+  events, overflow, disk reopen, rebuild, deletion and transactional rollback.
+- Preserve post-commit engine publication and no attention notifications.
+  Inbox, relay, snapshot subscriptions and client UI remain later issues.
+
+The complete transition/resolution table is maintained in
+`docs/internals/overview.md#current-attention-and-lifecycle-awareness`.
 
 ## External gates
 

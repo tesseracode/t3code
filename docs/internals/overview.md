@@ -88,7 +88,7 @@ Keep this upgrade path when reconciling future releases; never remove old
 records just to satisfy a newer manifest. Explicit migration bounds used by
 tests build upstream-only fixtures; normal startup also runs fork migrations.
 
-### Current request attention
+### Current attention and lifecycle awareness
 
 Current approval/input attention is separate from the compact audit. Rebuild
 it from persisted orchestration events, not audit rows or the latest thread
@@ -102,8 +102,42 @@ Resolved identities stay closed. Turn-scoped identities distinguish reused
 request IDs; an unscoped reply is ignored with a warning when history makes
 its target ambiguous. Revert resolves remaining requests; deletion removes
 current rows, recreation starts a new incarnation, and imported history never
-creates actionable requests. Completion, failure and disconnect awareness
-are separate follow-up work.
+creates actionable requests.
+
+Accepted provider lifecycle observations travel as an optional, bounded
+`lifecycle` field on existing session-set events. The provider boundary retains
+the originating turn before the ordinary session snapshot clears it; no prompt,
+raw error or command text is copied into awareness. Legacy events without that
+evidence remain unknown rather than interpreting any `stopped` status as a
+provider disconnect or any `ready` status as a completed turn.
+
+The current projection stores failure/disconnect items separately from request
+rows, plus bounded thread counts and an explicit unknown (`null`) phase.
+Detail reads merge both item kinds; counts saturate at 999 with an overflow
+flag and never replace the detail set. Provider observations are deduplicated
+inside the same projection transaction, and older provider timestamps cannot
+roll back recovered lifecycle state. Terminal turn tombstones reject late
+reopens. Client WebSocket loss does not enter this provider-evidence path.
+
+| Accepted transition | Resolution policy |
+|---|---|
+| Running for the same provider/turn | Resolve its failure/disconnect as recovered; a different turn leaves older items open |
+| Turn completion | Resolve only that turn's callback requests and matching failure/disconnect; create no completion item |
+| Turn failure | Close obsolete native callback requests; open/update its static failure item |
+| Provider exit/transport loss while that turn is running | Open disconnect and mark stale, unless an explicit stop/interruption was requested |
+| Intentional interruption/stop followed by provider exit | Close obsolete callback requests and disconnect, without inventing successful completion or clearing a failure |
+| Ready/reconnect without attributable running-turn evidence | Do not resolve an item |
+| Revert/delete/recreation | Revert resolves open items; deletion purges state; recreation starts a new incarnation |
+
+Message-mode questions may outlive the originating turn. Preserve them until a
+canonical answer/dismissal or explicit revert/delete instead of treating every
+question as a native callback. A source event can change multiple items and the
+summary; source event IDs therefore are not unique across attention rows.
+
+Fork migration 47 resets only the derived attention state/cursor so the expanded
+reducer can replay the durable event stream with its new semantics. Audit and
+other projection cursors stay intact. It does not synthesize missing lifecycle
+evidence for historical events.
 
 Rows and the internal projection cursor share the existing event/receipt
 transaction. Replay emits no notification; future delivery must publish only

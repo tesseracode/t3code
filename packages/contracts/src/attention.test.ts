@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
-import { AttentionId, RequestAttentionItem } from "./attention.ts";
+import {
+  AttentionId,
+  RequestAttentionItem,
+  ThreadAttentionItem,
+  ThreadAwarenessSummary,
+} from "./attention.ts";
 const decodeItem = Schema.decodeUnknownSync(RequestAttentionItem);
 const decodeId = Schema.decodeUnknownSync(AttentionId);
+const decodeAttention = Schema.decodeUnknownSync(ThreadAttentionItem);
+const decodeSummary = Schema.decodeUnknownSync(ThreadAwarenessSummary);
 
 const row = {
   attentionId: "a".repeat(64),
@@ -21,6 +28,36 @@ const row = {
   resolvedAt: null,
 };
 describe("current request attention contracts", () => {
+  it("requires bounded lifecycle summaries and redacted static lifecycle item titles", () => {
+    const summary = {
+      projectId: row.projectId,
+      threadId: row.threadId,
+      turnId: null,
+      phase: "failed",
+      approvalCount: 999,
+      inputCount: 0,
+      failureCount: 1,
+      disconnectCount: 0,
+      countsOverflowed: true,
+      revision: 1,
+      sourceEventId: row.sourceEventId,
+      sourceSequence: row.sourceSequence,
+      updatedAt: row.updatedAt,
+    };
+    expect(decodeSummary(summary)).toEqual(summary);
+    expect(() => decodeSummary({ ...summary, approvalCount: 1000 })).toThrow();
+    expect(() => decodeSummary({ ...summary, failureCount: -1 })).toThrow();
+    const lifecycle = {
+      ...row,
+      turnId: "turn",
+      requestId: null,
+      kind: "failure",
+      title: "Agent failed",
+      reasonCode: "provider_failed",
+    };
+    expect(decodeAttention({ ...lifecycle, detail: "private tool output" })).toEqual(lifecycle);
+    expect(() => decodeAttention({ ...lifecycle, title: "private tool output" })).toThrow();
+  });
   it("accepts bounded request state without storing prompts, commands or raw failure details", () => {
     const decoded = decodeItem({
       ...row,
