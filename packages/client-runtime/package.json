@@ -99,6 +99,10 @@
       "types": "./src/state/auth.ts",
       "default": "./src/state/auth.ts"
     },
+    "./state/attention": {
+      "types": "./src/state/attention.ts",
+      "default": "./src/state/attention.ts"
+    },
     "./state/assets": {
       "types": "./src/state/assets.ts",
       "default": "./src/state/assets.ts"

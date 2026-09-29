@@ -92,6 +92,35 @@ All implementation remains transport-neutral: the shared RPC group and
 environment authorization serve local/direct/SSH/relay/tunnel callers.
 No client UI, federation aggregator or notification preferences are implemented.
 
+## ATT-04 client aggregation
+
+`EnvironmentRegistry` already owns supervisor scopes and connection leases;
+the workspace only manages attention-consumer fibers for enabled catalog entries.
+The existing shell atom pattern supplies shared lazy state instances to both
+web/desktop and mobile. Attention requires its own fenced protocol consumer:
+generic durable subscriptions do not expose reset completion, capability skips
+or authorization eviction. It reuses the RPC subscription observer and exports
+the existing supervisor retry-delay helper without changing connection behavior.
+
+Keep protocol staging separate from the last visible complete snapshot. Signed
+cursor scope includes server authentication, which a new client RpcSession
+object cannot prove unchanged; new sessions therefore bootstrap while retaining
+stale visible rows. Same-session failure recovery may resume a complete cursor.
+Identity checks guard old-session frames and delayed configuration. No sync
+attempt can overwrite another environment.
+
+Existing relay activity rows contain environment/thread identity but no attention
+ID/revision. They cannot participate in canonical item merging. A separate pure
+validated selector exposes advisory hints only before direct completeness;
+there is no fetcher, polling or change to existing mobile registration behavior.
+Atom exports stay lazy for the later inbox/mobile presentation slices.
+
+Focused Effect tests use registry-owned supervisors, typed streams, completion
+barriers and TestClock for the actual capped retry thresholds. Unused connection,
+shell and thread RPCs fail in the harness rather than silently supplying fixtures.
+Pure selectors cover collision isolation, count semantics, sort/filter stability
+and direct/relay disagreement. No browser or live environment is used.
+
 ## Target and retained seams
 
 - Stable target: `719a76ca1dbf5490f1aa33ffb9966301e02be9a9`.

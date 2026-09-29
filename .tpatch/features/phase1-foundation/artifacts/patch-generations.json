@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "phase1-foundation",
-  "current_generation": 10,
+  "current_generation": 11,
   "generations": [
     {
       "generation": 1,
@@ -1503,7 +1503,7 @@
       "git_patch_id": "900a4cdd0b9bf2cf6444b2acd8d13f296ef265ca",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "dce8fe4282ed695880730d3bfd285023cdfed5f58c16120ce92c1cadced9dbe2",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/010-record.patch",
       "base_commit": "7b5f4af3501d89b42b840f875917c09db4f786ce",
       "upper": {
@@ -1646,6 +1646,140 @@
         "packages/contracts/src/workItem.ts",
         "packages/shared/src/agentAwareness.ts",
         "pnpm-lock.yaml"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 13,
+          "parent_patch_sha256": "0dcdce60954b58a5947da226696102b97faeb0d6d8dc9f1cf814b77596ff9b16",
+          "parent_recipe_sha256": "97814b0dab001d4711a4f4c578cf4575727f6e13dfa6da864101feaee124d236"
+        },
+        {
+          "slug": "copilot-plan-compaction",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-skill-discovery",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-text-generation",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-tool-detail",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-turn-timing",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "durable-thread-attention-ledger",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "6953cbea041b0d8c529f63e9e525c43322ac763ad0b8d65d2fd8bd1074d7ff75",
+          "parent_recipe_sha256": "e45b16ac455fd4b42b53edcff818f8b1145377f95453b69bb79852b169ae04c0"
+        },
+        {
+          "slug": "hosting-work-item-contracts",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "5268b20b56b371838563fcda3770cc50c30c1b43ba96a591db4a2058d38e0e86",
+          "parent_recipe_sha256": "a1f9c190d469f54999eeb023102e21f88445f2aedae82b2b581d865ebef8c684"
+        },
+        {
+          "slug": "session-search",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 9,
+          "parent_patch_sha256": "38333be0dcb886cdac0f24e44ce4756611fe1e4ab82c584820a5554f5f9eae01",
+          "parent_recipe_sha256": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e"
+        },
+        {
+          "slug": "tws-identity-bindings",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "2aff1a6c2726968b459e9282584f83e05798580a82ac77d9a0ecc9e90b05645e",
+          "parent_recipe_sha256": "63b18576300252c49752400e437a32d5e390d34ddd19cc92e84336fbf7760217"
+        },
+        {
+          "slug": "tws-readonly-cli-adapter",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "e0aec536d901c1c604647ad10144b4da0e4d6b24df67ae4979cf47a165429cfa",
+          "parent_recipe_sha256": "e873e30981f4784c07a95e939af9ed5f1cab9c5548b53e65c6f16892754a3874"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 11,
+      "generation_id": "pg_f1dd87b8bbaa",
+      "kind": "amend-refresh",
+      "patch_sha256": "1c56898daf77feea781d264c525c17b015b4f5e11960db401d2f5f98723183c1",
+      "git_patch_id": "d8fa6ac7a93c37ed9753f03e8a6f727930e3fd5f",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "fa9a38bc51c83dd3f4f92ff89d18492bf3dcbc83546c3ab110e170e508be1739",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/011-record.patch",
+      "base_commit": "5d5c9380b411848940057f31610c105f10d30392",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "apps/mobile/src/state/attention.ts",
+          "apps/web/src/state/attention.ts",
+          "docs/internals/overview.md",
+          "packages/client-runtime/package.json",
+          "packages/client-runtime/src/connection/supervisor.ts",
+          "packages/client-runtime/src/rpc/client.ts",
+          "packages/client-runtime/src/state/attention.test.ts",
+          "packages/client-runtime/src/state/attention.ts",
+          "packages/client-runtime/src/state/attentionProjection.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/mobile/src/state/attention.ts",
+        "apps/web/src/state/attention.ts",
+        "docs/internals/overview.md",
+        "packages/client-runtime/package.json",
+        "packages/client-runtime/src/connection/supervisor.ts",
+        "packages/client-runtime/src/rpc/client.ts",
+        "packages/client-runtime/src/state/attention.test.ts",
+        "packages/client-runtime/src/state/attention.ts",
+        "packages/client-runtime/src/state/attentionProjection.ts"
       ],
       "dependencies": [
         {

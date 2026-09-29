@@ -196,6 +196,55 @@ Startup/bootstrap rotates the delivery generation and gates delivery until
 replay completes. Reset clears only derived attention/delivery state and its
 cursor; the event history and audit remain authoritative and unchanged.
 
+### Client attention aggregation
+
+`@t3tools/client-runtime/state/attention` provides the shared workspace atom
+factory and selectors. Web/desktop and mobile each export one lazy
+`attentionWorkspace` from their state layer. Consumers share that instance;
+mounting an inbox or badge must not construct another workspace per component.
+This slice adds state, not inbox UI or notification delivery.
+
+The workspace observes the existing `EnvironmentRegistry` catalog and runs one
+attention subscription on each enabled environment's existing supervisor.
+It opens no connections and loads no shell, thread history or repository data.
+Environment plus attention ID keys items; `ScopedThreadRef` keys summaries,
+thread counts and navigation. Canonical repository grouping is not authority.
+Disabling, removing or replacing a target cancels its subscription and evicts
+its in-memory attention cache. Enabling it starts a fresh bootstrap.
+
+Each environment owns its protocol cursor, staging map and last complete
+snapshot. Partial pages never enter the aggregate. A fresh fence atomically
+replaces only that environment; other environments remain usable. Connection
+loss retains the complete snapshot as stale and creates no provider-failure
+item. Authorization errors or blocked authentication/permission clear it.
+Older servers remain explicitly unsupported, not successfully empty.
+
+The aggregate exposes completeness, environment status/reason, open items,
+scoped summaries, item and unique-thread totals, and separate live/stale counts.
+Totals are complete only when the catalog is ready and every selected enabled
+environment is live. Approval, input and failure share the blocking/error tier;
+disconnect is warning. Within a tier, sort by oldest opening time, environment,
+thread and attention ID. Environment, scoped project/thread, kind and priority
+filters use the same count semantics. Counts derive from items, never saturated
+summary counters.
+
+Transport failures wait for the supervisor's reconnection. Recoverable stream
+resets, server unavailability and premature completion reuse its 3/4/8/16-second
+capped retry timings on the same socket. This is failure-driven resubscription,
+not polling or a second connection retry loop. A complete cache can resume on
+the same RPC session; a replacement session bootstraps afresh because delivery
+tokens bind server-side authentication. Protocol/identity faults, oversized
+messages and authorization failures stop until connection/session renewal.
+Session ownership checks reject late values and configuration from old streams.
+
+Existing relay activity rows lack canonical attention IDs and revisions.
+`selectAttentionRelayHints` validates them as a separate advisory collection,
+deduplicated by scoped thread and timestamp. Unknown/unscoped hints are rejected;
+no hint creates an item, changes a count, or resolves direct state. After an
+environment has a complete direct snapshot, even a stale or empty one, its hints
+are suppressed. No relay fetcher or changes to upstream Live Activities are
+introduced here; mobile presentation/delivery alignment remains separate.
+
 ## Turn completion and checkpoints
 
 A turn ending and its follow-up work settling are separate milestones. The

@@ -18,6 +18,8 @@ The consolidated patch contains exactly:
   and bounded thread awareness through fork migration 47.
 - ATT-03 (#5): an authenticated owned attention bootstrap/replay/live stream,
   bounded derived delivery journal and shared client protocol reducer.
+- ATT-04 (#6): shared scoped multi-environment attention aggregation through
+  existing connection ownership, without inbox UI or notification delivery.
 
 ## Dependency model
 
@@ -180,6 +182,41 @@ authoritative event history.
   rebuild, token kind/scope changes, slow overflow and UTF-8 byte limits.
 - Existing web/desktop/mobile transports use the common RPC contracts. No UI,
   environment aggregation, notification preferences or mandatory relay here.
+
+## ATT-04 shared environment aggregation
+
+The maintainer approved retaining stale rows with separate live/stale counts,
+discarding disabled caches, advisory-only relay hints and capped reset backoff.
+
+- One lazy workspace instance per client observes the existing registry and
+  owns one subscription/cache per enabled environment on its existing supervisor.
+  No sockets, replacement registry, full thread loads or repository grouping.
+- Scope items by environment/attention ID; reuse ScopedThreadRef for thread
+  identity, summaries, filters and navigation. Count unique actionable threads
+  separately from items, deriving counts from items rather than saturated summaries.
+- Loading, syncing, live, stale, unauthorized, unsupported and error remain
+  explicit. Completeness requires a ready catalog and all selected enabled
+  environments live. Pages/replay stay staged; a completed fence replaces only
+  its environment, preserving the last complete snapshot as stale meanwhile.
+- Approval/input/failure share the blocking-error priority; disconnect is warning.
+  Sort oldest first, then environment/thread/attention ID. Scoped filters apply
+  before counting. Disconnection creates no canonical failure.
+- Remove/disable/replace cancels and evicts the environment. Lost authorization
+  clears inaccessible state. Ignore late old-session frames/configuration.
+- Reuse the connection supervisor's 3/4/8/16-second capped delays for recoverable
+  stream failures without reconnecting a healthy socket. Transport loss waits
+  for its supervisor. Only complete same-session caches resume; changed RPC
+  sessions bootstrap because cursor authentication identity cannot be inferred.
+  Authorization/protocol/oversize faults stop until connection/session renewal.
+- Relay rows have no canonical attention identity/revision. Validate scoped
+  hints separately, never count or promote them, and suppress hints after a
+  complete direct snapshot, including empty/stale snapshots and deleted items.
+- Tests cover collisions, partial bootstraps, atomic reconnect, stale counts,
+  sorting/scoped filtering, removal/disable/replacement, authorization, reset
+  delays, unsupported capability, late frames/config and direct/relay disagreement.
+- Shared lazy exports serve web/local/hosted, desktop via web and mobile.
+  Existing direct/bearer/SSH/relay/tunnel connection ownership is unchanged;
+  provider-independent canonical data needs no adapter changes.
 
 ## External gates
 
