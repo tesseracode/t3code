@@ -5,8 +5,8 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-03T10:11:24Z",
-  "updated_at": "2026-09-29T00:46:46Z",
-  "last_command": "record",
+  "updated_at": "2026-09-29T00:47:05Z",
+  "last_command": "verify",
   "notes": "landed at 2026-09-29T00:46:49Z",
   "apply": {
     "completed_at": "2026-09-29T00:40:46Z",
@@ -61,10 +61,10 @@
     }
   ],
   "verify": {
-    "verified_at": "2026-09-29T00:41:10Z",
+    "verified_at": "2026-09-29T00:47:01Z",
     "passed": true,
-    "recipe_hash_at_verify": "a82bedc3659f6ba85a43c69e58948c719ca11b85235963a705177172fd089a6c",
-    "patch_hash_at_verify": "aa7b1b7799b3615b5eb4a5a6d5b6c9b69d844dc425df62d6ec91c094129297e8",
+    "recipe_hash_at_verify": "dce8fe4282ed695880730d3bfd285023cdfed5f58c16120ce92c1cadced9dbe2",
+    "patch_hash_at_verify": "aea96e6d7c62e367c208de032d9716aaf54ec74495da8708fb1529dc4bf8869e",
     "parent_snapshot": {
       "copilot-cli-provider": "applied"
     }
