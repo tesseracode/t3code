@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "phase1-foundation",
-  "current_generation": 8,
+  "current_generation": 9,
   "generations": [
     {
       "generation": 1,
@@ -1143,7 +1143,7 @@
       "git_patch_id": "326a9f17ce87e3d7eea40bbcd6dc30ffb51c7ffb",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "a82bedc3659f6ba85a43c69e58948c719ca11b85235963a705177172fd089a6c",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/008-record.patch",
       "base_commit": "7b5f4af3501d89b42b840f875917c09db4f786ce",
       "upper": {
@@ -1286,6 +1286,122 @@
         "packages/contracts/src/workItem.ts",
         "packages/shared/src/agentAwareness.ts",
         "pnpm-lock.yaml"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 13,
+          "parent_patch_sha256": "0dcdce60954b58a5947da226696102b97faeb0d6d8dc9f1cf814b77596ff9b16",
+          "parent_recipe_sha256": "97814b0dab001d4711a4f4c578cf4575727f6e13dfa6da864101feaee124d236"
+        },
+        {
+          "slug": "copilot-plan-compaction",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-skill-discovery",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-text-generation",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-tool-detail",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-turn-timing",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "durable-thread-attention-ledger",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "6953cbea041b0d8c529f63e9e525c43322ac763ad0b8d65d2fd8bd1074d7ff75",
+          "parent_recipe_sha256": "e45b16ac455fd4b42b53edcff818f8b1145377f95453b69bb79852b169ae04c0"
+        },
+        {
+          "slug": "hosting-work-item-contracts",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "5268b20b56b371838563fcda3770cc50c30c1b43ba96a591db4a2058d38e0e86",
+          "parent_recipe_sha256": "a1f9c190d469f54999eeb023102e21f88445f2aedae82b2b581d865ebef8c684"
+        },
+        {
+          "slug": "session-search",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 9,
+          "parent_patch_sha256": "38333be0dcb886cdac0f24e44ce4756611fe1e4ab82c584820a5554f5f9eae01",
+          "parent_recipe_sha256": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e"
+        },
+        {
+          "slug": "tws-identity-bindings",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "2aff1a6c2726968b459e9282584f83e05798580a82ac77d9a0ecc9e90b05645e",
+          "parent_recipe_sha256": "63b18576300252c49752400e437a32d5e390d34ddd19cc92e84336fbf7760217"
+        },
+        {
+          "slug": "tws-readonly-cli-adapter",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "e0aec536d901c1c604647ad10144b4da0e4d6b24df67ae4979cf47a165429cfa",
+          "parent_recipe_sha256": "e873e30981f4784c07a95e939af9ed5f1cab9c5548b53e65c6f16892754a3874"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 9,
+      "generation_id": "pg_d587e6a5580c",
+      "kind": "amend-refresh",
+      "patch_sha256": "1d52c616da3a7ef6996e47811224460ea3b977bbc071348380eba1c968be6c7a",
+      "git_patch_id": "88840fab9fde3d442de31cf13b971fbb008b6d2f",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "37773bbf3f6333516ebe2330ce0c2a1853250aaee3ec615221f2b437b345482e",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/009-record.patch",
+      "base_commit": "45bc0ce7a8476126e796eeca998ee6bddcf660be",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration/AttentionSync.test.ts"
       ],
       "dependencies": [
         {

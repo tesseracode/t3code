@@ -217,6 +217,9 @@ describe("attention snapshot/live continuity", () => {
         while (true) {
           const frame = yield* read;
           if (frame.type === "sync-complete") break;
+          if (frame.type === "page") {
+            yield* f.activity("thread-4", "approval.requested", `during-page-${frames.length}`);
+          }
           if (frame.type === "page" && frame.entries.length < 17 && !beforeFence) {
             beforeFence = true;
             yield* f.activity("thread-3", "user-input.requested", "between-page-and-fence");
@@ -249,6 +252,56 @@ describe("attention snapshot/live continuity", () => {
         yield* f.activity("thread-2", "approval.resolved", "request");
         const live = yield* stream.next();
         assert.equal(live.type, "delta");
+        cache = reduceAttentionStream(cache, live);
+        assert.equal(cache.status, "live");
+        assert.isAbove(cache.notificationCandidates.length, 0);
+      }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer()))),
+  );
+
+  it.effect(
+    "keeps changes committed during catch-up above the captured fence for live delivery",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* setup;
+        yield* f.thread("thread");
+        const stream = yield* f.connect({ pageSize: 1 });
+        let cache = reduceAttentionStream(emptyAttentionSync(), yield* stream.next());
+        cache = reduceAttentionStream(cache, yield* stream.next());
+        const lastPage = yield* stream.next();
+        assert.equal(lastPage.type, "page");
+        cache = reduceAttentionStream(cache, lastPage);
+        yield* f.activity("thread", "approval.requested", "at-fence");
+        const expected = yield* f.sql<{
+          readonly entity_key: string;
+          readonly data_json: string;
+          readonly version: number;
+        }>`
+        SELECT entity_key, data_json, version FROM attention_delivery_rows WHERE status != 'resolved' ORDER BY entity_key
+      `;
+        const atFence = yield* Effect.forEach(expected, (row) =>
+          decodeEntity(row.data_json).pipe(
+            Effect.map((entity) => ({
+              key: row.entity_key,
+              version: row.version,
+              entity,
+            })),
+          ),
+        );
+        const firstDelta = yield* stream.next();
+        assert.equal(firstDelta.type, "delta");
+        cache = reduceAttentionStream(cache, firstDelta);
+        yield* f.activity("thread", "user-input.requested", "after-fence");
+        while (cache.status !== "live") {
+          cache = reduceAttentionStream(cache, yield* stream.next());
+          assert.lengthOf(cache.notificationCandidates, 0);
+        }
+        assert.deepEqual(
+          [...HashMap.values(cache.entries)].sort((a, b) => a.key.localeCompare(b.key)),
+          atFence,
+        );
+        const live = yield* stream.next();
+        assert.equal(live.type, "delta");
+        if (live.type === "delta") assert.isTrue(live.notificationEligible);
         cache = reduceAttentionStream(cache, live);
         assert.equal(cache.status, "live");
         assert.isAbove(cache.notificationCandidates.length, 0);
