@@ -2135,6 +2135,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     });
 
     const bootstrap: OrchestrationProjectionPipelineShape["bootstrap"] = Effect.gen(function* () {
+      yield* currentAttention.beginRebuild;
       const cleanupProjector = "projection.attachment-cleanup";
       const states = yield* projectionStateRepository.listAll();
       const byProjector = new Map(states.map((state) => [state.projector, state]));
@@ -2151,6 +2152,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         updatedAt: cleanupState?.updatedAt ?? "1970-01-01T00:00:00.000Z",
       });
       yield* Effect.forEach(projectors, bootstrapProjector, { concurrency: 1, discard: true });
+      yield* currentAttention.finishRebuild;
 
       // Cleanup has its own cursor so retries never have to replay committed text.
       // All message and activity references are current before any files are removed.

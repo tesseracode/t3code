@@ -60,6 +60,38 @@ the private request resolution policy and rebuilds only derived attention from
 the event store; original migration 46 bytes and the immutable audit are retained.
 The migration tests verify rollback before ledger commit and idempotent reruns.
 
+## ATT-03 extension
+
+Use the existing acquire-before-consume domain stream as a post-commit wakeup,
+not as a raw-thread payload buffer. The same attention relevance predicate
+guards both projection work and delivery wakeups, so content streaming does
+not add attention reads. SQLite's connection semaphore serializes short
+watermark/page/fence transactions with projection commits.
+
+Fork migration48 derives an immutable-key delivery view and bounded journal
+through material-change triggers. Generation rotates at bootstrap/reset and
+delivery stays gated until projection replay finishes. Deletes/filter exits
+retain transport versions; domain revisions may restart on recreation.
+The journal is disposable, indexed, limited to1000 changes/8MiB and explicitly
+validated at startup; it is not a competing event authority.
+
+One authenticated `attention.subscribe` stream owns bootstrap pages, catch-up
+and live mode. Signed token kinds bind environment, principal/scopes, filter
+and generation. Short reads recheck authorization; scope changes/revocation
+wake an idle subscriber. Per-message64KiB/100-row bounds and30s bootstrap
+expiry complement the existing ACK-aware live budget.
+
+The client-runtime reducer uses persistent maps, stages pages/replay until F
+and rejects page/cursor gaps. Engine-backed integration tests consume it
+directly, so the server package declares client-runtime as a test-only
+workspace dependency. Exact provider/runtime package pins remain unchanged.
+The generated lockfile is a composed workspace artifact; retain the existing
+packaging closure when recording this additive dev dependency.
+
+All implementation remains transport-neutral: the shared RPC group and
+environment authorization serve local/direct/SSH/relay/tunnel callers.
+No client UI, federation aggregator or notification preferences are implemented.
+
 ## Target and retained seams
 
 - Stable target: `719a76ca1dbf5490f1aa33ffb9966301e02be9a9`.

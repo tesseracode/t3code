@@ -16,6 +16,8 @@ import {
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as PubSub from "effect/PubSub";
+import * as Stream from "effect/Stream";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
@@ -44,6 +46,21 @@ const ActivityKind = Schema.Literals([
   "provider.user-input.respond.failed",
 ]);
 const isActivityKind = Schema.is(ActivityKind);
+/** Keep transport wakeups aligned with the projector; ordinary content deltas do no attention work. */
+export function affectsCurrentAttention(event: OrchestrationEvent): boolean {
+  if (event.metadata.historyImport === true && event.type !== "thread.created") return false;
+  if (event.type === "thread.activity-appended") return isActivityKind(event.payload.activity.kind);
+  if (event.type === "thread.session-set") return event.payload.lifecycle !== undefined;
+  return [
+    "thread.created",
+    "thread.deleted",
+    "project.deleted",
+    "thread.reverted",
+    "thread.turn-start-requested",
+    "thread.session-stop-requested",
+    "thread.turn-interrupt-requested",
+  ].includes(event.type);
+}
 const requestIdentity = Schema.decodeUnknownOption(
   Schema.Struct({
     requestId: Schema.optional(ApprovalRequestId),
@@ -61,6 +78,7 @@ const encodeLifecycleIdentity = Schema.encodeEffect(
 
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
+  const resets = yield* PubSub.sliding<void>(1);
   const context = SqlSchema.findOneOption({
     Request: ThreadId,
     Result: Schema.Struct({
@@ -469,24 +487,7 @@ const make = Effect.gen(function* () {
   const project = Effect.fn("ProjectionThreadAttentionCurrent.project")(function* (
     event: OrchestrationEvent,
   ) {
-    if (event.metadata.historyImport === true && event.type !== "thread.created") return;
-    if (event.type === "thread.session-set" && event.payload.lifecycle === undefined) return;
-    if (event.type === "thread.activity-appended" && !isActivityKind(event.payload.activity.kind))
-      return;
-    if (
-      event.type !== "thread.activity-appended" &&
-      ![
-        "thread.created",
-        "thread.deleted",
-        "project.deleted",
-        "thread.reverted",
-        "thread.session-set",
-        "thread.turn-start-requested",
-        "thread.session-stop-requested",
-        "thread.turn-interrupt-requested",
-      ].includes(event.type)
-    )
-      return;
+    if (!affectsCurrentAttention(event)) return;
     const cursor = yield* sql<{ readonly sequence: number }>`
       SELECT last_applied_sequence AS sequence FROM projection_state WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}
     `;
@@ -553,6 +554,23 @@ const make = Effect.gen(function* () {
       ? toPersistenceDecodeError(operation)(cause)
       : toPersistenceSqlError(operation)(cause);
   return ProjectionThreadAttentionCurrentRepository.of({
+    subscribeResets: PubSub.subscribe(resets).pipe(Effect.map(Stream.fromSubscription)),
+    beginRebuild: sql
+      .withTransaction(
+        Effect.gen(function* () {
+          yield* sql`UPDATE attention_delivery_state SET generation = lower(hex(randomblob(16))), ready = 0, floor = head WHERE id = 1`;
+          yield* sql`DELETE FROM attention_delivery_changes`;
+        }),
+      )
+      .pipe(
+        Effect.tap(() => PubSub.publish(resets, undefined)),
+        Effect.mapError(mapError("CurrentAttention.beginRebuild")),
+      ),
+    finishRebuild: sql`UPDATE attention_delivery_state SET ready = 1 WHERE id = 1`.pipe(
+      Effect.asVoid,
+      Effect.tap(() => PubSub.publish(resets, undefined)),
+      Effect.mapError(mapError("CurrentAttention.finishRebuild")),
+    ),
     project: (event) => project(event).pipe(Effect.mapError(mapError("CurrentAttention.project"))),
     listByThreadId: (input) => list(input).pipe(Effect.mapError(mapError("CurrentAttention.list"))),
     getSummary: (threadId) =>
@@ -570,8 +588,12 @@ const make = Effect.gen(function* () {
           yield* sql`DELETE FROM projection_thread_attention_observations`;
           yield* sql`DELETE FROM projection_thread_awareness`;
           yield* sql`DELETE FROM projection_state WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}`;
+          yield* sql`DELETE FROM attention_delivery_rows`;
+          yield* sql`DELETE FROM attention_delivery_changes`;
+          yield* sql`UPDATE attention_delivery_state SET generation = lower(hex(randomblob(16))), floor = head, ready = 0 WHERE id = 1`;
         }),
       )
+      .pipe(Effect.tap(() => PubSub.publish(resets, undefined)))
       .pipe(Effect.mapError(mapError("CurrentAttention.reset"))),
   });
 });

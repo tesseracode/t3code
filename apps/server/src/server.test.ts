@@ -122,6 +122,7 @@ import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
+import { ProjectionThreadAttentionCurrentRepositoryLive } from "./persistence/Layers/ProjectionThreadAttentionCurrent.ts";
 import {
   OrchestrationListenerCallbackError,
   OrchestrationThreadSettleBlockedError,
@@ -982,6 +983,7 @@ const buildAppUnderTest = (options?: {
               }),
             dispatch: () => Effect.succeed({ sequence: 0 }),
             streamDomainEvents: Stream.empty,
+            subscribeDomainEvents: Effect.succeed(Stream.never),
             latestSequence: Effect.succeed(0),
             ...options?.layers?.orchestrationEngine,
           }),
@@ -1057,7 +1059,9 @@ const buildAppUnderTest = (options?: {
     );
 
     const appLayer = servedRoutesLayer.pipe(
-      Layer.provide(resourceTelemetryLayer),
+      Layer.provide(
+        Layer.mergeAll(ProjectionThreadAttentionCurrentRepositoryLive, resourceTelemetryLayer),
+      ),
       Layer.provide(UsageService.layerTest),
       Layer.provide(
         Layer.mock(AnalyticsService.AnalyticsService)({
@@ -2966,6 +2970,23 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
+  it.effect("exposes bounded attention synchronization through authenticated environment RPC", () =>
+    Effect.gen(function* () {
+      yield* buildAppUnderTest();
+      const wsUrl = yield* getWsServerUrl("/ws");
+      const first = yield* Effect.scoped(
+        withWsRpcClient(wsUrl, (client) =>
+          client[WS_METHODS.attentionSubscribe]({ pageSize: 1 }).pipe(Stream.runHead),
+        ),
+      );
+      assert.isTrue(Option.isSome(first));
+      if (Option.isSome(first)) {
+        // The test server's mocked engine does not bootstrap projections.
+        assert.deepEqual(first.value, { type: "reset-required", reason: "rebuilding" });
+      }
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
   it.effect(
     "reports relay client status and streams installation progress over environment RPC",
     () =>
@@ -4191,7 +4212,18 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.equal(wsTicketResponse.status, 200);
       const wsUrl = `${yield* getWsServerUrl("/ws", { authenticated: false })}?wsTicket=${encodeURIComponent(wsTicketBody.ticket)}`;
       const rpcError = yield* Effect.flip(
-        Effect.scoped(withWsRpcClient(wsUrl, (client) => client[WS_METHODS.serverGetConfig]({}))),
+        Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            Effect.gen(function* () {
+              const denied = yield* client[WS_METHODS.attentionSubscribe]({}).pipe(
+                Stream.runHead,
+                Effect.flip,
+              );
+              assert.equal(denied._tag, "EnvironmentAuthorizationError");
+              return yield* client[WS_METHODS.serverGetConfig]({});
+            }),
+          ),
+        ),
       );
       assert.equal(rpcError._tag, "EnvironmentAuthorizationError");
       if (rpcError._tag === "EnvironmentAuthorizationError") {

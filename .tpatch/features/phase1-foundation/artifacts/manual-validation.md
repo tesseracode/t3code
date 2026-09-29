@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-09-28T08:05:45Z
+**Timestamp**: 2026-09-29T00:40:46Z
 
 ## Notes
 
-258 focused cases across9 files passed. Server/contracts/shared typechecks, targeted lint and server bundle passed. Covers actual ingestion/decider/projection, all7 normalized provider mappings, counts overflow, response failure, stale/duplicate events, same-turn recovery, file reopen/rebuild, deletion and migration rollback. No UI/RPC, notifications, live-data access or new platform qualification claim.
+136 focused cases across10 files plus2 selected real WebSocket RPC cases pass. Server/contracts/client-runtime typechecks and new-code lint pass; server bundle builds. Barrier tests cover registration, transactional rollback, mutable pages and post-page fence commits; real disk restart, generation reset, filter exits/removals, >100 items/summaries, retention/UTF8 size limits, malformed/scope tokens and idle revocation are exercised. No live environment or packaged-platform claim.

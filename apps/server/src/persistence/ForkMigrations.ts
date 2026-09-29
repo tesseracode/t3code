@@ -6,6 +6,9 @@ import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.
 import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
 import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
 import ThreadAwareness from "./ForkMigrations/047_ProjectionThreadAwareness.ts";
+import AttentionDelivery, {
+  ATTENTION_DELIVERY_TRIGGERS,
+} from "./ForkMigrations/048_AttentionDelivery.ts";
 import Upstream0044 from "./Migrations/044_ClearAutomaticProjectModelDefaults.ts";
 import Upstream0045 from "./Migrations/045_ProjectionProjectsAutoPull.ts";
 
@@ -15,6 +18,7 @@ const forkEntries = [
   [45, "TwsBindings", TwsBindings],
   [46, "ProjectionThreadAttentionCurrent", CurrentAttention],
   [47, "ProjectionThreadAwareness", ThreadAwareness],
+  [48, "AttentionDelivery", AttentionDelivery],
 ] as const;
 const run = Migrator.make({});
 
@@ -43,6 +47,54 @@ const locatorColumns = [
 ];
 const lifecycleColumns = ["first_seen_at", "last_seen_at", "retired_at"];
 const tables: ReadonlyArray<TableShape> = [
+  {
+    name: "attention_delivery_state",
+    migration: 48,
+    columns: ["id", "generation", "head", "floor", "ready"],
+    nullable: ["id"],
+    primaryKey: ["id"],
+    integerColumns: ["id", "head", "floor", "ready"],
+    indexes: [],
+  },
+  {
+    name: "attention_delivery_rows",
+    migration: 48,
+    columns: ["entity_key", "project_id", "thread_id", "status", "data_json", "version", "bytes"],
+    nullable: [],
+    primaryKey: ["entity_key"],
+    integerColumns: ["version", "bytes"],
+    indexes: ["idx_attention_delivery_scope"],
+  },
+  {
+    name: "attention_delivery_changes",
+    migration: 48,
+    columns: [
+      "sequence",
+      "entity_key",
+      "before_project",
+      "before_thread",
+      "before_status",
+      "project_id",
+      "thread_id",
+      "status",
+      "data_json",
+      "bytes",
+      "oversized",
+    ],
+    nullable: [
+      "sequence",
+      "before_project",
+      "before_thread",
+      "before_status",
+      "project_id",
+      "thread_id",
+      "status",
+      "data_json",
+    ],
+    primaryKey: ["sequence"],
+    integerColumns: ["sequence", "bytes", "oversized"],
+    indexes: [],
+  },
   {
     name: "projection_thread_attention_lifecycle",
     migration: 47,
@@ -263,6 +315,24 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
   applied: ReadonlySet<number>,
 ) {
   const sql = yield* SqlClient.SqlClient;
+  if (applied.has(48)) {
+    const triggers = yield* sql<{ readonly name: string; readonly tbl_name: string }>`
+      SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger'
+        AND ${sql.in(
+          "name",
+          ATTENTION_DELIVERY_TRIGGERS.map((trigger) => trigger.name),
+        )}
+    `;
+    if (
+      ATTENTION_DELIVERY_TRIGGERS.some(
+        (expected) =>
+          !triggers.some(
+            (actual) => actual.name === expected.name && actual.tbl_name === expected.table,
+          ),
+      )
+    )
+      return yield* badState("attention delivery triggers are missing or mismatched");
+  }
   for (const table of tables) {
     const indexes =
       table.name === "projection_thread_attention_current" && applied.has(47)

@@ -144,6 +144,58 @@ transaction. Replay emits no notification; future delivery must publish only
 after commit with its own delivery cursor. Ordinary streaming events do no
 attention lookup beyond the existing batched cursor write.
 
+### Attention synchronization
+
+Servers advertising `capabilities.attentionSync` expose `attention.subscribe`
+under `orchestration:read`. One owned RPC stream emits `begin`, keyset `page`
+messages, catch-up `delta`s, `sync-complete`, and live `delta`s. The page tokens
+chain pages within that subscription; they are not resumable delivery cursors.
+The shared reducer lives at `@t3tools/client-runtime/attention-sync`.
+
+Delivery cursors are signed and bound to environment, authenticated session
+and scopes, canonical project/thread filters, and delivery generation. They
+expire after 24 hours and are usable only while their complete interval remains
+available. Malformed or wrong-scope tokens fail explicitly. Revocation and
+expiry produce authorization failure; clients must clear inaccessible state.
+Filters are selection within an environment-wide authorized read scope, not
+an independent authorization mechanism.
+
+Fork migration 48 adds a rebuildable delivery view and a compact change journal.
+SQL triggers capture material item/summary changes and removals inside the
+same projection transaction. They are derived caches, not another authoritative
+event log. The journal retains at most 1000 changes and 8 MiB; ordinary content
+deltas neither populate it nor cause delivery queries. Missing capture triggers
+make startup fail rather than silently serving stale state.
+
+Subscribe to post-commit domain/reset signals before capturing watermark W in
+a short SQL transaction serialized with projection writes. Pages scan the
+mutable delivery view by immutable entity key. They are not frozen at W.
+After the last page, capture F through the same committed transaction boundary
+and replay every compact change in (W,F], including filtered-out watermark
+advances. Only then emit `sync-complete(F)`. The journal is written synchronously
+with projections, so there is no asynchronous attention-publication backlog
+to race at the fence. Live delivery continues strictly above F.
+
+The client stages pages and replay, compares transport versions (including
+removal tombstones), and exposes the cache atomically at F. A later incarnation
+can supersede a tombstone even when its domain revision restarts at 1. Only live
+frames above a completed fence are notification candidates; this protocol
+does not deliver notifications or aggregate environments.
+
+Default pages contain 50 rows, maximum 100 combined items/summaries, with a
+64 KiB encoded-message bound. Total dataset size is not capped by a page.
+Bootstrap/replay expires after 30 seconds; the existing live-stream ACK budget
+also bounds delivery. Slow consumers, missing replay intervals, oversized
+rows, restart/rebuild generations and incomplete rebuilds produce explicit
+reset/backpressure, never a truncated success. A single bounded wake signal
+replaces queued raw thread events, and no database transaction spans an RPC ACK.
+Consumers own normal reconnect backoff; persistent inability to synchronize
+must be surfaced rather than retried in a tight loop.
+
+Startup/bootstrap rotates the delivery generation and gates delivery until
+replay completes. Reset clears only derived attention/delivery state and its
+cursor; the event history and audit remain authoritative and unchanged.
+
 ## Turn completion and checkpoints
 
 A turn ending and its follow-up work settling are separate milestones. The

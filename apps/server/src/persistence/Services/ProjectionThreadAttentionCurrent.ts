@@ -9,6 +9,8 @@ import {
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type * as Option from "effect/Option";
+import type * as Scope from "effect/Scope";
+import type * as Stream from "effect/Stream";
 import * as Schema from "effect/Schema";
 import type { ProjectionRepositoryError } from "../Errors.ts";
 
@@ -32,6 +34,9 @@ export class ProjectionThreadAttentionCurrentRepository extends Context.Service<
     ) => Effect.Effect<Option.Option<ThreadAwarenessSummary>, ProjectionRepositoryError>;
     /** Clears only this projection and its cursor; pipeline bootstrap replays the durable event store. */
     readonly reset: Effect.Effect<void, ProjectionRepositoryError>;
+    readonly subscribeResets: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>;
+    readonly beginRebuild: Effect.Effect<void, ProjectionRepositoryError>;
+    readonly finishRebuild: Effect.Effect<void, ProjectionRepositoryError>;
   }
 >()(
   "t3/persistence/Services/ProjectionThreadAttentionCurrent/ProjectionThreadAttentionCurrentRepository",

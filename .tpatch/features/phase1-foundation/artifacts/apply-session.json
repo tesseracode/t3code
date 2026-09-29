@@ -1,9 +1,9 @@
 {
   "slug": "phase1-foundation",
-  "completed_at": "2026-09-28T08:05:45Z",
-  "base_commit": "6cc650d507d3ff80e23919d687fbc2920497da5f",
+  "completed_at": "2026-09-29T00:40:46Z",
+  "base_commit": "d701ac195d8f7eb35f750e47747bebc073dac545",
   "has_patch": true,
-  "operator_notes": "ATT-02: preserve bounded provider lifecycle evidence on accepted session-set events; project scoped failure/disconnect items and bounded summaries. Preserve message-mode questions, ignore duplicate/stale observations, distinguish intentional interruption/client loss, and atomically replay through fork migration47 without changing audit or prior migration bytes.",
+  "operator_notes": "ATT-03 as approved: one authenticated owned attention stream, separately signed cursor/page tokens, bounded derived journal/materialized delivery view, keyset bootstrap plus committed fence/replay/live delivery, generation/expiry/overflow/scope reset rules, and a shared staging reducer. Existing authority/event history/audit remain unchanged; no UI, aggregator or notification delivery.",
   "validation_status": "passed",
-  "validation_notes": "258 focused cases across9 files passed. Server/contracts/shared typechecks, targeted lint and server bundle passed. Covers actual ingestion/decider/projection, all7 normalized provider mappings, counts overflow, response failure, stale/duplicate events, same-turn recovery, file reopen/rebuild, deletion and migration rollback. No UI/RPC, notifications, live-data access or new platform qualification claim."
+  "validation_notes": "136 focused cases across10 files plus2 selected real WebSocket RPC cases pass. Server/contracts/client-runtime typechecks and new-code lint pass; server bundle builds. Barrier tests cover registration, transactional rollback, mutable pages and post-page fence commits; real disk restart, generation reset, filter exits/removals, \u003e100 items/summaries, retention/UTF8 size limits, malformed/scope tokens and idle revocation are exercised. No live environment or packaged-platform claim."
 }

@@ -16,6 +16,8 @@ The consolidated patch contains exactly:
   separate replayable projector/cursor, without changing the compact audit.
 - ATT-02 (#4): authoritative lifecycle evidence, failure/disconnect attention
   and bounded thread awareness through fork migration 47.
+- ATT-03 (#5): an authenticated owned attention bootstrap/replay/live stream,
+  bounded derived delivery journal and shared client protocol reducer.
 
 ## Dependency model
 
@@ -68,7 +70,7 @@ Superseded historical Copilot children already covered by the Copilot root:
 9. The single-parent landing and regenerated recipe verify on current parents.
 10. The superseder is active and healthy, removing granular/covered child
    records from default replay without deleting audit history.
-11. No new attention inbox, UI, RPC, relay, push, provider,
+11. No new attention inbox, UI, relay, push, provider,
    TWS mutation, hosting implementation or target-platform
    behavior is claimed.
 
@@ -145,6 +147,39 @@ saturated counts with an overflow flag.
 
 The complete transition/resolution table is maintained in
 `docs/internals/overview.md#current-attention-and-lifecycle-awareness`.
+
+## ATT-03 bounded synchronization
+
+The maintainer approved one owned backpressured stream rather than independently
+callable snapshot/stream RPCs, and a bounded derived journal rather than a new
+authoritative event history.
+
+- `attention.subscribe` uses environment orchestration-read authority and an
+  optional discovery capability. Tokens bind environment, session/scopes,
+  normalized filters and delivery generation. Page and delivery tokens are
+  distinct; page tokens only chain pages within the owned stream.
+- Register post-commit/reset wakeups before short transaction capture W.
+  Immutable-key pages are a mutable bootstrap scan. After the final page,
+  capture committed F, replay all journal changes (W,F], then sync-complete F.
+- SQL triggers capture material changes/removals transactionally. Item
+  incarnation/tombstone transport versions override overlapping older pages.
+  Filter exits/removals are explicit; empty filtered batches advance cursors.
+- Pages/messages default to50, cap at100 combined entries and64KiB; no dataset
+  cap. Journal retention is1000 changes/8MiB; bootstrap/replay expires at30s.
+  Use existing ACK-aware live budgeting and a single sliding wake signal.
+- Reconnect requires the complete contiguous interval; generation/retention/
+  size/time failures explicitly reset. Malformed/scope-mismatched cursors
+  fail; revoked authority discards client cache. No polling/reset loops.
+- Rebuild rotates generation, gates reads during replay and preserves the
+  immutable event/audit history. Missing journal triggers are a startup error.
+- Shared client reducer stages until the fence, rejects gaps/wrong scope,
+  handles overlap and deletion/recreation, and suppresses notification
+  candidates during bootstrap/resumed replay.
+- Cover real engine commit barriers, >100 items and summaries, inserts behind
+  the keyset, final-page/fence commits, filtered changes, rollback, restart,
+  rebuild, token kind/scope changes, slow overflow and UTF-8 byte limits.
+- Existing web/desktop/mobile transports use the common RPC contracts. No UI,
+  environment aggregation, notification preferences or mandatory relay here.
 
 ## External gates
 

@@ -1,3 +1,7 @@
+import { AttentionSyncError, AuthOrchestrationReadScope } from "@t3tools/contracts";
+import { makeAttentionStream } from "./orchestration/AttentionSync.ts";
+import { ServerSecretStore } from "./auth/ServerSecretStore.ts";
+import { AuthSessionRepository } from "./persistence/AuthSessions.ts";
 import {
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
@@ -500,6 +504,8 @@ const makeWsRpcLayer = (
   WsRpcGroup.toLayer(
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
+      const attentionSecrets = yield* ServerSecretStore;
+      const attentionAuthSessions = yield* AuthSessionRepository;
       const crypto = yield* Crypto.Crypto;
       const sql = yield* SqlClient.SqlClient;
       const projectionSnapshotQuery = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
@@ -2284,6 +2290,61 @@ const makeWsRpcLayer = (
               );
             }),
             { "rpc.aggregate": "orchestration" },
+          ),
+        [WS_METHODS.attentionSubscribe]: (input) =>
+          observeRpcStream(
+            WS_METHODS.attentionSubscribe,
+            Stream.unwrap(
+              Effect.gen(function* () {
+                const secret = yield* attentionSecrets
+                  .getOrCreateRandom("attention-cursors", 32)
+                  .pipe(
+                    Effect.mapError(
+                      () =>
+                        new AttentionSyncError({
+                          reason: "unavailable",
+                          message: "Attention cursor signing is unavailable.",
+                        }),
+                    ),
+                  );
+                const environmentId = yield* serverEnvironment.getEnvironmentId;
+                const scopes = [...currentSession.scopes].sort().join(",");
+                const authorize = Effect.gen(function* () {
+                  const active = yield* attentionAuthSessions
+                    .getById({ sessionId: currentSessionId })
+                    .pipe(
+                      Effect.mapError(
+                        () =>
+                          new AttentionSyncError({
+                            reason: "unavailable",
+                            message: "Could not verify attention authorization.",
+                          }),
+                      ),
+                    );
+                  const now = yield* DateTime.now;
+                  if (
+                    Option.isNone(active) ||
+                    active.value.revokedAt !== null ||
+                    DateTime.toEpochMillis(active.value.expiresAt) <= DateTime.toEpochMillis(now) ||
+                    [...active.value.scopes].sort().join(",") !== scopes ||
+                    !active.value.scopes.includes(AuthOrchestrationReadScope)
+                  ) {
+                    return yield* authorizationError(AuthOrchestrationReadScope);
+                  }
+                });
+                return makeAttentionStream(input, {
+                  environmentId,
+                  scopeBinding: `${currentSessionId}:${scopes}`,
+                  secret,
+                  authorize,
+                  authorizationChanges: sessions.streamChanges,
+                  ...(currentSession.expiresAt
+                    ? { expiresAtMs: DateTime.toEpochMillis(currentSession.expiresAt) }
+                    : {}),
+                });
+              }),
+            ),
+            { "rpc.aggregate": "attention" },
           ),
         [WS_METHODS.serverProbe]: (_input) =>
           observeRpcEffect(WS_METHODS.serverProbe, Effect.succeed({}), {

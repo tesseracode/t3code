@@ -1,6 +1,11 @@
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
+import {
+  AttentionSubscribeInput,
+  AttentionStreamMessage,
+  AttentionSyncError,
+} from "./attentionSync.ts";
 import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import {
   ProviderAuthCancelInput,
@@ -270,6 +275,7 @@ import {
 import { VcsError } from "./vcs.ts";
 
 export const WS_METHODS = {
+  attentionSubscribe: "attention.subscribe",
   // Project registry methods
   projectsList: "projects.list",
   projectsAdd: "projects.add",
@@ -1358,6 +1364,12 @@ const WsSubscribeResourceTelemetryRpc = Rpc.make(WS_METHODS.subscribeResourceTel
 });
 
 export const WsRpcGroup = RpcGroup.make(
+  Rpc.make(WS_METHODS.attentionSubscribe, {
+    payload: AttentionSubscribeInput,
+    success: AttentionStreamMessage,
+    error: Schema.Union([AttentionSyncError, EnvironmentAuthorizationError]),
+    stream: true,
+  }),
   WsServerProbeRpc,
   WsServerGetConfigRpc,
   WsServerRefreshProvidersRpc,

@@ -11,6 +11,7 @@ import { migrationManifest, runMigrations } from "./Migrations.ts";
 import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.ts";
 import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
 import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
+import { ATTENTION_DELIVERY_TRIGGERS } from "./ForkMigrations/048_AttentionDelivery.ts";
 
 const attentionName = "ProjectionThreadAttentionAudit";
 const twsName = "TwsBindings";
@@ -135,6 +136,7 @@ it.effect("fresh installs keep upstream and fork histories in separate namespace
         { migration_id: 45, name: twsName },
         { migration_id: 46, name: "ProjectionThreadAttentionCurrent" },
         { migration_id: 47, name: "ProjectionThreadAwareness" },
+        { migration_id: 48, name: "AttentionDelivery" },
       ],
     );
     assert.deepEqual(yield* runMigrations(), []);
@@ -152,7 +154,7 @@ it.effect("upstream-only databases add fork state without rerunning upstream mig
       original,
     );
 
-    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 4);
+    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 5);
   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
 );
 
@@ -242,6 +244,57 @@ it.effect("upgrades ATT-01 atomically and resets only its derived rows and repla
     yield* runMigrations();
     assert.deepEqual(yield* sql`SELECT * FROM projection_state ORDER BY projector`, cursors);
   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+);
+
+it.effect(
+  "backfills delivery from ATT-02 projections atomically without resetting domain state",
+  () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* runMigrations();
+      for (const trigger of ATTENTION_DELIVERY_TRIGGERS)
+        yield* sql.unsafe(`DROP TRIGGER ${trigger.name}`);
+      for (const table of [
+        "attention_delivery_changes",
+        "attention_delivery_rows",
+        "attention_delivery_state",
+      ])
+        yield* sql.unsafe(`DROP TABLE ${table}`);
+      yield* sql`DELETE FROM t3code_fork_migrations WHERE migration_id = 48`;
+      yield* sql`INSERT INTO projection_thread_attention_current
+      (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code, revision,
+       source_event_id, source_sequence, opened_at, updated_at, resolved_at)
+      VALUES (${"c".repeat(64)}, 'project', 'thread', 'turn', 'request', 'approval', 'open',
+        'approval_requested', 1, 'source', 12, '2026-09-28T00:00:00Z', '2026-09-28T00:00:00Z', NULL)`;
+      const domain = yield* sql`SELECT * FROM projection_thread_attention_current`;
+      const ledger = yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`;
+      yield* sql`CREATE TRIGGER reject_delivery BEFORE INSERT ON t3code_fork_migrations
+      WHEN NEW.migration_id = 48 BEGIN SELECT RAISE(ABORT, 'blocked delivery upgrade'); END`;
+      assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
+      assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_current`, domain);
+      assert.deepEqual(
+        yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`,
+        ledger,
+      );
+      assert.deepEqual(
+        yield* sql`SELECT name FROM sqlite_master WHERE name = 'attention_delivery_rows'`,
+        [],
+      );
+      yield* sql`DROP TRIGGER reject_delivery`;
+      yield* runMigrations();
+      const delivery = yield* sql<{ readonly entity_key: string; readonly version: number }>`
+      SELECT entity_key, version FROM attention_delivery_rows`;
+      assert.deepEqual(delivery, [{ entity_key: `item:${"c".repeat(64)}`, version: 0 }]);
+      assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_current`, domain);
+      assert.deepEqual(yield* sql`SELECT * FROM attention_delivery_changes`, []);
+      yield* runMigrations();
+      assert.deepEqual(
+        yield* sql`SELECT entity_key, version FROM attention_delivery_rows`,
+        delivery,
+      );
+      yield* sql`DROP TRIGGER delivery_projection_thread_attention_current_update`;
+      assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
+    }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
 );
 
 it.effect("does not reinterpret new fork migration IDs as historical upstream collisions", () =>
