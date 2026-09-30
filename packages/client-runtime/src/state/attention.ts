@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as HashMap from "effect/HashMap";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
@@ -19,6 +20,7 @@ import { EnvironmentRegistry } from "../connection/registry.ts";
 import { EnvironmentSupervisor, retryDelayMs } from "../connection/supervisor.ts";
 import { EnvironmentRpcSubscriptionObserver, isRpcClientError } from "../rpc/client.ts";
 import type { RpcSession } from "../rpc/session.ts";
+import { projectAttentionNotifications } from "./attentionNotifications.ts";
 import {
   aggregateAttention,
   emptyEnvironmentAttention,
@@ -59,6 +61,7 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
               ? "stale"
               : "loading",
         reason: current.status === "unauthorized" ? "unauthorized" : reason,
+        notificationCandidates: HashMap.empty(),
       }));
     const ownsSession = Effect.fn(function* (session: RpcSession) {
       const active = yield* SubscriptionRef.get(supervisor.session);
@@ -77,6 +80,7 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
         ...current,
         status: current.hasSnapshot ? "syncing" : "loading",
         reason: null,
+        notificationCandidates: HashMap.empty(),
       }));
       const config = yield* Effect.exit(session.initialConfig);
       if (!(yield* ownsSession(session))) return;
@@ -136,6 +140,7 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
                 terminal = true;
                 return;
               }
+              const before = sync;
               sync = reduceAttentionStream(sync, message);
               if (sync.status === "reset-required") {
                 retry = message.type === "reset-required" && message.reason !== "message-too-large";
@@ -144,6 +149,7 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
                   ...current,
                   status: retry ? (current.hasSnapshot ? "stale" : "loading") : "error",
                   reason: sync.reason,
+                  notificationCandidates: HashMap.empty(),
                 }));
                 yield* Effect.logWarning("Attention stream requires resynchronization.", {
                   environmentId,
@@ -151,17 +157,24 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
                   retry,
                 });
               } else if (sync.status === "live") {
-                yield* SubscriptionRef.set(state, {
+                yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
                   status: "live",
                   hasSnapshot: true,
                   entries: sync.entries,
                   reason: null,
-                });
+                  notificationCandidates: projectAttentionNotifications(
+                    current.notificationCandidates ?? HashMap.empty(),
+                    before,
+                    sync,
+                    message,
+                  ),
+                }));
               } else if (message.type === "begin") {
                 yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
                   ...current,
                   status: current.hasSnapshot ? "syncing" : "loading",
                   reason: null,
+                  notificationCandidates: HashMap.empty(),
                 }));
               }
             }),

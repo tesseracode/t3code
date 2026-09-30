@@ -529,6 +529,12 @@ describe("registry-owned attention subscriptions", () => {
         expect(aggregateAttention(stillPartial).complete).toBe(false);
         yield* Queue.offer(b.messages, { ...checkpoint(B), type: "sync-complete" });
         const live = yield* h.awaitStatus(B, "live");
+        expect([
+          ...HashMap.keys(live.environments.get(A)?.notificationCandidates ?? HashMap.empty()),
+        ]).toEqual([change(item("c"), 2).key]);
+        expect(
+          HashMap.size(live.environments.get(B)?.notificationCandidates ?? HashMap.empty()),
+        ).toBe(0);
         expect(aggregateAttention(live)).toMatchObject({
           complete: true,
           itemCount: 4,

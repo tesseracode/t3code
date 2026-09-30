@@ -24,6 +24,7 @@ export interface EnvironmentAttentionState {
   readonly hasSnapshot: boolean;
   readonly entries: HashMap.HashMap<string, AttentionChange>;
   readonly reason: string | null;
+  readonly notificationCandidates?: HashMap.HashMap<string, AttentionChange>;
 }
 
 export const emptyEnvironmentAttention = (): EnvironmentAttentionState => ({

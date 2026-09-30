@@ -1,8 +1,8 @@
 {
   "slug": "phase1-foundation",
-  "completed_at": "2026-09-29T01:29:41Z",
-  "base_commit": "5d5c9380b411848940057f31610c105f10d30392",
+  "completed_at": "2026-09-30T06:42:13Z",
+  "base_commit": "c87189e978856b8fd6043f42e296d2cf312cb6cc",
   "has_patch": true,
   "validation_status": "passed",
-  "validation_notes": "ATT-04: 90 focused tests across aggregation, reducer, registry, supervisor and RPC helpers; scoped client-runtime/web/mobile typechecks and lint pass. No browser, live-state access or provider changes."
+  "validation_notes": "Exact shared source bytes validated in integration worktree: three eligibility tests, registry-owned attention tests, client-runtime typecheck and scoped lint."
 }

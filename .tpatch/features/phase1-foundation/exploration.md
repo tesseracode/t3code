@@ -158,6 +158,13 @@ introduced. Success logging occurs after the outer commit.
 
 ## Proof and lifecycle
 
+ATT-06 adds a pure current-candidate projection at the shared attention stream
+boundary. It consumes accepted live deltas directly, so React coalescing cannot
+turn replay into an alert or lose independent still-open candidates. The public
+metadata is optional for conservative compatibility with callers constructing
+older snapshots; absence means no notification eligibility. Focused reducer and
+actual registry-owned stream tests cover the new boundary.
+
 Disposable memory/file databases cover fresh install, current upstream upgrade,
 legacy audit-only and full foundation, advanced mixed history, matching-column
 foreign-key damage, missing schema/history, provenance conflicts, rejected ledger

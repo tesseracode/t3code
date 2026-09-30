@@ -218,6 +218,19 @@ discarding disabled caches, advisory-only relay hints and capped reset backoff.
   Existing direct/bearer/SSH/relay/tunnel connection ownership is unchanged;
   provider-independent canonical data needs no adapter changes.
 
+## ATT-06 shared notification eligibility prerequisite
+
+- Expose accepted post-live notification candidates as derived client metadata,
+  not a new wire field, event journal or notification sink.
+- Retain independent still-relevant candidates across consumer batching,
+  bounded by current compact entities. Resolve/delete/nonlive states remove
+  eligibility; snapshots, replay, imports and rebuild remain silent.
+- Completion candidates require a newly completed non-null turn. Later
+  same-turn completed summary revisions and initial completed summaries do
+  not manufacture further completion alerts.
+- Delivery, client preferences and OS presentation belong to the separate
+  attention-notifications root.
+
 ## External gates
 
 Linux, Windows, and Windows+WSL execution remain documented target-host gates.
