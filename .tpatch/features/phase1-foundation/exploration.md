@@ -123,6 +123,26 @@ and direct/relay disagreement. No browser or live environment is used.
 
 ## Target and retained seams
 
+TWS-01 adds an optional environment-side service around the existing read-only
+adapter and binding repository. Public v1.2.14 status/stack structs were checked
+against their pinned source and actual read-only CLI output. The registry marker
+is persistent identity; report stable_id is derived from the repository path.
+Features/nodes have no immutable native ID, so name/path-only changes cannot
+silently carry an old association into a new one.
+
+Keep logical choice in T3-owned sidecar records, independently from current-node
+execution evidence. A partial creation-event index bounds incarnation lookup
+without traversing conversation history. Query summaries have their own compact
+projection; full locator data stays behind a single-binding provenance query.
+The service acquires config/domain subscriptions once, coalesces scans and
+cancels its own worker on disable; it never owns provider processes.
+
+Existing client-attention source is a separate maintenance root. Re-record this
+Foundation extension on its own source lineage, then replay the client root on
+the updated parent without merging its obsolete source anchor into that rebuilt
+stack. Preserve the old branch/history and prove exact integrated product
+equality rather than repeatedly consolidating unrelated behavior.
+
 - Stable target: `719a76ca1dbf5490f1aa33ffb9966301e02be9a9`.
 - Integrated base before this port: `7b5f4af3501d89b42b840f875917c09db4f786ce`.
 - Retain audit mapper/repository and its independent projector alongside current

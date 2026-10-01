@@ -2,6 +2,7 @@ import { AttentionSyncError, AuthOrchestrationReadScope } from "@t3tools/contrac
 import { makeAttentionStream } from "./orchestration/AttentionSync.ts";
 import { ServerSecretStore } from "./auth/ServerSecretStore.ts";
 import { AuthSessionRepository } from "./persistence/AuthSessions.ts";
+import { TwsContextService } from "./tws/TwsContextService.ts";
 import {
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
@@ -576,6 +577,7 @@ const makeWsRpcLayer = (
       const config = yield* ServerConfig.ServerConfig;
       const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
       const serverSettings = yield* ServerSettings.ServerSettingsService;
+      const twsContext = yield* TwsContextService;
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
@@ -2346,6 +2348,16 @@ const makeWsRpcLayer = (
             ),
             { "rpc.aggregate": "attention" },
           ),
+        [WS_METHODS.twsRefresh]: () =>
+          observeRpcEffect(WS_METHODS.twsRefresh, twsContext.refresh()),
+        [WS_METHODS.twsQuery]: (input) =>
+          observeRpcEffect(WS_METHODS.twsQuery, twsContext.query(input)),
+        [WS_METHODS.twsGetContexts]: (input) =>
+          observeRpcEffect(WS_METHODS.twsGetContexts, twsContext.getContexts(input.threadIds)),
+        [WS_METHODS.twsSetContext]: (input) =>
+          observeRpcEffect(WS_METHODS.twsSetContext, twsContext.setContext(input)),
+        [WS_METHODS.twsProvenance]: (input) =>
+          observeRpcEffect(WS_METHODS.twsProvenance, twsContext.provenance(input.bindingId)),
         [WS_METHODS.serverProbe]: (_input) =>
           observeRpcEffect(WS_METHODS.serverProbe, Effect.succeed({}), {
             "rpc.aggregate": "server",
@@ -2590,6 +2602,18 @@ const makeWsRpcLayer = (
                 ...patch,
                 ...(deviceHosts ? { deviceHosts } : {}),
               });
+              if (patch.twsIntegrationEnabled !== undefined) {
+                yield* twsContext
+                  .configure(settings.twsIntegrationEnabled)
+                  .pipe(
+                    Effect.catchTag("TwsContextError", (error) =>
+                      Effect.logWarning(
+                        "TWS integration preference saved, but cached observation invalidation failed.",
+                        { reason: error.reason },
+                      ),
+                    ),
+                  );
+              }
               return ServerSettings.redactServerSettingsForClient(settings);
             }),
             {

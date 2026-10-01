@@ -72,6 +72,35 @@ function testLayer(outputs: ReadonlyArray<ProcessRunOutput>, calls: ProcessRunIn
 }
 
 describe("TwsCliAdapter", () => {
+  it.effect(
+    "rechecks the pinned executable version for a new refresh and does not retain an obsolete success",
+    () => {
+      const calls: ProcessRunInput[] = [];
+      return Effect.gen(function* () {
+        const adapter = yield* TwsCliAdapter;
+        yield* adapter.probe();
+        const rejected = yield* adapter.probe({ refresh: true }).pipe(Effect.flip);
+        assert.strictEqual(rejected._tag, "TwsUnsupportedVersionError");
+        yield* adapter.checkRegistry();
+        assert.deepEqual(
+          calls.map((call) => call.args),
+          [["--version"], ["--version"], ["--version"], ["registry", "check", "--json"]],
+        );
+      }).pipe(
+        Effect.provide(
+          testLayer(
+            [
+              processOutput({ stdout: "tws version v1.2.14" }),
+              processOutput({ stdout: "tws version v1.3.0" }),
+              processOutput({ stdout: "tws version v1.2.14" }),
+              processOutput({ stdout: encodeJson([]) }),
+            ],
+            calls,
+          ),
+        ),
+      );
+    },
+  );
   it.effect("uses only read-only direct argument arrays and caches a successful version", () => {
     const calls: ProcessRunInput[] = [];
     const layer = testLayer(

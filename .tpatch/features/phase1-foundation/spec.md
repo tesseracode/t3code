@@ -20,6 +20,8 @@ The consolidated patch contains exactly:
   bounded derived delivery journal and shared client protocol reducer.
 - ATT-04 (#6): shared scoped multi-environment attention aggregation through
   existing connection ownership, without inbox UI or notification delivery.
+- TWS-01 (#9): optional environment-owned topology refresh and persisted thread
+  context, with an off-by-default integration switch and no grouping/tag UI.
 
 ## Dependency model
 
@@ -72,9 +74,9 @@ Superseded historical Copilot children already covered by the Copilot root:
 9. The single-parent landing and regenerated recipe verify on current parents.
 10. The superseder is active and healthy, removing granular/covered child
    records from default replay without deleting audit history.
-11. No new attention inbox, UI, relay, push, provider,
-   TWS mutation, hosting implementation or target-platform
-   behavior is claimed.
+11. No attention inbox, grouping/tag UI, relay, push, provider, TWS mutation,
+    hosting implementation or target-platform behavior is claimed. The minimal
+    TWS integration settings control is the explicit TWS-01 exception.
 
 ## ATT-01 request state
 
@@ -230,6 +232,36 @@ discarding disabled caches, advisory-only relay hints and capped reset backoff.
   not manufacture further completion alerts.
 - Delivery, client preferences and OS presentation belong to the separate
   attention-notifications root.
+
+## TWS-01 optional topology and thread context
+
+- Off by default per environment, controlled in Settings -> Integrations.
+  Disabled means no TWS CLI calls, cancellation of owned scans and inactive
+  retained choices. Re-enabling requires a fresh observation. No plugin loader.
+- Re-probe exact v1.2.14 each refresh. Normalize public workspace/feature/stack
+  association fields, counts and parent consistency; do not inspect backing
+  metadata files or infer provider state from TWS status.
+- Registry marker identity proves workspace moves; report stable_id does not.
+  Keep opaque scoped IDs, reject weak-locator merges on strong conflicts, and
+  require reassignment for unproved feature/node identity changes.
+- Coalesce on-demand view/reconnect/explicit refresh and execution-context
+  invalidations. No polling. Complete scopes can retain independent positives;
+  failures/limits retain last-known data without authoritative empty success.
+- Fork migration 49 stores coverage and T3-only context with optimistic material
+  revisions and thread/project incarnation/location guards. Explicit clear is
+  sticky until automatic mode is explicitly restored. Choices never move
+  checkouts, select providers or mutate TWS.
+- Cancellation and generation guards prevent stale completion; refresh commits
+  use the latest persisted choices so they cannot undo concurrent clear/set.
+  Observation evidence advances independently from material context revision.
+- Use bounded, path-free topology/context queries and lazy one-binding provenance.
+  Public pages are not source-completeness evidence. Scope-safe commands share
+  the existing authenticated environment RPC/lease on all clients.
+- Tests cover disabled bypass/cancellation, ambiguity, partial scans, archived
+  and cross-repository unsupported nodes, exact checkout proof, rename/move
+  constraints, concurrent choices, incarnation changes and disk persistence.
+- A minimal opt-in settings surface is included; grouping UI and derived tags
+  remain separate. Native Windows uses a WSL environment for pinned TWS.
 
 ## External gates
 

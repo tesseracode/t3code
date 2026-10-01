@@ -137,10 +137,45 @@ it.effect("fresh installs keep upstream and fork histories in separate namespace
         { migration_id: 46, name: "ProjectionThreadAttentionCurrent" },
         { migration_id: 47, name: "ProjectionThreadAwareness" },
         { migration_id: 48, name: "AttentionDelivery" },
+        { migration_id: 49, name: "TwsContext" },
       ],
     );
     assert.deepEqual(yield* runMigrations(), []);
   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+);
+
+it.effect(
+  "adds TWS context atomically without changing existing bindings or migration history",
+  () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* runMigrations();
+      for (const table of [
+        "tws_thread_contexts",
+        "tws_context_topology",
+        "tws_context_observations",
+      ])
+        yield* sql.unsafe(`DROP TABLE ${table}`);
+      yield* sql`DROP INDEX idx_tws_context_incarnation`;
+      yield* sql`DELETE FROM t3code_fork_migrations WHERE migration_id = 49`;
+      const before = yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`;
+      yield* sql`CREATE TRIGGER reject_tws_context BEFORE INSERT ON t3code_fork_migrations
+      WHEN NEW.migration_id = 49 BEGIN SELECT RAISE(ABORT, 'reject TWS context'); END`;
+      assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
+      assert.deepEqual(
+        yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`,
+        before,
+      );
+      assert.deepEqual(
+        yield* sql`SELECT name FROM sqlite_master WHERE name = 'tws_thread_contexts'`,
+        [],
+      );
+      yield* sql`DROP TRIGGER reject_tws_context`;
+      yield* runMigrations();
+      assert.deepEqual(yield* runMigrations(), []);
+      yield* sql`DROP INDEX idx_tws_context_incarnation`;
+      assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
+    }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
 );
 
 it.effect("upstream-only databases add fork state without rerunning upstream migrations", () =>
@@ -154,7 +189,7 @@ it.effect("upstream-only databases add fork state without rerunning upstream mig
       original,
     );
 
-    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 5);
+    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 6);
   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
 );
 
@@ -258,9 +293,13 @@ it.effect(
         "attention_delivery_changes",
         "attention_delivery_rows",
         "attention_delivery_state",
+        "tws_thread_contexts",
+        "tws_context_topology",
+        "tws_context_observations",
       ])
         yield* sql.unsafe(`DROP TABLE ${table}`);
-      yield* sql`DELETE FROM t3code_fork_migrations WHERE migration_id = 48`;
+      yield* sql`DELETE FROM t3code_fork_migrations WHERE migration_id >= 48`;
+      yield* sql`DROP INDEX idx_tws_context_incarnation`;
       yield* sql`INSERT INTO projection_thread_attention_current
       (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code, revision,
        source_event_id, source_sequence, opened_at, updated_at, resolved_at)

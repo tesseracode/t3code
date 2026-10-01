@@ -76,6 +76,8 @@ export const ServerSelfUpdateCapability = Schema.Literals([
 export type ServerSelfUpdateCapability = typeof ServerSelfUpdateCapability.Type;
 
 export const ExecutionEnvironmentCapabilities = Schema.Struct({
+  /** Optional read-only TWS context API; use the environment setting to opt in. */
+  twsContext: Schema.optionalKey(Schema.Boolean),
   /** Owned, paginated attention bootstrap/replay/live stream protocol v1. */
   attentionSync: Schema.optionalKey(Schema.Boolean),
   repositoryIdentity: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),

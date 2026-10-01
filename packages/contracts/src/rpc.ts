@@ -2,6 +2,18 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import {
+  TwsContextError,
+  TwsContextQuery,
+  TwsContextQueryResult,
+  TwsContextSetInput,
+  TwsThreadContext,
+  TwsIntegrationState,
+  TwsTopologyQuery,
+  TwsTopologyQueryResult,
+  TwsProvenanceInput,
+  TwsProvenance,
+} from "./twsContext.ts";
+import {
   AttentionSubscribeInput,
   AttentionStreamMessage,
   AttentionSyncError,
@@ -275,6 +287,11 @@ import {
 import { VcsError } from "./vcs.ts";
 
 export const WS_METHODS = {
+  twsRefresh: "tws.refresh",
+  twsQuery: "tws.query",
+  twsGetContexts: "tws.contexts.get",
+  twsSetContext: "tws.context.set",
+  twsProvenance: "tws.provenance",
   attentionSubscribe: "attention.subscribe",
   // Project registry methods
   projectsList: "projects.list",
@@ -1364,6 +1381,31 @@ const WsSubscribeResourceTelemetryRpc = Rpc.make(WS_METHODS.subscribeResourceTel
 });
 
 export const WsRpcGroup = RpcGroup.make(
+  Rpc.make(WS_METHODS.twsRefresh, {
+    payload: Schema.Struct({}),
+    success: TwsIntegrationState,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.twsQuery, {
+    payload: TwsTopologyQuery,
+    success: TwsTopologyQueryResult,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.twsGetContexts, {
+    payload: TwsContextQuery,
+    success: TwsContextQueryResult,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.twsSetContext, {
+    payload: TwsContextSetInput,
+    success: TwsThreadContext,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.twsProvenance, {
+    payload: TwsProvenanceInput,
+    success: TwsProvenance,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
   Rpc.make(WS_METHODS.attentionSubscribe, {
     payload: AttentionSubscribeInput,
     success: AttentionStreamMessage,

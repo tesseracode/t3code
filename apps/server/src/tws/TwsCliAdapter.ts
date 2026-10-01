@@ -39,7 +39,9 @@ export interface TwsStackStatusInput {
 }
 
 export interface TwsCliAdapterShape {
-  readonly probe: () => Effect.Effect<TwsVersionInfo, TwsCliAdapterError>;
+  readonly probe: (options?: {
+    readonly refresh?: boolean;
+  }) => Effect.Effect<TwsVersionInfo, TwsCliAdapterError>;
   readonly listRegistry: () => Effect.Effect<ReadonlyArray<TwsRegistryEntry>, TwsCliAdapterError>;
   readonly checkRegistry: () => Effect.Effect<ReadonlyArray<TwsRegistryCheck>, TwsCliAdapterError>;
   readonly readStatus: (
@@ -123,16 +125,19 @@ const makeTwsCliAdapter = Effect.gen(function* () {
   const probeUncached = () =>
     run("version", ["--version"]).pipe(Effect.flatMap(decodeTwsVersionOutput));
 
-  const probe: TwsCliAdapterShape["probe"] = () =>
-    cachedVersion
-      ? Effect.succeed(cachedVersion)
-      : probeUncached().pipe(
-          Effect.tap((version) =>
-            Effect.sync(() => {
-              cachedVersion = version;
-            }),
-          ),
-        );
+  const probe: TwsCliAdapterShape["probe"] = (options) =>
+    Effect.suspend(() => {
+      if (options?.refresh) cachedVersion = undefined;
+      return cachedVersion
+        ? Effect.succeed(cachedVersion)
+        : probeUncached().pipe(
+            Effect.tap((version) =>
+              Effect.sync(() => {
+                cachedVersion = version;
+              }),
+            ),
+          );
+    });
 
   const withSupportedVersion = <A, E>(
     effect: Effect.Effect<A, E>,

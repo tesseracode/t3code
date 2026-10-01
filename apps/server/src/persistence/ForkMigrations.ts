@@ -11,6 +11,7 @@ import AttentionDelivery, {
 } from "./ForkMigrations/048_AttentionDelivery.ts";
 import Upstream0044 from "./Migrations/044_ClearAutomaticProjectModelDefaults.ts";
 import Upstream0045 from "./Migrations/045_ProjectionProjectsAutoPull.ts";
+import TwsContext from "./ForkMigrations/049_TwsContext.ts";
 
 const FORK_MIGRATIONS_TABLE = "t3code_fork_migrations";
 const forkEntries = [
@@ -19,6 +20,7 @@ const forkEntries = [
   [46, "ProjectionThreadAttentionCurrent", CurrentAttention],
   [47, "ProjectionThreadAwareness", ThreadAwareness],
   [48, "AttentionDelivery", AttentionDelivery],
+  [49, "TwsContext", TwsContext],
 ] as const;
 const run = Migrator.make({});
 
@@ -47,6 +49,38 @@ const locatorColumns = [
 ];
 const lifecycleColumns = ["first_seen_at", "last_seen_at", "retired_at"];
 const tables: ReadonlyArray<TableShape> = [
+  {
+    name: "tws_context_observations",
+    migration: 49,
+    columns: ["environment_id", "generation", "data_json"],
+    nullable: [],
+    primaryKey: ["environment_id"],
+    integerColumns: ["generation"],
+    indexes: [],
+  },
+  {
+    name: "tws_context_topology",
+    migration: 49,
+    columns: [
+      "environment_id",
+      "binding_id",
+      "workspace_binding_id",
+      "feature_binding_id",
+      "summary_json",
+      "data_json",
+    ],
+    nullable: ["feature_binding_id"],
+    primaryKey: ["environment_id", "binding_id"],
+    indexes: ["idx_tws_context_topology_workspace", "idx_tws_context_topology_feature"],
+  },
+  {
+    name: "tws_thread_contexts",
+    migration: 49,
+    columns: ["environment_id", "thread_id", "data_json"],
+    nullable: [],
+    primaryKey: ["environment_id", "thread_id"],
+    indexes: [],
+  },
   {
     name: "attention_delivery_state",
     migration: 48,
@@ -315,6 +349,11 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
   applied: ReadonlySet<number>,
 ) {
   const sql = yield* SqlClient.SqlClient;
+  if (applied.has(49)) {
+    const index = yield* sql`SELECT name FROM sqlite_master WHERE type = 'index'
+      AND name = 'idx_tws_context_incarnation' AND tbl_name = 'orchestration_events'`;
+    if (index.length !== 1) return yield* badState("TWS incarnation index is missing");
+  }
   if (applied.has(48)) {
     const triggers = yield* sql<{ readonly name: string; readonly tbl_name: string }>`
       SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger'
