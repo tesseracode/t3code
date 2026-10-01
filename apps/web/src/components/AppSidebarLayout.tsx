@@ -45,6 +45,7 @@ import {
   useSidebarVisibility,
 } from "./ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
+import { AttentionWorkspaceRetention } from "./attention/AttentionWorkspaceRetention";
 
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
 
@@ -227,6 +228,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
         style={sidebarProviderStyle}
       >
         <ProjectProjectionRetention />
+        <AttentionWorkspaceRetention />
         <Sidebar
           side="left"
           collapsible="offcanvas"

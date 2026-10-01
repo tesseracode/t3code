@@ -1,4 +1,5 @@
 import { EnvironmentId } from "@t3tools/contracts";
+import { DEFAULT_CLIENT_SETTINGS, type ClientSettings } from "@t3tools/contracts/settings";
 import * as Option from "effect/Option";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -14,12 +15,23 @@ const state = vi.hoisted(() => ({
   badge: vi.fn(),
   environmentIds: ["one", "two"],
 }));
-vi.mock("@effect/atom-react", () => ({ useAtomValue: (id: string) => state.shells.get(id) }));
+vi.mock("@effect/atom-react", () => ({
+  useAtomValue: (id: string) =>
+    id === "attention"
+      ? {
+          isReady: true,
+          environments: new Map(
+            state.environmentIds.map((environmentId) => [environmentId, { status: "unsupported" }]),
+          ),
+        }
+      : state.shells.get(id),
+}));
+vi.mock("../state/attention", () => ({ attentionWorkspace: { valueAtom: "attention" } }));
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => state.navigate,
   useParams: () => ({}),
 }));
-vi.mock("./ui/toast", () => ({ toastManager: { add: state.toast } }));
+vi.mock("./ui/toast", () => ({ toastManager: { add: state.toast, close: vi.fn() } }));
 vi.mock("../state/shell", () => ({ environmentShell: { stateValueAtom: (id: string) => id } }));
 vi.mock("../state/environments", () => ({
   useEnvironments: () => ({
@@ -27,10 +39,17 @@ vi.mock("../state/environments", () => ({
   }),
 }));
 vi.mock("../hooks/useSettings", () => ({
-  useClientSettings: (
-    select: (settings: { notificationMode: string; inAppNotificationsEnabled: boolean }) => unknown,
-  ) => select({ notificationMode: state.mode, inAppNotificationsEnabled: state.inApp }),
-  getClientSettings: () => ({ notificationMode: state.mode }),
+  useClientSettings: (select: (settings: ClientSettings) => unknown = (settings) => settings) =>
+    select({
+      ...DEFAULT_CLIENT_SETTINGS,
+      notificationMode: state.mode as ClientSettings["notificationMode"],
+      inAppNotificationsEnabled: state.inApp,
+    }),
+  getClientSettings: () => ({
+    ...DEFAULT_CLIENT_SETTINGS,
+    notificationMode: state.mode,
+    inAppNotificationsEnabled: state.inApp,
+  }),
 }));
 vi.mock("../threadNotifications", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../threadNotifications")>()),

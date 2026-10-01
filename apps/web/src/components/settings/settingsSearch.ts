@@ -256,6 +256,24 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["notification toast popup completion input approval failure"],
   },
   {
+    id: "notification-categories",
+    title: "Notification categories",
+    to: "/settings/general",
+    searchTerms: ["notification approval input failure disconnect completion privacy"],
+  },
+  {
+    id: "notification-environment-mutes",
+    title: "Mute environment notifications",
+    to: "/settings/general",
+    searchTerms: ["notification environment machine mute silence"],
+  },
+  {
+    id: "notification-quiet-hours",
+    title: "Notification quiet hours",
+    to: "/settings/general",
+    searchTerms: ["notification quiet hours clock schedule do not disturb"],
+  },
+  {
     id: "time-format",
     title: "Time format",
     to: "/settings/general",

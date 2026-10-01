@@ -1,0 +1,2927 @@
+diff --git a/apps/web/src/attentionNotificationPolicy.test.ts b/apps/web/src/attentionNotificationPolicy.test.ts
+new file mode 100644
+index 000000000..dbefa0de4
+--- /dev/null
++++ b/apps/web/src/attentionNotificationPolicy.test.ts
+@@ -0,0 +1,87 @@
++import { describe, expect, it } from "vite-plus/test";
++import { EnvironmentId, ThreadId } from "@t3tools/contracts";
++import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts/settings";
++import {
++  isNotificationQuietTime,
++  notificationAllowed,
++  takeNewNotifications,
++  type AttentionNotification,
++} from "./attentionNotificationPolicy";
++const alert: AttentionNotification = {
++  key: "env:item:approval",
++  revision: 1,
++  category: "approval",
++  ref: { environmentId: EnvironmentId.make("env"), threadId: ThreadId.make("thread") },
++};
++const at = (time: string) => new Date(`2026-09-29T${time}:00`);
++describe("client notification policy", () => {
++  it.each([
++    ["21:59", false],
++    ["22:00", true],
++    ["23:59", true],
++    ["00:00", true],
++    ["07:59", true],
++    ["08:00", false],
++  ])("uses local overnight start-inclusive/end-exclusive policy at %s", (time, expected) => {
++    expect(isNotificationQuietTime({ enabled: true, start: "22:00", end: "08:00" }, at(time))).toBe(
++      expected,
++    );
++  });
++  it("handles daytime intervals, disabled schedules and equal endpoints", () => {
++    const schedule = { enabled: true, start: "09:00", end: "17:00" };
++    expect(isNotificationQuietTime(schedule, at("09:00"))).toBe(true);
++    expect(isNotificationQuietTime(schedule, at("17:00"))).toBe(false);
++    expect(isNotificationQuietTime({ ...schedule, end: "09:00" }, at("01:00"))).toBe(true);
++    expect(isNotificationQuietTime({ ...schedule, enabled: false }, at("10:00"))).toBe(false);
++  });
++  it("applies category, environment mute and quiet time without changing attention", () => {
++    expect(notificationAllowed(DEFAULT_CLIENT_SETTINGS, alert, at("12:00"))).toBe(true);
++    expect(
++      notificationAllowed(
++        { ...DEFAULT_CLIENT_SETTINGS, notificationCategories: [] },
++        alert,
++        at("12:00"),
++      ),
++    ).toBe(false);
++    expect(
++      notificationAllowed(
++        { ...DEFAULT_CLIENT_SETTINGS, notificationMutedEnvironments: [alert.ref.environmentId] },
++        alert,
++        at("12:00"),
++      ),
++    ).toBe(false);
++    expect(
++      notificationAllowed(
++        {
++          ...DEFAULT_CLIENT_SETTINGS,
++          notificationQuietHours: { enabled: true, start: "22:00", end: "08:00" },
++        },
++        alert,
++        at("23:00"),
++      ),
++    ).toBe(false);
++    expect(
++      notificationAllowed(
++        DEFAULT_CLIENT_SETTINGS,
++        { ...alert, category: "disconnect" },
++        at("12:00"),
++      ),
++    ).toBe(false);
++  });
++  it("deduplicates scoped material revisions independently for two clients and consumes suppressed observations", () => {
++    const first = takeNewNotifications(new Map(), [alert]);
++    expect(first.alerts).toEqual([alert]);
++    expect(takeNewNotifications(first.observed, [alert]).alerts).toEqual([]);
++    expect(takeNewNotifications(new Map(), [alert]).alerts).toEqual([alert]);
++    const newer = { ...alert, revision: 2 };
++    const next = takeNewNotifications(first.observed, [newer]);
++    expect(next.alerts).toEqual([newer]);
++    expect(takeNewNotifications(next.observed, [alert]).alerts).toEqual([]);
++    const other = {
++      ...alert,
++      key: "other:item:approval",
++      ref: { ...alert.ref, environmentId: EnvironmentId.make("other") },
++    };
++    expect(takeNewNotifications(next.observed, [newer, other]).alerts).toEqual([other]);
++  });
++});
+diff --git a/apps/web/src/attentionNotificationPolicy.ts b/apps/web/src/attentionNotificationPolicy.ts
+new file mode 100644
+index 000000000..8ad07c55b
+--- /dev/null
++++ b/apps/web/src/attentionNotificationPolicy.ts
+@@ -0,0 +1,102 @@
++import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
++import type { ClientSettings } from "@t3tools/contracts/settings";
++import type { EnvironmentAttentionState } from "@t3tools/client-runtime/state/attention";
++import { scopeThreadRef } from "@t3tools/client-runtime/environment";
++
++export type NotificationCategory = ClientSettings["notificationCategories"][number];
++export interface AttentionNotification {
++  readonly key: string;
++  readonly revision: number | string;
++  readonly category: NotificationCategory;
++  readonly ref: ScopedThreadRef;
++}
++export const NOTIFICATION_CATEGORIES = {
++  approval: "Approval needed",
++  user_input: "Input needed",
++  failure: "Thread failed",
++  disconnect: "Provider disconnected",
++  completion: "Thread completed",
++} satisfies Record<NotificationCategory, string>;
++
++export function isNotificationQuietTime(
++  quiet: ClientSettings["notificationQuietHours"],
++  now: Date,
++) {
++  if (!quiet.enabled) return false;
++  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
++  const start = minutes(quiet.start);
++  const end = minutes(quiet.end);
++  const current = now.getHours() * 60 + now.getMinutes();
++  return (
++    start === end ||
++    (start < end ? current >= start && current < end : current >= start || current < end)
++  );
++}
++
++export function notificationAllowed(
++  settings: ClientSettings,
++  alert: AttentionNotification,
++  now: Date,
++) {
++  return (
++    settings.notificationCategories.includes(alert.category) &&
++    !settings.notificationMutedEnvironments.includes(alert.ref.environmentId) &&
++    !isNotificationQuietTime(settings.notificationQuietHours, now)
++  );
++}
++
++export function canonicalNotificationCandidates(
++  environmentId: EnvironmentId,
++  state: EnvironmentAttentionState,
++): AttentionNotification[] {
++  if (state.status !== "live" || !state.notificationCandidates) return [];
++  const alerts: AttentionNotification[] = [];
++  for (const [, { entity }] of state.notificationCandidates) {
++    if (!entity) continue;
++    const ref = scopeThreadRef(environmentId, entity.value.threadId);
++    if (entity.type === "item" && entity.value.status === "open") {
++      alerts.push({
++        key: `${environmentId}:${entity.value.attentionId}:${entity.value.kind}`,
++        revision: entity.value.revision,
++        category: entity.value.kind,
++        ref,
++      });
++    } else if (
++      entity.type === "summary" &&
++      entity.value.phase === "completed" &&
++      entity.value.turnId !== null
++    ) {
++      alerts.push({
++        key: `${environmentId}:${entity.value.threadId}:completion`,
++        revision: entity.value.turnId,
++        category: "completion",
++        ref,
++      });
++    }
++  }
++  return alerts;
++}
++
++/** Observations advance even while muted, quiet or disabled: opting in never replays them. */
++export function takeNewNotifications(
++  observed: Map<string, string | number>,
++  candidates: ReadonlyArray<AttentionNotification>,
++) {
++  const next = new Map<string, string | number>();
++  const alerts: AttentionNotification[] = [];
++  for (const candidate of candidates) {
++    const old = observed.get(candidate.key);
++    const newer =
++      typeof old === "number" && typeof candidate.revision === "number"
++        ? candidate.revision > old
++        : old !== candidate.revision;
++    next.set(
++      candidate.key,
++      typeof old === "number" && typeof candidate.revision === "number"
++        ? Math.max(old, candidate.revision)
++        : candidate.revision,
++    );
++    if (newer) alerts.push(candidate);
++  }
++  return { observed: next, alerts };
++}
+diff --git a/apps/web/src/components/AppSidebarLayout.tsx b/apps/web/src/components/AppSidebarLayout.tsx
+index c00565f45..b3a27a1b0 100644
+--- a/apps/web/src/components/AppSidebarLayout.tsx
++++ b/apps/web/src/components/AppSidebarLayout.tsx
+@@ -45,6 +45,7 @@ import {
+   useSidebarVisibility,
+ } from "./ui/sidebar";
+ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
++import { AttentionWorkspaceRetention } from "./attention/AttentionWorkspaceRetention";
+ 
+ const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
+ 
+@@ -227,6 +228,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
+         style={sidebarProviderStyle}
+       >
+         <ProjectProjectionRetention />
++        <AttentionWorkspaceRetention />
+         <Sidebar
+           side="left"
+           collapsible="offcanvas"
+diff --git a/apps/web/src/components/CommandPalette.tsx b/apps/web/src/components/CommandPalette.tsx
+index acb1bbf4e..1ab1a2744 100644
+--- a/apps/web/src/components/CommandPalette.tsx
++++ b/apps/web/src/components/CommandPalette.tsx
+@@ -57,6 +57,7 @@ import {
+   SettingsIcon,
+   SquarePenIcon,
+   TextSearchIcon,
++  InboxIcon,
+ } from "lucide-react";
+ import {
+   useCallback,
+@@ -187,6 +188,8 @@ import {
+   buildSidebarProjectSnapshots,
+ } from "../sidebarProjectGrouping";
+ import type { Project } from "../types";
++import { useOpenAttentionInbox } from "./attention/useOpenAttentionInbox";
++import { ATTENTION_INBOX_COMMAND } from "./attention/attentionInbox.logic";
+ 
+ const EMPTY_BROWSE_ENTRIES: FilesystemBrowseResult["entries"] = [];
+ 
+@@ -1679,7 +1682,18 @@ function OpenCommandPaletteDialog(props: {
+     pushPaletteView,
+   ]);
+ 
+-  const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
++  const openAttentionInbox = useOpenAttentionInbox();
++  const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [
++    {
++      kind: "action",
++      value: "action:attention-inbox",
++      searchTerms: ["attention", "inbox", "approvals", "input", "failures"],
++      title: "Open attention inbox",
++      icon: <InboxIcon className={ITEM_ICON_CLASS} />,
++      shortcutCommand: ATTENTION_INBOX_COMMAND,
++      run: openAttentionInbox,
++    },
++  ];
+ 
+   if (projects.length > 0) {
+     const activeProjectTitle =
+diff --git a/apps/web/src/components/ThreadNotificationCoordinator.badge.test.tsx b/apps/web/src/components/ThreadNotificationCoordinator.badge.test.tsx
+index 3ce4b8d6f..bc57f0b73 100644
+--- a/apps/web/src/components/ThreadNotificationCoordinator.badge.test.tsx
++++ b/apps/web/src/components/ThreadNotificationCoordinator.badge.test.tsx
+@@ -1,4 +1,5 @@
+ import { EnvironmentId } from "@t3tools/contracts";
++import { DEFAULT_CLIENT_SETTINGS, type ClientSettings } from "@t3tools/contracts/settings";
+ import * as Option from "effect/Option";
+ import { act } from "react";
+ import { create, type ReactTestRenderer } from "react-test-renderer";
+@@ -14,12 +15,23 @@ const state = vi.hoisted(() => ({
+   badge: vi.fn(),
+   environmentIds: ["one", "two"],
+ }));
+-vi.mock("@effect/atom-react", () => ({ useAtomValue: (id: string) => state.shells.get(id) }));
++vi.mock("@effect/atom-react", () => ({
++  useAtomValue: (id: string) =>
++    id === "attention"
++      ? {
++          isReady: true,
++          environments: new Map(
++            state.environmentIds.map((environmentId) => [environmentId, { status: "unsupported" }]),
++          ),
++        }
++      : state.shells.get(id),
++}));
++vi.mock("../state/attention", () => ({ attentionWorkspace: { valueAtom: "attention" } }));
+ vi.mock("@tanstack/react-router", () => ({
+   useNavigate: () => state.navigate,
+   useParams: () => ({}),
+ }));
+-vi.mock("./ui/toast", () => ({ toastManager: { add: state.toast } }));
++vi.mock("./ui/toast", () => ({ toastManager: { add: state.toast, close: vi.fn() } }));
+ vi.mock("../state/shell", () => ({ environmentShell: { stateValueAtom: (id: string) => id } }));
+ vi.mock("../state/environments", () => ({
+   useEnvironments: () => ({
+@@ -27,10 +39,17 @@ vi.mock("../state/environments", () => ({
+   }),
+ }));
+ vi.mock("../hooks/useSettings", () => ({
+-  useClientSettings: (
+-    select: (settings: { notificationMode: string; inAppNotificationsEnabled: boolean }) => unknown,
+-  ) => select({ notificationMode: state.mode, inAppNotificationsEnabled: state.inApp }),
+-  getClientSettings: () => ({ notificationMode: state.mode }),
++  useClientSettings: (select: (settings: ClientSettings) => unknown = (settings) => settings) =>
++    select({
++      ...DEFAULT_CLIENT_SETTINGS,
++      notificationMode: state.mode as ClientSettings["notificationMode"],
++      inAppNotificationsEnabled: state.inApp,
++    }),
++  getClientSettings: () => ({
++    ...DEFAULT_CLIENT_SETTINGS,
++    notificationMode: state.mode,
++    inAppNotificationsEnabled: state.inApp,
++  }),
+ }));
+ vi.mock("../threadNotifications", async (importOriginal) => ({
+   ...(await importOriginal<typeof import("../threadNotifications")>()),
+diff --git a/apps/web/src/components/ThreadNotificationCoordinator.canonical.test.tsx b/apps/web/src/components/ThreadNotificationCoordinator.canonical.test.tsx
+new file mode 100644
+index 000000000..cb7830c6c
+--- /dev/null
++++ b/apps/web/src/components/ThreadNotificationCoordinator.canonical.test.tsx
+@@ -0,0 +1,296 @@
++import {
++  ApprovalRequestId,
++  AttentionId,
++  EnvironmentId,
++  EventId,
++  ProjectId,
++  ThreadId,
++  type AttentionChange,
++} from "@t3tools/contracts";
++import { DEFAULT_CLIENT_SETTINGS, type ClientSettings } from "@t3tools/contracts/settings";
++import type {
++  AttentionWorkspaceState,
++  EnvironmentAttentionState,
++} from "@t3tools/client-runtime/state/attention";
++import * as HashMap from "effect/HashMap";
++import * as Option from "effect/Option";
++import { act } from "react";
++import { create, type ReactTestRenderer } from "react-test-renderer";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
++
++const mocks = vi.hoisted(() => ({
++  settings: null as ClientSettings | null,
++  workspace: null as AttentionWorkspaceState | null,
++  focused: false,
++  active: { environmentId: "other", threadId: "other" },
++  legacyApproval: false,
++  navigate: vi.fn(),
++  toast: vi.fn(() => "toast"),
++  close: vi.fn(),
++  badge: vi.fn(),
++  sound: vi.fn(),
++  throwDelivery: false,
++}));
++vi.mock("@effect/atom-react", () => ({
++  useAtomValue: (atom: string) =>
++    atom === "attention"
++      ? mocks.workspace
++      : {
++          status: "live",
++          snapshot: Option.some({
++            threads: [
++              {
++                id: "thread",
++                title: "SECRET THREAD",
++                archivedAt: null,
++                hasPendingApprovals: mocks.legacyApproval,
++                hasPendingUserInput: false,
++                session: null,
++                latestTurn: { turnId: "turn", state: "running", completedAt: null },
++              },
++            ],
++          }),
++        },
++}));
++vi.mock("../state/attention", () => ({ attentionWorkspace: { valueAtom: "attention" } }));
++vi.mock("../state/shell", () => ({ environmentShell: { stateValueAtom: () => "shell" } }));
++vi.mock("../hooks/useSettings", () => ({
++  useClientSettings: () => mocks.settings,
++  getClientSettings: () => mocks.settings,
++}));
++vi.mock("@tanstack/react-router", () => ({
++  useNavigate: () => mocks.navigate,
++  useParams: () => mocks.active,
++}));
++vi.mock("./ui/toast", () => ({ toastManager: { add: mocks.toast, close: mocks.close } }));
++vi.mock("../threadNotifications", async (original) => ({
++  ...(await original<typeof import("../threadNotifications")>()),
++  playNotificationSound: mocks.sound,
++  setNotificationBadge: mocks.badge,
++  unlockNotificationAudio: vi.fn(),
++}));
++import { ThreadNotificationCoordinator } from "./ThreadNotificationCoordinator";
++
++const A = EnvironmentId.make("env");
++const B = EnvironmentId.make("other-env");
++const item = (revision = 1, id = "a"): AttentionChange => ({
++  key: `item:${id.repeat(64)}`,
++  version: revision,
++  entity: {
++    type: "item",
++    value: {
++      attentionId: AttentionId.make(id.repeat(64)),
++      projectId: ProjectId.make("project"),
++      threadId: ThreadId.make("thread"),
++      turnId: null,
++      requestId: ApprovalRequestId.make("request"),
++      kind: "approval",
++      status: "open",
++      reasonCode: revision > 1 ? "response_failed" : "approval_requested",
++      revision,
++      sourceSequence: revision,
++      sourceEventId: EventId.make(`event-${revision}`),
++      openedAt: "2026-09-29T00:00:00Z",
++      updatedAt: "2026-09-29T00:00:00Z",
++      resolvedAt: null,
++    },
++  },
++});
++function environment(
++  changes: AttentionChange[] = [],
++  status: EnvironmentAttentionState["status"] = "live",
++): EnvironmentAttentionState {
++  const entries = HashMap.fromIterable(changes.map((entry) => [entry.key, entry] as const));
++  return { status, hasSnapshot: true, entries, reason: null, notificationCandidates: entries };
++}
++function setEnvironment(
++  changes: AttentionChange[],
++  status: EnvironmentAttentionState["status"] = "live",
++  environmentId = A,
++) {
++  const environments = new Map(mocks.workspace?.environments);
++  environments.set(environmentId, environment(changes, status));
++  mocks.workspace = { isReady: true, environments };
++}
++class TestNotification extends EventTarget {
++  static permission = "granted";
++  static sent: TestNotification[] = [];
++  close = vi.fn();
++  get tag() {
++    return this.options.tag ?? "";
++  }
++  constructor(
++    readonly title: string,
++    readonly options: NotificationOptions,
++  ) {
++    super();
++    if (mocks.throwDelivery) throw new Error("Platform failure");
++    TestNotification.sent.push(this);
++  }
++}
++let renderer: ReactTestRenderer | undefined;
++async function render() {
++  await act(async () => {
++    if (renderer) renderer.update(<ThreadNotificationCoordinator />);
++    else renderer = create(<ThreadNotificationCoordinator />);
++  });
++}
++beforeEach(() => {
++  vi.clearAllMocks();
++  mocks.settings = { ...DEFAULT_CLIENT_SETTINGS, notificationMode: "notifications" };
++  mocks.workspace = { isReady: true, environments: new Map([[A, environment()]]) };
++  mocks.focused = false;
++  mocks.active = { environmentId: "other", threadId: "other" };
++  mocks.legacyApproval = false;
++  mocks.throwDelivery = false;
++  TestNotification.permission = "granted";
++  TestNotification.sent = [];
++  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++  vi.stubGlobal("Notification", TestNotification);
++  vi.stubGlobal(
++    "window",
++    Object.assign(new EventTarget(), { focus: vi.fn(), isSecureContext: true }),
++  );
++  vi.stubGlobal(
++    "document",
++    Object.assign(new EventTarget(), { visibilityState: "visible", hasFocus: () => mocks.focused }),
++  );
++});
++afterEach(async () => {
++  await act(async () => renderer?.unmount());
++  renderer = undefined;
++  vi.unstubAllGlobals();
++});
++describe("canonical notification presentation", () => {
++  it("deduplicates material revisions, suppresses the parallel shell detector and keeps OS payloads static", async () => {
++    await render();
++    mocks.legacyApproval = true;
++    setEnvironment([item()]);
++    await render();
++    await render();
++    expect(TestNotification.sent).toHaveLength(1);
++    setEnvironment([item(2)]);
++    await render();
++    expect(TestNotification.sent).toHaveLength(2);
++    expect(TestNotification.sent[0]?.close).toHaveBeenCalled();
++    expect(TestNotification.sent[1]?.options).toEqual({
++      body: "Open the owning thread in T3 Code to review its current state.",
++      tag: "env:thread",
++      silent: true,
++    });
++    expect(
++      JSON.stringify(TestNotification.sent.map((notification) => notification.options)),
++    ).not.toContain("SECRET");
++    expect(mocks.badge).toHaveBeenLastCalledWith(1);
++  });
++  it("does not notify canonical cache entries without accepted live eligibility", async () => {
++    const snapshot = environment([item()]);
++    mocks.workspace = {
++      isReady: true,
++      environments: new Map([[A, { ...snapshot, notificationCandidates: HashMap.empty() }]]),
++    };
++    await render();
++    setEnvironment([item()], "syncing");
++    await render();
++    mocks.workspace = {
++      isReady: true,
++      environments: new Map([[A, { ...snapshot, notificationCandidates: HashMap.empty() }]]),
++    };
++    await render();
++    expect(TestNotification.sent).toHaveLength(0);
++  });
++  it.each(["off", "muted", "category", "quiet"] as const)(
++    "consumes %s events without replay after policy changes",
++    async (policy) => {
++      await render();
++      mocks.settings = {
++        ...DEFAULT_CLIENT_SETTINGS,
++        notificationMode: policy === "off" ? "off" : "notifications",
++        notificationMutedEnvironments: policy === "muted" ? [A] : [],
++        notificationCategories:
++          policy === "category" ? [] : DEFAULT_CLIENT_SETTINGS.notificationCategories,
++        notificationQuietHours: { enabled: policy === "quiet", start: "00:00", end: "00:00" },
++      };
++      setEnvironment([item()]);
++      await render();
++      expect(TestNotification.sent).toHaveLength(0);
++      mocks.settings = { ...DEFAULT_CLIENT_SETTINGS, notificationMode: "notifications" };
++      await render();
++      expect(TestNotification.sent).toHaveLength(0);
++      setEnvironment([item(2)]);
++      await render();
++      expect(TestNotification.sent).toHaveLength(1);
++      mocks.settings = { ...DEFAULT_CLIENT_SETTINGS, notificationMode: "off" };
++      await render();
++      expect(TestNotification.sent[0]?.close).toHaveBeenCalled();
++      expect(mocks.badge).toHaveBeenLastCalledWith(0);
++    },
++  );
++  it("silences the focused active thread on every channel but allows another scoped thread", async () => {
++    mocks.settings = {
++      ...DEFAULT_CLIENT_SETTINGS,
++      notificationMode: "notifications-and-sound",
++      inAppNotificationsEnabled: true,
++    };
++    mocks.focused = true;
++    mocks.active = { environmentId: A, threadId: "thread" };
++    await render();
++    setEnvironment([item()]);
++    await render();
++    expect(mocks.sound).not.toHaveBeenCalled();
++    expect(mocks.toast).not.toHaveBeenCalled();
++    expect(TestNotification.sent).toHaveLength(0);
++    setEnvironment([item()], "live", B);
++    await render();
++    expect(mocks.sound).toHaveBeenCalledOnce();
++    expect(mocks.toast).toHaveBeenCalledOnce();
++    expect(TestNotification.sent).toHaveLength(0);
++    const shouldPlay = mocks.sound.mock.calls[0]?.[1];
++    mocks.settings = { ...mocks.settings, notificationMutedEnvironments: [B] };
++    expect(shouldPlay()).toBe(false);
++  });
++  it.each(["denied", "unsupported", "throws", "error"] as const)(
++    "reports %s delivery without disabling the inbox or retrying duplicates",
++    async (failure) => {
++      await render();
++      if (failure === "denied") TestNotification.permission = "denied";
++      if (failure === "unsupported") vi.stubGlobal("Notification", undefined);
++      if (failure === "throws") mocks.throwDelivery = true;
++      setEnvironment([item()]);
++      await render();
++      if (failure === "error") TestNotification.sent[0]?.dispatchEvent(new Event("error"));
++      await render();
++      expect(mocks.toast).toHaveBeenCalledWith(
++        expect.objectContaining({ title: "Notification delivery unavailable" }),
++      );
++      expect(mocks.workspace?.environments.get(A)?.entries).toBeDefined();
++      expect(mocks.badge).toHaveBeenLastCalledWith(0);
++    },
++  );
++  it("routes same local thread IDs to their owning environments, including stale and revoked destinations", async () => {
++    await render();
++    setEnvironment([item()]);
++    setEnvironment([item()], "live", B);
++    await render();
++    expect(TestNotification.sent).toHaveLength(2);
++    await act(async () => TestNotification.sent[1]?.dispatchEvent(new Event("click")));
++    expect(mocks.navigate).toHaveBeenLastCalledWith({
++      to: "/$environmentId/$threadId",
++      params: { environmentId: B, threadId: "thread" },
++    });
++    setEnvironment([item()], "stale", B);
++    await render();
++    await act(async () => TestNotification.sent[1]?.dispatchEvent(new Event("click")));
++    expect(mocks.navigate).toHaveBeenCalledTimes(1);
++    expect(mocks.toast).toHaveBeenCalledWith(
++      expect.objectContaining({ title: "Environment disconnected" }),
++    );
++    setEnvironment([], "unauthorized", A);
++    await render();
++    await act(async () => TestNotification.sent[0]?.dispatchEvent(new Event("click")));
++    expect(mocks.navigate).toHaveBeenLastCalledWith({ to: "/attention" });
++    expect(mocks.toast).toHaveBeenCalledWith(
++      expect.objectContaining({ title: "Notification destination unavailable" }),
++    );
++  });
++});
+diff --git a/apps/web/src/components/ThreadNotificationCoordinator.test.tsx b/apps/web/src/components/ThreadNotificationCoordinator.test.tsx
+index 860b6389d..5e32fa238 100644
+--- a/apps/web/src/components/ThreadNotificationCoordinator.test.tsx
++++ b/apps/web/src/components/ThreadNotificationCoordinator.test.tsx
+@@ -1,4 +1,4 @@
+-import type { ClientSettings } from "@t3tools/contracts/settings";
++import { DEFAULT_CLIENT_SETTINGS, type ClientSettings } from "@t3tools/contracts/settings";
+ import * as Option from "effect/Option";
+ import { act } from "react";
+ import { create, type ReactTestRenderer } from "react-test-renderer";
+@@ -30,39 +30,51 @@ const state = vi.hoisted(() => ({
+ }));
+ 
+ vi.mock("@effect/atom-react", () => ({
+-  useAtomValue: () => ({
+-    status: state.live ? "live" : "disconnected",
+-    snapshot: Option.some({
+-      threads: [
+-        {
+-          id: "thread-1",
+-          title: "Fix the login form",
+-          archivedAt: state.archivedAt,
+-          hasPendingUserInput: state.input,
+-          hasPendingApprovals: state.approval,
+-          session: state.sessionError ? { status: "error" } : null,
+-          latestTurn: {
+-            turnId: "turn-1",
+-            state: state.turnError ? "error" : state.completedAt ? "completed" : "running",
+-            completedAt: state.completedAt,
+-          },
++  useAtomValue: (atom: string) =>
++    atom === "attention"
++      ? {
++          isReady: true,
++          environments: new Map([["env-1", { status: "unsupported" }]]),
++        }
++      : {
++          status: state.live ? "live" : "disconnected",
++          snapshot: Option.some({
++            threads: [
++              {
++                id: "thread-1",
++                title: "Fix the login form",
++                archivedAt: state.archivedAt,
++                hasPendingUserInput: state.input,
++                hasPendingApprovals: state.approval,
++                session: state.sessionError ? { status: "error" } : null,
++                latestTurn: {
++                  turnId: "turn-1",
++                  state: state.turnError ? "error" : state.completedAt ? "completed" : "running",
++                  completedAt: state.completedAt,
++                },
++              },
++            ],
++          }),
+         },
+-      ],
+-    }),
+-  }),
+ }));
+ vi.mock("@tanstack/react-router", () => ({
+   useNavigate: () => state.navigate,
+   useParams: () => state.active,
+ }));
+ vi.mock("../hooks/useSettings", () => ({
+-  useClientSettings: (
+-    select: (
+-      settings: Pick<ClientSettings, "notificationMode" | "inAppNotificationsEnabled">,
+-    ) => unknown,
+-  ) => select({ notificationMode: state.mode, inAppNotificationsEnabled: state.inApp }),
+-  getClientSettings: () => ({ notificationMode: state.mode }),
++  useClientSettings: (select: (settings: ClientSettings) => unknown = (settings) => settings) =>
++    select({
++      ...DEFAULT_CLIENT_SETTINGS,
++      notificationMode: state.mode,
++      inAppNotificationsEnabled: state.inApp,
++    }),
++  getClientSettings: () => ({
++    ...DEFAULT_CLIENT_SETTINGS,
++    notificationMode: state.mode,
++    inAppNotificationsEnabled: state.inApp,
++  }),
+ }));
++vi.mock("../state/attention", () => ({ attentionWorkspace: { valueAtom: "attention" } }));
+ vi.mock("../state/environments", () => ({
+   useEnvironments: () => ({ environments: [{ environmentId: "env-1" }] }),
+ }));
+@@ -111,7 +123,7 @@ beforeEach(() => {
+     turnError: false,
+   });
+   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+-  vi.stubGlobal("window", new EventTarget());
++  vi.stubGlobal("window", Object.assign(new EventTarget(), { focus: vi.fn() }));
+   vi.stubGlobal("document", {
+     get visibilityState() {
+       return state.visible;
+@@ -137,7 +149,9 @@ describe("thread notifications", () => {
+     expect(state.add).toHaveBeenCalledTimes(1);
+     const toast = state.add.mock.calls[0]?.[0];
+     expect(toast?.title).toBe("Thread completed");
+-    expect(toast?.description).toBe("Fix the login form");
++    expect(toast?.description).toBe(
++      "Open the owning thread in T3 Code to review its current state.",
++    );
+     toast?.actionProps.onClick();
+     expect(state.close).toHaveBeenCalledWith("toast-1");
+     expect(state.navigate).toHaveBeenCalledWith({
+@@ -186,7 +200,7 @@ describe("thread notifications", () => {
+     expect(state.add).toHaveBeenCalledTimes(1);
+     expect(state.notification).toHaveBeenCalledTimes(1);
+     expect(state.notification).toHaveBeenCalledWith(title, {
+-      body: "Fix the login form",
++      body: "Open the owning thread in T3 Code to review its current state.",
+       tag: "env-1:thread-1",
+       silent: true,
+     });
+@@ -246,7 +260,7 @@ describe("thread notifications", () => {
+     await complete();
+     expect(state.add).not.toHaveBeenCalled();
+     expect(state.notification).toHaveBeenCalledWith("Thread completed", {
+-      body: "Fix the login form",
++      body: "Open the owning thread in T3 Code to review its current state.",
+       tag: "env-1:thread-1",
+       silent: true,
+     });
+diff --git a/apps/web/src/components/ThreadNotificationCoordinator.tsx b/apps/web/src/components/ThreadNotificationCoordinator.tsx
+index 5feda71ea..306ecc779 100644
+--- a/apps/web/src/components/ThreadNotificationCoordinator.tsx
++++ b/apps/web/src/components/ThreadNotificationCoordinator.tsx
+@@ -1,16 +1,26 @@
+ import { useAtomValue } from "@effect/atom-react";
+ import { useNavigate, useParams } from "@tanstack/react-router";
+ import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
++import type { EnvironmentAttentionState } from "@t3tools/client-runtime/state/attention";
+ import * as Option from "effect/Option";
+-import { useCallback, useEffect, useRef } from "react";
++import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+ 
++import {
++  canonicalNotificationCandidates,
++  notificationAllowed,
++  NOTIFICATION_CATEGORIES,
++  takeNewNotifications,
++  type AttentionNotification,
++} from "../attentionNotificationPolicy";
+ import { getClientSettings, useClientSettings } from "../hooks/useSettings";
+-import { useEnvironments } from "../state/environments";
++import { attentionWorkspace } from "../state/attention";
+ import { environmentShell } from "../state/shell";
+ import {
+   hasDesktopNotifications,
+   hasNotificationSound,
++  notificationPermissionIssue,
+   playNotificationSound,
++  reportNotificationDeliveryFailure,
+   setNotificationBadge,
+   unlockNotificationAudio,
+ } from "../threadNotifications";
+@@ -18,36 +28,200 @@ import { resolveSidebarThreadStatus } from "./Sidebar.logic";
+ import { toastManager } from "./ui/toast";
+ 
+ export function ThreadNotificationCoordinator() {
+-  const { environments } = useEnvironments();
+-  const mode = useClientSettings((settings) => settings.notificationMode);
+-  const inAppNotificationsEnabled = useClientSettings(
+-    (settings) => settings.inAppNotificationsEnabled,
+-  );
++  const workspace = useAtomValue(attentionWorkspace.valueAtom);
++  const settings = useClientSettings();
++  const mode = settings.notificationMode;
++  const policyKey = JSON.stringify([
++    mode,
++    settings.inAppNotificationsEnabled,
++    settings.notificationCategories,
++    settings.notificationMutedEnvironments,
++    settings.notificationQuietHours,
++  ]);
++  const navigate = useNavigate();
++  const active = useParams({ strict: false });
++  const latest = useRef({ workspace, active });
++  useLayoutEffect(() => {
++    latest.current = { workspace, active };
++  }, [workspace, active]);
+   const pending = useRef(
+-    new Map<string, { environmentId: EnvironmentId; notification: Notification }>(),
++    new Map<string, { alert: AttentionNotification; notification: Notification }>(),
+   );
+-  const onNotification = useCallback((environmentId: EnvironmentId, notification: Notification) => {
+-    pending.current.get(notification.tag)?.notification.close();
+-    pending.current.set(notification.tag, { environmentId, notification });
+-    setNotificationBadge(pending.current.size);
++  const toasts = useRef(new Map<string, { alert: AttentionNotification; id: string }>());
++  const reported = useRef(new Set<string>());
++  const lastBadge = useRef<number | null>(null);
++  const updateBadge = useCallback((count: number) => {
++    if (lastBadge.current === count) return;
++    lastBadge.current = count;
++    setNotificationBadge(count);
+   }, []);
++  const report = useCallback((message: string, error?: unknown) => {
++    reportNotificationDeliveryFailure(message, error);
++    if (reported.current.has(message)) return;
++    reported.current.add(message);
++    toastManager.add({
++      type: "warning",
++      title: "Notification delivery unavailable",
++      description: message,
++    });
++  }, []);
++
++  const open = useCallback(
++    async function openDestination(alert: AttentionNotification): Promise<void> {
++      window.focus();
++      const environment = latest.current.workspace.environments.get(alert.ref.environmentId);
++      try {
++        if (!environment || environment.status === "unauthorized") {
++          toastManager.add({
++            type: "warning",
++            title: "Notification destination unavailable",
++            description:
++              "This environment is no longer connected or authorized. Review Connections in Settings.",
++          });
++          await navigate({ to: "/attention" });
++          return;
++        }
++        if (environment.status !== "live" && environment.status !== "unsupported") {
++          const id = toastManager.add({
++            type: "warning",
++            title: "Environment disconnected",
++            description: "Reconnect before opening this thread; its last known state may be stale.",
++            timeout: 0,
++            actionProps: {
++              children: "Retry open thread",
++              onClick: () => {
++                toastManager.close(id);
++                void openDestination(alert);
++              },
++            },
++          });
++          return;
++        }
++        await navigate({ to: "/$environmentId/$threadId", params: alert.ref });
++      } catch (error) {
++        report("Could not open the notification destination.", error);
++      }
++    },
++    [navigate, report],
++  );
++
++  const deliver = useCallback(
++    (alert: AttentionNotification) => {
++      const current = getClientSettings();
++      if (!notificationAllowed(current, alert, new Date())) return;
++      const focused = document.visibilityState === "visible" && document.hasFocus();
++      if (
++        focused &&
++        latest.current.active.environmentId === alert.ref.environmentId &&
++        latest.current.active.threadId === alert.ref.threadId
++      )
++        return;
++      const title = NOTIFICATION_CATEGORIES[alert.category];
++      const description = "Open the owning thread in T3 Code to review its current state.";
++      const tag = `${alert.ref.environmentId}:${alert.ref.threadId}`;
++      if (hasNotificationSound(current.notificationMode)) {
++        void playNotificationSound(alert.category === "completion" ? "completion" : "input", () => {
++          const now = getClientSettings();
++          const state = latest.current.workspace.environments.get(alert.ref.environmentId);
++          const focusedNow = document.visibilityState === "visible" && document.hasFocus();
++          return (
++            !!state &&
++            (state.status === "live" || state.status === "unsupported") &&
++            hasNotificationSound(now.notificationMode) &&
++            notificationAllowed(now, alert, new Date()) &&
++            !(
++              focusedNow &&
++              latest.current.active.environmentId === alert.ref.environmentId &&
++              latest.current.active.threadId === alert.ref.threadId
++            )
++          );
++        });
++      }
++      if (focused && current.inAppNotificationsEnabled) {
++        const previous = toasts.current.get(tag);
++        if (previous) toastManager.close(previous.id);
++        const id = toastManager.add({
++          type:
++            alert.category === "completion"
++              ? "success"
++              : alert.category === "failure"
++                ? "error"
++                : "warning",
++          title,
++          description,
++          data: { hideCopyButton: true },
++          actionProps: {
++            children: "Open thread",
++            onClick: () => {
++              toastManager.close(id);
++              toasts.current.delete(tag);
++              void open(alert);
++            },
++          },
++          onClose: () => {
++            if (toasts.current.get(tag)?.id === id) toasts.current.delete(tag);
++          },
++        });
++        toasts.current.set(tag, { alert, id });
++        return;
++      }
++      if (focused || !hasDesktopNotifications(current.notificationMode)) return;
++      const issue = notificationPermissionIssue();
++      if (issue) {
++        report(issue);
++        return;
++      }
++      try {
++        const notification = new Notification(title, { body: description, tag, silent: true });
++        pending.current.get(tag)?.notification.close();
++        pending.current.set(tag, { alert, notification });
++        updateBadge(pending.current.size);
++        notification.addEventListener("click", () => {
++          notification.close();
++          void open(alert);
++        });
++        notification.addEventListener("error", () => {
++          if (pending.current.get(tag)?.notification === notification) {
++            pending.current.delete(tag);
++            updateBadge(pending.current.size);
++          }
++          notification.close();
++          report("The browser or operating system could not present a notification.");
++        });
++      } catch (error) {
++        report("The browser or operating system rejected notification delivery.", error);
++      }
++    },
++    [open, report, updateBadge],
++  );
+ 
+   useEffect(() => {
+-    const activeIds = new Set(environments.map(({ environmentId }) => environmentId));
+-    const count = pending.current.size;
+-    for (const [tag, { environmentId, notification }] of pending.current) {
+-      if (activeIds.has(environmentId)) continue;
++    const accessible = (alert: AttentionNotification) => {
++      const state = workspace.environments.get(alert.ref.environmentId);
++      return (
++        state !== undefined &&
++        state.status !== "unauthorized" &&
++        notificationAllowed(settings, alert, new Date())
++      );
++    };
++    for (const [tag, { alert, notification }] of pending.current) {
++      if (hasDesktopNotifications(mode) && accessible(alert)) continue;
+       notification.close();
+       pending.current.delete(tag);
+     }
+-    if (count !== pending.current.size) setNotificationBadge(pending.current.size);
+-  }, [environments]);
++    for (const [tag, { alert, id }] of toasts.current) {
++      if (settings.inAppNotificationsEnabled && accessible(alert)) continue;
++      toastManager.close(id);
++      toasts.current.delete(tag);
++    }
++    updateBadge(pending.current.size);
++  }, [settings, mode, workspace, updateBadge]);
+ 
+   useEffect(() => {
+     const clear = () => {
+       for (const { notification } of pending.current.values()) notification.close();
+       pending.current.clear();
+-      setNotificationBadge(0);
++      updateBadge(0);
+     };
+     clear();
+     if (!hasDesktopNotifications(mode)) return;
+@@ -58,8 +232,7 @@ export function ThreadNotificationCoordinator() {
+       window.removeEventListener("focus", clear);
+       clear();
+     };
+-  }, [mode]);
+-
++  }, [mode, updateBadge]);
+   useEffect(() => {
+     if (!hasNotificationSound(mode)) return;
+     document.addEventListener("pointerdown", unlockNotificationAudio);
+@@ -69,39 +242,56 @@ export function ThreadNotificationCoordinator() {
+       document.removeEventListener("keydown", unlockNotificationAudio);
+     };
+   }, [mode]);
++  useEffect(
++    () => () => {
++      for (const { id } of toasts.current.values()) toastManager.close(id);
++      toasts.current.clear();
++    },
++    [],
++  );
+ 
+-  if (mode === "off" && !inAppNotificationsEnabled) return null;
+-
+-  return environments.map((environment) => (
++  return [...workspace.environments].map(([environmentId, attention]) => (
+     <EnvironmentNotifications
+-      key={environment.environmentId}
+-      environmentId={environment.environmentId}
+-      onNotification={onNotification}
++      key={environmentId}
++      environmentId={environmentId}
++      attention={attention}
++      deliver={deliver}
++      policyKey={policyKey}
+     />
+   ));
+ }
+ 
+ function EnvironmentNotifications({
+   environmentId,
+-  onNotification,
++  attention,
++  deliver,
++  policyKey,
+ }: {
+   environmentId: EnvironmentId;
+-  onNotification: (environmentId: EnvironmentId, notification: Notification) => void;
++  attention: EnvironmentAttentionState;
++  deliver: (alert: AttentionNotification) => void;
++  policyKey: string;
+ }) {
+   const shell = useAtomValue(environmentShell.stateValueAtom(environmentId));
+-  const mode = useClientSettings((settings) => settings.notificationMode);
+-  const inAppNotificationsEnabled = useClientSettings(
+-    (settings) => settings.inAppNotificationsEnabled,
+-  );
+-  const navigate = useNavigate();
+-  const { environmentId: activeEnvironmentId, threadId: activeThreadId } = useParams({
+-    strict: false,
+-  });
++  const observed = useRef(new Map<string, number | string>());
++  const previousPolicy = useRef(policyKey);
+   const previous = useRef(
+     new Map<ThreadId, { attention: string | null; completion: number | null }>(),
+   );
+-
+   useEffect(() => {
++    const policyChanged = previousPolicy.current !== policyKey;
++    previousPolicy.current = policyKey;
++    if (attention.status !== "unsupported") {
++      previous.current.clear();
++      const result = takeNewNotifications(
++        observed.current,
++        canonicalNotificationCandidates(environmentId, attention),
++      );
++      observed.current = result.observed;
++      if (!policyChanged) for (const alert of result.alerts) deliver(alert);
++      return;
++    }
++    observed.current.clear();
+     if (shell.status !== "live" || Option.isNone(shell.snapshot)) {
+       previous.current.clear();
+       return;
+@@ -124,87 +314,25 @@ function EnvironmentNotifications({
+           : (prior?.completion ?? null);
+       next.set(thread.id, { attention, completion });
+       if (!prior || thread.archivedAt !== null) continue;
+-      const kind =
++      const category =
+         attention && attention !== prior.attention
+-          ? "input"
++          ? status === "approval"
++            ? "approval"
++            : status === "failed"
++              ? "failure"
++              : "user_input"
+           : completion !== null && (prior.completion === null || completion > prior.completion)
+             ? "completion"
+             : null;
+-      if (!kind) continue;
+-      const title =
+-        kind === "completion"
+-          ? "Thread completed"
+-          : status === "approval"
+-            ? "Approval needed"
+-            : status === "failed"
+-              ? "Thread failed"
+-              : "Input needed";
+-      if (hasNotificationSound(mode)) {
+-        void playNotificationSound(kind, () =>
+-          hasNotificationSound(getClientSettings().notificationMode),
+-        );
+-      }
+-      if (
+-        inAppNotificationsEnabled &&
+-        document.visibilityState === "visible" &&
+-        document.hasFocus() &&
+-        (activeEnvironmentId !== environmentId || activeThreadId !== thread.id)
+-      ) {
+-        const toastId = toastManager.add({
+-          type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
+-          title,
+-          description: thread.title,
+-          data: { hideCopyButton: true },
+-          actionProps: {
+-            children: "Open thread",
+-            onClick: () => {
+-              toastManager.close(toastId);
+-              void navigate({
+-                to: "/$environmentId/$threadId",
+-                params: { environmentId, threadId: thread.id },
+-              });
+-            },
+-          },
+-        });
+-        continue;
+-      }
+-      if (
+-        !hasDesktopNotifications(mode) ||
+-        (document.visibilityState === "visible" && document.hasFocus()) ||
+-        typeof Notification === "undefined" ||
+-        Notification.permission !== "granted"
+-      )
+-        continue;
+-      try {
+-        const notification = new Notification(title, {
+-          body: thread.title,
+-          tag: `${environmentId}:${thread.id}`,
+-          silent: true,
+-        });
+-        onNotification(environmentId, notification);
+-        notification.addEventListener("click", () => {
+-          notification.close();
+-          window.focus();
+-          void navigate({
+-            to: "/$environmentId/$threadId",
+-            params: { environmentId, threadId: thread.id },
+-          });
++      if (category && !policyChanged)
++        deliver({
++          key: `${environmentId}:${thread.id}:${category}`,
++          revision: attention ?? completion ?? 0,
++          category,
++          ref: { environmentId, threadId: thread.id },
+         });
+-      } catch {
+-        // Some browsers expose Notification but reject desktop presentation.
+-      }
+     }
+     previous.current = next;
+-  }, [
+-    activeEnvironmentId,
+-    activeThreadId,
+-    environmentId,
+-    inAppNotificationsEnabled,
+-    mode,
+-    navigate,
+-    onNotification,
+-    shell,
+-  ]);
+-
++  }, [attention, deliver, environmentId, policyKey, shell]);
+   return null;
+ }
+diff --git a/apps/web/src/components/attention/AttentionInbox.tsx b/apps/web/src/components/attention/AttentionInbox.tsx
+new file mode 100644
+index 000000000..afcdbc5cd
+--- /dev/null
++++ b/apps/web/src/components/attention/AttentionInbox.tsx
+@@ -0,0 +1,394 @@
++import { useAtomValue } from "@effect/atom-react";
++import { LegendList, type LegendListRef } from "@legendapp/list/react";
++import { useNavigate } from "@tanstack/react-router";
++import type { ScopedAttentionItem } from "@t3tools/client-runtime/state/attention";
++import type { EnvironmentId } from "@t3tools/contracts";
++import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
++import { InboxIcon } from "lucide-react";
++import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
++import { environmentCatalog } from "../../connection/catalog";
++import { isElectron } from "../../env";
++import { cn } from "../../lib/utils";
++import { attentionWorkspace } from "../../state/attention";
++import { useProjects, useThreadShell } from "../../state/entities";
++import { Button } from "../ui/button";
++import { SidebarInset } from "../ui/sidebar";
++import { toastManager } from "../ui/toast";
++import { WorkspacePageHeader } from "../WorkspacePageHeader";
++import { useAttentionSeen } from "./AttentionWorkspaceRetention";
++import {
++  ATTENTION_KINDS,
++  ATTENTION_PRIORITIES,
++  ATTENTION_STATUSES,
++  EMPTY_ATTENTION_FILTERS,
++  attentionKeyboardIndex,
++  attentionThreadTarget,
++  filterAttentionInbox,
++  markAttentionSeen,
++} from "./attentionInbox.logic";
++
++function AttentionRowTitle({ row }: { row: ScopedAttentionItem }) {
++  const shell = useThreadShell(row.ref);
++  return <>{shell?.title ?? `Thread ${row.ref.threadId}`}</>;
++}
++
++export function AttentionInbox() {
++  const workspace = useAtomValue(attentionWorkspace.valueAtom);
++  const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
++  const projects = useProjects();
++  const [filters, setFilters] = useState(EMPTY_ATTENTION_FILTERS);
++  const [seen, setSeen] = useAttentionSeen();
++  const [activeKey, setActiveKey] = useState<string | null>(null);
++  const [mountedActiveId, setMountedActiveId] = useState<string | undefined>();
++  const listRef = useRef<LegendListRef | null>(null);
++  const listboxRef = useRef<HTMLDivElement | null>(null);
++  const id = useId();
++  const navigate = useNavigate();
++  const all = useAtomValue(attentionWorkspace.aggregateAtom);
++  const filtered = useMemo(() => filterAttentionInbox(all, filters), [all, filters]);
++  const seenByKey = useMemo(
++    () => new Map(seen.map((entry) => [entry.key, entry.revision])),
++    [seen],
++  );
++  const activeIndex = Math.max(
++    0,
++    filtered.items.findIndex((row) => row.key === activeKey),
++  );
++  const active = filtered.items[activeIndex];
++  const activeId = active ? `${id}-${active.key}` : undefined;
++  const labels = useMemo(
++    () =>
++      new Map(
++        projects.map((project) => [
++          scopedProjectKey(scopeProjectRef(project.environmentId, project.id)),
++          project.title,
++        ]),
++      ),
++    [projects],
++  );
++  const environmentLabel = (environmentId: EnvironmentId) =>
++    catalog.entries.get(environmentId)?.target.label ?? environmentId;
++  const projectOptions = useMemo(
++    () => [
++      ...new Map(
++        all.items
++          .filter((row) => !filters.environment || row.ref.environmentId === filters.environment)
++          .map((row) => {
++            const key = scopedProjectKey(
++              scopeProjectRef(row.ref.environmentId, row.item.projectId),
++            );
++            return [
++              key,
++              { key, projectId: row.item.projectId, environmentId: row.ref.environmentId },
++            ];
++          }),
++      ).values(),
++    ],
++    [all.items, filters.environment],
++  );
++  const scrollTo = useCallback((index: number) => {
++    void listRef.current
++      ?.scrollIndexIntoView({ index, animated: false })
++      .catch((error: unknown) => {
++        console.error("Could not navigate attention list.", error);
++        toastManager.add({ type: "error", title: "Could not navigate attention list" });
++      });
++  }, []);
++  useEffect(() => {
++    if (activeId) scrollTo(activeIndex);
++  }, [activeId, activeIndex, scrollTo]);
++  useEffect(() => {
++    const listbox = listboxRef.current;
++    if (!listbox) return;
++    const update = () =>
++      setMountedActiveId(activeId && document.getElementById(activeId) ? activeId : undefined);
++    update();
++    const observer = new MutationObserver(update);
++    observer.observe(listbox, { childList: true, subtree: true });
++    return () => observer.disconnect();
++  }, [activeId]);
++
++  const openRow = useCallback(
++    async (row: ScopedAttentionItem) => {
++      setSeen((current) => markAttentionSeen(current, row, true));
++      try {
++        await navigate(attentionThreadTarget(row));
++      } catch (error) {
++        console.error("Could not open attention thread.", error);
++        toastManager.add({ type: "error", title: "Could not open thread" });
++      }
++    },
++    [navigate, setSeen],
++  );
++  const selectClass =
++    "h-8 max-w-64 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring";
++  return (
++    <SidebarInset className="h-svh min-h-0 overflow-hidden bg-background text-foreground md:h-dvh">
++      <WorkspacePageHeader electron={isElectron}>
++        <InboxIcon className="size-4" aria-hidden="true" />
++        <h1 className="text-sm font-medium">Attention inbox</h1>
++      </WorkspacePageHeader>
++      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-4 px-5 py-5 sm:px-6">
++        <div>
++          <h2 className="text-lg font-semibold">Needs your attention</h2>
++          <p className="text-sm text-muted-foreground" role="status">
++            {all.threadCount} actionable threads · {all.itemCount} items
++            {!all.complete ? " · Total incomplete" : ""}
++            {` · ${all.liveThreadCount} live / ${all.staleThreadCount} stale threads`}
++          </p>
++          <p className="mt-1 text-xs text-muted-foreground">
++            Open a thread to respond with its existing controls. Seen only changes emphasis on this
++            device, not the actionable count.
++          </p>
++        </div>
++        {(!all.complete || workspace.environments.size === 0) && (
++          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
++            <p>
++              {workspace.environments.size === 0
++                ? workspace.isReady
++                  ? "No enabled environments. Add or enable one in Settings → Connections."
++                  : "Loading environments…"
++                : "Some attention may be missing or stale. A frontend disconnection is not an agent failure."}
++            </p>
++            <ul className="mt-1 text-xs text-muted-foreground">
++              {[...workspace.environments]
++                .filter(([, state]) => state.status !== "live")
++                .map(([environmentId, state]) => (
++                  <li key={environmentId}>
++                    {environmentLabel(environmentId)}: {ATTENTION_STATUSES[state.status]}
++                    {state.reason ? ` (${state.reason})` : ""}
++                  </li>
++                ))}
++            </ul>
++          </div>
++        )}
++        <div className="flex flex-wrap gap-3" aria-label="Attention filters">
++          <label className="flex flex-col gap-1 text-xs">
++            Environment
++            <select
++              aria-label="Environment"
++              className={selectClass}
++              value={filters.environment}
++              onChange={(event) => {
++                setFilters((current) => ({
++                  ...current,
++                  environment: event.target.value,
++                  project: "",
++                }));
++                setActiveKey(null);
++              }}
++            >
++              <option value="">All environments</option>
++              {[...workspace.environments.keys()].map((environmentId) => (
++                <option key={environmentId} value={environmentId}>
++                  {environmentLabel(environmentId)}
++                </option>
++              ))}
++            </select>
++          </label>
++          <label className="flex flex-col gap-1 text-xs">
++            Project
++            <select
++              aria-label="Project"
++              className={selectClass}
++              value={filters.project}
++              onChange={(event) => {
++                setFilters((current) => ({ ...current, project: event.target.value }));
++                setActiveKey(null);
++              }}
++            >
++              <option value="">All projects</option>
++              {projectOptions.map((project) => (
++                <option key={project.key} value={project.key}>
++                  {labels.get(project.key) ?? project.projectId} ·{" "}
++                  {environmentLabel(project.environmentId)}
++                </option>
++              ))}
++            </select>
++          </label>
++          <label className="flex flex-col gap-1 text-xs">
++            Kind
++            <select
++              aria-label="Kind"
++              className={selectClass}
++              value={filters.kind}
++              onChange={(event) => {
++                setFilters((current) => ({ ...current, kind: event.target.value }));
++                setActiveKey(null);
++              }}
++            >
++              <option value="">All kinds</option>
++              {Object.entries(ATTENTION_KINDS).map(([key, label]) => (
++                <option key={key} value={key}>
++                  {label}
++                </option>
++              ))}
++            </select>
++          </label>
++          <label className="flex flex-col gap-1 text-xs">
++            Severity
++            <select
++              aria-label="Severity"
++              className={selectClass}
++              value={filters.priority}
++              onChange={(event) => {
++                setFilters((current) => ({ ...current, priority: event.target.value }));
++                setActiveKey(null);
++              }}
++            >
++              <option value="">All severities</option>
++              {Object.entries(ATTENTION_PRIORITIES).map(([key, label]) => (
++                <option key={key} value={key}>
++                  {label}
++                </option>
++              ))}
++            </select>
++          </label>
++          <Button
++            className="self-end"
++            variant="outline"
++            size="sm"
++            onClick={() => {
++              setFilters(EMPTY_ATTENTION_FILTERS);
++              setActiveKey(null);
++            }}
++          >
++            Clear filters
++          </Button>
++        </div>
++        <div className="flex flex-wrap items-center justify-between gap-2">
++          <p className="text-xs text-muted-foreground">
++            {filtered.items.length} items in {filtered.threadCount} threads shown
++          </p>
++          <div className="flex gap-2">
++            <Button
++              size="sm"
++              variant="outline"
++              disabled={!active}
++              onClick={() => {
++                if (active)
++                  setSeen((current) =>
++                    markAttentionSeen(
++                      current,
++                      active,
++                      seenByKey.get(active.key) !== active.item.revision,
++                    ),
++                  );
++              }}
++            >
++              {active && seenByKey.get(active.key) === active.item.revision
++                ? "Mark unseen"
++                : "Mark seen"}
++            </Button>
++            <Button
++              size="sm"
++              disabled={!active}
++              onClick={() => {
++                if (active) void openRow(active);
++              }}
++            >
++              Open thread
++            </Button>
++          </div>
++        </div>
++        <p id={`${id}-help`} className="text-xs text-muted-foreground">
++          Use Up/Down or Home/End to select; Enter opens the thread. Stale items may already be
++          resolved; reconnect before responding.
++        </p>
++        {filtered.items.length === 0 ? (
++          <div className="flex flex-1 items-center justify-center rounded-md border border-border p-6 text-center text-sm text-muted-foreground">
++            {all.itemCount > 0
++              ? "No items match these filters."
++              : workspace.environments.size === 0
++                ? "No enabled environments."
++                : all.complete
++                  ? "No open attention items."
++                  : "No attention available yet. The total is incomplete."}
++          </div>
++        ) : (
++          <div
++            ref={listboxRef}
++            role="listbox"
++            aria-label="Attention items"
++            aria-describedby={`${id}-help`}
++            aria-activedescendant={mountedActiveId}
++            tabIndex={0}
++            className="min-h-0 flex-1 overflow-hidden rounded-md border border-border focus-visible:outline-2 focus-visible:outline-ring"
++            onKeyDown={(event) => {
++              const next = attentionKeyboardIndex(event.key, activeIndex, filtered.items.length);
++              if (next !== null) {
++                event.preventDefault();
++                setActiveKey(filtered.items[next]?.key ?? null);
++                scrollTo(next);
++              } else if (event.key === "Enter" && active) {
++                event.preventDefault();
++                void openRow(active);
++              }
++            }}
++          >
++            <LegendList
++              ref={listRef}
++              data={filtered.items}
++              keyExtractor={(row) => row.key}
++              estimatedItemSize={100}
++              drawDistance={300}
++              style={{ height: "100%" }}
++              extraData={{ activeKey: active?.key, seenByKey, labels, catalog }}
++              renderItem={({ item: row, index }) => {
++                const isSeen = seenByKey.get(row.key) === row.item.revision;
++                return (
++                  <div
++                    id={`${id}-${row.key}`}
++                    role="option"
++                    aria-selected={row.key === active?.key}
++                    aria-posinset={index + 1}
++                    aria-setsize={filtered.items.length}
++                    onMouseDown={(event) => {
++                      event.preventDefault();
++                      listboxRef.current?.focus();
++                    }}
++                    onClick={() => {
++                      setActiveKey(row.key);
++                      void openRow(row);
++                    }}
++                    className={cn(
++                      "cursor-pointer border-b border-border px-4 py-3 text-sm",
++                      row.key === active?.key ? "bg-accent" : "hover:bg-muted/50",
++                    )}
++                  >
++                    <div className="flex items-center justify-between gap-3">
++                      <span className={cn("truncate", !isSeen && "font-semibold")}>
++                        {ATTENTION_KINDS[row.item.kind]} · <AttentionRowTitle row={row} />
++                      </span>
++                      <span className="shrink-0 text-xs text-muted-foreground">
++                        {isSeen ? "Seen" : "Unseen"}
++                        {row.stale ? " · Stale" : ""}
++                      </span>
++                    </div>
++                    <div className="mt-1 truncate text-xs text-muted-foreground">
++                      {environmentLabel(row.ref.environmentId)} ·{" "}
++                      {labels.get(
++                        scopedProjectKey(
++                          scopeProjectRef(row.ref.environmentId, row.item.projectId),
++                        ),
++                      ) ?? row.item.projectId}
++                    </div>
++                    <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
++                      <span>{ATTENTION_PRIORITIES[row.priority]}</span>
++                      <time dateTime={row.item.openedAt}>
++                        {new Date(row.item.openedAt).toLocaleString()}
++                      </time>
++                      {row.item.reasonCode === "response_failed" && (
++                        <span>Response failed; still open</span>
++                      )}
++                    </div>
++                  </div>
++                );
++              }}
++            />
++          </div>
++        )}
++      </div>
++    </SidebarInset>
++  );
++}
+diff --git a/apps/web/src/components/attention/AttentionSidebarItem.tsx b/apps/web/src/components/attention/AttentionSidebarItem.tsx
+new file mode 100644
+index 000000000..f18b0b74a
+--- /dev/null
++++ b/apps/web/src/components/attention/AttentionSidebarItem.tsx
+@@ -0,0 +1,39 @@
++import { useAtomValue } from "@effect/atom-react";
++import { useLocation } from "@tanstack/react-router";
++import { InboxIcon } from "lucide-react";
++import { attentionWorkspace } from "../../state/attention";
++import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "../ui/sidebar";
++import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
++import { attentionBadge } from "./attentionInbox.logic";
++import { useOpenAttentionInbox } from "./useOpenAttentionInbox";
++
++export function AttentionSidebarItem() {
++  const aggregate = useAtomValue(attentionWorkspace.aggregateAtom);
++  const badge = attentionBadge(aggregate);
++  const active = useLocation({ select: (location) => location.pathname === "/attention" });
++  const open = useOpenAttentionInbox();
++  const { isMobile, setOpenMobile } = useSidebar();
++  return (
++    <SidebarMenuItem className="shrink-0">
++      <Tooltip>
++        <TooltipTrigger
++          render={
++            <SidebarMenuButton
++              aria-label={`Attention inbox. ${badge.label}`}
++              isActive={active}
++              className="w-auto gap-1.5"
++              onClick={() => {
++                if (isMobile) setOpenMobile(false);
++                void open();
++              }}
++            >
++              <InboxIcon />
++              <span className="tabular-nums text-xs">{badge.text}</span>
++            </SidebarMenuButton>
++          }
++        />
++        <TooltipPopup side="top">Attention inbox: {badge.label}</TooltipPopup>
++      </Tooltip>
++    </SidebarMenuItem>
++  );
++}
+diff --git a/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx b/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx
+new file mode 100644
+index 000000000..1669a79b7
+--- /dev/null
++++ b/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx
+@@ -0,0 +1,47 @@
++import { useAtomValue } from "@effect/atom-react";
++import { useEffect, useRef } from "react";
++import type { EnvironmentId } from "@t3tools/contracts";
++import { isCommandPaletteOpen } from "../../commandPaletteBus";
++import { useLocalStorage } from "../../hooks/useLocalStorage";
++import { resolveShortcutCommand } from "../../keybindings";
++import { attentionWorkspace } from "../../state/attention";
++import { primaryServerKeybindingsAtom } from "../../state/server";
++import {
++  ATTENTION_INBOX_COMMAND,
++  AttentionSeen,
++  EMPTY_ATTENTION_SEEN,
++  pruneAttentionSeen,
++} from "./attentionInbox.logic";
++import { useOpenAttentionInbox } from "./useOpenAttentionInbox";
++
++export function useAttentionSeen() {
++  return useLocalStorage("t3code:attention-seen:v1", EMPTY_ATTENTION_SEEN, AttentionSeen);
++}
++
++export function AttentionWorkspaceRetention() {
++  const workspace = useAtomValue(attentionWorkspace.valueAtom);
++  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
++  const [seen, setSeen] = useAttentionSeen();
++  const observedEnvironments = useRef(new Set<EnvironmentId>());
++  const open = useOpenAttentionInbox();
++  useEffect(() => {
++    for (const id of workspace.environments.keys()) observedEnvironments.current.add(id);
++    if (pruneAttentionSeen(seen, workspace, observedEnvironments.current) !== seen) {
++      setSeen((current) => pruneAttentionSeen(current, workspace, observedEnvironments.current));
++    }
++  }, [seen, setSeen, workspace]);
++  useEffect(() => {
++    const onKeyDown = (event: KeyboardEvent) => {
++      if (event.defaultPrevented || isCommandPaletteOpen()) return;
++      if (event.target instanceof HTMLElement && event.target.closest("[data-keybinding-capture]"))
++        return;
++      if (resolveShortcutCommand(event, keybindings) !== ATTENTION_INBOX_COMMAND) return;
++      event.preventDefault();
++      event.stopPropagation();
++      void open();
++    };
++    window.addEventListener("keydown", onKeyDown);
++    return () => window.removeEventListener("keydown", onKeyDown);
++  }, [keybindings, open]);
++  return null;
++}
+diff --git a/apps/web/src/components/attention/attentionInbox.logic.test.ts b/apps/web/src/components/attention/attentionInbox.logic.test.ts
+new file mode 100644
+index 000000000..90a303717
+--- /dev/null
++++ b/apps/web/src/components/attention/attentionInbox.logic.test.ts
+@@ -0,0 +1,219 @@
++import { describe, expect, it } from "vite-plus/test";
++import {
++  ApprovalRequestId,
++  AttentionId,
++  EnvironmentId,
++  EventId,
++  ProjectId,
++  ThreadId,
++  type AttentionChange,
++} from "@t3tools/contracts";
++import * as HashMap from "effect/HashMap";
++import * as Schema from "effect/Schema";
++import {
++  aggregateAttention,
++  type AttentionWorkspaceState,
++  type ScopedAttentionItem,
++} from "@t3tools/client-runtime/state/attention";
++import { KeybindingRule } from "@t3tools/contracts";
++import {
++  DEFAULT_RESOLVED_KEYBINDINGS,
++  compileResolvedKeybindingsConfig,
++} from "@t3tools/shared/keybindings";
++import { resolveShortcutCommand } from "../../keybindings";
++import {
++  ATTENTION_INBOX_COMMAND,
++  ATTENTION_SEEN_LIMIT,
++  AttentionSeen,
++  EMPTY_ATTENTION_FILTERS,
++  attentionBadge,
++  attentionKeyboardIndex,
++  attentionThreadTarget,
++  filterAttentionInbox,
++  markAttentionSeen,
++  pruneAttentionSeen,
++} from "./attentionInbox.logic";
++
++const A = EnvironmentId.make("machine-a");
++const B = EnvironmentId.make("machine-b");
++const isAttentionSeen = Schema.is(AttentionSeen);
++const decodeKeybindingRule = Schema.decodeUnknownSync(KeybindingRule);
++function row(index: number, environmentId = A): ScopedAttentionItem {
++  const threadId = ThreadId.make(`thread-${Math.floor(index / 2)}`);
++  const item = {
++    attentionId: AttentionId.make(index.toString(16).padStart(64, "0")),
++    projectId: ProjectId.make(index % 2 === 0 ? "repo-one" : "repo-two"),
++    threadId,
++    turnId: null,
++    requestId: ApprovalRequestId.make(`request-${index}`),
++    kind: index % 2 === 0 ? ("approval" as const) : ("user_input" as const),
++    status: "open" as const,
++    reasonCode: "approval_requested" as const,
++    revision: 1,
++    sourceEventId: EventId.make(`event-${index}`),
++    sourceSequence: index,
++    openedAt: "2026-09-28T00:00:00Z",
++    updatedAt: "2026-09-28T00:00:00Z",
++    resolvedAt: null,
++  };
++  return {
++    key: `${environmentId}:${item.attentionId}`,
++    ref: { environmentId, threadId },
++    item,
++    stale: false,
++    priority: "blocking-error",
++  };
++}
++function workspace(count: number, stale = false): AttentionWorkspaceState {
++  return {
++    isReady: true,
++    environments: new Map(
++      [A, B].map((environmentId) => {
++        const entries = Array.from({ length: count }, (_, index) => {
++          const { item } = row(index, environmentId);
++          const key = `item:${item.attentionId}`;
++          const change: AttentionChange = {
++            key,
++            version: index,
++            entity: { type: "item", value: item },
++          };
++          return [key, change] as const;
++        });
++        return [
++          environmentId,
++          {
++            status: stale && environmentId === B ? "stale" : "live",
++            hasSnapshot: true,
++            entries: HashMap.fromIterable(entries),
++            reason: null,
++          },
++        ];
++      }),
++    ),
++  };
++}
++
++describe("attention inbox semantics", () => {
++  it("keeps colliding IDs, routing and filtered counts scoped across a realistic large list", () => {
++    const state = workspace(2_500);
++    const all = aggregateAttention(state);
++    expect(all.itemCount).toBe(5_000);
++    expect(all.threadCount).toBe(2_500);
++    const selected = filterAttentionInbox(all, {
++      ...EMPTY_ATTENTION_FILTERS,
++      project: `${B}:repo-one`,
++      kind: "approval",
++      priority: "blocking-error",
++    });
++    expect(selected.items).toHaveLength(1_250);
++    expect(selected.threadCount).toBe(1_250);
++    expect(new Set(selected.items.map((item) => item.ref.environmentId))).toEqual(new Set([B]));
++    expect(attentionThreadTarget(row(0, A))).toEqual({
++      to: "/$environmentId/$threadId",
++      params: { environmentId: A, threadId: "thread-0" },
++    });
++    expect(attentionThreadTarget({ ...row(0, B), stale: true }).params.environmentId).toBe(B);
++    expect(
++      filterAttentionInbox(all, { ...EMPTY_ATTENTION_FILTERS, environment: "missing" }).items,
++    ).toEqual([]);
++    expect(
++      filterAttentionInbox(all, { ...EMPTY_ATTENTION_FILTERS, priority: "warning" }).items,
++    ).toEqual([]);
++  });
++  it("distinguishes partial/stale badge totals from a complete zero", () => {
++    expect(attentionBadge(aggregateAttention(workspace(2, true)))).toEqual({
++      text: "2?",
++      label: "2 actionable threads known; total incomplete. 1 stale.",
++    });
++    expect(attentionBadge(aggregateAttention(workspace(0))).text).toBe("0");
++    expect(
++      attentionBadge(aggregateAttention({ isReady: false, environments: new Map() })).text,
++    ).toBe("0?");
++  });
++  it("marks revisions seen and unseen without changing canonical items or counts", () => {
++    const state = workspace(2);
++    const before = aggregateAttention(state);
++    const target = row(0);
++    let seen = markAttentionSeen([], target, true);
++    expect(seen).toEqual([{ key: target.key, environmentId: A, revision: 1 }]);
++    seen = markAttentionSeen(seen, target, true);
++    expect(seen).toHaveLength(1);
++    const revised = { ...target, item: { ...target.item, revision: 2 } };
++    expect(seen[0]?.revision).not.toBe(revised.item.revision);
++    seen = markAttentionSeen(seen, revised, true);
++    expect(seen[0]?.revision).toBe(2);
++    expect(markAttentionSeen(seen, revised, false)).toEqual([]);
++    expect(aggregateAttention(state)).toEqual(before);
++  });
++  it("retains at most 2000 most recently marked scoped revisions", () => {
++    let seen = Array.from({ length: ATTENTION_SEEN_LIMIT }, (_, index) => ({
++      key: row(index).key,
++      environmentId: A,
++      revision: 1,
++    }));
++    seen = [...markAttentionSeen(seen, row(0), true)];
++    seen = [...markAttentionSeen(seen, row(ATTENTION_SEEN_LIMIT), true)];
++    expect(seen).toHaveLength(ATTENTION_SEEN_LIMIT);
++    expect(seen[0]?.key).toBe(row(2).key);
++    expect(seen.at(-2)?.key).toBe(row(0).key);
++    expect(isAttentionSeen(seen)).toBe(true);
++    expect(isAttentionSeen([...seen, seen[0]])).toBe(false);
++  });
++  it("prunes only complete authoritative absence, removal or revocation, never partial/stale caches", () => {
++    const state = workspace(2);
++    const a = row(5);
++    const b = row(5, B);
++    const seen = markAttentionSeen(markAttentionSeen([], a, true), b, true);
++    const observed = new Set([A, B]);
++    expect(pruneAttentionSeen(seen, { ...state, isReady: false }, observed)).toBe(seen);
++    expect(pruneAttentionSeen(seen, { isReady: true, environments: new Map() }, new Set())).toBe(
++      seen,
++    );
++    const disconnected = new Map(state.environments);
++    for (const [id, value] of disconnected)
++      disconnected.set(id, { ...value, status: id === A ? "syncing" : "stale" });
++    expect(pruneAttentionSeen(seen, { ...state, environments: disconnected }, observed)).toBe(seen);
++    expect(pruneAttentionSeen(seen, state, observed)).toEqual([]);
++    disconnected.delete(A);
++    expect(pruneAttentionSeen(seen, { ...state, environments: disconnected }, observed)).toEqual([
++      seen[1],
++    ]);
++    const current = disconnected.get(B)!;
++    disconnected.set(B, { ...current, status: "unauthorized" });
++    expect(pruneAttentionSeen(seen, { ...state, environments: disconnected }, observed)).toEqual(
++      [],
++    );
++  });
++  it("bounds keyboard selection and supports Home/End without truncating large lists", () => {
++    expect(attentionKeyboardIndex("End", 0, 5_000)).toBe(4_999);
++    expect(attentionKeyboardIndex("ArrowDown", 4_999, 5_000)).toBe(4_999);
++    expect(attentionKeyboardIndex("Home", 4_999, 5_000)).toBe(0);
++    expect(attentionKeyboardIndex("ArrowUp", 0, 5_000)).toBe(0);
++    expect(attentionKeyboardIndex("ArrowDown", 0, 0)).toBeNull();
++    expect(attentionKeyboardIndex("Enter", 2, 5_000)).toBeNull();
++  });
++  it("accepts the configurable inbox command without assigning a default shortcut", () => {
++    const rule = decodeKeybindingRule({
++      command: ATTENTION_INBOX_COMMAND,
++      key: "mod+shift+i",
++    });
++    expect(rule.command).toBe(ATTENTION_INBOX_COMMAND);
++    expect(
++      DEFAULT_RESOLVED_KEYBINDINGS.some((entry) => entry.command === ATTENTION_INBOX_COMMAND),
++    ).toBe(false);
++    const bindings = compileResolvedKeybindingsConfig([rule]);
++    expect(
++      resolveShortcutCommand(
++        {
++          key: "i",
++          metaKey: true,
++          ctrlKey: false,
++          shiftKey: true,
++          altKey: false,
++        },
++        bindings,
++        { platform: "MacIntel" },
++      ),
++    ).toBe(ATTENTION_INBOX_COMMAND);
++  });
++});
+diff --git a/apps/web/src/components/attention/attentionInbox.logic.ts b/apps/web/src/components/attention/attentionInbox.logic.ts
+new file mode 100644
+index 000000000..a58c3f2af
+--- /dev/null
++++ b/apps/web/src/components/attention/attentionInbox.logic.ts
+@@ -0,0 +1,141 @@
++import {
++  type AttentionWorkspaceState,
++  type EnvironmentAttentionState,
++  type ScopedAttentionItem,
++  aggregateAttention,
++} from "@t3tools/client-runtime/state/attention";
++import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
++import { EnvironmentId, PositiveInt } from "@t3tools/contracts";
++import * as Schema from "effect/Schema";
++import * as HashMap from "effect/HashMap";
++import * as Option from "effect/Option";
++import { scopedThreadKey } from "@t3tools/client-runtime/environment";
++import { buildThreadRouteParams } from "../../threadRoutes";
++
++export const ATTENTION_INBOX_COMMAND = "attention.open" as const;
++export const ATTENTION_INBOX_ROUTE = { to: "/attention" } as const;
++export const ATTENTION_SEEN_LIMIT = 2_000;
++export const AttentionSeen = Schema.Array(
++  Schema.Struct({
++    key: Schema.String,
++    environmentId: EnvironmentId,
++    revision: PositiveInt,
++  }),
++).check(Schema.isMaxLength(ATTENTION_SEEN_LIMIT));
++export type AttentionSeen = typeof AttentionSeen.Type;
++export const EMPTY_ATTENTION_SEEN: AttentionSeen = [];
++
++export const ATTENTION_KINDS = {
++  approval: "Approval requested",
++  user_input: "Input requested",
++  failure: "Agent failed",
++  disconnect: "Provider disconnected",
++} as const;
++export const ATTENTION_PRIORITIES = {
++  "blocking-error": "Blocking / error",
++  warning: "Warning",
++} as const;
++export const ATTENTION_STATUSES: Record<EnvironmentAttentionState["status"], string> = {
++  loading: "Waiting for attention",
++  syncing: "Synchronizing; previous snapshot is stale",
++  live: "Up to date",
++  stale: "Disconnected or retrying; retained snapshot is stale",
++  unauthorized: "Access denied; cached attention removed",
++  unsupported: "Attention is not supported by this server",
++  error: "Attention sync stopped; reconnect to retry",
++};
++export interface AttentionInboxFilters {
++  environment: string;
++  project: string;
++  kind: string;
++  priority: string;
++}
++export const EMPTY_ATTENTION_FILTERS: AttentionInboxFilters = {
++  environment: "",
++  project: "",
++  kind: "",
++  priority: "",
++};
++
++export function filterAttentionInbox(
++  aggregate: ReturnType<typeof aggregateAttention>,
++  filters: AttentionInboxFilters,
++) {
++  const items = aggregate.items.filter(
++    (row) =>
++      (filters.environment === "" || row.ref.environmentId === filters.environment) &&
++      (filters.project === "" ||
++        scopedProjectKey(scopeProjectRef(row.ref.environmentId, row.item.projectId)) ===
++          filters.project) &&
++      (filters.kind === "" || row.item.kind === filters.kind) &&
++      (filters.priority === "" || row.priority === filters.priority),
++  );
++  return { items, threadCount: new Set(items.map((row) => scopedThreadKey(row.ref))).size };
++}
++
++export function attentionBadge(aggregate: ReturnType<typeof aggregateAttention>) {
++  return {
++    text: aggregate.complete ? String(aggregate.threadCount) : `${aggregate.threadCount}?`,
++    label: `${aggregate.threadCount} actionable ${aggregate.threadCount === 1 ? "thread" : "threads"}${aggregate.complete ? "" : " known; total incomplete"}. ${aggregate.staleThreadCount} stale.`,
++  };
++}
++
++export function attentionThreadTarget(row: ScopedAttentionItem) {
++  return { to: "/$environmentId/$threadId" as const, params: buildThreadRouteParams(row.ref) };
++}
++
++export function markAttentionSeen(
++  current: AttentionSeen,
++  row: ScopedAttentionItem,
++  seen: boolean,
++): AttentionSeen {
++  const rest = current.filter((entry) => entry.key !== row.key);
++  return seen
++    ? [
++        ...rest,
++        { key: row.key, environmentId: row.ref.environmentId, revision: row.item.revision },
++      ].slice(-ATTENTION_SEEN_LIMIT)
++    : rest;
++}
++
++/** Only a complete live snapshot proves that a previously seen item is gone. */
++export function pruneAttentionSeen(
++  current: AttentionSeen,
++  state: AttentionWorkspaceState,
++  observedEnvironments: ReadonlySet<EnvironmentId>,
++): AttentionSeen {
++  if (!state.isReady) return current;
++  const next = current.filter((entry) => {
++    const environment = state.environments.get(entry.environmentId);
++    if (!environment) return !observedEnvironments.has(entry.environmentId);
++    if (environment.status === "unauthorized") return false;
++    if (environment.status !== "live") return true;
++    const change = HashMap.get(
++      environment.entries,
++      `item:${entry.key.slice(entry.environmentId.length + 1)}`,
++    );
++    return (
++      Option.isSome(change) &&
++      change.value.entity?.type === "item" &&
++      change.value.entity.value.status === "open" &&
++      change.value.entity.value.revision === entry.revision
++    );
++  });
++  return next.length === current.length ? current : next;
++}
++
++export function attentionKeyboardIndex(key: string, index: number, count: number): number | null {
++  if (count === 0) return null;
++  switch (key) {
++    case "ArrowDown":
++      return Math.min(count - 1, index + 1);
++    case "ArrowUp":
++      return Math.max(0, index - 1);
++    case "Home":
++      return 0;
++    case "End":
++      return count - 1;
++    default:
++      return null;
++  }
++}
+diff --git a/apps/web/src/components/attention/useOpenAttentionInbox.ts b/apps/web/src/components/attention/useOpenAttentionInbox.ts
+new file mode 100644
+index 000000000..03ab7760e
+--- /dev/null
++++ b/apps/web/src/components/attention/useOpenAttentionInbox.ts
+@@ -0,0 +1,16 @@
++import { useNavigate } from "@tanstack/react-router";
++import { useCallback } from "react";
++import { toastManager } from "../ui/toast";
++import { ATTENTION_INBOX_ROUTE } from "./attentionInbox.logic";
++
++export function useOpenAttentionInbox() {
++  const navigate = useNavigate();
++  return useCallback(async () => {
++    try {
++      await navigate(ATTENTION_INBOX_ROUTE);
++    } catch (error) {
++      console.error("Could not open attention inbox.", error);
++      toastManager.add({ type: "error", title: "Could not open attention inbox" });
++    }
++  }, [navigate]);
++}
+diff --git a/apps/web/src/components/settings/NotificationSettings.tsx b/apps/web/src/components/settings/NotificationSettings.tsx
+index 5af5f0a85..cb3660ec1 100644
+--- a/apps/web/src/components/settings/NotificationSettings.tsx
++++ b/apps/web/src/components/settings/NotificationSettings.tsx
+@@ -1,10 +1,16 @@
+ import { useState } from "react";
++import { NOTIFICATION_CATEGORIES } from "../../attentionNotificationPolicy";
++import { useEnvironments } from "../../state/environments";
++import { Switch } from "../ui/switch";
++import { Input } from "../ui/input";
+ 
+ import {
+   hasDesktopNotifications,
+   hasNotificationSound,
+   NOTIFICATION_MODE_LABELS,
+   unlockNotificationAudio,
++  notificationPermissionIssue,
++  useNotificationDeliveryStatus,
+ } from "../../threadNotifications";
+ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+ import { SettingsRow } from "./settingsLayout";
+@@ -13,71 +19,199 @@ import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings"
+ 
+ export function NotificationSettings() {
+   const mode = useScopedSettings((settings) => settings.notificationMode);
++  const categories = useScopedSettings((settings) => settings.notificationCategories);
++  const muted = useScopedSettings((settings) => settings.notificationMutedEnvironments);
++  const quiet = useScopedSettings((settings) => settings.notificationQuietHours);
++  const deliveryIssue = useNotificationDeliveryStatus((state) => state.issue);
++  const { environments } = useEnvironments();
+   const updateSettings = useUpdateScopedSettings();
+   const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
+   const [requesting, setRequesting] = useState(false);
++  const [timeIssue, setTimeIssue] = useState<string | null>(null);
+ 
+   return (
+-    <SettingsRow
+-      {...searchableSetting("thread-notifications")}
+-      description={
+-        permissionMessage ??
+-        "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open."
+-      }
+-      control={
+-        <Select
+-          value={mode}
+-          disabled={requesting}
+-          onValueChange={async (value) => {
+-            if (
+-              value !== "off" &&
+-              value !== "notifications" &&
+-              value !== "sound" &&
+-              value !== "notifications-and-sound"
+-            )
+-              return;
+-            setPermissionMessage(null);
+-            if (hasNotificationSound(value)) unlockNotificationAudio();
+-            if (hasDesktopNotifications(value)) {
+-              if (typeof Notification === "undefined" || !window.isSecureContext) {
+-                setPermissionMessage(
+-                  "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+-                );
++    <>
++      <SettingsRow
++        {...searchableSetting("thread-notifications")}
++        description={
++          permissionMessage ??
++          deliveryIssue ??
++          (hasDesktopNotifications(mode) ? notificationPermissionIssue() : null) ??
++          "Applies only to this client while T3 Code is open. System alerts contain static category text, never thread titles. The active focused thread is silent; other focused threads may toast or play sound."
++        }
++        control={
++          <Select
++            value={mode}
++            disabled={requesting}
++            onValueChange={async (value) => {
++              if (
++                value !== "off" &&
++                value !== "notifications" &&
++                value !== "sound" &&
++                value !== "notifications-and-sound"
++              )
+                 return;
+-              }
+-              setRequesting(true);
+-              try {
+-                const permission = await Notification.requestPermission();
+-                if (permission !== "granted") {
++              setPermissionMessage(null);
++              if (hasNotificationSound(value)) unlockNotificationAudio();
++              if (hasDesktopNotifications(value)) {
++                if (typeof Notification === "undefined" || !window.isSecureContext) {
+                   setPermissionMessage(
+-                    "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
++                    "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+                   );
+                   return;
+                 }
+-              } catch {
+-                setPermissionMessage(
+-                  "Notifications are unavailable in this browser. Sound only is still available.",
+-                );
+-                return;
+-              } finally {
+-                setRequesting(false);
++                setRequesting(true);
++                try {
++                  const permission = await Notification.requestPermission();
++                  if (permission !== "granted") {
++                    setPermissionMessage(
++                      "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
++                    );
++                    return;
++                  }
++                } catch {
++                  setPermissionMessage(
++                    "Notifications are unavailable in this browser. Sound only is still available.",
++                  );
++                  return;
++                } finally {
++                  setRequesting(false);
++                }
++              }
++              updateSettings({ notificationMode: value });
++              useNotificationDeliveryStatus.setState({ issue: null });
++            }}
++          >
++            <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Thread notifications">
++              <SelectValue>{NOTIFICATION_MODE_LABELS[mode]}</SelectValue>
++            </SelectTrigger>
++            <SelectPopup align="end" alignItemWithTrigger={false}>
++              {Object.entries(NOTIFICATION_MODE_LABELS).map(([value, label]) => (
++                <SelectItem key={value} hideIndicator value={value}>
++                  {label}
++                </SelectItem>
++              ))}
++            </SelectPopup>
++          </Select>
++        }
++      />
++      <SettingsRow
++        {...searchableSetting("notification-categories")}
++        description="Choose which events may use your enabled channels. Completion is optional awareness, not open attention. These choices also apply to in-app toasts."
++        control={
++          <div className="flex flex-col gap-2" role="group" aria-label="Notification categories">
++            {Object.entries(NOTIFICATION_CATEGORIES).map(([category, label]) => {
++              const value = category as keyof typeof NOTIFICATION_CATEGORIES;
++              return (
++                <div key={value} className="flex items-center justify-between gap-4 text-sm">
++                  {label}
++                  <Switch
++                    aria-label={`Notify: ${label}`}
++                    checked={categories.includes(value)}
++                    aria-checked={categories.includes(value)}
++                    onCheckedChange={(checked) =>
++                      updateSettings({
++                        notificationCategories: checked
++                          ? [...categories, value]
++                          : categories.filter((entry) => entry !== value),
++                      })
++                    }
++                  />
++                </div>
++              );
++            })}
++          </div>
++        }
++      />
++      <SettingsRow
++        {...searchableSetting("notification-environment-mutes")}
++        description="Mute all notification channels for an environment on this client. Muting never resolves or hides attention in the inbox."
++        control={
++          <div
++            className="flex max-h-56 flex-col gap-2 overflow-auto"
++            role="group"
++            aria-label="Muted notification environments"
++          >
++            {environments.map((environment) => (
++              <div
++                key={environment.environmentId}
++                className="flex items-center justify-between gap-4 text-sm"
++              >
++                {environment.label}
++                <Switch
++                  aria-label={`Mute notifications: ${environment.label}`}
++                  checked={muted.includes(environment.environmentId)}
++                  aria-checked={muted.includes(environment.environmentId)}
++                  onCheckedChange={(checked) =>
++                    updateSettings({
++                      notificationMutedEnvironments: checked
++                        ? [...muted, environment.environmentId]
++                        : muted.filter((id) => id !== environment.environmentId),
++                    })
++                  }
++                />
++              </div>
++            ))}
++            {muted
++              .filter((id) => !environments.some((environment) => environment.environmentId === id))
++              .map((id) => (
++                <div key={id} className="flex items-center justify-between gap-4 text-sm">
++                  Unavailable environment {id}
++                  <Switch
++                    aria-label={`Mute notifications: ${id}`}
++                    checked
++                    aria-checked
++                    onCheckedChange={() =>
++                      updateSettings({
++                        notificationMutedEnvironments: muted.filter((entry) => entry !== id),
++                      })
++                    }
++                  />
++                </div>
++              ))}
++          </div>
++        }
++      />
++      <SettingsRow
++        {...searchableSetting("notification-quiet-hours")}
++        description={
++          timeIssue ??
++          "Mute every channel on this client's local clock. Start is inclusive, end is exclusive; equal times mean all day. Suppressed events are not replayed later."
++        }
++        control={
++          <div className="flex flex-wrap items-center gap-2">
++            <Switch
++              aria-label="Quiet hours"
++              checked={quiet.enabled}
++              aria-checked={quiet.enabled}
++              onCheckedChange={(enabled) =>
++                updateSettings({ notificationQuietHours: { ...quiet, enabled } })
+               }
+-            }
+-            updateSettings({ notificationMode: value });
+-          }}
+-        >
+-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Thread notifications">
+-            <SelectValue>{NOTIFICATION_MODE_LABELS[mode]}</SelectValue>
+-          </SelectTrigger>
+-          <SelectPopup align="end" alignItemWithTrigger={false}>
+-            {Object.entries(NOTIFICATION_MODE_LABELS).map(([value, label]) => (
+-              <SelectItem key={value} hideIndicator value={value}>
+-                {label}
+-              </SelectItem>
++            />
++            {(["start", "end"] as const).map((field) => (
++              <label key={field} className="flex flex-col gap-1 text-xs">
++                {field === "start" ? "From" : "Until"}
++                <Input
++                  type="time"
++                  aria-label={`Quiet hours ${field}`}
++                  value={quiet[field]}
++                  disabled={!quiet.enabled}
++                  onChange={(event) => {
++                    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(event.target.value)) {
++                      setTimeIssue("Choose a valid start and end time.");
++                      return;
++                    }
++                    setTimeIssue(null);
++                    updateSettings({
++                      notificationQuietHours: { ...quiet, [field]: event.target.value },
++                    });
++                  }}
++                />
++              </label>
+             ))}
+-          </SelectPopup>
+-        </Select>
+-      }
+-    />
++          </div>
++        }
++      />
++    </>
+   );
+ }
+diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx
+index 5238cf19e..1865aca7d 100644
+--- a/apps/web/src/components/settings/SettingsPanels.tsx
++++ b/apps/web/src/components/settings/SettingsPanels.tsx
+@@ -2293,7 +2293,7 @@ export function GeneralSettingsPanel() {
+         <NotificationSettings />
+         <SettingsRow
+           {...searchableSetting("in-app-notifications")}
+-          description="Show a toast when another thread finishes, fails, or needs input or approval while this app has focus."
++          description="Show a toast for another thread while this app has focus. Notification categories, environment mutes and quiet hours apply here too."
+           control={
+             <Switch
+               checked={settings.inAppNotificationsEnabled}
+diff --git a/apps/web/src/components/settings/settingsSearch.ts b/apps/web/src/components/settings/settingsSearch.ts
+index 7e999417f..945e8d622 100644
+--- a/apps/web/src/components/settings/settingsSearch.ts
++++ b/apps/web/src/components/settings/settingsSearch.ts
+@@ -249,6 +249,24 @@ export const SETTINGS_SEARCH_ITEMS = [
+     to: "/settings/general",
+     searchTerms: ["notification toast popup completion input approval failure"],
+   },
++  {
++    id: "notification-categories",
++    title: "Notification categories",
++    to: "/settings/general",
++    searchTerms: ["notification approval input failure disconnect completion privacy"],
++  },
++  {
++    id: "notification-environment-mutes",
++    title: "Mute environment notifications",
++    to: "/settings/general",
++    searchTerms: ["notification environment machine mute silence"],
++  },
++  {
++    id: "notification-quiet-hours",
++    title: "Notification quiet hours",
++    to: "/settings/general",
++    searchTerms: ["notification quiet hours clock schedule do not disturb"],
++  },
+   {
+     id: "time-format",
+     title: "Time format",
+diff --git a/apps/web/src/components/sidebar/SidebarChrome.tsx b/apps/web/src/components/sidebar/SidebarChrome.tsx
+index 5a332b860..1c406648e 100644
+--- a/apps/web/src/components/sidebar/SidebarChrome.tsx
++++ b/apps/web/src/components/sidebar/SidebarChrome.tsx
+@@ -33,6 +33,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+ import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+ import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
+ import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
++import { AttentionSidebarItem } from "../attention/AttentionSidebarItem";
+ 
+ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
+   isElectron,
+@@ -146,7 +147,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
+             ? "usage"
+             : location.pathname === "/pull-requests"
+               ? "pull-requests"
+-              : null,
++              : location.pathname === "/attention"
++                ? "attention"
++                : null,
+   });
+   const { environments } = useEnvironments();
+   // The page reads every connected server, so one of them offering pull requests is enough for
+@@ -189,6 +192,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
+ 
+   return (
+     <SidebarMenu className="flex-row items-center">
++      <AttentionSidebarItem />
+       {currentFooterPage ? (
+         <SidebarMenuItem className="min-w-0 flex-1">
+           <SidebarMenuButton onClick={handleBackClick}>
+diff --git a/apps/web/src/routeTree.gen.ts b/apps/web/src/routeTree.gen.ts
+index f6ba4dece..d2c3dc1aa 100644
+--- a/apps/web/src/routeTree.gen.ts
++++ b/apps/web/src/routeTree.gen.ts
+@@ -30,6 +30,7 @@ import { Route as SettingsArchivedRouteImport } from './routes/settings.archived
+ import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
+ import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
+ import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
++import { Route as ChatAttentionRouteImport } from './routes/_chat.attention'
+ import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
+ import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
+ 
+@@ -138,6 +139,11 @@ const ChatPullRequestsRoute = ChatPullRequestsRouteImport.update({
+   path: '/pull-requests',
+   getParentRoute: () => ChatRoute,
+ } as any)
++const ChatAttentionRoute = ChatAttentionRouteImport.update({
++  id: '/attention',
++  path: '/attention',
++  getParentRoute: () => ChatRoute,
++} as any)
+ const ChatDraftDraftIdRoute = ChatDraftDraftIdRouteImport.update({
+   id: '/draft/$draftId',
+   path: '/draft/$draftId',
+@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
+   '/settings': typeof SettingsRouteWithChildren
+   '/usage': typeof UsageRoute
+   '/welcome': typeof WelcomeRoute
++  '/attention': typeof ChatAttentionRoute
+   '/pull-requests': typeof ChatPullRequestsRoute
+   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+   '/settings/appearance': typeof SettingsAppearanceRoute
+@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
+   '/settings': typeof SettingsRouteWithChildren
+   '/usage': typeof UsageRoute
+   '/welcome': typeof WelcomeRoute
++  '/attention': typeof ChatAttentionRoute
+   '/pull-requests': typeof ChatPullRequestsRoute
+   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+   '/settings/appearance': typeof SettingsAppearanceRoute
+@@ -206,6 +214,7 @@ export interface FileRoutesById {
+   '/settings': typeof SettingsRouteWithChildren
+   '/usage': typeof UsageRoute
+   '/welcome': typeof WelcomeRoute
++  '/_chat/attention': typeof ChatAttentionRoute
+   '/_chat/pull-requests': typeof ChatPullRequestsRoute
+   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+   '/settings/appearance': typeof SettingsAppearanceRoute
+@@ -233,6 +242,7 @@ export interface FileRouteTypes {
+     | '/settings'
+     | '/usage'
+     | '/welcome'
++    | '/attention'
+     | '/pull-requests'
+     | '/projects/$projectKey'
+     | '/settings/appearance'
+@@ -256,6 +266,7 @@ export interface FileRouteTypes {
+     | '/settings'
+     | '/usage'
+     | '/welcome'
++    | '/attention'
+     | '/pull-requests'
+     | '/projects/$projectKey'
+     | '/settings/appearance'
+@@ -281,6 +292,7 @@ export interface FileRouteTypes {
+     | '/settings'
+     | '/usage'
+     | '/welcome'
++    | '/_chat/attention'
+     | '/_chat/pull-requests'
+     | '/projects/$projectKey'
+     | '/settings/appearance'
+@@ -459,6 +471,13 @@ declare module '@tanstack/react-router' {
+       preLoaderRoute: typeof ChatPullRequestsRouteImport
+       parentRoute: typeof ChatRoute
+     }
++    '/_chat/attention': {
++      id: '/_chat/attention'
++      path: '/attention'
++      fullPath: '/attention'
++      preLoaderRoute: typeof ChatAttentionRouteImport
++      parentRoute: typeof ChatRoute
++    }
+     '/_chat/draft/$draftId': {
+       id: '/_chat/draft/$draftId'
+       path: '/draft/$draftId'
+@@ -477,6 +496,7 @@ declare module '@tanstack/react-router' {
+ }
+ 
+ interface ChatRouteChildren {
++  ChatAttentionRoute: typeof ChatAttentionRoute
+   ChatPullRequestsRoute: typeof ChatPullRequestsRoute
+   ChatIndexRoute: typeof ChatIndexRoute
+   ChatEnvironmentIdThreadIdRoute: typeof ChatEnvironmentIdThreadIdRoute
+@@ -484,6 +504,7 @@ interface ChatRouteChildren {
+ }
+ 
+ const ChatRouteChildren: ChatRouteChildren = {
++  ChatAttentionRoute: ChatAttentionRoute,
+   ChatPullRequestsRoute: ChatPullRequestsRoute,
+   ChatIndexRoute: ChatIndexRoute,
+   ChatEnvironmentIdThreadIdRoute: ChatEnvironmentIdThreadIdRoute,
+diff --git a/apps/web/src/routes/_chat.attention.tsx b/apps/web/src/routes/_chat.attention.tsx
+new file mode 100644
+index 000000000..01bc9873e
+--- /dev/null
++++ b/apps/web/src/routes/_chat.attention.tsx
+@@ -0,0 +1,6 @@
++import { createFileRoute } from "@tanstack/react-router";
++import { AttentionInbox } from "../components/attention/AttentionInbox";
++
++export const Route = createFileRoute("/_chat/attention")({
++  component: AttentionInbox,
++});
+diff --git a/apps/web/src/threadNotifications.ts b/apps/web/src/threadNotifications.ts
+index 2f9d45497..0d08d248b 100644
+--- a/apps/web/src/threadNotifications.ts
++++ b/apps/web/src/threadNotifications.ts
+@@ -1,9 +1,25 @@
+ import type { ClientSettings } from "@t3tools/contracts/settings";
++import { create } from "zustand";
+ 
+ import completionUrl from "./assets/notification-completion.mp3";
+ import inputUrl from "./assets/notification-input.mp3";
+ 
+ type NotificationMode = ClientSettings["notificationMode"];
++export const useNotificationDeliveryStatus = create<{ issue: string | null }>(() => ({
++  issue: null,
++}));
++export function reportNotificationDeliveryFailure(message: string, error?: unknown) {
++  if (useNotificationDeliveryStatus.getState().issue === message) return;
++  console.warn(message, error ?? "");
++  useNotificationDeliveryStatus.setState({ issue: message });
++}
++export function notificationPermissionIssue(): string | null {
++  if (typeof Notification === "undefined" || window.isSecureContext === false)
++    return "System notifications require a supported secure browser or the desktop app. The attention inbox remains available.";
++  if (Notification.permission !== "granted")
++    return "System notification permission is not granted. Enable it from Settings; the attention inbox remains available.";
++  return null;
++}
+ export const NOTIFICATION_MODE_LABELS = {
+   off: "Off",
+   notifications: "Notifications only",
+@@ -61,7 +77,11 @@ export function setNotificationBadge(count: number) {
+       originalFavicon = undefined;
+     }
+   }
+-  void bridge?.setNotificationBadge?.({ count, image }).catch(() => undefined);
++  void bridge
++    ?.setNotificationBadge?.({ count, image })
++    .catch((error) =>
++      reportNotificationDeliveryFailure("Could not update the notification badge.", error),
++    );
+ }
+ 
+ let audioContext: AudioContext | undefined;
+@@ -69,8 +89,16 @@ const buffers = new Map<string, Promise<AudioBuffer>>();
+ 
+ /** Called from a gesture so browsers allow later background playback. */
+ export function unlockNotificationAudio() {
+-  audioContext ??= new AudioContext();
+-  void audioContext.resume().catch(() => undefined);
++  try {
++    audioContext ??= new AudioContext();
++    void audioContext
++      .resume()
++      .catch((error) =>
++        reportNotificationDeliveryFailure("Notification audio is unavailable.", error),
++      );
++  } catch (error) {
++    reportNotificationDeliveryFailure("Notification audio is unavailable.", error);
++  }
+ }
+ 
+ export async function playNotificationSound(
+@@ -84,7 +112,11 @@ export async function playNotificationSound(
+     let buffer = buffers.get(url);
+     if (!buffer) {
+       buffer = fetch(url)
+-        .then((response) => response.arrayBuffer())
++        .then((response) => {
++          if (!response.ok)
++            throw new Error(`Notification audio request failed (${response.status}).`);
++          return response.arrayBuffer();
++        })
+         .then((data) => context.decodeAudioData(data));
+       buffers.set(url, buffer);
+     }
+@@ -94,7 +126,8 @@ export async function playNotificationSound(
+     source.buffer = decoded;
+     source.connect(context.destination);
+     source.start();
+-  } catch {
++  } catch (error) {
+     buffers.delete(url);
++    reportNotificationDeliveryFailure("Could not play notification audio.", error);
+   }
+ }
+diff --git a/docs/internals/attention-notifications.md b/docs/internals/attention-notifications.md
+new file mode 100644
+index 000000000..701a328c6
+--- /dev/null
++++ b/docs/internals/attention-notifications.md
+@@ -0,0 +1,36 @@
++# Frontend notification policy
++
++`ThreadNotificationCoordinator` remains the sole web/desktop renderer emitter.
++Electron keeps the existing renderer Notification path and native badge IPC;
++there is no server-only notification sink, mobile/relay dependency or user-wide
++lease.
++
++The existing shared attention consumer projects a current eligible-candidate
++map from accepted post-live deltas. This metadata is absent from wire contracts
++and is bounded by current compact items/summaries, not an event backlog.
++Bootstrap, replay fences, reset and nonlive states clear eligibility. Resolution
++and deletion remove candidates; same-turn completed-summary revisions do not
++manufacture new completions. Keeping independent candidates until they cease
++to be relevant makes consumer batching safe.
++
++The coordinator consumes candidates even while channels, categories or
++environments are muted. Revision/category observations are client-local and
++never feed back into canonical state. Completion is a newly completed non-null
++turn, not an open item. Explicitly unsupported environments use the existing
++shell transition detector exclusively; unknown or failed canonical sync does
++not activate fallback.
++
++`ClientSettingsSchema` stores category choices, muted environment IDs and local
++quiet hours alongside the existing opt-in modes. Patch codecs use the raw field
++schemas without decoding defaults, so unrelated preference updates cannot
++silently reset notification policy. Quiet hours are checked at delivery and
++again after asynchronous sound decoding; suppressed events are not queued.
++
++Foreground active-thread suppression is scoped by environment/thread and
++covers every channel. The existing toast/system-alert split and pending-thread
++notification badge remain distinct from the actionable inbox. OS payloads use
++static text and opaque scoped tags; clicks recheck current access/status.
++Disconnected clicks retain their scoped destination in a persistent retry action
++instead of attempting to fetch a lazy route while offline.
++Permission and delivery failures surface through the existing Settings area
++and bounded diagnostics without disabling attention state.
+diff --git a/docs/internals/overview.md b/docs/internals/overview.md
+index a7fbfd315..bc1627338 100644
+--- a/docs/internals/overview.md
++++ b/docs/internals/overview.md
+@@ -287,3 +287,26 @@ down, so new native capability goes in a child with a deadline, not an `import`
+ 
+ See the [glossary](./glossary.md) for shared terms and the
+ [development runbook](../operations/development.md) for setup and checks.
++
++## Web and desktop attention inbox
++
++The `/attention` route consumes the single web `attentionWorkspace`; the
++authenticated app sidebar layout retains it across route/sidebar changes.
++Both sidebar variants and Settings use one attention entry. Command-palette
++selection and the configurable `attention.open` shortcut share the same route
++action. No shortcut is assigned by default, and the existing OS notification
++coordinator/badge is unchanged.
++
++The page filters the already-sorted aggregate, rather than re-sorting for each
++consumer. LegendList bounds rendered rows; only visible rows read thread shell
++titles, and thread detail is loaded only after scoped navigation. The listbox
++retains selection by scoped item identity, scrolls keyboard selection into view
++and exposes an active descendant only while its row is mounted.
++
++Seen state is a schema-checked, device-local list of at most 2000 recent scoped
++item revisions. Marking seen/unseen never changes canonical counts. Cleanup
++uses direct item lookups and only trusts absence in a live complete snapshot.
++Environment removal is recognized only after that environment was observed in
++the current mount: the initially empty catalog during discovery is not evidence
++that persisted seen marks should be erased. Unknown leftover IDs remain bounded
++by the retention cap, without persisting titles, prompts or provider output.
+diff --git a/docs/user/attention.md b/docs/user/attention.md
+new file mode 100644
+index 000000000..f0ca37b65
+--- /dev/null
++++ b/docs/user/attention.md
+@@ -0,0 +1,29 @@
++# Attention inbox
++
++Open **Attention inbox** from the sidebar or command palette to see open approvals,
++input requests, agent failures and provider disconnections across enabled
++environments. The sidebar badge counts threads, while the inbox lists individual
++items: two approvals in one thread count as one thread and two items.
++
++Use Environment, Project, Kind and Severity to narrow the list. Blocking requests
++and errors appear before warnings, oldest first within each group. In the list,
++Up/Down and Home/End select an item; Enter opens its owning thread. Respond using
++the thread's normal approval or input controls.
++
++A `?` after the badge count means the total is incomplete. Disconnected
++environments retain a visibly stale snapshot; their items might already be
++resolved elsewhere. Reconnect before responding. Disabling or removing an
++environment removes its cached attention from this client.
++
++Opening an item marks that revision **Seen** on this device. **Mark unseen**
++reverses the emphasis. A changed revision becomes unseen again. Seen items
++remain in the inbox and actionable count until the environment resolves them;
++seen history keeps up to 2,000 recent marks.
++
++You can assign **Attention: Open** in Settings → Keybindings. No shortcut is
++assigned by default. The inbox and its badge are separate from background
++notification badges; opening the app or marking items seen does not resolve
++attention or change notification preferences.
++
++Configure categories, environment mutes and quiet hours in
++[Thread notifications](./notifications.md).
+diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md
+index 5c62b3d85..1910fd895 100644
+--- a/docs/user/keybindings.md
++++ b/docs/user/keybindings.md
+@@ -130,3 +130,10 @@ keyboard repeat; if repeat is disabled, use two presses or the application menu.
+ Change **Settings → General → Confirmations → Quit shortcut** to **Direct** for a
+ single press or **Double press** for two presses only. Choosing **Quit** from the
+ application menu always quits immediately.
++
++## Open the attention inbox
++
++Choose **Open attention inbox** in the command palette, or assign
++`attention.open` in Settings → Keybindings. No shortcut is assigned by default.
++Inside the [attention inbox](./attention.md), Up/Down and Home/End select an
++item; Enter opens its owning thread.
+diff --git a/docs/user/notifications.md b/docs/user/notifications.md
+new file mode 100644
+index 000000000..761a25b07
+--- /dev/null
++++ b/docs/user/notifications.md
+@@ -0,0 +1,47 @@
++# Thread notifications
++
++Notifications belong to the client you are using, not to the environment hosting
++your work. They are off by default. Running a server without an interactive
++client does not show alerts or play sounds.
++
++In **Settings → General → Behavior**, choose system notifications, sound, both,
++or neither. The separate **In-app notifications** switch enables foreground
++toasts. Browser permission is requested only when you choose a system-alert
++mode. Denial or unavailable delivery is shown in Settings; the
++[attention inbox](./attention.md) remains usable.
++
++## Categories, mutes and quiet hours
++
++Choose which categories may use your enabled channels: approvals, input,
++failures, provider disconnections and completion. Existing choices retain
++approval/input/failure/completion alerts; provider-disconnection alerts start
++disabled. Completion is awareness, not an open attention item.
++
++Mute individual environments without removing them from the inbox. Quiet hours
++mute all channels using this client's local clock. The start is inclusive and
++the end exclusive, including schedules crossing midnight. Equal start and end
++times mean quiet all day. Events suppressed while disabled, muted or quiet are
++not delivered later.
++
++The focused active thread is silent on every channel. Other threads may show
++opted-in toasts or play sound while the app is focused; background clients may
++use system alerts and sound. These preferences do not synchronize across
++clients. Two opted-in clients may each notify.
++
++## Privacy and reliability
++
++System notifications use static category text, not thread titles, prompts,
++tool output or error details. Clicking focuses T3 Code and opens the owning
++environment/thread. A disconnected destination retains a **Retry open thread**
++action until you reconnect, rather than trying to load an unavailable route;
++removed or unauthorized environments lead to the inbox.
++
++Initial snapshots, history import, rebuilds and reconnect replay do not notify.
++Live canonical items deduplicate by scoped identity and material revision.
++Older servers explicitly lacking canonical attention use the existing
++shell-based transition detector instead, never in parallel.
++
++Notification badges count threads with pending notifications and clear on
++focus. They remain separate from the inbox's actionable-thread count.
++Disabling notifications, muting an environment or marking an inbox item seen
++does not resolve attention.
+diff --git a/docs/user/thread-sidebar.md b/docs/user/thread-sidebar.md
+index dfd2eb865..6b487b52f 100644
+--- a/docs/user/thread-sidebar.md
++++ b/docs/user/thread-sidebar.md
+@@ -109,6 +109,11 @@ The linked pull request participates in automatic settlement.
+ 
+ ## Find and reference work
+ 
++The sidebar's [attention inbox](./attention.md) badge counts threads with open
++approvals, input requests, failures or provider disconnections across enabled
++environments. A `?` marks an incomplete total; opening or marking an item seen
++does not resolve it.
++
+ On web and desktop, open the command palette with `Cmd/Ctrl+K` to search threads
+ across connected environments. Message search starts after two characters and
+ includes your messages and final agent responses.
+diff --git a/packages/contracts/src/keybindings.ts b/packages/contracts/src/keybindings.ts
+index 634bd611a..d447e74a3 100644
+--- a/packages/contracts/src/keybindings.ts
++++ b/packages/contracts/src/keybindings.ts
+@@ -55,6 +55,7 @@ const MODEL_PICKER_KEYBINDING_COMMANDS = [
+ export type ModelPickerKeybindingCommand = (typeof MODEL_PICKER_KEYBINDING_COMMANDS)[number];
+ 
+ export const STATIC_KEYBINDING_COMMANDS = [
++  "attention.open",
+   "sidebar.toggle",
+   "terminal.toggle",
+   "terminal.split",
+diff --git a/packages/contracts/src/settings.test.ts b/packages/contracts/src/settings.test.ts
+index bd84d2b96..b0722af55 100644
+--- a/packages/contracts/src/settings.test.ts
++++ b/packages/contracts/src/settings.test.ts
+@@ -165,6 +165,41 @@ describe("ClaudeSettings auto-compaction", () => {
+ });
+ 
+ describe("ClientSettings notifications", () => {
++  it("keeps notification policy client-local and preserves consent defaults", () => {
++    const settings = decodeClientSettings({});
++    expect(settings.notificationCategories).toEqual([
++      "approval",
++      "user_input",
++      "failure",
++      "completion",
++    ]);
++    expect(settings.notificationMutedEnvironments).toEqual([]);
++    expect(settings.notificationQuietHours).toEqual({
++      enabled: false,
++      start: "22:00",
++      end: "08:00",
++    });
++    expect(decodeClientSettingsPatch({})).not.toHaveProperty("notificationCategories");
++    expect(decodeClientSettingsPatch({})).not.toHaveProperty("notificationQuietHours");
++    const patch = {
++      notificationCategories: ["disconnect"],
++      notificationMutedEnvironments: ["env"],
++      notificationQuietHours: { enabled: true, start: "22:30", end: "06:00" },
++    };
++    expect(decodeClientSettingsPatch(patch)).toEqual(patch);
++    expect(encodeClientSettings(decodeClientSettings(patch))).toMatchObject(patch);
++    expect(decodeServerSettingsPatch(patch)).toEqual({});
++  });
++  it.each(["24:00", "12:60", "1:00", "", "noon"])(
++    "rejects malformed quiet-hour time %s",
++    (start) => {
++      expect(() =>
++        decodeClientSettingsPatch({
++          notificationQuietHours: { enabled: true, start, end: "08:00" },
++        }),
++      ).toThrow();
++    },
++  );
+   it("requires opt-in when existing settings omit notification preferences", () => {
+     expect(decodeClientSettings({}).notificationMode).toBe("off");
+     expect(decodeClientSettings({}).inAppNotificationsEnabled).toBe(false);
+diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts
+index 5388f49f5..6f33a7527 100644
+--- a/packages/contracts/src/settings.ts
++++ b/packages/contracts/src/settings.ts
+@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
+ import * as SchemaTransformation from "effect/SchemaTransformation";
+ import {
+   ForwardCompatibleNullable,
++  EnvironmentId,
+   ProjectId,
+   TrimmedNonEmptyString,
+   TrimmedString,
+@@ -287,11 +288,32 @@ export const LoadBalancingWeights = Schema.Record(
+ 
+ export const DiffColorScheme = Schema.Literals(["red-green", "blue-orange"]);
+ 
++const NotificationCategories = Schema.Array(
++  Schema.Literals(["approval", "user_input", "failure", "disconnect", "completion"]),
++);
++const NotificationMutedEnvironments = Schema.Array(EnvironmentId);
++const NotificationQuietHours = Schema.Struct({
++  enabled: Schema.Boolean,
++  start: Schema.String.check(Schema.isPattern(/^([01]\d|2[0-3]):[0-5]\d$/)),
++  end: Schema.String.check(Schema.isPattern(/^([01]\d|2[0-3]):[0-5]\d$/)),
++});
++
+ export const ClientSettingsSchema = Schema.Struct({
+   notificationMode: NotificationMode.pipe(
+     Schema.withDecodingDefault(Effect.succeed("off" as const)),
+   ),
+   inAppNotificationsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
++  notificationCategories: NotificationCategories.pipe(
++    Schema.withDecodingDefault(
++      Effect.succeed(["approval", "user_input", "failure", "completion"] as const),
++    ),
++  ),
++  notificationMutedEnvironments: NotificationMutedEnvironments.pipe(
++    Schema.withDecodingDefault(Effect.succeed([])),
++  ),
++  notificationQuietHours: NotificationQuietHours.pipe(
++    Schema.withDecodingDefault(Effect.succeed({ enabled: false, start: "22:00", end: "08:00" })),
++  ),
+   diffColorScheme: DiffColorScheme.pipe(
+     Schema.withDecodingDefault(Effect.succeed("red-green" as const)),
+   ),
+@@ -1500,6 +1522,9 @@ export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;
+ export const ClientSettingsPatch = Schema.Struct({
+   notificationMode: Schema.optionalKey(NotificationMode),
+   inAppNotificationsEnabled: Schema.optionalKey(Schema.Boolean),
++  notificationCategories: Schema.optionalKey(NotificationCategories),
++  notificationMutedEnvironments: Schema.optionalKey(NotificationMutedEnvironments),
++  notificationQuietHours: Schema.optionalKey(NotificationQuietHours),
+   diffColorScheme: Schema.optionalKey(DiffColorScheme),
+   loadBalancingEnabled: Schema.optionalKey(Schema.Boolean),
+   loadBalancingWeights: Schema.optionalKey(LoadBalancingWeights),

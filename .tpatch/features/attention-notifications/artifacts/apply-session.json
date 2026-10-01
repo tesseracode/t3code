@@ -1,0 +1,8 @@
+{
+  "slug": "attention-notifications",
+  "completed_at": "2026-10-01T15:12:06Z",
+  "base_commit": "c964ad3328feb63da34425ae41aec7aca4dad096",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Canonical source replay equals the tested product; deterministic recipe uses actual updated-parent bytes, not retained historical preimages."
+}

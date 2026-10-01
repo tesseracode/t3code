@@ -287,3 +287,26 @@ down, so new native capability goes in a child with a deadline, not an `import` 
 
 See the [glossary](./glossary.md) for shared terms and the
 [development runbook](../operations/development.md) for setup and checks.
+
+## Web and desktop attention inbox
+
+The `/attention` route consumes the single web `attentionWorkspace`; the
+authenticated app sidebar layout retains it across route/sidebar changes.
+Both sidebar variants and Settings use one attention entry. Command-palette
+selection and the configurable `attention.open` shortcut share the same route
+action. No shortcut is assigned by default, and the existing OS notification
+coordinator/badge is unchanged.
+
+The page filters the already-sorted aggregate, rather than re-sorting for each
+consumer. LegendList bounds rendered rows; only visible rows read thread shell
+titles, and thread detail is loaded only after scoped navigation. The listbox
+retains selection by scoped item identity, scrolls keyboard selection into view
+and exposes an active descendant only while its row is mounted.
+
+Seen state is a schema-checked, device-local list of at most 2000 recent scoped
+item revisions. Marking seen/unseen never changes canonical counts. Cleanup
+uses direct item lookups and only trusts absence in a live complete snapshot.
+Environment removal is recognized only after that environment was observed in
+the current mount: the initially empty catalog during discovery is not evidence
+that persisted seen marks should be erased. Unknown leftover IDs remain bounded
+by the retention cap, without persisting titles, prompts or provider output.
