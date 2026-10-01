@@ -60,7 +60,7 @@ jobs:
       - name: Align preview version and build JS
         run: |
           node scripts/update-release-package-versions.ts "$PREVIEW_VERSION"
-          vp run build:desktop
+          vp run --filter t3 build
       - name: Build native resource monitor
         run: |
           cargo build --locked --release --target x86_64-unknown-linux-gnu --manifest-path native/resource-monitor/Cargo.toml

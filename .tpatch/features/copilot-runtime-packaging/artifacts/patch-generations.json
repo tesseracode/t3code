@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-runtime-packaging",
-  "current_generation": 5,
+  "current_generation": 6,
   "generations": [
     {
       "generation": 1,
@@ -367,7 +367,7 @@
       "git_patch_id": "bf50283d6ebfdab6c9802d12243f174f501c4581",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "e4767a72f813a71f5fced9a45b831b52cdf463520f6f12b6dd8a25f5609c7afe",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/005-record.patch",
       "base_commit": "187e91eb870209e770c6eb7901f7feeee831c9d6",
       "upper": {
@@ -436,6 +436,81 @@
         "scripts/lib/copilot-payload.ts",
         "scripts/lib/fork-preview.test.ts",
         "scripts/lib/fork-preview.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 13,
+          "parent_patch_sha256": "0dcdce60954b58a5947da226696102b97faeb0d6d8dc9f1cf814b77596ff9b16",
+          "parent_recipe_sha256": "97814b0dab001d4711a4f4c578cf4575727f6e13dfa6da864101feaee124d236"
+        },
+        {
+          "slug": "copilot-koffi-packaging-pin",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 6,
+          "parent_patch_sha256": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306",
+          "parent_recipe_sha256": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8"
+        },
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        },
+        {
+          "slug": "windows-portable-packaging-tests",
+          "kind": "hard",
+          "satisfied_by": "0a590fa01af66ec135d2ebf2d5542b08a37dc275",
+          "parent_generation": 1,
+          "parent_patch_sha256": "23c8db1aebbae84fa3971f607ef0bdcf0f7962495f2eff786798c3afe9fa7faa",
+          "parent_recipe_sha256": "5a531c8a1456697b19931438b9a14804c8998f95da3ed82ddd9758310fd8572e"
+        },
+        {
+          "slug": "wsl-runtime-executable-modes",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
+          "parent_recipe_sha256": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 6,
+      "generation_id": "pg_57c3f800c609",
+      "kind": "amend-refresh",
+      "patch_sha256": "c94c80863fa2f46a661a959b75673187ca1a836701ed2f899de2f2f6c01a8336",
+      "git_patch_id": "36108c75a67540b3ffc31ac316748fef1114325a",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "7735fa348a2b789381f23f9935b5e921a74037df310c7f758659636c0c9103b7",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/006-record.patch",
+      "base_commit": "31abb335c28c1b1006dc64f75f9cd19c47dc7067",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          ".github/workflows/fork-native-preview.yml"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/workflows/fork-native-preview.yml"
       ],
       "dependencies": [
         {
