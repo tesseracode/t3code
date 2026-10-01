@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-09-26T04:58:56Z
+**Timestamp**: 2026-10-01T17:48:39Z
 
 ## Notes
 
-Complete nine-file gate: macOS217 pass/14 capability skips; native Linux231 pass/0 skips. Desktop/scripts typechecks and targeted lint pass. Windows full no-skip execution remains required; no packaged runtime result is inferred.
+PKG-01 build inputs: 156 focused tests pass, 14 existing capability skips; desktop/scripts types and scoped lint pass; build-only workflow passes actionlint. Native artifacts and target-host gates remain pending.

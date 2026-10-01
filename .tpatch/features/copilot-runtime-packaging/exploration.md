@@ -1,5 +1,24 @@
 # Exploration: copilot-runtime-packaging
 
+## PKG-01 preview delivery
+
+The stock builder supports unsigned preview versions and omits update feeds,
+but its installer identity and Electron legacy-profile lookup still target the
+ordinary app. Clerk also claims the renderer URL scheme during bridge creation.
+The gated overlay therefore supplies a distinct build identity and bootstrap,
+an isolated Electron path, and a no-renderer/no-passkeys bridge for previews.
+The bootstrap, not Clerk, owns the preview's single-instance lock.
+
+WSL strips Windows T3CODE_HOME by design. Preview WSL launch instead supplies a
+Linux-home-derived preview directory; install/prune/invalidate scripts use that
+same separate cache namespace. Normal launches and generated scripts retain
+their existing defaults.
+
+The build-only workflow uses native Windows/Linux runners, a short Windows
+checkout/temp root, pinned actions, existing archive/payload smoke checks and
+hash/provenance manifests. It has no release publication or deployment path.
+Mac builds and UI inspection remain local with owned state.
+
 ## Bounded source ownership
 
 The actual committed delta from `acd69601918506de8a86754cb2aee73cc7afb085`

@@ -28,6 +28,17 @@ import {
 
 const encoder = new TextEncoder();
 
+it("keeps preview runtime installation, pruning and invalidation outside the stock cache", () => {
+  for (const script of [
+    buildWslRuntimeInstallScript("/tmp/runtime.tar.gz", "sha256-preview", "a".repeat(64), true),
+    buildWslRuntimePruneScript("sha256-preview", true),
+    buildWslRuntimeInvalidateScript("sha256-preview", true),
+  ]) {
+    expect(script).toContain("$HOME/.t3-fork-preview/wsl-runtime");
+    expect(script).not.toContain("$HOME/.t3/wsl-runtime");
+  }
+});
+
 // The install script only fails the way this file cares about when a real shell
 // runs it, so find one that has the tools it needs: bash directly on Linux, and
 // the WSL distro on a Windows dev box, where Git Bash ships no flock. Anywhere

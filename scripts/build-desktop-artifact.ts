@@ -38,6 +38,7 @@ import {
 import { loadRepoEnv } from "./lib/public-config.ts";
 import { selectDesktopRuntimeExternalDependencies } from "./lib/desktop-external-packages.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
+import { forkPreviewBuildConfig, FORK_PREVIEW_PRODUCT_NAME } from "./lib/fork-preview.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -58,6 +59,14 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
 const DESKTOP_APP_ID = "com.t3tools.t3code";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
+export class ForkPreviewConfigurationError extends Schema.TaggedError<ForkPreviewConfigurationError>()(
+  "ForkPreviewConfigurationError",
+  { detail: Schema.String },
+) {
+  override get message() {
+    return this.detail;
+  }
+}
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
@@ -164,6 +173,7 @@ interface BuildCliInput {
   readonly mockUpdates: Option.Option<boolean>;
   readonly mockUpdateServerPort: Option.Option<number>;
   readonly wslRuntime: Option.Option<string>;
+  readonly forkPreview?: Option.Option<boolean>;
 }
 
 function detectHostBuildPlatform(hostPlatform: string): typeof BuildPlatform.Type | undefined {
@@ -909,6 +919,7 @@ const resolvePythonForNodeGyp = Effect.fn("resolvePythonForNodeGyp")(function* (
 });
 
 interface ResolvedBuildOptions {
+  readonly forkPreview?: boolean;
   readonly platform: typeof BuildPlatform.Type;
   readonly target: string;
   readonly arch: typeof BuildArch.Type;
@@ -1555,6 +1566,7 @@ const AzureTrustedSigningOptionsConfig = Config.all({
 });
 
 const BuildEnvConfig = Config.all({
+  forkPreview: Config.boolean("T3CODE_DESKTOP_FORK_PREVIEW").pipe(Config.withDefault(false)),
   platform: Config.schema(BuildPlatform, "T3CODE_DESKTOP_PLATFORM").pipe(Config.option),
   target: Config.string("T3CODE_DESKTOP_TARGET").pipe(Config.option),
   arch: Config.schema(BuildArch, "T3CODE_DESKTOP_ARCH").pipe(Config.option),
@@ -1665,6 +1677,7 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
     Option.getOrUndefined(input.wslRuntime) ?? Option.getOrUndefined(env.wslRuntime);
 
   return {
+    forkPreview: resolveBooleanFlag(input.forkPreview ?? Option.none(), env.forkPreview),
     platform,
     target,
     arch,
@@ -3383,6 +3396,20 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     });
   }
   const workspaceConfig = yield* readWorkspaceConfig();
+  if (
+    options.forkPreview &&
+    (options.platform === "linux" ||
+      options.signed ||
+      options.mockUpdates ||
+      !isDesktopPreviewVersion(options.version ?? desktopPackageJson.version))
+  ) {
+    return yield* Effect.fail(
+      new ForkPreviewConfigurationError({
+        detail:
+          "Fork desktop previews require Mac/Windows, an unsigned preview version and no mock updates.",
+      }),
+    );
+  }
   const workspaceCatalog = workspaceConfig.catalog ?? {};
   const workspaceOverrides = workspaceConfig.overrides ?? {};
   const workspacePatchedDependencies = workspaceConfig.patchedDependencies ?? {};
@@ -3675,7 +3702,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    name: options.forkPreview ? "t3code-fork-preview" : "t3code",
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
@@ -3683,7 +3710,9 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     packageManager: rootPackageJson.packageManager,
     description: "T3 Code desktop build",
     author: "T3 Tools",
-    main: "apps/desktop/dist-electron/main.cjs",
+    main: options.forkPreview
+      ? "fork-preview-bootstrap.cjs"
+      : "apps/desktop/dist-electron/main.cjs",
     build: yield* createBuildConfig(
       options.platform,
       options.target,
@@ -3705,8 +3734,18 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       electron: electronVersion,
     },
   };
+  if (options.forkPreview) {
+    yield* fs.copyFile(
+      path.join(repoRoot, "scripts/fork-preview-bootstrap.cjs"),
+      path.join(stageAppDir, "fork-preview-bootstrap.cjs"),
+    );
+  }
 
-  const stagePackageJsonString = yield* encodeJsonString(stagePackageJson);
+  const stagePackageJsonString = yield* encodeJsonString(
+    options.forkPreview
+      ? { ...stagePackageJson, build: forkPreviewBuildConfig(stagePackageJson.build) }
+      : stagePackageJson,
+  );
   yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
   const stageWorkspaceConfig = createStageWorkspaceConfig({
     platform: options.platform,
@@ -3865,7 +3904,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   if (options.platform === "win") {
     yield* validateWindowsPackagedPayload({
       stageDistDir,
-      appExecutableName: `${resolveDesktopProductName(appVersion)}.exe`,
+      appExecutableName: `${options.forkPreview ? FORK_PREVIEW_PRODUCT_NAME : resolveDesktopProductName(appVersion)}.exe`,
       targetArch: options.arch,
       appVersion,
       expectWslRuntime: bundlesWslRuntime({
@@ -3939,6 +3978,12 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
   signed: Flag.boolean("signed").pipe(
     Flag.withDescription(
       "Enable signing/notarization discovery; Windows uses Azure Trusted Signing (env: T3CODE_DESKTOP_SIGNED).",
+    ),
+    Flag.optional,
+  ),
+  forkPreview: Flag.boolean("fork-preview").pipe(
+    Flag.withDescription(
+      "Build a separate unsigned fork preview with isolated state and no stock protocol/update registration.",
     ),
     Flag.optional,
   ),

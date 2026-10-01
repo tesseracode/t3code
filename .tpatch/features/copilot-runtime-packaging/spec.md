@@ -1,5 +1,24 @@
 # Specification: copilot-runtime-packaging
 
+## PKG-01 isolated personal previews
+
+Extend this packaging boundary with an explicit `--fork-preview` mode. It
+requires an unsigned Mac/Windows preview version, uses a distinct installer
+identity and a bootstrap that selects separate T3/Electron state, and emits no
+update feed. Normal builds remain unchanged. WSL data/cache operations use the
+Linux user's separate preview home.
+
+The isolated profile must not claim stock URL handlers or cloud OAuth/passkey
+support. Its bootstrap owns a separate single-instance lock. It must reject
+ordinary T3/profile locations and preserve user credentials/state during checks.
+
+The build-only workflow targets Windows x64 and Linux x64; Mac arm64 is built
+locally. Record base source, actual overlay/build commit, version-only transforms
+and artifact digests. Preserve all dependency, payload, executable-mode and
+native smoke gates. No publishing, signing, deployment, provider turns, or more
+than two CI attempts per target. Windows/WSL interactive gates stay pending until
+the receiving host executes them.
+
 ## Exact dependency closure
 
 1. Require SDK 1.0.8, CLI and matching platform packages 1.0.75, Koffi and

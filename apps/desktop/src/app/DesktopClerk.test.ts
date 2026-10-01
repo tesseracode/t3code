@@ -29,10 +29,16 @@ import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as DesktopClerk from "./DesktopClerk.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 
-const makeDesktopClerkLayer = (isDevelopment = true, events: string[] = []) => {
+const makeDesktopClerkLayer = (
+  isDevelopment = true,
+  events: string[] = [],
+  isolatedPreview = false,
+) => {
   const environment = DesktopEnvironment.DesktopEnvironment.of({
     stateDir: "/tmp/t3-state",
     isDevelopment,
+    isolatedPreview,
+    baseDir: "/tmp/fork-preview",
     appDataDirectory: "/tmp/app-data",
     userDataDirName: isDevelopment ? "t3code-dev" : "t3code",
     legacyUserDataDirName: isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)",
@@ -61,6 +67,19 @@ describe("DesktopClerk", () => {
   beforeEach(() => {
     createClerkBridgeMock.mockReset();
     storageMock.mockReset();
+  });
+  it.effect("does not claim a stock URL scheme or passkey support for the isolated preview", () => {
+    storageMock.mockReturnValue(storageAdapter);
+    createClerkBridgeMock.mockReturnValue({ cleanup: vi.fn(), isPrimaryInstance: true });
+    const events: string[] = [];
+    return Effect.gen(function* () {
+      yield* Effect.scoped(Layer.build(makeDesktopClerkLayer(false, events, true)));
+      assert.deepEqual(createClerkBridgeMock.mock.calls[0]?.[0], {
+        storage: storageAdapter,
+        passkeys: false,
+      });
+      assert.deepEqual(events, ["setPath:userData:/tmp/fork-preview/electron"]);
+    });
   });
 
   it.effect("acquires and releases the SDK bridge with the layer", () => {
