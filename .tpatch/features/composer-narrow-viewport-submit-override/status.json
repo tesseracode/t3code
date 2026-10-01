@@ -1,0 +1,12 @@
+{
+  "id": "composer-narrow-viewport-submit-override",
+  "slug": "composer-narrow-viewport-submit-override",
+  "title": "Add an opt-in web client setting to bypass the narrow-viewport composer submission guard for physical-keyboard users, preserving mobile newline behavior by default.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-01T18:32:57Z",
+  "updated_at": "2026-10-01T18:32:57Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}
