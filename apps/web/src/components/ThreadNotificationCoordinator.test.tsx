@@ -1,4 +1,4 @@
-import type { ClientSettings } from "@t3tools/contracts/settings";
+import { DEFAULT_CLIENT_SETTINGS, type ClientSettings } from "@t3tools/contracts/settings";
 import * as Option from "effect/Option";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -30,39 +30,51 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@effect/atom-react", () => ({
-  useAtomValue: () => ({
-    status: state.live ? "live" : "disconnected",
-    snapshot: Option.some({
-      threads: [
-        {
-          id: "thread-1",
-          title: "Fix the login form",
-          archivedAt: state.archivedAt,
-          hasPendingUserInput: state.input,
-          hasPendingApprovals: state.approval,
-          session: state.sessionError ? { status: "error" } : null,
-          latestTurn: {
-            turnId: "turn-1",
-            state: state.turnError ? "error" : state.completedAt ? "completed" : "running",
-            completedAt: state.completedAt,
-          },
+  useAtomValue: (atom: string) =>
+    atom === "attention"
+      ? {
+          isReady: true,
+          environments: new Map([["env-1", { status: "unsupported" }]]),
+        }
+      : {
+          status: state.live ? "live" : "disconnected",
+          snapshot: Option.some({
+            threads: [
+              {
+                id: "thread-1",
+                title: "Fix the login form",
+                archivedAt: state.archivedAt,
+                hasPendingUserInput: state.input,
+                hasPendingApprovals: state.approval,
+                session: state.sessionError ? { status: "error" } : null,
+                latestTurn: {
+                  turnId: "turn-1",
+                  state: state.turnError ? "error" : state.completedAt ? "completed" : "running",
+                  completedAt: state.completedAt,
+                },
+              },
+            ],
+          }),
         },
-      ],
-    }),
-  }),
 }));
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => state.navigate,
   useParams: () => state.active,
 }));
 vi.mock("../hooks/useSettings", () => ({
-  useClientSettings: (
-    select: (
-      settings: Pick<ClientSettings, "notificationMode" | "inAppNotificationsEnabled">,
-    ) => unknown,
-  ) => select({ notificationMode: state.mode, inAppNotificationsEnabled: state.inApp }),
-  getClientSettings: () => ({ notificationMode: state.mode }),
+  useClientSettings: (select: (settings: ClientSettings) => unknown = (settings) => settings) =>
+    select({
+      ...DEFAULT_CLIENT_SETTINGS,
+      notificationMode: state.mode,
+      inAppNotificationsEnabled: state.inApp,
+    }),
+  getClientSettings: () => ({
+    ...DEFAULT_CLIENT_SETTINGS,
+    notificationMode: state.mode,
+    inAppNotificationsEnabled: state.inApp,
+  }),
 }));
+vi.mock("../state/attention", () => ({ attentionWorkspace: { valueAtom: "attention" } }));
 vi.mock("../state/environments", () => ({
   useEnvironments: () => ({ environments: [{ environmentId: "env-1" }] }),
 }));
@@ -111,7 +123,7 @@ beforeEach(() => {
     turnError: false,
   });
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  vi.stubGlobal("window", new EventTarget());
+  vi.stubGlobal("window", Object.assign(new EventTarget(), { focus: vi.fn() }));
   vi.stubGlobal("document", {
     get visibilityState() {
       return state.visible;
@@ -137,7 +149,9 @@ describe("thread notifications", () => {
     expect(state.add).toHaveBeenCalledTimes(1);
     const toast = state.add.mock.calls[0]?.[0];
     expect(toast?.title).toBe("Thread completed");
-    expect(toast?.description).toBe("Fix the login form");
+    expect(toast?.description).toBe(
+      "Open the owning thread in T3 Code to review its current state.",
+    );
     toast?.actionProps.onClick();
     expect(state.close).toHaveBeenCalledWith("toast-1");
     expect(state.navigate).toHaveBeenCalledWith({
@@ -186,7 +200,7 @@ describe("thread notifications", () => {
     expect(state.add).toHaveBeenCalledTimes(1);
     expect(state.notification).toHaveBeenCalledTimes(1);
     expect(state.notification).toHaveBeenCalledWith(title, {
-      body: "Fix the login form",
+      body: "Open the owning thread in T3 Code to review its current state.",
       tag: "env-1:thread-1",
       silent: true,
     });
@@ -246,7 +260,7 @@ describe("thread notifications", () => {
     await complete();
     expect(state.add).not.toHaveBeenCalled();
     expect(state.notification).toHaveBeenCalledWith("Thread completed", {
-      body: "Fix the login form",
+      body: "Open the owning thread in T3 Code to review its current state.",
       tag: "env-1:thread-1",
       silent: true,
     });

@@ -165,6 +165,41 @@ describe("ClaudeSettings auto-compaction", () => {
 });
 
 describe("ClientSettings notifications", () => {
+  it("keeps notification policy client-local and preserves consent defaults", () => {
+    const settings = decodeClientSettings({});
+    expect(settings.notificationCategories).toEqual([
+      "approval",
+      "user_input",
+      "failure",
+      "completion",
+    ]);
+    expect(settings.notificationMutedEnvironments).toEqual([]);
+    expect(settings.notificationQuietHours).toEqual({
+      enabled: false,
+      start: "22:00",
+      end: "08:00",
+    });
+    expect(decodeClientSettingsPatch({})).not.toHaveProperty("notificationCategories");
+    expect(decodeClientSettingsPatch({})).not.toHaveProperty("notificationQuietHours");
+    const patch = {
+      notificationCategories: ["disconnect"],
+      notificationMutedEnvironments: ["env"],
+      notificationQuietHours: { enabled: true, start: "22:30", end: "06:00" },
+    };
+    expect(decodeClientSettingsPatch(patch)).toEqual(patch);
+    expect(encodeClientSettings(decodeClientSettings(patch))).toMatchObject(patch);
+    expect(decodeServerSettingsPatch(patch)).toEqual({});
+  });
+  it.each(["24:00", "12:60", "1:00", "", "noon"])(
+    "rejects malformed quiet-hour time %s",
+    (start) => {
+      expect(() =>
+        decodeClientSettingsPatch({
+          notificationQuietHours: { enabled: true, start, end: "08:00" },
+        }),
+      ).toThrow();
+    },
+  );
   it("requires opt-in when existing settings omit notification preferences", () => {
     expect(decodeClientSettings({}).notificationMode).toBe("off");
     expect(decodeClientSettings({}).inAppNotificationsEnabled).toBe(false);

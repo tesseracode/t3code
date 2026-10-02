@@ -130,3 +130,10 @@ keyboard repeat; if repeat is disabled, use two presses or the application menu.
 Change **Settings → General → Confirmations → Quit shortcut** to **Direct** for a
 single press or **Double press** for two presses only. Choosing **Quit** from the
 application menu always quits immediately.
+
+## Open the attention inbox
+
+Choose **Open attention inbox** in the command palette, or assign
+`attention.open` in Settings → Keybindings. No shortcut is assigned by default.
+Inside the [attention inbox](./attention.md), Up/Down and Home/End select an
+item; Enter opens its owning thread.

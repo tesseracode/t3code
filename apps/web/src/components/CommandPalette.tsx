@@ -57,6 +57,7 @@ import {
   SettingsIcon,
   SquarePenIcon,
   TextSearchIcon,
+  InboxIcon,
 } from "lucide-react";
 import {
   useCallback,
@@ -187,6 +188,8 @@ import {
   buildSidebarProjectSnapshots,
 } from "../sidebarProjectGrouping";
 import type { Project } from "../types";
+import { useOpenAttentionInbox } from "./attention/useOpenAttentionInbox";
+import { ATTENTION_INBOX_COMMAND } from "./attention/attentionInbox.logic";
 
 const EMPTY_BROWSE_ENTRIES: FilesystemBrowseResult["entries"] = [];
 
@@ -1679,7 +1682,18 @@ function OpenCommandPaletteDialog(props: {
     pushPaletteView,
   ]);
 
-  const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
+  const openAttentionInbox = useOpenAttentionInbox();
+  const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [
+    {
+      kind: "action",
+      value: "action:attention-inbox",
+      searchTerms: ["attention", "inbox", "approvals", "input", "failures"],
+      title: "Open attention inbox",
+      icon: <InboxIcon className={ITEM_ICON_CLASS} />,
+      shortcutCommand: ATTENTION_INBOX_COMMAND,
+      run: openAttentionInbox,
+    },
+  ];
 
   if (projects.length > 0) {
     const activeProjectTitle =

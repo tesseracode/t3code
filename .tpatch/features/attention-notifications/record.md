@@ -1,6 +1,6 @@
 # Implementation Record: attention-notifications
 
-**Recorded**: 2026-10-02T07:19:59Z
+**Recorded**: 2026-10-02T07:22:48Z
 **Files changed**: 30
 **Patch size**: 120855 bytes
 **Capture mode**: working-tree-all
@@ -33,7 +33,7 @@
 - **capture_mode**: `working-tree-all`
 - **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `c85a648522dea67a5744984cdad2b1d677e21dd4`
+- **base_commit**: `cb48436fb80a24dab62de033240456fd4fc933eb`
 - **upper_commit**: `working-tree`
 
 ## Replay Instructions
