@@ -1,0 +1,21 @@
+diff --git a/third-party-licenses.config.json b/third-party-licenses.config.json
+index 01955554a..23b809c59 100644
+--- a/third-party-licenses.config.json
++++ b/third-party-licenses.config.json
+@@ -152,6 +152,16 @@
+     }
+   ],
+   "packageOverrides": [
++    {
++      "name": "@github/copilot-sdk",
++      "version": "1.0.8",
++      "license": "MIT",
++      "sourceUrl": "https://github.com/github/copilot-sdk/blob/a54b0b5885534ba5ad073cfe99c7f0085b1be11c/LICENSE",
++      "generatedNotice": {
++        "licenseId": "MIT",
++        "copyrights": ["Copyright GitHub, Inc."]
++      }
++    },
+     {
+       "license": "MIT",
+       "name": "@react-grab/cli",

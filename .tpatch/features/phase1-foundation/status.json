@@ -5,22 +5,18 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-03T10:11:24Z",
-  "updated_at": "2026-09-03T10:16:40Z",
-  "last_command": "verify",
-  "notes": "landed at 2026-09-03T10:14:27Z",
+  "updated_at": "2026-10-02T07:19:56Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-02T07:19:57Z",
   "apply": {
-    "completed_at": "2026-09-03T10:13:55Z",
-    "base_commit": "4b9584b1bfdf5803e41fbc262cda573fdd4ec803",
+    "completed_at": "2026-10-01T15:02:05Z",
+    "base_commit": "9e3a2cda1dfc28cf402996aded85192c3a3c06a7",
     "has_patch": true
   },
   "reconcile": {},
   "depends_on": [
     {
       "slug": "copilot-cli-provider",
-      "kind": "hard"
-    },
-    {
-      "slug": "session-search",
       "kind": "hard"
     },
     {
@@ -58,16 +54,19 @@
     {
       "slug": "copilot-turn-timing",
       "kind": "supersedes"
+    },
+    {
+      "slug": "session-search",
+      "kind": "soft"
     }
   ],
   "verify": {
-    "verified_at": "2026-09-03T10:16:37Z",
+    "verified_at": "2026-10-01T15:12:18Z",
     "passed": true,
-    "recipe_hash_at_verify": "71897d8909979e86addf8ba9702dbae83dab222e4d018026917265b94887e17f",
-    "patch_hash_at_verify": "b61fc4bc72887930d063b571588a1e4ed43b0fde5d5ec75c32c7175b0783ea07",
+    "recipe_hash_at_verify": "ae7d0124443ab08e32855eaf7bf1602619396caa94a5f507114e02d03323301d",
+    "patch_hash_at_verify": "3e350ca9d1c0fef84af7208ab0488244867d7adb663a1a85d682d229b0b1e6dd",
     "parent_snapshot": {
-      "copilot-cli-provider": "applied",
-      "session-search": "applied"
+      "copilot-cli-provider": "applied"
     }
   }
 }

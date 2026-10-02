@@ -1,8 +1,9 @@
 {
   "slug": "session-search",
-  "completed_at": "2026-09-03T07:41:10Z",
-  "base_commit": "d01f4d65fd45a2f018019895da595142aeb106eb",
+  "completed_at": "2026-09-25T04:13:09Z",
+  "base_commit": "6f4f49189cad1ac4dd9fb817053760248e1f092f",
   "has_patch": true,
+  "operator_notes": "Packaged qualification reproduced Escape failing after Next button focus. Handle Escape across the search region while keeping Enter activation on buttons native.",
   "validation_status": "passed",
-  "validation_notes": "tpatch test — command: pnpm exec vp test run packages/contracts/src/keybindings.test.ts apps/web/src/keybindings.test.ts apps/web/src/components/settings/KeybindingsSettings.logic.test.ts apps/web/src/components/CommandPalette.logic.test.ts apps/web/src/components/chat/sessionSearch.test.ts apps/web/src/components/chat/MessagesTimeline.logic.test.ts"
+  "validation_notes": "72 focused tests, web typecheck and changed-source lint passed. Rebuilt packaged verification remains pending."
 }

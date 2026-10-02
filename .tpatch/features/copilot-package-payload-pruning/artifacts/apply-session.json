@@ -1,6 +1,9 @@
 {
   "slug": "copilot-package-payload-pruning",
-  "completed_at": "2026-09-09T02:40:53Z",
-  "base_commit": "ee3377d45c2895073315d4135ef104e53d8cb1ca",
-  "has_patch": true
+  "completed_at": "2026-09-23T18:23:06Z",
+  "base_commit": "acd69601918506de8a86754cb2aee73cc7afb085",
+  "has_patch": true,
+  "operator_notes": "Manual semantic port to separate v0.0.42 desktop/server and CLI-archive stages. Review SDK 1.0.8 / CLI 1.0.75 / source Koffi 3.3.1 layouts. Preflight all required targets and containment before pruning; preserve WSL archive bytes and the 80-file Windows cap. Reject dependency-expanded false retirement metadata from already-landed parents; retain the full CLI output and actual packaging conflict evidence.",
+  "validation_status": "passed",
+  "validation_notes": "110 focused packaging cases, scripts typecheck and changed-file lint pass. Real macOS hoisted and strict stages prune successfully; retained native hashes, clipboard/Koffi loading and no-inference Copilot 1.0.75 protocol-3 handshake pass. Real Windows native files packed with the production ASAR helper yield nine retained Copilot/Koffi loose files. This is not Windows execution or a full installer-budget pass; assembled platform, WSL readiness and exact-stage-closure gates remain pending."
 }

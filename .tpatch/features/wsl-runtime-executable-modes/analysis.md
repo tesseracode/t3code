@@ -2,7 +2,7 @@
 
 ## Problem
 
-A real Windows x64 package passed the 78-file payload gate, native Windows
+A historical v0.0.38-based Windows x64 package passed the 78-file payload gate, native Windows
 backend startup, and packaged Copilot approval/session continuity. The WSL
 runtime then failed with exit 126 because Windows `tar` archived the Linux
 Copilot executable as mode `0666`; extraction onto WSL ext4 yielded `0644`.
@@ -11,6 +11,11 @@ The retained Linux `rg` and `tgrep` entries had the same defect.
 NTFS does not provide trustworthy POSIX execute metadata to the Windows archive
 creator. Archive bytes and membership were valid, so neither the digest nor
 existing archive validation detected the problem.
+
+Upstream v0.0.42 now embeds the independently built Linux CLI archive verbatim.
+Preserve that topology, while retaining Linux-side executable normalization
+and warm-cache repair. Historical Windows evidence is not qualification of
+the newly assembled stable stack.
 
 ## Compatibility
 

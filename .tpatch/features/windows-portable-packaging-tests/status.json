@@ -18,12 +18,6 @@
     "outcome": "upstreamed",
     "review_verdict": "confirmed-upstreamed"
   },
-  "depends_on": [
-    {
-      "slug": "phase1-foundation",
-      "kind": "hard"
-    }
-  ],
   "verify": {
     "verified_at": "2026-09-09T02:41:46Z",
     "passed": true,

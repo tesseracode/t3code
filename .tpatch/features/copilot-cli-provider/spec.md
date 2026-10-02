@@ -16,6 +16,13 @@
    per configured instance. Event RPC, drain, disconnect, graceful client-stop, and force-stop
    deadlines keep teardown bounded.
 5. `turn.started.createdAt` is captured when T3 submits the message, not from a later SDK event.
+   Successful completion uses root `session.idle`, never an intermediate
+   `assistant.turn_end` or foreground-only `assistant.idle`. The submitted turn
+   retains its ID, running state, full usage and tool/message attribution across
+   iterations and attached background work. Child idle and duplicate terminal
+   events cannot complete it; explicit failure, abort and shutdown remain terminal.
+   Follow-up sends are refused until completion, and independent task updates
+   remain distinct. Issue #20 is maintained as a fixup of this complete root.
 6. Current T3 approval, user-input, and proposed-plan flows resolve the corresponding SDK
    callbacks. Approval options never advertise unsupported persistence, and identical plans remain
    valid in later turns. Unsupported rollback is a typed, explicit error.
@@ -47,6 +54,18 @@
     dependency closure outside the bundle so target platform packages remain resolvable.
 14. Focused tests cover client options, provider/model status, migration, create/resume/stop,
     permissions/user input/plans, critical runtime events, text generation, and packaging closure.
+15. On v0.0.42, the driver uses shared identity stamping and maintenance resolution,
+    accepts current structured custom model settings, and preserves linked-context
+    title generation/refinement and upstream project-settings folding.
+16. Node single-executables load the external SDK through `createRequire` with no
+    file-backed ESM imports. Electron and standalone hosts resolve the native target
+    executable without respawning T3; explicit runtime/connection overrides win.
+    Missing SDK/runtime payloads produce typed initialization/status failures.
+
+Full packaged Windows/Linux/WSL qualification, exact all-stage dependency closure
+and payload pruning remain integration gates on the dependent maintenance roots.
+Focused mocked session tests and a no-inference runtime handshake do not substitute
+for the later real SDK/native-CLI session-continuity gate.
 
 ## Non-Goals
 

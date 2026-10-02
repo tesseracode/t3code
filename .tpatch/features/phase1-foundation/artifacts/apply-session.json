@@ -1,8 +1,8 @@
 {
   "slug": "phase1-foundation",
-  "completed_at": "2026-09-03T10:13:55Z",
-  "base_commit": "4b9584b1bfdf5803e41fbc262cda573fdd4ec803",
+  "completed_at": "2026-10-01T15:02:05Z",
+  "base_commit": "26b7eb894d1ce095c3469b9451ea9f0c4172c1ae",
   "has_patch": true,
   "validation_status": "passed",
-  "validation_notes": "tpatch test — command: /Users/jdbencardinop/Documents/Proyectos/tesserabox/t3code/node_modules/.bin/vp test run packages/contracts/src/orchestration.test.ts apps/server/src/persistence/Migrations/044_ProjectionThreadAttentionAudit.test.ts apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts apps/server/src/orchestration/ThreadAttentionAudit.test.ts apps/server/src/orchestration/Layers/ProjectionPipeline.test.ts apps/server/src/orchestration/Layers/ProjectionSnapshotQuery.test.ts apps/server/src/tws/TwsCliDecoder.test.ts apps/server/src/tws/TwsCliAdapter.test.ts apps/server/src/processRunner.test.ts packages/contracts/src/workItem.test.ts packages/contracts/src/environment.test.ts packages/contracts/src/pullRequest.test.ts packages/contracts/src/twsBindings.test.ts apps/server/src/tws/TwsBindingMatch.test.ts apps/server/src/persistence/Migrations/045_TwsBindings.test.ts apps/server/src/persistence/Layers/TwsBindings.test.ts"
+  "validation_notes": "TWS-01 optional environment integration: 219 focused tests, two selected authenticated RPC gates, server/web/mobile/client-runtime/desktop types, targeted lint and web build pass. Approved isolated browser: disabled makes no fixture CLI calls, explicit opt-in/refresh/version rejection/disable/reload pass. No TWS mutation or live T3 writes."
 }

@@ -1,6 +1,6 @@
 # Exploration: wsl-runtime-executable-modes
 
-## Windows evidence
+## Historical Windows evidence (v0.0.38 foundation)
 
 - Windows payload validation: 78/80 files.
 - Native backend: HTTP 200.
@@ -12,6 +12,9 @@
 
 ## Integration points
 
+- `packages/shared/src/copilotRuntime.ts`
+  - shares archive membership rules and executable shell checks;
+  - portable shell tests execute production functions, not a simulated installer.
 - `apps/desktop/src/wsl/DesktopWslEnvironment.ts`
   - generates the verified extraction/cache-promotion shell script;
   - owns warm-cache readiness.
@@ -27,4 +30,11 @@
 ## Boundary
 
 Do not rely on Windows-side `chmod` or archive entry modes. Normalize only
-after extraction on the Linux filesystem.
+after extraction on the Linux filesystem. v0.0.42 archives have a versioned
+single directory stripped during extraction. Mark Copilot-bearing cache
+digests so complete payload loss is detected on later reuse.
+
+The old generation's hard-parent snapshot predates the pruning port.
+Read-only reconcile refused with `parent-generation-stale`; manual adaptation
+against the landed parent is followed by real apply/record, not an invented
+generation manifest or dependency bypass.

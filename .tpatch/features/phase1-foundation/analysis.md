@@ -2,22 +2,34 @@
 
 ## Summary
 
-The granular Phase 1 features are independently reviewed and landed, but two
-shared registry files are legitimately extended by later children:
+Port the previously consolidated local-first foundation onto stable v0.0.42
+after the verified Copilot and search roots. The retained capabilities are
+the compact attention audit, read-only TWS adapter, opaque TWS bindings and
+GitHub/Azure work-item contracts.
 
-- `apps/server/src/persistence/Migrations.ts`
-- `packages/contracts/src/index.ts`
+The original fork used upstream migration IDs 44/45. Stable upstream now
+uses those IDs for different changes. Its numeric high-water migrator would
+silently skip those upstream operations on a legacy fork database.
 
-Re-verifying an earlier granular patch at the final integrated tree can
-therefore discard all context for those files even though the downstream
-change is correct and explicitly ordered. A single integrated maintenance root
-is needed in addition to the granular audit records.
+Move fork migration ownership to `t3code_fork_migrations`. Preserve verified
+legacy records and their timestamps there, execute the collided upstream
+operations, and record their real completion in the upstream ledger. The bridge,
+upstream migration stream and fork stream share one transaction. Unknown
+history, missing schema and false concurrent-lock success are rejected.
 
 ## Compatibility
 
-- The consolidated source is exactly the already-tested Phase 1 tree.
-- No new runtime behavior is introduced by consolidation.
-- Phase 0 Copilot and search remain hard parents.
+- Current Effect uses `Schema.TaggedError`; retain the same typed error behavior.
+- Preserve upstream projection additions and reuse the shared request-ID
+  normalizer at all current call sites.
+- Existing fork rows, opaque identities, projection cursors and native session
+  references survive upgrade. Fresh/upstream installs create the same foundation.
+- The return shape of `runMigrations` remains upstream migration tuples; fork
+  execution has a separate history and is logged only after transaction commit.
+- Copilot remains a hard parent. Search is a soft ordering dependency: its
+  disjoint client/command scope is not consumed by Foundation. The maintainer
+  approved correcting the historical hard ordering edge after an independent
+  search dismissal repair invalidated Foundation's historical parent replay.
 - Granular Phase 1 features remain available as review/provenance records but
   are superseded for future replay.
 - Five historical Copilot child records are also superseded because their
@@ -25,6 +37,8 @@ is needed in addition to the granular audit records.
 
 ## Recommendation
 
-Record and land one 30-file Phase 1 patch from the verified Phase 0 tip, verify
-that patch as the active maintenance root, and retain the granular branches and
-commits as audit history.
+Record and land the current semantic port, regenerate its recipe and capture
+current parent-generation snapshots. Tpatch 0.16 refused the initial reconcile
+at its stale-parent-generation gate; preserve that refusal as evidence rather
+than changing archived manifests or disabling dependency validation. The manual
+port and real record operation establish the new generation.

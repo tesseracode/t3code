@@ -1,0 +1,4392 @@
+diff --git a/apps/mobile/src/state/tws.ts b/apps/mobile/src/state/tws.ts
+new file mode 100644
+index 000000000..4107c2b73
+--- /dev/null
++++ b/apps/mobile/src/state/tws.ts
+@@ -0,0 +1,4 @@
++import { createTwsEnvironmentAtoms } from "@t3tools/client-runtime/state/tws";
++import { connectionAtomRuntime } from "../connection/runtime";
++
++export const twsEnvironment = createTwsEnvironmentAtoms(connectionAtomRuntime);
+diff --git a/apps/server/integration/orphanedProviderSessionStartup.integration.test.ts b/apps/server/integration/orphanedProviderSessionStartup.integration.test.ts
+index e07681ae1..3e0c16bf5 100644
+--- a/apps/server/integration/orphanedProviderSessionStartup.integration.test.ts
++++ b/apps/server/integration/orphanedProviderSessionStartup.integration.test.ts
+@@ -42,6 +42,7 @@ import * as RepositoryIdentityResolver from "../src/project/RepositoryIdentityRe
+ import * as ServerLifecycleEvents from "../src/serverLifecycleEvents.ts";
+ import * as ServerRuntimeStartup from "../src/serverRuntimeStartup.ts";
+ import * as ServerSettings from "../src/serverSettings.ts";
++import { TwsContextService } from "../src/tws/TwsContextService.ts";
+ import * as AnalyticsService from "../src/telemetry/AnalyticsService.ts";
+ import * as GitVcsDriver from "../src/vcs/GitVcsDriver.ts";
+ 
+@@ -69,6 +70,7 @@ const makePersistedRuntimeLayer = (dbPath: string) => {
+ };
+ 
+ const startupDependencies = Layer.mergeAll(
++  Layer.mock(TwsContextService)({ start: Effect.void }),
+   Layer.mock(Keybindings.Keybindings)({
+     start: Effect.void,
+   }),
+diff --git a/apps/server/src/auth/RpcAuthorization.ts b/apps/server/src/auth/RpcAuthorization.ts
+index f08bd2845..3da721a35 100644
+--- a/apps/server/src/auth/RpcAuthorization.ts
++++ b/apps/server/src/auth/RpcAuthorization.ts
+@@ -21,6 +21,11 @@ type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
+  * runtime failure.
+  */
+ export const RPC_REQUIRED_SCOPES = {
++  [WS_METHODS.twsRefresh]: AuthOrchestrationReadScope,
++  [WS_METHODS.twsQuery]: AuthOrchestrationReadScope,
++  [WS_METHODS.twsGetContexts]: AuthOrchestrationReadScope,
++  [WS_METHODS.twsSetContext]: AuthOrchestrationOperateScope,
++  [WS_METHODS.twsProvenance]: AuthOrchestrationReadScope,
+   [WS_METHODS.attentionSubscribe]: AuthOrchestrationReadScope,
+   [ORCHESTRATION_WS_METHODS.dispatchCommand]: AuthOrchestrationOperateScope,
+   [ORCHESTRATION_WS_METHODS.getWorkflowScript]: AuthOrchestrationReadScope,
+diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
+index 51150a45b..1ec33d730 100644
+--- a/apps/server/src/environment/ServerEnvironment.ts
++++ b/apps/server/src/environment/ServerEnvironment.ts
+@@ -214,6 +214,7 @@ export const make = Effect.gen(function* () {
+     serverVersion: packageJson.version,
+     capabilities: {
+       attentionSync: true,
++      twsContext: true,
+       repositoryIdentity: true,
+       connectionProbe: true,
+       attachmentUploads: true,
+diff --git a/apps/server/src/persistence/ForkMigrations.test.ts b/apps/server/src/persistence/ForkMigrations.test.ts
+index c0c141017..878fe1c0d 100644
+--- a/apps/server/src/persistence/ForkMigrations.test.ts
++++ b/apps/server/src/persistence/ForkMigrations.test.ts
+@@ -137,12 +137,47 @@ it.effect("fresh installs keep upstream and fork histories in separate namespace
+         { migration_id: 46, name: "ProjectionThreadAttentionCurrent" },
+         { migration_id: 47, name: "ProjectionThreadAwareness" },
+         { migration_id: 48, name: "AttentionDelivery" },
++        { migration_id: 49, name: "TwsContext" },
+       ],
+     );
+     assert.deepEqual(yield* runMigrations(), []);
+   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+ );
+ 
++it.effect(
++  "adds TWS context atomically without changing existing bindings or migration history",
++  () =>
++    Effect.gen(function* () {
++      const sql = yield* SqlClient.SqlClient;
++      yield* runMigrations();
++      for (const table of [
++        "tws_thread_contexts",
++        "tws_context_topology",
++        "tws_context_observations",
++      ])
++        yield* sql.unsafe(`DROP TABLE ${table}`);
++      yield* sql`DROP INDEX idx_tws_context_incarnation`;
++      yield* sql`DELETE FROM t3code_fork_migrations WHERE migration_id = 49`;
++      const before = yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`;
++      yield* sql`CREATE TRIGGER reject_tws_context BEFORE INSERT ON t3code_fork_migrations
++      WHEN NEW.migration_id = 49 BEGIN SELECT RAISE(ABORT, 'reject TWS context'); END`;
++      assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
++      assert.deepEqual(
++        yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`,
++        before,
++      );
++      assert.deepEqual(
++        yield* sql`SELECT name FROM sqlite_master WHERE name = 'tws_thread_contexts'`,
++        [],
++      );
++      yield* sql`DROP TRIGGER reject_tws_context`;
++      yield* runMigrations();
++      assert.deepEqual(yield* runMigrations(), []);
++      yield* sql`DROP INDEX idx_tws_context_incarnation`;
++      assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
++    }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
++);
++
+ it.effect("upstream-only databases add fork state without rerunning upstream migrations", () =>
+   Effect.gen(function* () {
+     const sql = yield* SqlClient.SqlClient;
+@@ -154,7 +189,7 @@ it.effect("upstream-only databases add fork state without rerunning upstream mig
+       original,
+     );
+ 
+-    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 5);
++    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 6);
+   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+ );
+ 
+@@ -258,9 +293,13 @@ it.effect(
+         "attention_delivery_changes",
+         "attention_delivery_rows",
+         "attention_delivery_state",
++        "tws_thread_contexts",
++        "tws_context_topology",
++        "tws_context_observations",
+       ])
+         yield* sql.unsafe(`DROP TABLE ${table}`);
+-      yield* sql`DELETE FROM t3code_fork_migrations WHERE migration_id = 48`;
++      yield* sql`DELETE FROM t3code_fork_migrations WHERE migration_id >= 48`;
++      yield* sql`DROP INDEX idx_tws_context_incarnation`;
+       yield* sql`INSERT INTO projection_thread_attention_current
+       (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code, revision,
+        source_event_id, source_sequence, opened_at, updated_at, resolved_at)
+diff --git a/apps/server/src/persistence/ForkMigrations.ts b/apps/server/src/persistence/ForkMigrations.ts
+index 5be45e733..e01f99003 100644
+--- a/apps/server/src/persistence/ForkMigrations.ts
++++ b/apps/server/src/persistence/ForkMigrations.ts
+@@ -11,6 +11,7 @@ import AttentionDelivery, {
+ } from "./ForkMigrations/048_AttentionDelivery.ts";
+ import Upstream0044 from "./Migrations/044_ClearAutomaticProjectModelDefaults.ts";
+ import Upstream0045 from "./Migrations/045_ProjectionProjectsAutoPull.ts";
++import TwsContext from "./ForkMigrations/049_TwsContext.ts";
+ 
+ const FORK_MIGRATIONS_TABLE = "t3code_fork_migrations";
+ const forkEntries = [
+@@ -19,6 +20,7 @@ const forkEntries = [
+   [46, "ProjectionThreadAttentionCurrent", CurrentAttention],
+   [47, "ProjectionThreadAwareness", ThreadAwareness],
+   [48, "AttentionDelivery", AttentionDelivery],
++  [49, "TwsContext", TwsContext],
+ ] as const;
+ const run = Migrator.make({});
+ 
+@@ -47,6 +49,38 @@ const locatorColumns = [
+ ];
+ const lifecycleColumns = ["first_seen_at", "last_seen_at", "retired_at"];
+ const tables: ReadonlyArray<TableShape> = [
++  {
++    name: "tws_context_observations",
++    migration: 49,
++    columns: ["environment_id", "generation", "data_json"],
++    nullable: [],
++    primaryKey: ["environment_id"],
++    integerColumns: ["generation"],
++    indexes: [],
++  },
++  {
++    name: "tws_context_topology",
++    migration: 49,
++    columns: [
++      "environment_id",
++      "binding_id",
++      "workspace_binding_id",
++      "feature_binding_id",
++      "summary_json",
++      "data_json",
++    ],
++    nullable: ["feature_binding_id"],
++    primaryKey: ["environment_id", "binding_id"],
++    indexes: ["idx_tws_context_topology_workspace", "idx_tws_context_topology_feature"],
++  },
++  {
++    name: "tws_thread_contexts",
++    migration: 49,
++    columns: ["environment_id", "thread_id", "data_json"],
++    nullable: [],
++    primaryKey: ["environment_id", "thread_id"],
++    indexes: [],
++  },
+   {
+     name: "attention_delivery_state",
+     migration: 48,
+@@ -315,6 +349,11 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
+   applied: ReadonlySet<number>,
+ ) {
+   const sql = yield* SqlClient.SqlClient;
++  if (applied.has(49)) {
++    const index = yield* sql`SELECT name FROM sqlite_master WHERE type = 'index'
++      AND name = 'idx_tws_context_incarnation' AND tbl_name = 'orchestration_events'`;
++    if (index.length !== 1) return yield* badState("TWS incarnation index is missing");
++  }
+   if (applied.has(48)) {
+     const triggers = yield* sql<{ readonly name: string; readonly tbl_name: string }>`
+       SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger'
+diff --git a/apps/server/src/persistence/ForkMigrations/049_TwsContext.ts b/apps/server/src/persistence/ForkMigrations/049_TwsContext.ts
+new file mode 100644
+index 000000000..62cc645d6
+--- /dev/null
++++ b/apps/server/src/persistence/ForkMigrations/049_TwsContext.ts
+@@ -0,0 +1,31 @@
++import * as Effect from "effect/Effect";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++
++export default Effect.gen(function* () {
++  const sql = yield* SqlClient.SqlClient;
++  yield* sql`CREATE INDEX idx_tws_context_incarnation
++    ON orchestration_events(aggregate_kind, stream_id, event_type, sequence DESC)
++    WHERE event_type = 'thread.created' OR event_type = 'project.created'`;
++  yield* sql`CREATE TABLE tws_context_observations (
++    environment_id TEXT PRIMARY KEY NOT NULL,
++    generation INTEGER NOT NULL,
++    data_json TEXT NOT NULL
++  )`;
++  yield* sql`CREATE TABLE tws_context_topology (
++    environment_id TEXT NOT NULL,
++    binding_id TEXT NOT NULL,
++    workspace_binding_id TEXT NOT NULL,
++    feature_binding_id TEXT,
++    summary_json TEXT NOT NULL,
++    data_json TEXT NOT NULL,
++    PRIMARY KEY(environment_id, binding_id)
++  )`;
++  yield* sql`CREATE INDEX idx_tws_context_topology_workspace ON tws_context_topology(environment_id, workspace_binding_id, binding_id)`;
++  yield* sql`CREATE INDEX idx_tws_context_topology_feature ON tws_context_topology(environment_id, feature_binding_id, binding_id)`;
++  yield* sql`CREATE TABLE tws_thread_contexts (
++    environment_id TEXT NOT NULL,
++    thread_id TEXT NOT NULL,
++    data_json TEXT NOT NULL,
++    PRIMARY KEY(environment_id, thread_id)
++  )`;
++});
+diff --git a/apps/server/src/server.test.ts b/apps/server/src/server.test.ts
+index e20bfef53..8d3cad01c 100644
+--- a/apps/server/src/server.test.ts
++++ b/apps/server/src/server.test.ts
+@@ -109,6 +109,7 @@ import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
+ import * as ServerConfig from "./config.ts";
+ import * as DeviceService from "./device/DeviceService.ts";
+ import { HTTP_ROUTER_CONFIG, makeRoutesLayer } from "./server.ts";
++import { TwsContextLive } from "./tws/runtimeLayer.ts";
+ import {
+   isThreadDetailEvent,
+   resolveAvailableEditorsForConfig,
+@@ -761,302 +762,304 @@ const buildAppUnderTest = (options?: {
+         disableLogger: true,
+         routerConfig: HTTP_ROUTER_CONFIG,
+       },
+-    ).pipe(
+-      Layer.provide(
+-        Layer.mergeAll(
+-          Layer.mock(Keybindings.Keybindings)({
+-            loadConfigState: Effect.succeed({
+-              keybindings: [],
+-              issues: [],
++    )
++      .pipe(Layer.provide(TwsContextLive))
++      .pipe(
++        Layer.provide(
++          Layer.mergeAll(
++            Layer.mock(Keybindings.Keybindings)({
++              loadConfigState: Effect.succeed({
++                keybindings: [],
++                issues: [],
++              }),
++              streamChanges: Stream.empty,
++              ...options?.layers?.keybindings,
+             }),
+-            streamChanges: Stream.empty,
+-            ...options?.layers?.keybindings,
+-          }),
+-          Layer.mock(EnvironmentTheme.EnvironmentThemeService)({
+-            current: Effect.succeed([]),
+-            streamChanges: Stream.empty,
+-            ...options?.layers?.environmentTheme,
+-          }),
+-          Layer.mock(UsageLimitSources.UsageLimitSources)({
+-            current: Effect.succeed([]),
+-            streamChanges: Stream.make([]),
+-            refresh: Effect.void,
+-            ...options?.layers?.usageLimitSources,
+-          }),
++            Layer.mock(EnvironmentTheme.EnvironmentThemeService)({
++              current: Effect.succeed([]),
++              streamChanges: Stream.empty,
++              ...options?.layers?.environmentTheme,
++            }),
++            Layer.mock(UsageLimitSources.UsageLimitSources)({
++              current: Effect.succeed([]),
++              streamChanges: Stream.make([]),
++              refresh: Effect.void,
++              ...options?.layers?.usageLimitSources,
++            }),
++          ),
+         ),
+-      ),
+-      Layer.provide(
+-        Layer.mergeAll(
+-          Layer.mock(ProviderRegistry.ProviderRegistry)({
+-            getProviders: Effect.succeed([]),
+-            refresh: () => Effect.succeed([]),
+-            refreshInstance: () => Effect.succeed([]),
+-            getProviderMaintenanceCapabilitiesForInstance: (_instanceId, provider) =>
+-              Effect.succeed(
+-                makeManualOnlyProviderMaintenanceCapabilities({ provider, packageName: null }),
+-              ),
+-            setProviderMaintenanceActionState: () => Effect.succeed([]),
+-            streamChanges: Stream.empty,
+-            ...options?.layers?.providerRegistry,
+-          }),
+-          Layer.mock(ProviderService.ProviderService)({
+-            uploadFeedback: () => Effect.die("Provider feedback is not stubbed in this test"),
+-            ...options?.layers?.providerService,
+-          }),
+-          Layer.mock(ProviderAuthService)({
+-            ...options?.layers?.providerAuth,
+-          }),
+-          Layer.mock(ProviderInstanceRegistry)({
+-            getInstance: () => Effect.succeed(undefined),
+-            listInstances: Effect.succeed([]),
+-            ...options?.layers?.providerInstanceRegistry,
+-          }),
+-          Layer.mock(AntigravityInstallation)({
+-            managedDirectory: "unused-test-antigravity-runtime",
+-            ...options?.layers?.antigravityInstallation,
+-          }),
+-          Layer.mock(ProviderSessionDirectory.ProviderSessionDirectory)({
+-            upsert: () => Effect.void,
+-            getBinding: () => Effect.succeed(Option.none()),
+-            listThreadIds: () => Effect.succeed([]),
+-            listBindings: () => Effect.succeed([]),
+-            ...options?.layers?.providerSessionDirectory,
+-          }),
+-          Layer.mock(DeviceService.DeviceService)({
+-            state: Effect.succeed(EMPTY_DEVICE_STATE),
+-            currentReadiness: () => Effect.succeed(null),
+-            sessionsForThread: () => Effect.succeed([]),
+-          }),
++        Layer.provide(
++          Layer.mergeAll(
++            Layer.mock(ProviderRegistry.ProviderRegistry)({
++              getProviders: Effect.succeed([]),
++              refresh: () => Effect.succeed([]),
++              refreshInstance: () => Effect.succeed([]),
++              getProviderMaintenanceCapabilitiesForInstance: (_instanceId, provider) =>
++                Effect.succeed(
++                  makeManualOnlyProviderMaintenanceCapabilities({ provider, packageName: null }),
++                ),
++              setProviderMaintenanceActionState: () => Effect.succeed([]),
++              streamChanges: Stream.empty,
++              ...options?.layers?.providerRegistry,
++            }),
++            Layer.mock(ProviderService.ProviderService)({
++              uploadFeedback: () => Effect.die("Provider feedback is not stubbed in this test"),
++              ...options?.layers?.providerService,
++            }),
++            Layer.mock(ProviderAuthService)({
++              ...options?.layers?.providerAuth,
++            }),
++            Layer.mock(ProviderInstanceRegistry)({
++              getInstance: () => Effect.succeed(undefined),
++              listInstances: Effect.succeed([]),
++              ...options?.layers?.providerInstanceRegistry,
++            }),
++            Layer.mock(AntigravityInstallation)({
++              managedDirectory: "unused-test-antigravity-runtime",
++              ...options?.layers?.antigravityInstallation,
++            }),
++            Layer.mock(ProviderSessionDirectory.ProviderSessionDirectory)({
++              upsert: () => Effect.void,
++              getBinding: () => Effect.succeed(Option.none()),
++              listThreadIds: () => Effect.succeed([]),
++              listBindings: () => Effect.succeed([]),
++              ...options?.layers?.providerSessionDirectory,
++            }),
++            Layer.mock(DeviceService.DeviceService)({
++              state: Effect.succeed(EMPTY_DEVICE_STATE),
++              currentReadiness: () => Effect.succeed(null),
++              sessionsForThread: () => Effect.succeed([]),
++            }),
++          ),
+         ),
+-      ),
+-      Layer.provide(
+-        Layer.mock(ServerSettings.ServerSettingsService)({
+-          start: Effect.void,
+-          ready: Effect.void,
+-          getSettings: Effect.succeed(DEFAULT_SERVER_SETTINGS),
+-          updateSettings: () => Effect.succeed(DEFAULT_SERVER_SETTINGS),
+-          streamChanges: Stream.empty,
+-          ...options?.layers?.serverSettings,
+-        }),
+-      ),
+-      Layer.provide(
+-        Layer.mergeAll(
+-          Layer.mock(ExternalLauncher.ExternalLauncher)({
+-            resolveAvailableEditors: () => Effect.succeed([]),
+-            resolveFileManagerRevealKind: () => Effect.sync((): undefined => undefined),
+-            ...options?.layers?.externalLauncher,
+-          }),
+-          Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({
+-            resolveTargets: () => Effect.succeed([]),
++        Layer.provide(
++          Layer.mock(ServerSettings.ServerSettingsService)({
++            start: Effect.void,
++            ready: Effect.void,
++            getSettings: Effect.succeed(DEFAULT_SERVER_SETTINGS),
++            updateSettings: () => Effect.succeed(DEFAULT_SERVER_SETTINGS),
++            streamChanges: Stream.empty,
++            ...options?.layers?.serverSettings,
+           }),
+         ),
+-      ),
+-      Layer.provide(
+-        Layer.mock(ProcessDiagnostics.ProcessDiagnostics)({
+-          read: Effect.succeed({
+-            serverPid: process.pid,
+-            readAt: TEST_EPOCH,
+-            processCount: 0,
+-            totalRssBytes: 0,
+-            totalCpuPercent: 0,
+-            processes: [],
+-            error: Option.none(),
+-          }),
+-          signal: (input) =>
+-            Effect.succeed({
+-              pid: input.pid,
+-              signal: input.signal,
+-              signaled: true,
+-              message: Option.none(),
++        Layer.provide(
++          Layer.mergeAll(
++            Layer.mock(ExternalLauncher.ExternalLauncher)({
++              resolveAvailableEditors: () => Effect.succeed([]),
++              resolveFileManagerRevealKind: () => Effect.sync((): undefined => undefined),
++              ...options?.layers?.externalLauncher,
+             }),
+-        }),
+-      ),
+-      Layer.provide([
+-        HostResources.layer,
+-        Layer.mock(ProcessResourceMonitor.ProcessResourceMonitor)({
+-          readHistory: (input) =>
+-            Effect.succeed({
+-              readAt: TEST_EPOCH,
+-              windowMs: input.windowMs,
+-              bucketMs: input.bucketMs,
+-              sampleIntervalMs: 5_000,
+-              retainedSampleCount: 0,
+-              totalCpuSecondsApprox: 0,
+-              buckets: [],
+-              topProcesses: [],
+-              error: Option.none(),
++            Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({
++              resolveTargets: () => Effect.succeed([]),
+             }),
+-        }),
+-      ]),
+-      Layer.provide(
+-        Layer.mock(TraceDiagnostics.TraceDiagnostics)({
+-          read: () =>
+-            Effect.succeed({
+-              traceFilePath: "",
+-              scannedFilePaths: [],
++          ),
++        ),
++        Layer.provide(
++          Layer.mock(ProcessDiagnostics.ProcessDiagnostics)({
++            read: Effect.succeed({
++              serverPid: process.pid,
+               readAt: TEST_EPOCH,
+-              recordCount: 0,
+-              parseErrorCount: 0,
+-              firstSpanAt: Option.none(),
+-              lastSpanAt: Option.none(),
+-              failureCount: 0,
+-              interruptionCount: 0,
+-              slowSpanThresholdMs: 1_000,
+-              slowSpanCount: 0,
+-              logLevelCounts: {},
+-              topSpansByCount: [],
+-              slowestSpans: [],
+-              commonFailures: [],
+-              latestFailures: [],
+-              latestWarningAndErrorLogs: [],
+-              partialFailure: Option.none(),
++              processCount: 0,
++              totalRssBytes: 0,
++              totalCpuPercent: 0,
++              processes: [],
+               error: Option.none(),
+             }),
+-        }),
+-      ),
+-      Layer.provide(gitManagerLayer),
+-      Layer.provide(gitVcsDriverLayer),
+-      Layer.provide(gitWorkflowLayer),
+-      Layer.provide(reviewLayer),
+-      Layer.provide(vcsProvisioningLayer),
+-      Layer.provide(
+-        Layer.mock(SourceControlRepositoryService.SourceControlRepositoryService)({
+-          ...options?.layers?.sourceControlRepositoryService,
+-        }),
+-      ),
+-      Layer.provideMerge(vcsStatusBroadcasterLayer),
+-      Layer.provide(
+-        Layer.mock(ProjectSetupScriptRunner.ProjectSetupScriptRunner)({
+-          runForThread: () => Effect.succeed({ status: "no-script" as const }),
+-          ...options?.layers?.projectSetupScriptRunner,
+-        }),
+-      ),
+-      Layer.provide(
+-        Layer.mergeAll(
+-          Layer.mock(TerminalManager.TerminalManager)({
+-            ...options?.layers?.terminalManager,
+-          }),
+-          WorktreeSetupTracker.layer,
+-          ProjectCloneTracker.layer.pipe(
+-            Layer.provide(
+-              Layer.mock(SourceControlRepositoryService.SourceControlRepositoryService)({
+-                ...options?.layers?.sourceControlRepositoryService,
++            signal: (input) =>
++              Effect.succeed({
++                pid: input.pid,
++                signal: input.signal,
++                signaled: true,
++                message: Option.none(),
+               }),
+-            ),
+-          ),
+-        ),
+-      ),
+-      Layer.provide(
+-        Layer.mergeAll(
+-          Layer.mock(PreviewManager.PreviewManager)({
+-            open: () => Effect.die("PreviewManager not stubbed in this test"),
+-            navigate: () => Effect.die("PreviewManager not stubbed in this test"),
+-            resize: () => Effect.die("PreviewManager not stubbed in this test"),
+-            reportStatus: () => Effect.void,
+-            refresh: () => Effect.void,
+-            close: () => Effect.void,
+-            list: () => Effect.succeed({ sessions: [], serverEpoch: "test-server", revision: 0 }),
+-            events: Stream.empty,
+-            subscribeEvents: Effect.flatMap(PubSub.unbounded<PreviewEvent>(), (pubsub) =>
+-              PubSub.subscribe(pubsub),
+-            ),
+-          }),
+-          Layer.mock(PortScanner.PortDiscovery)({
+-            scan: () => Effect.succeed([]),
+-            subscribe: () => Effect.void,
+-            retain: Effect.void,
+-            registerTerminalProcesses: () => Effect.void,
+-            unregisterTerminal: () => Effect.void,
+           }),
+         ),
+-      ),
+-      Layer.provide(
+-        Layer.mergeAll(
+-          Layer.mock(OrchestrationEngine.OrchestrationEngineService)({
+-            readEvents: () => Stream.empty,
+-            readThreadEvents: () => Stream.empty,
+-            getThreadReplayStats: () =>
++        Layer.provide([
++          HostResources.layer,
++          Layer.mock(ProcessResourceMonitor.ProcessResourceMonitor)({
++            readHistory: (input) =>
+               Effect.succeed({
+-                eventCount: 0,
+-                payloadBytes: 0,
+-                hasCreateEvent: false,
++                readAt: TEST_EPOCH,
++                windowMs: input.windowMs,
++                bucketMs: input.bucketMs,
++                sampleIntervalMs: 5_000,
++                retainedSampleCount: 0,
++                totalCpuSecondsApprox: 0,
++                buckets: [],
++                topProcesses: [],
++                error: Option.none(),
+               }),
+-            dispatch: () => Effect.succeed({ sequence: 0 }),
+-            streamDomainEvents: Stream.empty,
+-            subscribeDomainEvents: Effect.succeed(Stream.never),
+-            latestSequence: Effect.succeed(0),
+-            ...options?.layers?.orchestrationEngine,
+           }),
+-          Layer.mock(ThreadDeletionReactor)({
+-            start: () => Effect.void,
+-            drainThrough: () => Effect.void,
+-            ...options?.layers?.threadDeletionReactor,
++        ]),
++        Layer.provide(
++          Layer.mock(TraceDiagnostics.TraceDiagnostics)({
++            read: () =>
++              Effect.succeed({
++                traceFilePath: "",
++                scannedFilePaths: [],
++                readAt: TEST_EPOCH,
++                recordCount: 0,
++                parseErrorCount: 0,
++                firstSpanAt: Option.none(),
++                lastSpanAt: Option.none(),
++                failureCount: 0,
++                interruptionCount: 0,
++                slowSpanThresholdMs: 1_000,
++                slowSpanCount: 0,
++                logLevelCounts: {},
++                topSpansByCount: [],
++                slowestSpans: [],
++                commonFailures: [],
++                latestFailures: [],
++                latestWarningAndErrorLogs: [],
++                partialFailure: Option.none(),
++                error: Option.none(),
++              }),
+           }),
+-          Layer.mock(PullRequestSyncReactor.PullRequestSyncReactor)({
+-            start: () => Effect.void,
+-            drain: Effect.void,
+-            requestSync: () => Effect.void,
++        ),
++        Layer.provide(gitManagerLayer),
++        Layer.provide(gitVcsDriverLayer),
++        Layer.provide(gitWorkflowLayer),
++        Layer.provide(reviewLayer),
++        Layer.provide(vcsProvisioningLayer),
++        Layer.provide(
++          Layer.mock(SourceControlRepositoryService.SourceControlRepositoryService)({
++            ...options?.layers?.sourceControlRepositoryService,
+           }),
+         ),
+-      ),
+-      Layer.provide(
+-        Layer.mock(ProjectionSnapshotQuery.ProjectionSnapshotQuery)({
+-          getUserInputActivity: () => Effect.die("unused"),
+-          getCommandReadModel: () => Effect.succeed(makeDefaultOrchestrationReadModel()),
+-          getSnapshot: () => Effect.succeed(makeDefaultOrchestrationReadModel()),
+-          getShellSnapshot: () =>
+-            Effect.succeed({
+-              snapshotSequence: 0,
+-              projects: [],
+-              threads: [],
+-              updatedAt: "1970-01-01T00:00:00.000Z",
++        Layer.provideMerge(vcsStatusBroadcasterLayer),
++        Layer.provide(
++          Layer.mock(ProjectSetupScriptRunner.ProjectSetupScriptRunner)({
++            runForThread: () => Effect.succeed({ status: "no-script" as const }),
++            ...options?.layers?.projectSetupScriptRunner,
++          }),
++        ),
++        Layer.provide(
++          Layer.mergeAll(
++            Layer.mock(TerminalManager.TerminalManager)({
++              ...options?.layers?.terminalManager,
+             }),
+-          getArchivedShellSnapshot: () =>
+-            Effect.succeed({
+-              snapshotSequence: 0,
+-              projects: [],
+-              threads: [],
+-              updatedAt: "1970-01-01T00:00:00.000Z",
++            WorktreeSetupTracker.layer,
++            ProjectCloneTracker.layer.pipe(
++              Layer.provide(
++                Layer.mock(SourceControlRepositoryService.SourceControlRepositoryService)({
++                  ...options?.layers?.sourceControlRepositoryService,
++                }),
++              ),
++            ),
++          ),
++        ),
++        Layer.provide(
++          Layer.mergeAll(
++            Layer.mock(PreviewManager.PreviewManager)({
++              open: () => Effect.die("PreviewManager not stubbed in this test"),
++              navigate: () => Effect.die("PreviewManager not stubbed in this test"),
++              resize: () => Effect.die("PreviewManager not stubbed in this test"),
++              reportStatus: () => Effect.void,
++              refresh: () => Effect.void,
++              close: () => Effect.void,
++              list: () => Effect.succeed({ sessions: [], serverEpoch: "test-server", revision: 0 }),
++              events: Stream.empty,
++              subscribeEvents: Effect.flatMap(PubSub.unbounded<PreviewEvent>(), (pubsub) =>
++                PubSub.subscribe(pubsub),
++              ),
+             }),
+-          searchThreads: () => Effect.succeed({ matches: [] }),
+-          getSnapshotSequence: () => Effect.succeed({ snapshotSequence: 0 }),
+-          getProjectShellById: () => Effect.succeed(Option.none()),
+-          getThreadShellById: () => Effect.succeed(Option.none()),
+-          getThreadDetailById: () => Effect.succeed(Option.none()),
+-          getThreadDetailSnapshot: () => Effect.succeed(Option.none()),
+-          getCounts: () => Effect.succeed({ projectCount: 0, threadCount: 0 }),
+-          getEventReplayStats: ({ fromSequenceExclusive, toSequenceInclusive }) =>
+-            Effect.succeed({
+-              eventCount: Math.max(0, toSequenceInclusive - fromSequenceExclusive),
+-              payloadBytes: 0,
++            Layer.mock(PortScanner.PortDiscovery)({
++              scan: () => Effect.succeed([]),
++              subscribe: () => Effect.void,
++              retain: Effect.void,
++              registerTerminalProcesses: () => Effect.void,
++              unregisterTerminal: () => Effect.void,
+             }),
+-          getActiveProjectByWorkspaceRoot: () => Effect.succeed(Option.none()),
+-          getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
+-          getImportedAgentSessionSources: () => Effect.succeed([]),
+-          getThreadCheckpointContext: () => Effect.succeed(Option.none()),
+-          ...options?.layers?.projectionSnapshotQuery,
+-        }),
+-      ),
+-      Layer.provide(
+-        Layer.mock(CheckpointDiffQuery.CheckpointDiffQuery)({
+-          getTurnDiff: () =>
+-            Effect.succeed({
+-              threadId: defaultThreadId,
+-              fromTurnCount: 0,
+-              toTurnCount: 0,
+-              diff: "",
++          ),
++        ),
++        Layer.provide(
++          Layer.mergeAll(
++            Layer.mock(OrchestrationEngine.OrchestrationEngineService)({
++              readEvents: () => Stream.empty,
++              readThreadEvents: () => Stream.empty,
++              getThreadReplayStats: () =>
++                Effect.succeed({
++                  eventCount: 0,
++                  payloadBytes: 0,
++                  hasCreateEvent: false,
++                }),
++              dispatch: () => Effect.succeed({ sequence: 0 }),
++              streamDomainEvents: Stream.empty,
++              subscribeDomainEvents: Effect.succeed(Stream.never),
++              latestSequence: Effect.succeed(0),
++              ...options?.layers?.orchestrationEngine,
+             }),
+-          getFullThreadDiff: () =>
+-            Effect.succeed({
+-              threadId: defaultThreadId,
+-              fromTurnCount: 0,
+-              toTurnCount: 0,
+-              diff: "",
++            Layer.mock(ThreadDeletionReactor)({
++              start: () => Effect.void,
++              drainThrough: () => Effect.void,
++              ...options?.layers?.threadDeletionReactor,
+             }),
+-          ...options?.layers?.checkpointDiffQuery,
+-        }),
+-      ),
+-    );
++            Layer.mock(PullRequestSyncReactor.PullRequestSyncReactor)({
++              start: () => Effect.void,
++              drain: Effect.void,
++              requestSync: () => Effect.void,
++            }),
++          ),
++        ),
++        Layer.provide(
++          Layer.mock(ProjectionSnapshotQuery.ProjectionSnapshotQuery)({
++            getUserInputActivity: () => Effect.die("unused"),
++            getCommandReadModel: () => Effect.succeed(makeDefaultOrchestrationReadModel()),
++            getSnapshot: () => Effect.succeed(makeDefaultOrchestrationReadModel()),
++            getShellSnapshot: () =>
++              Effect.succeed({
++                snapshotSequence: 0,
++                projects: [],
++                threads: [],
++                updatedAt: "1970-01-01T00:00:00.000Z",
++              }),
++            getArchivedShellSnapshot: () =>
++              Effect.succeed({
++                snapshotSequence: 0,
++                projects: [],
++                threads: [],
++                updatedAt: "1970-01-01T00:00:00.000Z",
++              }),
++            searchThreads: () => Effect.succeed({ matches: [] }),
++            getSnapshotSequence: () => Effect.succeed({ snapshotSequence: 0 }),
++            getProjectShellById: () => Effect.succeed(Option.none()),
++            getThreadShellById: () => Effect.succeed(Option.none()),
++            getThreadDetailById: () => Effect.succeed(Option.none()),
++            getThreadDetailSnapshot: () => Effect.succeed(Option.none()),
++            getCounts: () => Effect.succeed({ projectCount: 0, threadCount: 0 }),
++            getEventReplayStats: ({ fromSequenceExclusive, toSequenceInclusive }) =>
++              Effect.succeed({
++                eventCount: Math.max(0, toSequenceInclusive - fromSequenceExclusive),
++                payloadBytes: 0,
++              }),
++            getActiveProjectByWorkspaceRoot: () => Effect.succeed(Option.none()),
++            getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
++            getImportedAgentSessionSources: () => Effect.succeed([]),
++            getThreadCheckpointContext: () => Effect.succeed(Option.none()),
++            ...options?.layers?.projectionSnapshotQuery,
++          }),
++        ),
++        Layer.provide(
++          Layer.mock(CheckpointDiffQuery.CheckpointDiffQuery)({
++            getTurnDiff: () =>
++              Effect.succeed({
++                threadId: defaultThreadId,
++                fromTurnCount: 0,
++                toTurnCount: 0,
++                diff: "",
++              }),
++            getFullThreadDiff: () =>
++              Effect.succeed({
++                threadId: defaultThreadId,
++                fromTurnCount: 0,
++                toTurnCount: 0,
++                diff: "",
++              }),
++            ...options?.layers?.checkpointDiffQuery,
++          }),
++        ),
++      );
+ 
+     const appLayer = servedRoutesLayer.pipe(
+       Layer.provide(
+@@ -2987,6 +2990,31 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
+     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+   );
+ 
++  it.effect(
++    "exposes disabled-by-default TWS operations through authenticated environment RPC",
++    () =>
++      Effect.gen(function* () {
++        yield* buildAppUnderTest();
++        const wsUrl = yield* getWsServerUrl("/ws");
++        yield* Effect.scoped(
++          withWsRpcClient(wsUrl, (client) =>
++            Effect.gen(function* () {
++              const topology = yield* client[WS_METHODS.twsQuery]({ limit: 1 });
++              assert.equal(topology.integration.status, "disabled");
++              assert.deepEqual(topology.entries, []);
++              const contexts = yield* client[WS_METHODS.twsGetContexts]({
++                threadIds: [ThreadId.make("missing")],
++              });
++              assert.equal(contexts.integration.status, "disabled");
++              const denied = yield* client[WS_METHODS.twsRefresh]({}).pipe(Effect.flip);
++              assert.equal(denied._tag, "TwsContextError");
++              if (denied._tag === "TwsContextError") assert.equal(denied.reason, "disabled");
++            }),
++          ),
++        );
++      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
++  );
++
+   it.effect(
+     "reports relay client status and streams installation progress over environment RPC",
+     () =>
+@@ -4220,6 +4248,13 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
+                 Effect.flip,
+               );
+               assert.equal(denied._tag, "EnvironmentAuthorizationError");
++              yield* client[WS_METHODS.twsQuery]({}).pipe(
++                Effect.match({
++                  onFailure: (error) => assert.equal(error._tag, "EnvironmentAuthorizationError"),
++                  onSuccess: () =>
++                    assert.fail("TWS read was authorized without orchestration-read scope"),
++                }),
++              );
+               return yield* client[WS_METHODS.serverGetConfig]({});
+             }),
+           ),
+diff --git a/apps/server/src/server.ts b/apps/server/src/server.ts
+index e0aeecb3f..36b939ffc 100644
+--- a/apps/server/src/server.ts
++++ b/apps/server/src/server.ts
+@@ -86,6 +86,7 @@ import { ThreadDeletionReactorLive } from "./orchestration/Layers/ThreadDeletion
+ import * as ThreadSettlementReactor from "./orchestration/ThreadSettlementReactor.ts";
+ import * as PullRequestSyncReactor from "./orchestration/PullRequestSyncReactor.ts";
+ import * as ThreadPullRequestReactor from "./orchestration/ThreadPullRequestReactor.ts";
++import { TwsContextLive } from "./tws/runtimeLayer.ts";
+ import * as AgentAwarenessRelay from "./relay/AgentAwarenessRelay.ts";
+ import { hasCloudPublicConfig } from "./cloud/publicConfig.ts";
+ import { ProviderRegistryLive } from "./provider/Layers/ProviderRegistry.ts";
+@@ -250,6 +251,7 @@ const ReactorLayerLive = Layer.empty.pipe(
+   Layer.provideMerge(ThreadSettlementReactor.layer),
+   Layer.provideMerge(PullRequestSyncReactor.layer),
+   Layer.provideMerge(ThreadPullRequestReactor.layer),
++  Layer.provideMerge(TwsContextLive),
+   Layer.provideMerge(AgentAwarenessRelay.layer.pipe(Layer.provide(ServerSecretStore.layer))),
+   Layer.provideMerge(RuntimeReceiptBusLive),
+ );
+diff --git a/apps/server/src/serverRuntimeStartup.ts b/apps/server/src/serverRuntimeStartup.ts
+index 1468e1efe..9fb2354a4 100644
+--- a/apps/server/src/serverRuntimeStartup.ts
++++ b/apps/server/src/serverRuntimeStartup.ts
+@@ -38,6 +38,7 @@ import * as ExternalLauncher from "./process/externalLauncher.ts";
+ import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
+ import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
+ import * as OrchestrationReactor from "./orchestration/Services/OrchestrationReactor.ts";
++import { TwsContextService } from "./tws/TwsContextService.ts";
+ import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
+ import * as ServerSettings from "./serverSettings.ts";
+ import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
+@@ -903,6 +904,7 @@ export const make = (options?: StartupOptions) =>
+     const serverConfig = yield* ServerConfig.ServerConfig;
+     const keybindings = yield* Keybindings.Keybindings;
+     const orchestrationReactor = yield* OrchestrationReactor.OrchestrationReactor;
++    const twsContext = yield* TwsContextService;
+     const providerSessionReaper = yield* ProviderSessionReaper.ProviderSessionReaper;
+     const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
+     const serverSettings = yield* ServerSettings.ServerSettingsService;
+@@ -965,6 +967,14 @@ export const make = (options?: StartupOptions) =>
+         "reactors.start",
+         Effect.gen(function* () {
+           yield* orchestrationReactor.start().pipe(Scope.provide(reactorScope));
++          yield* twsContext.start.pipe(
++            Scope.provide(reactorScope),
++            Effect.catchTag("TwsContextError", (error) =>
++              Effect.logWarning("Optional TWS integration is unavailable.", {
++                reason: error.reason,
++              }),
++            ),
++          );
+           yield* providerSessionReaper.start().pipe(Scope.provide(reactorScope));
+         }),
+       );
+diff --git a/apps/server/src/tws/TwsCliAdapter.test.ts b/apps/server/src/tws/TwsCliAdapter.test.ts
+index a0d8810ee..50f45306b 100644
+--- a/apps/server/src/tws/TwsCliAdapter.test.ts
++++ b/apps/server/src/tws/TwsCliAdapter.test.ts
+@@ -72,6 +72,35 @@ function testLayer(outputs: ReadonlyArray<ProcessRunOutput>, calls: ProcessRunIn
+ }
+ 
+ describe("TwsCliAdapter", () => {
++  it.effect(
++    "rechecks the pinned executable version for a new refresh and does not retain an obsolete success",
++    () => {
++      const calls: ProcessRunInput[] = [];
++      return Effect.gen(function* () {
++        const adapter = yield* TwsCliAdapter;
++        yield* adapter.probe();
++        const rejected = yield* adapter.probe({ refresh: true }).pipe(Effect.flip);
++        assert.strictEqual(rejected._tag, "TwsUnsupportedVersionError");
++        yield* adapter.checkRegistry();
++        assert.deepEqual(
++          calls.map((call) => call.args),
++          [["--version"], ["--version"], ["--version"], ["registry", "check", "--json"]],
++        );
++      }).pipe(
++        Effect.provide(
++          testLayer(
++            [
++              processOutput({ stdout: "tws version v1.2.14" }),
++              processOutput({ stdout: "tws version v1.3.0" }),
++              processOutput({ stdout: "tws version v1.2.14" }),
++              processOutput({ stdout: encodeJson([]) }),
++            ],
++            calls,
++          ),
++        ),
++      );
++    },
++  );
+   it.effect("uses only read-only direct argument arrays and caches a successful version", () => {
+     const calls: ProcessRunInput[] = [];
+     const layer = testLayer(
+diff --git a/apps/server/src/tws/TwsCliAdapter.ts b/apps/server/src/tws/TwsCliAdapter.ts
+index f99204865..b550da5e0 100644
+--- a/apps/server/src/tws/TwsCliAdapter.ts
++++ b/apps/server/src/tws/TwsCliAdapter.ts
+@@ -39,7 +39,9 @@ export interface TwsStackStatusInput {
+ }
+ 
+ export interface TwsCliAdapterShape {
+-  readonly probe: () => Effect.Effect<TwsVersionInfo, TwsCliAdapterError>;
++  readonly probe: (options?: {
++    readonly refresh?: boolean;
++  }) => Effect.Effect<TwsVersionInfo, TwsCliAdapterError>;
+   readonly listRegistry: () => Effect.Effect<ReadonlyArray<TwsRegistryEntry>, TwsCliAdapterError>;
+   readonly checkRegistry: () => Effect.Effect<ReadonlyArray<TwsRegistryCheck>, TwsCliAdapterError>;
+   readonly readStatus: (
+@@ -123,16 +125,19 @@ const makeTwsCliAdapter = Effect.gen(function* () {
+   const probeUncached = () =>
+     run("version", ["--version"]).pipe(Effect.flatMap(decodeTwsVersionOutput));
+ 
+-  const probe: TwsCliAdapterShape["probe"] = () =>
+-    cachedVersion
+-      ? Effect.succeed(cachedVersion)
+-      : probeUncached().pipe(
+-          Effect.tap((version) =>
+-            Effect.sync(() => {
+-              cachedVersion = version;
+-            }),
+-          ),
+-        );
++  const probe: TwsCliAdapterShape["probe"] = (options) =>
++    Effect.suspend(() => {
++      if (options?.refresh) cachedVersion = undefined;
++      return cachedVersion
++        ? Effect.succeed(cachedVersion)
++        : probeUncached().pipe(
++            Effect.tap((version) =>
++              Effect.sync(() => {
++                cachedVersion = version;
++              }),
++            ),
++          );
++    });
+ 
+   const withSupportedVersion = <A, E>(
+     effect: Effect.Effect<A, E>,
+diff --git a/apps/server/src/tws/TwsContextInference.ts b/apps/server/src/tws/TwsContextInference.ts
+new file mode 100644
+index 000000000..8654b5a09
+--- /dev/null
++++ b/apps/server/src/tws/TwsContextInference.ts
+@@ -0,0 +1,256 @@
++import type {
++  EnvironmentId,
++  TwsContextChoice,
++  TwsIntegrationState,
++  TwsThreadContext,
++} from "@t3tools/contracts";
++import type {
++  TwsExecution,
++  TwsRecord,
++  TwsStoredContext,
++  TwsThreadInput,
++} from "./TwsContextModel.ts";
++import { twsThreadLocationKey } from "./TwsContextModel.ts";
++
++export function initialTwsContext(
++  environmentId: EnvironmentId,
++  thread: TwsThreadInput,
++): TwsThreadContext {
++  return {
++    environmentId,
++    threadId: thread.threadId,
++    projectId: thread.projectId,
++    revision: 0,
++    mode: "auto",
++    workspaceBindingId: null,
++    featureBindingId: null,
++    stackNodeBindingId: null,
++    freshness: "unknown",
++    reason: "not-observed",
++    observationId: null,
++    lastConfirmedAt: null,
++  };
++}
++
++export function invalidateTwsContext(
++  previous: TwsStoredContext,
++  thread: TwsThreadInput,
++): TwsStoredContext {
++  const locationKey = twsThreadLocationKey(thread);
++  if (locationKey === previous.locationKey) return previous;
++  return {
++    ...previous,
++    locationKey,
++    context: {
++      ...previous.context,
++      revision: previous.context.revision + 1,
++      stackNodeBindingId: null,
++      freshness: "stale",
++      reason: "location-changed",
++    },
++  };
++}
++
++/** Physical evidence can select automatic context, but cannot overwrite an explicit logical choice. */
++export function inferTwsContext(input: {
++  environmentId: EnvironmentId;
++  thread: TwsThreadInput;
++  execution: TwsExecution | null;
++  records: ReadonlyArray<TwsRecord>;
++  integration: TwsIntegrationState;
++  previous: TwsStoredContext | undefined;
++  choice?: TwsContextChoice;
++}): TwsStoredContext {
++  const { thread, integration, execution } = input;
++  const prior = input.previous?.incarnation === thread.incarnation ? input.previous : undefined;
++  const previous = prior ? invalidateTwsContext(prior, thread) : undefined;
++  const choice = input.choice ?? previous?.choice ?? { mode: "auto" as const };
++  const base = previous?.context ?? initialTwsContext(input.environmentId, thread);
++  let next: TwsThreadContext = { ...base, mode: choice.mode, projectId: thread.projectId };
++  if (input.choice?.mode === "auto")
++    next = {
++      ...next,
++      workspaceBindingId: null,
++      featureBindingId: null,
++      stackNodeBindingId: null,
++      observationId: null,
++      lastConfirmedAt: null,
++    };
++  if (choice.mode === "explicit")
++    next = {
++      ...next,
++      workspaceBindingId: choice.workspaceBindingId,
++      featureBindingId:
++        choice.featureBindingId ??
++        (base.workspaceBindingId === choice.workspaceBindingId ? base.featureBindingId : null),
++      stackNodeBindingId:
++        base.workspaceBindingId === choice.workspaceBindingId &&
++        (choice.featureBindingId === null || base.featureBindingId === choice.featureBindingId)
++          ? base.stackNodeBindingId
++          : null,
++    };
++  const stale = (reason: TwsThreadContext["reason"]) => {
++    next = {
++      ...next,
++      freshness: previous ? "stale" : "unknown",
++      reason,
++      observationId: integration.observationId,
++    };
++  };
++  if (choice.mode === "none") {
++    next = {
++      ...next,
++      workspaceBindingId: null,
++      featureBindingId: null,
++      stackNodeBindingId: null,
++      freshness: "confirmed",
++      reason: "cleared",
++      observationId: null,
++      lastConfirmedAt: null,
++    };
++  } else if (
++    execution === null ||
++    integration.observationId === null ||
++    (thread.branch !== null && thread.branch !== execution.branch)
++  ) {
++    stale(execution === null ? "source-unavailable" : "location-changed");
++  } else {
++    const workspaces = input.records.filter(
++      (record) =>
++        record.kind === "workspace" &&
++        record.projectIds.includes(thread.projectId) &&
++        record.execution?.commonDirectory === execution.commonDirectory,
++    );
++    const selected =
++      choice.mode === "explicit"
++        ? workspaces.filter((record) => record.workspaceBindingId === choice.workspaceBindingId)
++        : workspaces.filter((record) => record.presence !== "missing");
++    if (choice.mode === "auto" && integration.status !== "ready") {
++      stale("incomplete-scope");
++    } else if (selected.length !== 1) {
++      if (choice.mode === "auto" && selected.length === 0 && integration.status === "ready")
++        next = {
++          ...next,
++          workspaceBindingId: null,
++          featureBindingId: null,
++          stackNodeBindingId: null,
++          freshness: "confirmed",
++          reason: "no-match",
++          observationId: integration.observationId,
++          lastConfirmedAt: integration.observedAt,
++        };
++      else stale(selected.length > 1 ? "ambiguous" : "incomplete-scope");
++    } else {
++      const workspace = selected[0]!;
++      if (
++        choice.mode === "auto" &&
++        input.choice === undefined &&
++        prior?.locationKey === twsThreadLocationKey(thread) &&
++        base.workspaceBindingId !== null &&
++        base.workspaceBindingId !== workspace.workspaceBindingId
++      ) {
++        stale("source-identity-changed");
++      } else if (
++        (!workspace.complete &&
++          !(choice.mode === "explicit" && choice.featureBindingId !== null)) ||
++        workspace.presence !== "present" ||
++        (choice.mode === "auto" &&
++          workspace.requiresConfirmation &&
++          base.workspaceBindingId !== workspace.workspaceBindingId)
++      ) {
++        stale(workspace.requiresConfirmation ? "source-identity-changed" : "incomplete-scope");
++      } else {
++        const features = input.records.filter(
++          (record) =>
++            record.kind === "feature" &&
++            record.workspaceBindingId === workspace.workspaceBindingId &&
++            record.presence !== "missing",
++        );
++        const explicitFeature = choice.mode === "explicit" ? choice.featureBindingId : null;
++        const selectedFeatures =
++          explicitFeature === null
++            ? features
++            : features.filter(
++                (record) =>
++                  record.kind === "feature" && record.binding.featureBindingId === explicitFeature,
++              );
++        if (
++          selectedFeatures.some((record) => !record.complete) ||
++          (explicitFeature !== null && selectedFeatures.length !== 1)
++        ) {
++          stale("incomplete-scope");
++        } else {
++          const featureIds = new Set(
++            selectedFeatures.flatMap((record) =>
++              record.kind === "feature" ? [record.binding.featureBindingId] : [],
++            ),
++          );
++          const nodes = input.records.filter(
++            (record) =>
++              record.kind === "node" &&
++              record.complete &&
++              record.presence === "present" &&
++              featureIds.has(record.binding.featureBindingId) &&
++              !record.binding.archived &&
++              record.execution?.root === execution.root &&
++              record.execution.commonDirectory === execution.commonDirectory &&
++              record.execution.branch !== null &&
++              record.execution.branch === execution.branch &&
++              record.binding.gitBranch === execution.branch,
++          );
++          const node = nodes.length === 1 && nodes[0]?.kind === "node" ? nodes[0] : undefined;
++          const featureId = explicitFeature ?? node?.binding.featureBindingId ?? null;
++          if (nodes.length > 1) stale("ambiguous");
++          else if (
++            node &&
++            input.choice === undefined &&
++            prior?.locationKey === twsThreadLocationKey(thread) &&
++            base.stackNodeBindingId !== null &&
++            base.stackNodeBindingId !== node.binding.stackNodeBindingId
++          )
++            stale("source-identity-changed");
++          else if (
++            choice.mode === "auto" &&
++            input.choice === undefined &&
++            prior?.locationKey === twsThreadLocationKey(thread) &&
++            base.featureBindingId !== null &&
++            featureId !== null &&
++            base.featureBindingId !== featureId
++          )
++            stale("source-identity-changed");
++          else
++            next = {
++              ...next,
++              workspaceBindingId: workspace.workspaceBindingId,
++              featureBindingId: featureId,
++              stackNodeBindingId: node?.binding.stackNodeBindingId ?? null,
++              freshness: "confirmed",
++              reason: node
++                ? "exact-execution"
++                : choice.mode === "explicit"
++                  ? "explicit"
++                  : "no-match",
++              observationId: integration.observationId,
++              lastConfirmedAt: integration.observedAt,
++            };
++        }
++      }
++    }
++  }
++  const material = (value: TwsThreadContext) =>
++    JSON.stringify([
++      value.mode,
++      value.workspaceBindingId,
++      value.featureBindingId,
++      value.stackNodeBindingId,
++    ]);
++  const changed =
++    material(next) !== material(base) ||
++    JSON.stringify(choice) !== JSON.stringify(previous?.choice ?? { mode: "auto" });
++  return {
++    context: { ...next, revision: base.revision + (changed ? 1 : 0) },
++    choice,
++    incarnation: thread.incarnation ?? "",
++    locationKey: twsThreadLocationKey(thread),
++  };
++}
+diff --git a/apps/server/src/tws/TwsContextModel.ts b/apps/server/src/tws/TwsContextModel.ts
+new file mode 100644
+index 000000000..21cd21612
+--- /dev/null
++++ b/apps/server/src/tws/TwsContextModel.ts
+@@ -0,0 +1,108 @@
++import * as Schema from "effect/Schema";
++import {
++  IsoDateTime,
++  ProjectId,
++  ThreadId,
++  TwsContextChoice,
++  TwsFeatureBinding,
++  TwsObservationId,
++  TwsStackNodeBinding,
++  TwsThreadContext,
++  TwsWorkspaceBinding,
++  TwsWorkspaceBindingId,
++  type TwsTopologyEntry,
++} from "@t3tools/contracts";
++
++export const TwsExecution = Schema.Struct({
++  path: Schema.String,
++  root: Schema.String,
++  commonDirectory: Schema.String,
++  branch: Schema.NullOr(Schema.String),
++});
++export type TwsExecution = typeof TwsExecution.Type;
++const common = {
++  workspaceBindingId: TwsWorkspaceBindingId,
++  label: Schema.String,
++  complete: Schema.Boolean,
++  requiresConfirmation: Schema.Boolean,
++  presence: Schema.Literals(["present", "missing", "unknown"]),
++  observationId: Schema.NullOr(TwsObservationId),
++  lastConfirmedAt: Schema.NullOr(IsoDateTime),
++  missingObservations: Schema.Array(TwsObservationId),
++};
++export const TwsRecord = Schema.Union([
++  Schema.Struct({
++    ...common,
++    kind: Schema.Literal("workspace"),
++    binding: TwsWorkspaceBinding,
++    execution: Schema.NullOr(TwsExecution),
++    projectIds: Schema.Array(ProjectId),
++    identityKey: Schema.String,
++  }),
++  Schema.Struct({ ...common, kind: Schema.Literal("feature"), binding: TwsFeatureBinding }),
++  Schema.Struct({
++    ...common,
++    kind: Schema.Literal("node"),
++    binding: TwsStackNodeBinding,
++    execution: Schema.NullOr(TwsExecution),
++  }),
++]);
++export type TwsRecord = typeof TwsRecord.Type;
++export const TwsThreadInput = Schema.Struct({
++  threadId: ThreadId,
++  projectId: ProjectId,
++  workspaceRoot: Schema.String,
++  worktreePath: Schema.NullOr(Schema.String),
++  branch: Schema.NullOr(Schema.String),
++  incarnation: Schema.NullOr(Schema.String),
++});
++export type TwsThreadInput = typeof TwsThreadInput.Type;
++export const TwsStoredContext = Schema.Struct({
++  context: TwsThreadContext,
++  choice: TwsContextChoice,
++  incarnation: Schema.String,
++  locationKey: Schema.String,
++});
++export type TwsStoredContext = typeof TwsStoredContext.Type;
++
++export function twsRecordId(record: TwsRecord): string {
++  switch (record.kind) {
++    case "workspace":
++      return record.binding.workspaceBindingId;
++    case "feature":
++      return record.binding.featureBindingId;
++    case "node":
++      return record.binding.stackNodeBindingId;
++  }
++}
++export function twsThreadLocationKey(thread: TwsThreadInput) {
++  return JSON.stringify([
++    thread.projectId,
++    thread.workspaceRoot,
++    thread.worktreePath,
++    thread.branch,
++  ]);
++}
++
++export function twsTopologyEntry(
++  record: TwsRecord,
++  projectIds: ReadonlyArray<ProjectId>,
++): TwsTopologyEntry {
++  return {
++    kind: record.kind,
++    bindingId: twsRecordId(record),
++    workspaceBindingId: record.workspaceBindingId,
++    featureBindingId: record.kind === "workspace" ? null : record.binding.featureBindingId,
++    projectIds: projectIds.slice(0, 100),
++    projectIdsOverflowed: projectIds.length > 100,
++    label: record.label,
++    archived: record.kind === "node" && record.binding.archived,
++    materialized: record.kind === "node" && record.execution !== null,
++    requiresConfirmation: record.requiresConfirmation,
++    complete: record.complete,
++    presence: record.presence,
++    missingObservations: record.missingObservations,
++    observationId: record.observationId,
++    lastConfirmedAt: record.lastConfirmedAt,
++  };
++}
+diff --git a/apps/server/src/tws/TwsContextService.test.ts b/apps/server/src/tws/TwsContextService.test.ts
+new file mode 100644
+index 000000000..6add376b6
+--- /dev/null
++++ b/apps/server/src/tws/TwsContextService.test.ts
+@@ -0,0 +1,605 @@
++import * as NodeServices from "@effect/platform-node/NodeServices";
++import { describe, expect, it } from "@effect/vitest";
++import {
++  EnvironmentId,
++  ThreadId,
++  TwsContextError,
++  type OrchestrationEvent,
++} from "@t3tools/contracts";
++import * as Deferred from "effect/Deferred";
++import * as Context from "effect/Context";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Fiber from "effect/Fiber";
++import * as Layer from "effect/Layer";
++import * as Path from "effect/Path";
++import * as PubSub from "effect/PubSub";
++import * as Schema from "effect/Schema";
++import * as Stream from "effect/Stream";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++import { ServerEnvironment } from "../environment/ServerEnvironment.ts";
++import { OrchestrationEngineService } from "../orchestration/Services/OrchestrationEngine.ts";
++import { TwsBindingRepositoryLive } from "../persistence/Layers/TwsBindings.ts";
++import {
++  SqlitePersistenceMemory,
++  makeSqlitePersistenceLive,
++} from "../persistence/Layers/Sqlite.ts";
++import { ServerSettingsService, layerTest as settingsLayer } from "../serverSettings.ts";
++import { TwsCliAdapter } from "./TwsCliAdapter.ts";
++import { decodeTwsStackStatus, decodeTwsStatus, TwsOutputDecodeError } from "./TwsCliDecoder.ts";
++import { TwsContextService, TwsContextServiceLive } from "./TwsContextService.ts";
++import { TwsContextStore, TwsContextStoreLive } from "./TwsContextStore.ts";
++import { TwsExecutionResolver } from "./TwsExecutionResolver.ts";
++
++const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
++const env = EnvironmentId.make("environment-a");
++const threadId = ThreadId.make("thread-a");
++const date = "2026-09-30T00:00:00Z";
++
++const harness = Effect.fn(function* () {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const sql = yield* SqlClient.SqlClient;
++  const root = yield* fs.makeTempDirectoryScoped();
++  const otherRoot = yield* fs.makeTempDirectoryScoped();
++  const repo = path.join(root, "repo");
++  const checkout = path.join(root, "feature-a");
++  const common = path.join(root, "repo.git");
++  const calls: string[] = [];
++  const controls = {
++    marker: "a".repeat(32),
++    registryPath: root,
++    feature: "feature-a",
++    branch: "feature-a",
++    node: "node",
++    extraFeature: false,
++    stackFails: false,
++    registryFails: false,
++    executionMissing: false,
++    archived: false,
++    partial: false,
++    extraWorkspace: false,
++    manyFeatures: 0,
++    gate: null as Deferred.Deferred<void> | null,
++    entered: null as Deferred.Deferred<void> | null,
++    cancelled: null as Deferred.Deferred<void> | null,
++  };
++  const adapter = TwsCliAdapter.of({
++    probe: () =>
++      Effect.gen(function* () {
++        calls.push("version");
++        if (controls.entered) yield* Deferred.succeed(controls.entered, undefined);
++        if (controls.gate) yield* Deferred.await(controls.gate);
++        return { version: "v1.2.14" as const };
++      }).pipe(
++        Effect.onInterrupt(() =>
++          controls.cancelled ? Deferred.succeed(controls.cancelled, undefined) : Effect.void,
++        ),
++      ),
++    listRegistry: () => Effect.die("Unexpected separate registry scan"),
++    checkRegistry: () =>
++      Effect.gen(function* () {
++        calls.push("registry");
++        if (controls.registryFails)
++          return yield* new TwsOutputDecodeError({
++            command: "registry-check",
++            reason: "invalid-json",
++            detail: "fixture",
++          });
++        const entries = [
++          {
++            entry: {
++              id: "registry-a",
++              path: controls.registryPath,
++              aliases: ["Workspace"],
++              kind: "external-workspace",
++              gitIdentity: "repo",
++              markerId: controls.marker,
++              addedAt: date,
++              updatedAt: date,
++              raw: {},
++            },
++            status: "ok",
++            raw: {},
++          },
++        ];
++        if (controls.extraWorkspace)
++          entries.push({
++            entry: {
++              ...entries[0]!.entry,
++              id: "registry-b",
++              path: otherRoot,
++              markerId: "b".repeat(32),
++            },
++            status: "ok",
++            raw: {},
++          });
++        return entries;
++      }),
++    readStatus: ({ cwd }) => {
++      calls.push("status");
++      const feature = (name: string) => ({
++        feature: name,
++        path: path.join(cwd, "features", name),
++        stack_state: "ok",
++        entries: [{ name: controls.node, git_branch: controls.branch }],
++      });
++      const features = [
++        feature(controls.feature),
++        ...(controls.extraFeature ? [feature("other-feature")] : []),
++        ...Array.from({ length: controls.manyFeatures }, (_, index) => feature(`feature-${index}`)),
++      ];
++      return decodeTwsStatus(
++        encodeJson({
++          schema_version: 1,
++          generated_at: date,
++          workspace: {
++            mode: "external",
++            stable_id: "path-derived-not-identity",
++            repo_root: repo,
++            metadata_root: cwd,
++            degraded: false,
++          },
++          features,
++          issues: [],
++          summary: { features: controls.partial ? 99 : features.length, entries: features.length },
++        }),
++      );
++    },
++    readStackStatus: ({ cwd, feature }) => {
++      calls.push(`stack:${feature}`);
++      if (controls.stackFails && feature === "other-feature")
++        return Effect.fail(
++          new TwsOutputDecodeError({
++            command: "stack-status",
++            reason: "invalid-json",
++            detail: "fixture",
++          }),
++        );
++      return decodeTwsStackStatus(
++        encodeJson({
++          schema_version: 1,
++          feature,
++          workspace: {
++            mode: "external",
++            metadata_root: cwd,
++            repository: { dir: repo },
++            checkout: null,
++          },
++          entries: [
++            {
++              name: controls.node,
++              git_branch: controls.branch,
++              archived: controls.archived,
++              repo: null,
++              ref_exists: true,
++              is_current_checkout: false,
++              materialization: {
++                kind: "worktree",
++                state: controls.archived ? "archived" : "present",
++                path: controls.archived ? null : checkout,
++                checked_out_branch: controls.branch,
++                detached: false,
++              },
++            },
++          ],
++          summary: { entries: 1 },
++        }),
++      );
++    },
++  });
++  const resolver = TwsExecutionResolver.of({
++    resolve: (cwd) =>
++      controls.executionMissing
++        ? Effect.fail(
++            new TwsContextError({ reason: "unavailable", message: "Missing fixture execution" }),
++          )
++        : Effect.succeed({
++            path: cwd,
++            root: cwd,
++            commonDirectory: common,
++            branch: cwd === repo ? "main" : controls.branch,
++          }),
++  });
++  const events = yield* PubSub.unbounded<OrchestrationEvent>();
++  const engine = OrchestrationEngineService.of({
++    dispatch: () => Effect.die("TWS must not dispatch provider or thread operations"),
++    readEvents: () => Stream.die("unused"),
++    readThreadEvents: () => Stream.die("unused"),
++    getThreadReplayStats: () => Effect.die("unused"),
++    latestSequence: Effect.succeed(0),
++    streamDomainEvents: Stream.fromPubSub(events),
++    subscribeDomainEvents: PubSub.subscribe(events).pipe(Effect.map(Stream.fromSubscription)),
++  });
++  yield* sql`INSERT INTO projection_projects(project_id,title,workspace_root,scripts_json,created_at,updated_at)
++    VALUES ('project-a','Project',${repo},'[]',${date},${date})`;
++  yield* sql`INSERT INTO projection_threads(thread_id,project_id,title,branch,worktree_path,created_at,updated_at)
++    VALUES (${threadId},'project-a','Thread',${controls.branch},${checkout},${date},${date})`;
++  yield* sql`INSERT INTO orchestration_events(event_id,aggregate_kind,stream_id,stream_version,event_type,occurred_at,actor_kind,payload_json,metadata_json)
++    VALUES ('thread-created','thread',${threadId},1,'thread.created',${date},'user','{}','{}')`;
++  yield* sql`INSERT INTO orchestration_events(event_id,aggregate_kind,stream_id,stream_version,event_type,occurred_at,actor_kind,payload_json,metadata_json)
++    VALUES ('project-created','project','project-a',1,'project.created',${date},'user','{}','{}')`;
++  const serviceLayer = TwsContextServiceLive.pipe(
++    Layer.provideMerge(settingsLayer()),
++    Layer.provide(TwsContextStoreLive),
++    Layer.provide(TwsBindingRepositoryLive),
++    Layer.provide(Layer.succeed(TwsCliAdapter, adapter)),
++    Layer.provide(Layer.succeed(TwsExecutionResolver, resolver)),
++    Layer.provide(
++      Layer.succeed(ServerEnvironment, {
++        getEnvironmentId: Effect.succeed(env),
++        getDescriptor: Effect.die("unused"),
++      }),
++    ),
++    Layer.provide(Layer.succeed(OrchestrationEngineService, engine)),
++  );
++  const context = yield* Layer.build(serviceLayer);
++  const service = Context.get(context, TwsContextService);
++  const settings = Context.get(context, ServerSettingsService);
++  yield* service.start;
++  const enable = Effect.gen(function* () {
++    yield* settings.updateSettings({ twsIntegrationEnabled: true });
++    yield* service.configure(true);
++  });
++  return {
++    service,
++    settings,
++    enable,
++    calls,
++    controls,
++    root,
++    otherRoot,
++    repo,
++    checkout,
++    sql,
++    events,
++  };
++});
++
++const base = Layer.mergeAll(SqlitePersistenceMemory, NodeServices.layer);
++describe("optional TWS context", () => {
++  it.effect("keeps an explicit clear across a real database close and reopen", () =>
++    Effect.gen(function* () {
++      const fs = yield* FileSystem.FileSystem;
++      const path = yield* Path.Path;
++      const directory = yield* fs.makeTempDirectoryScoped();
++      const persistence = makeSqlitePersistenceLive(path.join(directory, "context.sqlite"));
++      const saved = yield* Effect.scoped(
++        Effect.gen(function* () {
++          const h = yield* harness();
++          yield* h.enable;
++          yield* h.service.refresh();
++          const context = (yield* h.service.getContexts([threadId])).contexts[0]!;
++          return yield* h.service.setContext({
++            threadId,
++            expectedRevision: context.revision,
++            choice: { mode: "none" },
++          });
++        }).pipe(Effect.provide(Layer.fresh(persistence))),
++      );
++      const reopened = yield* Effect.scoped(
++        Effect.gen(function* () {
++          const store = yield* TwsContextStore;
++          return yield* store.contexts(env, [threadId]);
++        }).pipe(Effect.provide(TwsContextStoreLive.pipe(Layer.provide(Layer.fresh(persistence))))),
++      );
++      expect(reopened[0]?.context).toEqual(saved);
++      expect(reopened[0]?.choice).toEqual({ mode: "none" });
++    }).pipe(Effect.provide(NodeServices.layer)),
++  );
++  it.effect(
++    "keeps workspace ambiguity separate from an explicit parent-scoped feature choice",
++    () =>
++      Effect.gen(function* () {
++        const h = yield* harness();
++        h.controls.extraWorkspace = true;
++        yield* h.enable;
++        yield* h.service.refresh();
++        const current = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        expect(current.reason).toBe("ambiguous");
++        const topology = (yield* h.service.query({})).entries;
++        const feature = topology.find((entry) => entry.kind === "feature")!;
++        const selected = yield* h.service.setContext({
++          threadId,
++          expectedRevision: current.revision,
++          choice: {
++            mode: "explicit",
++            workspaceBindingId: feature.workspaceBindingId,
++            featureBindingId: feature.featureBindingId,
++          },
++        });
++        expect(selected.featureBindingId).toBe(feature.featureBindingId);
++        expect(selected.stackNodeBindingId).not.toBeNull();
++      }).pipe(Effect.provide(base)),
++  );
++
++  it.effect(
++    "preserves proven workspace moves but requires reassignment for feature renames and marker conflicts",
++    () =>
++      Effect.gen(function* () {
++        const h = yield* harness();
++        yield* h.enable;
++        yield* h.service.refresh();
++        const initial = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        h.controls.registryPath = h.otherRoot;
++        yield* h.service.refresh();
++        const moved = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        expect(moved.workspaceBindingId).toBe(initial.workspaceBindingId);
++        expect(moved.featureBindingId).toBe(initial.featureBindingId);
++        h.controls.node = "renamed-node";
++        yield* h.service.refresh();
++        yield* h.service.refresh();
++        const renamedNode = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        expect(renamedNode.reason).toBe("source-identity-changed");
++        expect(renamedNode.stackNodeBindingId).toBe(initial.stackNodeBindingId);
++        h.controls.feature = "renamed-feature";
++        yield* h.service.refresh();
++        const renamed = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        expect(renamed.featureBindingId).toBe(initial.featureBindingId);
++        expect(renamed.reason).toBe("source-identity-changed");
++        expect(renamed.freshness).toBe("stale");
++        h.controls.marker = "c".repeat(32);
++        yield* h.service.refresh();
++        const topology = (yield* h.service.query({})).entries;
++        const replacement = topology.find(
++          (entry) => entry.kind === "workspace" && entry.presence === "present",
++        )!;
++        expect(replacement.bindingId).not.toBe(initial.workspaceBindingId);
++        expect(replacement.requiresConfirmation).toBe(true);
++        expect((yield* h.service.getContexts([threadId])).contexts[0]?.workspaceBindingId).toBe(
++          initial.workspaceBindingId,
++        );
++      }).pipe(Effect.provide(base)),
++  );
++
++  it.effect(
++    "returns bounded path-free pages and retains last-known data after failed or truncated scans",
++    () =>
++      Effect.gen(function* () {
++        const h = yield* harness();
++        h.controls.manyFeatures = 110;
++        yield* h.enable;
++        yield* h.service.refresh();
++        const first = yield* h.service.query({ limit: 100 });
++        expect(first.entries.length).toBeLessThanOrEqual(100);
++        expect(new TextEncoder().encode(encodeJson(first)).byteLength).toBeLessThanOrEqual(
++          64 * 1024,
++        );
++        expect(first.nextCursor).not.toBeNull();
++        expect(encodeJson(first)).not.toContain(h.root);
++        const next = yield* h.service.query({ after: first.nextCursor!, limit: 100 });
++        expect(
++          next.entries.every(
++            (entry) => !first.entries.some((old) => old.bindingId === entry.bindingId),
++          ),
++        ).toBe(true);
++        const detail = yield* h.service.provenance(first.entries[0]!.bindingId);
++        expect(detail.locators.length).toBeGreaterThan(0);
++        h.controls.registryFails = true;
++        expect((yield* h.service.refresh()).status).toBe("unavailable");
++        expect((yield* h.service.query({ limit: 100 })).entries.length).toBeGreaterThan(0);
++        expect((yield* h.service.getContexts([threadId])).contexts[0]?.freshness).not.toBe(
++          "confirmed",
++        );
++      }).pipe(Effect.provide(base)),
++  );
++
++  it.effect(
++    "does not let an older refresh overwrite an explicit clear or changed execution location",
++    () =>
++      Effect.gen(function* () {
++        const h = yield* harness();
++        yield* h.enable;
++        yield* h.service.refresh();
++        const initial = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        h.controls.gate = yield* Deferred.make<void>();
++        h.controls.entered = yield* Deferred.make<void>();
++        const running = yield* h.service
++          .refresh()
++          .pipe(Effect.forkScoped({ startImmediately: true }));
++        yield* Deferred.await(h.controls.entered);
++        yield* h.service.setContext({
++          threadId,
++          expectedRevision: initial.revision,
++          choice: { mode: "none" },
++        });
++        yield* Deferred.succeed(h.controls.gate, undefined);
++        yield* Fiber.join(running);
++        expect((yield* h.service.getContexts([threadId])).contexts[0]?.mode).toBe("none");
++        h.controls.gate = yield* Deferred.make<void>();
++        h.controls.entered = yield* Deferred.make<void>();
++        const stale = yield* h.service
++          .refresh()
++          .pipe(Effect.forkScoped({ startImmediately: true }));
++        yield* Deferred.await(h.controls.entered);
++        yield* h.sql`UPDATE projection_threads SET branch = 'changed' WHERE thread_id = ${threadId}`;
++        yield* Deferred.succeed(h.controls.gate, undefined);
++        expect((yield* Fiber.join(stale).pipe(Effect.flip)).reason).toBe("conflict");
++        expect((yield* h.service.state).status).toBe("unavailable");
++      }).pipe(Effect.provide(base)),
++  );
++  it.effect("makes no CLI calls while disabled, including refresh and context requests", () =>
++    Effect.gen(function* () {
++      const h = yield* harness();
++      expect((yield* h.service.query({})).integration.status).toBe("disabled");
++      expect((yield* h.service.getContexts([threadId])).contexts).toEqual([]);
++      expect((yield* h.service.refresh().pipe(Effect.flip)).reason).toBe("disabled");
++      expect(h.calls).toEqual([]);
++    }).pipe(Effect.provide(base)),
++  );
++
++  it.effect(
++    "coalesces simultaneous refreshes, persists exact context and leaves revisions stable on observations",
++    () =>
++      Effect.gen(function* () {
++        const h = yield* harness();
++        h.controls.gate = yield* Deferred.make<void>();
++        h.controls.entered = yield* Deferred.make<void>();
++        yield* h.enable;
++        yield* Deferred.await(h.controls.entered);
++        const first = yield* h.service
++          .refresh()
++          .pipe(Effect.forkScoped({ startImmediately: true }));
++        const second = yield* h.service
++          .refresh()
++          .pipe(Effect.forkScoped({ startImmediately: true }));
++        yield* Deferred.succeed(h.controls.gate, undefined);
++        const a = yield* Fiber.join(first);
++        const b = yield* Fiber.join(second);
++        expect(a.observationId).toBe(b.observationId);
++        expect(h.calls.filter((call) => call === "version")).toHaveLength(1);
++        const before = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        expect(before.freshness).toBe("confirmed");
++        expect(before.stackNodeBindingId).not.toBeNull();
++        yield* h.service.refresh();
++        const after = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        expect(after.revision).toBe(before.revision);
++        expect(after.observationId).not.toBe(before.observationId);
++        expect(after.featureBindingId).toBe(before.featureBindingId);
++      }).pipe(Effect.provide(base)),
++  );
++
++  it.effect(
++    "supports explicit set/clear/auto with conflicts and rejects unrelated membership",
++    () =>
++      Effect.gen(function* () {
++        const h = yield* harness();
++        yield* h.enable;
++        yield* h.service.refresh();
++        const initial = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        const chosen = yield* h.service.setContext({
++          threadId,
++          expectedRevision: initial.revision,
++          choice: {
++            mode: "explicit",
++            workspaceBindingId: initial.workspaceBindingId!,
++            featureBindingId: initial.featureBindingId,
++          },
++        });
++        expect(chosen.mode).toBe("explicit");
++        const cleared = yield* h.service.setContext({
++          threadId,
++          expectedRevision: chosen.revision,
++          choice: { mode: "none" },
++        });
++        yield* h.service.refresh();
++        expect((yield* h.service.getContexts([threadId])).contexts[0]?.mode).toBe("none");
++        expect(
++          (yield* h.service
++            .setContext({ threadId, expectedRevision: chosen.revision, choice: { mode: "auto" } })
++            .pipe(Effect.flip)).reason,
++        ).toBe("conflict");
++        const automatic = yield* h.service.setContext({
++          threadId,
++          expectedRevision: cleared.revision,
++          choice: { mode: "auto" },
++        });
++        expect(automatic.stackNodeBindingId).not.toBeNull();
++        yield* h.sql`UPDATE projection_threads SET project_id = 'missing-project' WHERE thread_id = ${threadId}`;
++        expect(
++          (yield* h.service
++            .setContext({
++              threadId,
++              expectedRevision: automatic.revision,
++              choice: { mode: "none" },
++            })
++            .pipe(Effect.flip)).reason,
++        ).toBe("thread-unavailable");
++      }).pipe(Effect.provide(base)),
++  );
++
++  it.effect(
++    "keeps logical choice on checkout change and prevents an old incarnation from reusing it",
++    () =>
++      Effect.gen(function* () {
++        const h = yield* harness();
++        yield* h.enable;
++        yield* h.service.refresh();
++        const initial = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        const explicit = yield* h.service.setContext({
++          threadId,
++          expectedRevision: initial.revision,
++          choice: {
++            mode: "explicit",
++            workspaceBindingId: initial.workspaceBindingId!,
++            featureBindingId: initial.featureBindingId,
++          },
++        });
++        yield* h.sql`UPDATE projection_threads SET branch = 'elsewhere', worktree_path = ${h.repo} WHERE thread_id = ${threadId}`;
++        const stale = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        expect(stale.featureBindingId).toBe(explicit.featureBindingId);
++        expect(stale.stackNodeBindingId).toBeNull();
++        expect(stale.revision).toBeGreaterThan(explicit.revision);
++        yield* h.sql`INSERT INTO orchestration_events(event_id,aggregate_kind,stream_id,stream_version,event_type,occurred_at,actor_kind,payload_json,metadata_json)
++      VALUES ('recreated','thread',${threadId},2,'thread.created',${date},'user','{}','{}')`;
++        const recreated = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        expect(recreated.revision).toBe(0);
++        expect(recreated.featureBindingId).toBeNull();
++        yield* h.sql`INSERT INTO orchestration_events(event_id,aggregate_kind,stream_id,stream_version,event_type,occurred_at,actor_kind,payload_json,metadata_json)
++          VALUES ('project-recreated','project','project-a',2,'project.created',${date},'user','{}','{}')`;
++        expect((yield* h.service.getContexts([threadId])).contexts[0]?.mode).toBe("auto");
++      }).pipe(Effect.provide(base)),
++  );
++
++  it.effect(
++    "preserves partial positives, rejects ambiguity and never fabricates a node for archived work",
++    () =>
++      Effect.gen(function* () {
++        const h = yield* harness();
++        yield* h.enable;
++        yield* h.service.refresh();
++        const first = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        h.controls.extraFeature = true;
++        yield* h.service.refresh();
++        expect((yield* h.service.getContexts([threadId])).contexts[0]?.reason).toBe("ambiguous");
++        h.controls.stackFails = true;
++        const partial = yield* h.service.refresh();
++        expect(partial.status).toBe("degraded");
++        const rows = (yield* h.service.query({})).entries;
++        expect(
++          rows.some((row) => row.kind === "feature" && row.label === "feature-a" && row.complete),
++        ).toBe(true);
++        expect(rows.some((row) => row.label === "other-feature" && !row.complete)).toBe(true);
++        const current = (yield* h.service.getContexts([threadId])).contexts[0]!;
++        const selected = yield* h.service.setContext({
++          threadId,
++          expectedRevision: current.revision,
++          choice: {
++            mode: "explicit",
++            workspaceBindingId: first.workspaceBindingId!,
++            featureBindingId: first.featureBindingId,
++          },
++        });
++        expect(selected.featureBindingId).toBe(first.featureBindingId);
++        h.controls.archived = true;
++        yield* h.service.refresh();
++        expect(
++          (yield* h.service.getContexts([threadId])).contexts[0]?.stackNodeBindingId,
++        ).toBeNull();
++      }).pipe(Effect.provide(base)),
++  );
++
++  it.effect("cancels an owned scan on disable and requires fresh observation after re-enable", () =>
++    Effect.gen(function* () {
++      const h = yield* harness();
++      yield* h.enable;
++      yield* h.service.refresh();
++      h.controls.gate = yield* Deferred.make<void>();
++      h.controls.entered = yield* Deferred.make<void>();
++      h.controls.cancelled = yield* Deferred.make<void>();
++      const running = yield* h.service
++        .refresh()
++        .pipe(Effect.forkScoped({ startImmediately: true }));
++      yield* Deferred.await(h.controls.entered);
++      yield* h.settings.updateSettings({ twsIntegrationEnabled: false });
++      yield* h.service.configure(false);
++      yield* Deferred.await(h.controls.cancelled);
++      expect((yield* Fiber.join(running).pipe(Effect.flip)).reason).toBe("disabled");
++      expect((yield* h.service.query({})).entries).toEqual([]);
++      h.controls.gate = null;
++      yield* h.enable;
++      yield* h.service.refresh();
++      expect((yield* h.service.getContexts([threadId])).contexts[0]?.freshness).toBe("confirmed");
++    }).pipe(Effect.provide(base)),
++  );
++});
+diff --git a/apps/server/src/tws/TwsContextService.ts b/apps/server/src/tws/TwsContextService.ts
+new file mode 100644
+index 000000000..6be1867f0
+--- /dev/null
++++ b/apps/server/src/tws/TwsContextService.ts
+@@ -0,0 +1,624 @@
++import * as NodeCrypto from "node:crypto";
++import {
++  TwsContextError,
++  TwsObservationId,
++  type TwsContextSetInput,
++  type TwsIntegrationState,
++  TwsTopologyEntry,
++  type TwsTopologyQuery,
++  type TwsThreadContext,
++  type ThreadId,
++} from "@t3tools/contracts";
++import * as Cause from "effect/Cause";
++import * as DateTime from "effect/DateTime";
++import * as Context from "effect/Context";
++import * as Deferred from "effect/Deferred";
++import * as Effect from "effect/Effect";
++import * as Exit from "effect/Exit";
++import * as Fiber from "effect/Fiber";
++import * as FileSystem from "effect/FileSystem";
++import * as Layer from "effect/Layer";
++import * as Option from "effect/Option";
++import * as Path from "effect/Path";
++import * as Queue from "effect/Queue";
++import * as Schema from "effect/Schema";
++import * as Scope from "effect/Scope";
++import * as Semaphore from "effect/Semaphore";
++import * as Stream from "effect/Stream";
++import { ServerEnvironment } from "../environment/ServerEnvironment.ts";
++import { OrchestrationEngineService } from "../orchestration/Services/OrchestrationEngine.ts";
++import { TwsBindingRepository } from "../persistence/Services/TwsBindings.ts";
++import { ServerSettingsService } from "../serverSettings.ts";
++import { collectTwsTopology } from "./TwsTopologyRefresh.ts";
++import { TwsContextStore } from "./TwsContextStore.ts";
++import { TwsExecutionResolver } from "./TwsExecutionResolver.ts";
++import { TwsCliAdapter } from "./TwsCliAdapter.ts";
++import { initialTwsContext, inferTwsContext, invalidateTwsContext } from "./TwsContextInference.ts";
++import { twsThreadLocationKey, twsTopologyEntry, type TwsExecution } from "./TwsContextModel.ts";
++
++const isTwsContextError = Schema.is(TwsContextError);
++const unavailable = (error: unknown) =>
++  isTwsContextError(error)
++    ? error
++    : new TwsContextError({
++        reason: "unavailable",
++        message: "TWS context could not be read or updated.",
++      });
++const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso));
++const encodeEntry = Schema.encodeSync(Schema.fromJsonString(TwsTopologyEntry));
++interface RefreshFlight {
++  readonly receipt: Deferred.Deferred<TwsIntegrationState, TwsContextError>;
++  fiber?: Fiber.Fiber<void, never>;
++}
++
++const make = Effect.gen(function* () {
++  const settings = yield* ServerSettingsService;
++  const environment = yield* ServerEnvironment;
++  const environmentId = yield* environment.getEnvironmentId;
++  const engine = yield* OrchestrationEngineService;
++  const store = yield* TwsContextStore;
++  const bindings = yield* TwsBindingRepository;
++  const resolver = yield* TwsExecutionResolver;
++  const cli = yield* TwsCliAdapter;
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const owner = yield* Scope.Scope;
++  const lock = yield* Semaphore.make(1);
++  const requests = yield* Queue.sliding<void>(1);
++  let enabled = false;
++  let started = false;
++  let flight: RefreshFlight | null = null;
++  let epoch = 0;
++  let readyEpoch = -1;
++  const emptyState = (status: TwsIntegrationState["status"]): TwsIntegrationState => ({
++    environmentId,
++    status,
++    generation: 0,
++    observationId: null,
++    observedAt: null,
++    completeScopes: 0,
++    incompleteScopes: 0,
++  });
++  const ensureEnabled = Effect.gen(function* () {
++    if (!(yield* settings.getSettings).twsIntegrationEnabled)
++      return yield* new TwsContextError({
++        reason: "disabled",
++        message: "TWS integration is disabled for this environment.",
++      });
++  }).pipe(Effect.mapError(unavailable));
++  const state = Effect.gen(function* () {
++    const current = yield* store.readState(environmentId);
++    if (!(yield* settings.getSettings).twsIntegrationEnabled)
++      return { ...(current ?? emptyState("disabled")), status: "disabled" as const };
++    if (current?.status === "unavailable" && flight === null) return current;
++    if (readyEpoch !== epoch)
++      return {
++        ...(current ?? emptyState("unknown")),
++        status: flight ? ("refreshing" as const) : ("unknown" as const),
++        observationId: null,
++      };
++    return current ?? emptyState("unknown");
++  }).pipe(Effect.mapError(unavailable));
++
++  const runRefresh = Effect.gen(function* () {
++    yield* ensureEnabled;
++    const refreshEpoch = epoch;
++    const observationId = TwsObservationId.make(NodeCrypto.randomUUID());
++    const observationTime = yield* nowIso;
++    const observing = yield* store.begin({
++      ...emptyState("refreshing"),
++      observationId,
++      observedAt: observationTime,
++    });
++    const projects = yield* store.projects();
++    const inputs = yield* store.threads();
++    const oldRecords = yield* store.records(environmentId);
++    const collected = yield* collectTwsTopology({
++      environmentId,
++      observationId,
++      observedAt: observationTime,
++      previous: oldRecords,
++      projects,
++    }).pipe(
++      Effect.provideService(TwsCliAdapter, cli),
++      Effect.provideService(TwsBindingRepository, bindings),
++      Effect.provideService(TwsExecutionResolver, resolver),
++      Effect.provideService(FileSystem.FileSystem, fs),
++      Effect.provideService(Path.Path, path),
++    );
++    const completed: TwsIntegrationState = {
++      ...observing,
++      status: collected.status,
++      completeScopes: collected.completeScopes,
++      incompleteScopes: collected.incompleteScopes,
++    };
++    const resolved = new Map<string, TwsExecution | null>();
++    for (const thread of inputs) {
++      if (thread.incarnation === null) continue;
++      const cwd = thread.worktreePath ?? thread.workspaceRoot;
++      if (!resolved.has(cwd))
++        resolved.set(
++          cwd,
++          collected.status === "unavailable"
++            ? null
++            : Option.getOrNull(
++                yield* resolver.resolve(cwd).pipe(
++                  Effect.tapError(() =>
++                    Effect.logWarning("TWS thread execution could not be verified.", {
++                      threadId: thread.threadId,
++                    }),
++                  ),
++                  Effect.option,
++                ),
++              ),
++        );
++    }
++    yield* store.transaction(
++      Effect.gen(function* () {
++        yield* ensureEnabled;
++        yield* store.guard(environmentId, observing.generation);
++        const currentProjects = yield* store.projects();
++        const currentThreads = yield* store.threads();
++        if (
++          refreshEpoch !== epoch ||
++          projects.length !== currentProjects.length ||
++          projects.some(
++            (project, index) =>
++              project.projectId !== currentProjects[index]?.projectId ||
++              project.workspaceRoot !== currentProjects[index]?.workspaceRoot,
++          ) ||
++          inputs.length !== currentThreads.length ||
++          inputs.some((thread, index) => {
++            const current = currentThreads[index];
++            return (
++              !current ||
++              thread.threadId !== current.threadId ||
++              thread.incarnation !== current.incarnation ||
++              twsThreadLocationKey(thread) !== twsThreadLocationKey(current)
++            );
++          })
++        )
++          return yield* new TwsContextError({
++            reason: "conflict",
++            message: "Execution context changed while TWS was refreshing.",
++          });
++        const projectIdsByWorkspace = new Map(
++          collected.records.flatMap((record) =>
++            record.kind === "workspace"
++              ? [[record.workspaceBindingId, record.projectIds] as const]
++              : [],
++          ),
++        );
++        for (const record of collected.records) {
++          switch (record.kind) {
++            case "workspace":
++              yield* bindings.upsertWorkspace({
++                ...record.binding,
++                retiredAt:
++                  record.presence === "missing"
++                    ? (record.binding.retiredAt ?? observationTime)
++                    : record.binding.retiredAt,
++              });
++              if (record.presence === "present") {
++                for (const projectId of record.projectIds)
++                  yield* bindings.upsertWorkspaceProject({
++                    environmentId,
++                    workspaceBindingId: record.workspaceBindingId,
++                    projectId,
++                    firstSeenAt: observationTime,
++                    lastSeenAt: observationTime,
++                    retiredAt: null,
++                  });
++              }
++              break;
++            case "feature":
++              yield* bindings.upsertFeature({
++                ...record.binding,
++                retiredAt:
++                  record.presence === "missing"
++                    ? (record.binding.retiredAt ?? observationTime)
++                    : record.binding.retiredAt,
++              });
++              break;
++            case "node":
++              yield* bindings.upsertStackNode({
++                ...record.binding,
++                retiredAt:
++                  record.presence === "missing"
++                    ? (record.binding.retiredAt ?? observationTime)
++                    : record.binding.retiredAt,
++              });
++              break;
++          }
++          yield* store.writeRecord(
++            environmentId,
++            record,
++            twsTopologyEntry(record, projectIdsByWorkspace.get(record.workspaceBindingId) ?? []),
++          );
++        }
++        const previous = yield* store.contexts(environmentId);
++        const byThread = new Map(previous.map((context) => [context.context.threadId, context]));
++        for (const thread of inputs) {
++          if (!thread.incarnation) continue;
++          yield* store.writeContext(
++            environmentId,
++            inferTwsContext({
++              environmentId,
++              thread,
++              integration: completed,
++              execution: resolved.get(thread.worktreePath ?? thread.workspaceRoot) ?? null,
++              previous: byThread.get(thread.threadId),
++              records: collected.records,
++            }),
++          );
++        }
++        yield* store.removeDeleted(environmentId);
++        yield* store.finish(completed);
++      }),
++    );
++    if (epoch === refreshEpoch) readyEpoch = refreshEpoch;
++    return completed;
++  }).pipe(
++    Effect.tapError((error) => Effect.logWarning("TWS refresh failed.", { error })),
++    Effect.mapError(unavailable),
++  );
++
++  const refresh = Effect.fn("TwsContextService.refresh")(function* () {
++    const receipt = yield* lock.withPermit(
++      Effect.gen(function* () {
++        yield* ensureEnabled;
++        enabled = true;
++        if (flight !== null) return flight.receipt;
++        const active: RefreshFlight = {
++          receipt: yield* Deferred.make<TwsIntegrationState, TwsContextError>(),
++        };
++        flight = active;
++        active.fiber = yield* runRefresh.pipe(
++          Effect.onExit((exit) =>
++            Effect.gen(function* () {
++              if (Exit.isFailure(exit) && flight === active) {
++                yield* store
++                  .transaction(
++                    Effect.gen(function* () {
++                      const current = yield* store.readState(environmentId);
++                      if (flight !== active || current?.status !== "refreshing") return;
++                      yield* store.finish({
++                        ...current,
++                        status: "unavailable",
++                        incompleteScopes: Math.max(1, current.incompleteScopes),
++                      });
++                    }),
++                  )
++                  .pipe(
++                    Effect.catch((error) =>
++                      Effect.logWarning("TWS failed observation could not be recorded.", { error }),
++                    ),
++                  );
++              }
++              if (flight === active) flight = null;
++              if (Exit.isSuccess(exit)) yield* Deferred.succeed(active.receipt, exit.value);
++              else {
++                const error = enabled
++                  ? unavailable(Cause.squash(exit.cause))
++                  : new TwsContextError({
++                      reason: "disabled",
++                      message: "TWS refresh was cancelled because the integration was disabled.",
++                    });
++                yield* Deferred.fail(active.receipt, error);
++              }
++            }),
++          ),
++          Effect.catchCause((cause) =>
++            Cause.hasInterruptsOnly(cause)
++              ? Effect.void
++              : Effect.logWarning("TWS refresh worker stopped.", { cause: Cause.pretty(cause) }),
++          ),
++          Effect.asVoid,
++          Effect.interruptible,
++          Effect.forkIn(owner),
++        );
++        return active.receipt;
++      }),
++    );
++    return yield* Deferred.await(receipt);
++  });
++
++  const invalidate = Effect.fn("TwsContextService.invalidate")(function* (
++    nextEnabled: boolean,
++    force = true,
++  ) {
++    let active: RefreshFlight | null = null;
++    let changed = false;
++    yield* lock
++      .withPermit(
++        Effect.gen(function* () {
++          if (!force && nextEnabled === enabled) return;
++          changed = true;
++          enabled = nextEnabled;
++          epoch++;
++          active = flight;
++          flight = null;
++          yield* store.begin(emptyState(nextEnabled ? "unknown" : "disabled"));
++        }),
++      )
++      .pipe(
++        Effect.ensuring(
++          Effect.suspend(() => (active?.fiber ? Fiber.interrupt(active.fiber) : Effect.void)),
++        ),
++      );
++    if (changed && nextEnabled) yield* Queue.offer(requests, undefined);
++  }, Effect.mapError(unavailable));
++  const configure = Effect.fn("TwsContextService.configure")(function* (nextEnabled: boolean) {
++    yield* invalidate(nextEnabled, false);
++  });
++  const start = Effect.gen(function* () {
++    if (started) return;
++    started = true;
++    const changes = yield* settings.subscribeChanges;
++    const events = yield* engine.subscribeDomainEvents;
++    yield* Stream.fromQueue(requests).pipe(
++      Stream.runForEach(() =>
++        refresh().pipe(
++          Effect.catchTag("TwsContextError", (error) =>
++            Effect.logWarning("TWS requested refresh did not complete.", { reason: error.reason }),
++          ),
++        ),
++      ),
++      Effect.forkIn(owner),
++    );
++    yield* changes.pipe(
++      Stream.runForEach((value) =>
++        configure(value.twsIntegrationEnabled).pipe(
++          Effect.catchTag("TwsContextError", (error) =>
++            Effect.logWarning("TWS integration setting could not be applied.", {
++              reason: error.reason,
++            }),
++          ),
++        ),
++      ),
++      Effect.forkIn(owner),
++    );
++    yield* events.pipe(
++      Stream.runForEach((event) => {
++        if (!enabled) return Effect.void;
++        if (
++          event.type === "thread.created" ||
++          event.type === "thread.deleted" ||
++          event.type === "project.created" ||
++          event.type === "project.deleted" ||
++          (event.type === "thread.meta-updated" &&
++            (event.payload.branch !== undefined || event.payload.worktreePath !== undefined)) ||
++          (event.type === "project.meta-updated" && event.payload.workspaceRoot !== undefined)
++        )
++          return invalidate(true).pipe(
++            Effect.catchTag("TwsContextError", (error) =>
++              Effect.logWarning("TWS context invalidation failed.", { reason: error.reason }),
++            ),
++          );
++        return Effect.void;
++      }),
++      Effect.forkIn(owner),
++    );
++    yield* configure((yield* settings.getSettings).twsIntegrationEnabled);
++  }).pipe(Effect.mapError(unavailable));
++
++  const getContexts = Effect.fn("TwsContextService.getContexts")(function* (
++    threadIds: ReadonlyArray<ThreadId>,
++  ) {
++    const integration = yield* state;
++    if (integration.status === "disabled")
++      return { integration, contexts: [], unavailableThreadIds: [] };
++    return yield* store.transaction(
++      Effect.gen(function* () {
++        const inputs = yield* store.threads(threadIds);
++        const existing = yield* store.contexts(environmentId, threadIds);
++        const contexts: TwsThreadContext[] = [];
++        for (const thread of inputs) {
++          if (!thread.incarnation) continue;
++          const stored = existing.find(
++            (row) =>
++              row.context.threadId === thread.threadId && row.incarnation === thread.incarnation,
++          );
++          if (!stored) {
++            contexts.push(initialTwsContext(environmentId, thread));
++            continue;
++          }
++          const current = invalidateTwsContext(stored, thread);
++          if (current !== stored) yield* store.writeContext(environmentId, current);
++          contexts.push(
++            current.choice.mode !== "none" &&
++              (current.context.observationId !== integration.observationId ||
++                (integration.status !== "ready" && integration.status !== "degraded"))
++              ? {
++                  ...current.context,
++                  freshness:
++                    current.context.lastConfirmedAt === null
++                      ? ("unknown" as const)
++                      : ("stale" as const),
++                  reason:
++                    current.context.freshness === "confirmed"
++                      ? ("source-unavailable" as const)
++                      : current.context.reason,
++                }
++              : current.context,
++          );
++        }
++        return {
++          integration,
++          contexts,
++          unavailableThreadIds: threadIds.filter(
++            (id) => !contexts.some((context) => context.threadId === id),
++          ),
++        };
++      }),
++    );
++  }, Effect.mapError(unavailable));
++
++  const setContext = Effect.fn("TwsContextService.setContext")(
++    function* (input: TwsContextSetInput) {
++      yield* ensureEnabled;
++      const thread = (yield* store.threads([input.threadId]))[0];
++      if (!thread?.incarnation)
++        return yield* new TwsContextError({
++          reason: "thread-unavailable",
++          message: "The owning thread is no longer available.",
++        });
++      if (input.choice.mode !== "none") yield* refresh();
++      const integration = yield* state;
++      const records = yield* store.records(environmentId);
++      if (input.choice.mode === "explicit") {
++        const choice = input.choice;
++        const workspace = records.find(
++          (record) =>
++            record.kind === "workspace" &&
++            record.workspaceBindingId === choice.workspaceBindingId &&
++            record.presence === "present" &&
++            record.observationId === integration.observationId &&
++            record.projectIds.includes(thread.projectId),
++        );
++        const feature =
++          choice.featureBindingId === null
++            ? null
++            : records.find(
++                (record) =>
++                  record.kind === "feature" &&
++                  record.binding.featureBindingId === choice.featureBindingId &&
++                  record.workspaceBindingId === choice.workspaceBindingId &&
++                  record.complete &&
++                  record.presence === "present" &&
++                  record.observationId === integration.observationId,
++              );
++        if (
++          (integration.status !== "ready" && integration.status !== "degraded") ||
++          integration.observationId === null ||
++          !workspace ||
++          (choice.featureBindingId !== null && !feature)
++        )
++          return yield* new TwsContextError({
++            reason: "invalid-selection",
++            message: "Choose a currently verified workspace and feature belonging to this project.",
++          });
++      }
++      const execution =
++        input.choice.mode === "none"
++          ? null
++          : Option.getOrNull(
++              yield* resolver.resolve(thread.worktreePath ?? thread.workspaceRoot).pipe(
++                Effect.tapError(() =>
++                  Effect.logWarning("TWS context choice has no verified execution node.", {
++                    threadId: thread.threadId,
++                  }),
++                ),
++                Effect.option,
++              ),
++            );
++      return yield* store.transaction(
++        Effect.gen(function* () {
++          yield* ensureEnabled;
++          yield* store.guard(environmentId, integration.generation);
++          const currentThread = (yield* store.threads([input.threadId]))[0];
++          if (
++            !currentThread ||
++            currentThread.incarnation !== thread.incarnation ||
++            twsThreadLocationKey(currentThread) !== twsThreadLocationKey(thread)
++          )
++            return yield* new TwsContextError({
++              reason: "conflict",
++              message: "The thread execution location changed; reload its context.",
++            });
++          const previous = (yield* store.contexts(environmentId, [thread.threadId])).find(
++            (row) => row.incarnation === thread.incarnation,
++          );
++          const current = previous ? invalidateTwsContext(previous, thread) : undefined;
++          if ((current?.context.revision ?? 0) !== input.expectedRevision)
++            return yield* new TwsContextError({
++              reason: "conflict",
++              message: "TWS context changed; reload it before applying this choice.",
++            });
++          const next = inferTwsContext({
++            environmentId,
++            thread,
++            records,
++            execution,
++            integration,
++            previous: current,
++            choice: input.choice,
++          });
++          yield* store.writeContext(environmentId, next);
++          return next.context;
++        }),
++      );
++    },
++    Effect.tapError((error) => Effect.logWarning("TWS context choice rejected.", { error })),
++    Effect.mapError(unavailable),
++  );
++
++  const query = Effect.fn("TwsContextService.query")(function* (input: TwsTopologyQuery) {
++    const integration = yield* state;
++    if (integration.status === "disabled") return { integration, entries: [], nextCursor: null };
++    if (
++      input.workspaceBindingId &&
++      (yield* store.record(environmentId, input.workspaceBindingId))?.kind !== "workspace"
++    )
++      return yield* new TwsContextError({
++        reason: "invalid-selection",
++        message: "That TWS workspace is not known in this environment.",
++      });
++    if (input.featureBindingId) {
++      const feature = yield* store.record(environmentId, input.featureBindingId);
++      if (
++        feature?.kind !== "feature" ||
++        (input.workspaceBindingId && feature.workspaceBindingId !== input.workspaceBindingId)
++      )
++        return yield* new TwsContextError({
++          reason: "invalid-selection",
++          message: "That TWS feature does not belong to the selected workspace.",
++        });
++    }
++    const entries = (yield* store.page(environmentId, input)).map((entry) =>
++      entry.observationId === integration.observationId &&
++      (integration.status === "ready" || integration.status === "degraded")
++        ? entry
++        : { ...entry, complete: false, presence: "unknown" as const },
++    );
++    const page: TwsTopologyEntry[] = [];
++    let bytes = 0;
++    for (const entry of entries) {
++      const size = new TextEncoder().encode(encodeEntry(entry)).byteLength;
++      if (size > 60 * 1024)
++        return yield* new TwsContextError({
++          reason: "unavailable",
++          message: "A TWS topology row exceeds the bounded response size.",
++        });
++      if (page.length >= (input.limit ?? 50) || bytes + size > 60 * 1024) break;
++      page.push(entry);
++      bytes += size;
++    }
++    return {
++      integration,
++      entries: page,
++      nextCursor: entries.length > page.length ? (page.at(-1)?.bindingId ?? null) : null,
++    };
++  }, Effect.mapError(unavailable));
++  const provenance = Effect.fn("TwsContextService.provenance")(function* (bindingId: string) {
++    yield* ensureEnabled;
++    const record = yield* store.record(environmentId, bindingId);
++    if (!record)
++      return yield* new TwsContextError({
++        reason: "invalid-selection",
++        message: "That TWS binding is not known in this environment.",
++      });
++    return {
++      bindingId,
++      canonicalLocator: record.binding.canonicalLocator,
++      locators: record.binding.locators,
++    };
++  }, Effect.mapError(unavailable));
++  return { start, refresh, configure, state, getContexts, setContext, query, provenance };
++});
++
++export class TwsContextService extends Context.Service<
++  TwsContextService,
++  Effect.Success<typeof make>
++>()("t3/tws/TwsContextService") {}
++export const TwsContextServiceLive = Layer.effect(TwsContextService, make);
+diff --git a/apps/server/src/tws/TwsContextStore.ts b/apps/server/src/tws/TwsContextStore.ts
+new file mode 100644
+index 000000000..8334de44f
+--- /dev/null
++++ b/apps/server/src/tws/TwsContextStore.ts
+@@ -0,0 +1,206 @@
++import {
++  EnvironmentId,
++  ProjectId,
++  TwsContextError,
++  TwsIntegrationState,
++  TwsTopologyEntry,
++  type ThreadId,
++  type TwsTopologyQuery,
++} from "@t3tools/contracts";
++import * as Context from "effect/Context";
++import * as Effect from "effect/Effect";
++import * as Layer from "effect/Layer";
++import * as Schema from "effect/Schema";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++import { toPersistenceDecodeError } from "../persistence/Errors.ts";
++import { TwsRecord, TwsStoredContext, TwsThreadInput, twsRecordId } from "./TwsContextModel.ts";
++
++const decodeStates = Schema.decodeUnknownEffect(
++  Schema.Array(Schema.Struct({ data: Schema.fromJsonString(TwsIntegrationState) })),
++);
++const decodeRecords = Schema.decodeUnknownEffect(
++  Schema.Array(Schema.Struct({ data: Schema.fromJsonString(TwsRecord) })),
++);
++const decodeContexts = Schema.decodeUnknownEffect(
++  Schema.Array(Schema.Struct({ data: Schema.fromJsonString(TwsStoredContext) })),
++);
++const decodeThreads = Schema.decodeUnknownEffect(Schema.Array(TwsThreadInput));
++const decodeProjects = Schema.decodeUnknownEffect(
++  Schema.Array(Schema.Struct({ projectId: ProjectId, workspaceRoot: Schema.String })),
++);
++const decodeGeneration = Schema.decodeUnknownEffect(
++  Schema.Array(Schema.Struct({ generation: Schema.Number })),
++);
++const encodeState = Schema.encodeEffect(Schema.fromJsonString(TwsIntegrationState));
++const encodeRecord = Schema.encodeEffect(Schema.fromJsonString(TwsRecord));
++const encodeContext = Schema.encodeEffect(Schema.fromJsonString(TwsStoredContext));
++const encodeSummary = Schema.encodeEffect(Schema.fromJsonString(TwsTopologyEntry));
++const decodeSummaries = Schema.decodeUnknownEffect(
++  Schema.Array(Schema.Struct({ data: Schema.fromJsonString(TwsTopologyEntry) })),
++);
++
++const make = Effect.gen(function* () {
++  const sql = yield* SqlClient.SqlClient;
++  const readState = Effect.fn("TwsContextStore.readState")(function* (
++    environmentId: EnvironmentId,
++  ) {
++    const rows =
++      yield* sql`SELECT data_json AS data FROM tws_context_observations WHERE environment_id = ${environmentId}`;
++    return (
++      (yield* decodeStates(rows).pipe(
++        Effect.mapError(toPersistenceDecodeError("TwsContextStore.readState")),
++      ))[0]?.data ?? null
++    );
++  });
++  const records = Effect.fn("TwsContextStore.records")(function* (environmentId: EnvironmentId) {
++    const rows =
++      yield* sql`SELECT data_json AS data FROM tws_context_topology WHERE environment_id = ${environmentId} ORDER BY binding_id`;
++    return (yield* decodeRecords(rows).pipe(
++      Effect.mapError(toPersistenceDecodeError("TwsContextStore.records")),
++    )).map((row) => row.data);
++  });
++  const contexts = Effect.fn("TwsContextStore.contexts")(function* (
++    environmentId: EnvironmentId,
++    ids?: ReadonlyArray<ThreadId>,
++  ) {
++    const rows =
++      yield* sql`SELECT data_json AS data FROM tws_thread_contexts WHERE environment_id = ${environmentId}
++      AND ${ids === undefined ? sql`1 = 1` : sql.in("thread_id", ids)}`;
++    return (yield* decodeContexts(rows).pipe(
++      Effect.mapError(toPersistenceDecodeError("TwsContextStore.contexts")),
++    )).map((row) => row.data);
++  });
++  const record = Effect.fn("TwsContextStore.record")(function* (
++    environmentId: EnvironmentId,
++    bindingId: string,
++  ) {
++    const rows = yield* sql`SELECT data_json AS data FROM tws_context_topology
++      WHERE environment_id = ${environmentId} AND binding_id = ${bindingId}`;
++    return (
++      (yield* decodeRecords(rows).pipe(
++        Effect.mapError(toPersistenceDecodeError("TwsContextStore.record")),
++      ))[0]?.data ?? null
++    );
++  });
++  const page = Effect.fn("TwsContextStore.page")(function* (
++    environmentId: EnvironmentId,
++    query: TwsTopologyQuery,
++  ) {
++    const rows =
++      yield* sql`SELECT summary_json AS data FROM tws_context_topology WHERE environment_id = ${environmentId}
++      AND ${query.workspaceBindingId ? sql`workspace_binding_id = ${query.workspaceBindingId}` : sql`1 = 1`}
++      AND ${query.featureBindingId ? sql`feature_binding_id = ${query.featureBindingId}` : sql`1 = 1`}
++      AND ${query.after ? sql`binding_id > ${query.after}` : sql`1 = 1`}
++      ORDER BY binding_id LIMIT ${(query.limit ?? 50) + 1}`;
++    return (yield* decodeSummaries(rows).pipe(
++      Effect.mapError(toPersistenceDecodeError("TwsContextStore.page")),
++    )).map((row) => row.data);
++  });
++  const threads = Effect.fn("TwsContextStore.threads")(function* (ids?: ReadonlyArray<ThreadId>) {
++    const rows = yield* sql`
++      SELECT t.thread_id AS threadId, t.project_id AS projectId, p.workspace_root AS workspaceRoot,
++        t.worktree_path AS worktreePath, t.branch,
++        CASE WHEN te.event_id IS NULL OR pe.event_id IS NULL THEN NULL
++          ELSE json_array(te.event_id, pe.event_id) END AS incarnation
++      FROM projection_threads t JOIN projection_projects p ON p.project_id = t.project_id
++      LEFT JOIN orchestration_events te ON te.sequence = (
++        SELECT sequence FROM orchestration_events WHERE aggregate_kind = 'thread' AND stream_id = t.thread_id
++          AND event_type = 'thread.created' ORDER BY sequence DESC LIMIT 1)
++      LEFT JOIN orchestration_events pe ON pe.sequence = (
++        SELECT sequence FROM orchestration_events WHERE aggregate_kind = 'project' AND stream_id = p.project_id
++          AND event_type = 'project.created' ORDER BY sequence DESC LIMIT 1)
++      WHERE t.deleted_at IS NULL AND p.deleted_at IS NULL
++        AND ${ids === undefined ? sql`1 = 1` : sql.in("t.thread_id", ids)}
++      ORDER BY t.thread_id
++    `;
++    return yield* decodeThreads(rows).pipe(
++      Effect.mapError(toPersistenceDecodeError("TwsContextStore.threads")),
++    );
++  });
++  const projects = Effect.fn("TwsContextStore.projects")(function* () {
++    const rows = yield* sql`SELECT project_id AS projectId, workspace_root AS workspaceRoot
++      FROM projection_projects WHERE deleted_at IS NULL ORDER BY project_id`;
++    return yield* decodeProjects(rows).pipe(
++      Effect.mapError(toPersistenceDecodeError("TwsContextStore.projects")),
++    );
++  });
++  const begin = Effect.fn("TwsContextStore.begin")(function* (state: TwsIntegrationState) {
++    return yield* sql.withTransaction(
++      Effect.gen(function* () {
++        const rows =
++          yield* sql`INSERT INTO tws_context_observations(environment_id, generation, data_json)
++        VALUES (${state.environmentId}, 1, ${yield* encodeState(state)})
++        ON CONFLICT(environment_id) DO UPDATE SET generation = generation + 1
++        RETURNING generation`;
++        const generation = (yield* decodeGeneration(rows))[0]?.generation;
++        if (generation === undefined)
++          return yield* new TwsContextError({
++            reason: "unavailable",
++            message: "TWS observation generation was not allocated.",
++          });
++        const next = { ...state, generation };
++        yield* sql`UPDATE tws_context_observations SET data_json = ${yield* encodeState(next)} WHERE environment_id = ${state.environmentId}`;
++        return next;
++      }),
++    );
++  });
++  const guard = Effect.fn("TwsContextStore.guard")(function* (
++    environmentId: EnvironmentId,
++    generation: number,
++  ) {
++    const current = yield* readState(environmentId);
++    if (current?.generation !== generation)
++      return yield* new TwsContextError({
++        reason: "conflict",
++        message: "A newer TWS observation superseded this refresh.",
++      });
++  });
++  const writeRecord = Effect.fn(function* (
++    environmentId: EnvironmentId,
++    record: TwsRecord,
++    summary: TwsTopologyEntry,
++  ) {
++    yield* sql`INSERT INTO tws_context_topology(environment_id, binding_id, workspace_binding_id, feature_binding_id, summary_json, data_json)
++      VALUES (${environmentId}, ${twsRecordId(record)}, ${record.workspaceBindingId}, ${summary.featureBindingId},
++        ${yield* encodeSummary(summary)}, ${yield* encodeRecord(record)})
++      ON CONFLICT(environment_id, binding_id) DO UPDATE SET workspace_binding_id = excluded.workspace_binding_id,
++        feature_binding_id = excluded.feature_binding_id, summary_json = excluded.summary_json, data_json = excluded.data_json`;
++  });
++  const writeContext = Effect.fn(function* (
++    environmentId: EnvironmentId,
++    context: TwsStoredContext,
++  ) {
++    yield* sql`INSERT INTO tws_thread_contexts(environment_id, thread_id, data_json)
++      VALUES (${environmentId}, ${context.context.threadId}, ${yield* encodeContext(context)})
++      ON CONFLICT(environment_id, thread_id) DO UPDATE SET data_json = excluded.data_json`;
++  });
++  const finish = Effect.fn(function* (state: TwsIntegrationState) {
++    yield* sql`UPDATE tws_context_observations SET data_json = ${yield* encodeState(state)}
++      WHERE environment_id = ${state.environmentId} AND generation = ${state.generation}`;
++  });
++  const removeDeleted = (environmentId: EnvironmentId) =>
++    sql`DELETE FROM tws_thread_contexts WHERE environment_id = ${environmentId} AND thread_id NOT IN
++      (SELECT t.thread_id FROM projection_threads t JOIN projection_projects p ON p.project_id=t.project_id
++       WHERE t.deleted_at IS NULL AND p.deleted_at IS NULL)`.pipe(Effect.asVoid);
++  return {
++    readState,
++    records,
++    record,
++    page,
++    contexts,
++    threads,
++    projects,
++    begin,
++    guard,
++    writeRecord,
++    writeContext,
++    finish,
++    removeDeleted,
++    transaction: sql.withTransaction,
++  };
++});
++export class TwsContextStore extends Context.Service<
++  TwsContextStore,
++  Effect.Success<typeof make>
++>()("t3/tws/TwsContextStore") {}
++export const TwsContextStoreLive = Layer.effect(TwsContextStore, make);
+diff --git a/apps/server/src/tws/TwsExecutionResolver.ts b/apps/server/src/tws/TwsExecutionResolver.ts
+new file mode 100644
+index 000000000..dd5d2e342
+--- /dev/null
++++ b/apps/server/src/tws/TwsExecutionResolver.ts
+@@ -0,0 +1,67 @@
++import { TwsContextError } from "@t3tools/contracts";
++import * as Context from "effect/Context";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Layer from "effect/Layer";
++import { ProcessRunner } from "../processRunner.ts";
++import type { TwsExecution } from "./TwsContextModel.ts";
++
++export class TwsExecutionResolver extends Context.Service<
++  TwsExecutionResolver,
++  {
++    readonly resolve: (path: string) => Effect.Effect<TwsExecution, TwsContextError>;
++  }
++>()("t3/tws/TwsExecutionResolver") {}
++
++export const TwsExecutionResolverLive = Layer.effect(
++  TwsExecutionResolver,
++  Effect.gen(function* () {
++    const runner = yield* ProcessRunner;
++    const fs = yield* FileSystem.FileSystem;
++    const resolve = Effect.fn("TwsExecutionResolver.resolve")(
++      function* (path: string) {
++        const realPath = yield* fs.realPath(path);
++        const run = (args: ReadonlyArray<string>) =>
++          runner.run({
++            command: "git",
++            args: ["-C", realPath, ...args],
++            timeout: "10 seconds",
++            maxOutputBytes: 16 * 1024,
++          });
++        const top = yield* run(["rev-parse", "--path-format=absolute", "--show-toplevel"]);
++        const common = yield* run(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
++        const branch = yield* run(["symbolic-ref", "--quiet", "--short", "HEAD"]);
++        if (
++          top.code !== 0 ||
++          common.code !== 0 ||
++          (branch.code !== 0 && branch.code !== 1) ||
++          top.stdoutInvalidUtf8 ||
++          common.stdoutInvalidUtf8 ||
++          branch.stdoutInvalidUtf8 ||
++          top.stdoutTruncated ||
++          common.stdoutTruncated ||
++          branch.stdoutTruncated
++        )
++          return yield* new TwsContextError({
++            reason: "unavailable",
++            message: "The owning environment could not verify the Git execution location.",
++          });
++        const stripLineEnding = (value: string) => value.replace(/\r?\n$/, "");
++        return {
++          path: realPath,
++          root: yield* fs.realPath(stripLineEnding(top.stdout)),
++          commonDirectory: yield* fs.realPath(stripLineEnding(common.stdout)),
++          branch: branch.code === 0 ? stripLineEnding(branch.stdout) : null,
++        } satisfies TwsExecution;
++      },
++      Effect.mapError(
++        () =>
++          new TwsContextError({
++            reason: "unavailable",
++            message: "The owning environment could not verify the Git execution location.",
++          }),
++      ),
++    );
++    return TwsExecutionResolver.of({ resolve });
++  }),
++);
+diff --git a/apps/server/src/tws/TwsTopology.test.ts b/apps/server/src/tws/TwsTopology.test.ts
+new file mode 100644
+index 000000000..54c047115
+--- /dev/null
++++ b/apps/server/src/tws/TwsTopology.test.ts
+@@ -0,0 +1,124 @@
++import { describe, expect, it } from "@effect/vitest";
++import * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
++import { decodeTwsStackStatus, decodeTwsStatus } from "./TwsCliDecoder.ts";
++import { normalizeTwsStack, normalizeTwsStatus } from "./TwsTopology.ts";
++
++const encode = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
++const feature = {
++  feature: "feature",
++  path: "/repo/.tws/features/feature",
++  stack_state: "ok",
++  entries: [{ name: "node", git_branch: "feature/node" }],
++};
++const status = {
++  schema_version: 1,
++  generated_at: "2026-09-30T00:00:00Z",
++  workspace: { mode: "checkout", repo_root: "/repo", metadata_root: "/repo/.tws", degraded: false },
++  features: [feature],
++  issues: [],
++  summary: { features: 1, entries: 1 },
++};
++const stack = {
++  schema_version: 1,
++  feature: "feature",
++  workspace: {
++    mode: "checkout",
++    metadata_root: "/repo/.tws",
++    repository: { dir: "/repo" },
++    checkout: { path: "/repo", branch: "feature/node", detached: false },
++  },
++  entries: [
++    {
++      name: "node",
++      git_branch: "feature/node",
++      archived: false,
++      repo: null,
++      ref_exists: true,
++      is_current_checkout: true,
++      materialization: {
++        kind: "ref",
++        state: "present",
++        path: null,
++        checked_out_branch: null,
++        detached: null,
++      },
++    },
++  ],
++  summary: { entries: 1 },
++};
++describe("public TWS topology normalization", () => {
++  it.effect("requires an exact current checkout, never a branch or agent-state hint alone", () =>
++    Effect.gen(function* () {
++      const workspace = normalizeTwsStatus(yield* decodeTwsStatus(encode(status)))!;
++      const report = yield* decodeTwsStackStatus(encode(stack));
++      expect(normalizeTwsStack(workspace, workspace.features[0]!, report)?.[0]?.executionPath).toBe(
++        "/repo",
++      );
++      for (const patch of [
++        { is_current_checkout: false, agent_state: "working" },
++        { archived: true },
++        { repo: "another-repository" },
++        { ref_exists: null },
++      ]) {
++        const changed = yield* decodeTwsStackStatus(
++          encode({ ...stack, entries: [{ ...stack.entries[0], ...patch }] }),
++        );
++        expect(
++          normalizeTwsStack(workspace, workspace.features[0]!, changed)?.[0]?.executionPath,
++        ).toBeNull();
++      }
++    }),
++  );
++  it.effect("rejects cross-scope, changed and partially decoded stack reports", () =>
++    Effect.gen(function* () {
++      const workspace = normalizeTwsStatus(yield* decodeTwsStatus(encode(status)))!;
++      for (const changed of [
++        { ...stack, feature: "other" },
++        { ...stack, summary: { entries: 100 } },
++        { ...stack, workspace: { ...stack.workspace, metadata_root: "/other" } },
++        { ...stack, entries: [{ ...stack.entries[0], git_branch: "other" }] },
++        { ...stack, entries: [{ ...stack.entries[0], materialization: { kind: "ref" } }] },
++      ]) {
++        expect(
++          normalizeTwsStack(
++            workspace,
++            workspace.features[0]!,
++            yield* decodeTwsStackStatus(encode(changed)),
++          ),
++        ).toBeNull();
++      }
++    }),
++  );
++  it.effect(
++    "distinguishes complete scopes from missing fields, duplicate names and count truncation",
++    () =>
++      Effect.gen(function* () {
++        for (const raw of [
++          { ...status, summary: { features: 2, entries: 1 } },
++          { ...status, features: [feature, feature], summary: { features: 2, entries: 2 } },
++          {
++            ...status,
++            features: [feature, { feature: "bad" }],
++            summary: { features: 2, entries: 1 },
++          },
++        ]) {
++          const parsed = normalizeTwsStatus(yield* decodeTwsStatus(encode(raw)))!;
++          expect(parsed.complete).toBe(false);
++        }
++        const duplicated = normalizeTwsStatus(
++          yield* decodeTwsStatus(
++            encode({
++              ...status,
++              features: [feature, feature],
++              summary: { features: 2, entries: 2 },
++            }),
++          ),
++        )!;
++        expect(duplicated.features[0]?.complete).toBe(false);
++        expect(
++          normalizeTwsStatus(yield* decodeTwsStatus(encode({ ...status, workspace: {} }))),
++        ).toBeNull();
++      }),
++  );
++});
+diff --git a/apps/server/src/tws/TwsTopology.ts b/apps/server/src/tws/TwsTopology.ts
+new file mode 100644
+index 000000000..8fdb0580a
+--- /dev/null
++++ b/apps/server/src/tws/TwsTopology.ts
+@@ -0,0 +1,183 @@
++import * as Schema from "effect/Schema";
++import * as Option from "effect/Option";
++import type { TwsStackStatusReport, TwsStatusReport } from "./TwsCliDecoder.ts";
++
++const Label = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256));
++const LocalPath = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096));
++const StatusEnvelope = Schema.Struct({
++  schema_version: Schema.Literal(1),
++  workspace: Schema.Struct({
++    mode: Schema.Literals(["checkout", "external"]),
++    repo_root: Schema.NullOr(LocalPath),
++    metadata_root: LocalPath,
++    degraded: Schema.Boolean,
++  }),
++  features: Schema.Array(Schema.Unknown),
++  summary: Schema.Struct({ features: Schema.Int, entries: Schema.Int }),
++});
++const Feature = Schema.Struct({
++  feature: Label,
++  path: LocalPath,
++  stack_state: Schema.String,
++  entries: Schema.Array(Schema.Struct({ name: Label, git_branch: Label })),
++});
++const StackEnvelope = Schema.Struct({
++  schema_version: Schema.Literal(1),
++  feature: Label,
++  workspace: Schema.Struct({
++    mode: Schema.Literals(["checkout", "external"]),
++    metadata_root: LocalPath,
++    repository: Schema.Struct({ dir: Schema.NullOr(LocalPath) }),
++    checkout: Schema.NullOr(
++      Schema.Struct({
++        path: Schema.NullOr(LocalPath),
++        branch: Schema.NullOr(Label),
++        detached: Schema.NullOr(Schema.Boolean),
++      }),
++    ),
++  }),
++  entries: Schema.Array(
++    Schema.Struct({
++      name: Label,
++      git_branch: Label,
++      archived: Schema.Boolean,
++      repo: Schema.NullOr(Label),
++      ref_exists: Schema.NullOr(Schema.Boolean),
++      is_current_checkout: Schema.NullOr(Schema.Boolean),
++      materialization: Schema.Struct({
++        kind: Schema.Literals(["ref", "worktree"]),
++        state: Schema.Literals([
++          "present",
++          "archived",
++          "missing",
++          "prunable-missing",
++          "cross-repo-unsupported",
++          "unknown",
++        ]),
++        path: Schema.NullOr(LocalPath),
++        checked_out_branch: Schema.NullOr(Label),
++        detached: Schema.NullOr(Schema.Boolean),
++      }),
++    }),
++  ),
++  summary: Schema.Struct({ entries: Schema.Int }),
++});
++const decodeStatus = Schema.decodeUnknownOption(StatusEnvelope);
++const decodeFeature = Schema.decodeUnknownOption(Feature);
++const decodeStack = Schema.decodeUnknownOption(StackEnvelope);
++
++export interface TwsFeatureObservation {
++  readonly name: string;
++  readonly path: string;
++  readonly entries: ReadonlyArray<{ readonly name: string; readonly gitBranch: string }>;
++  readonly complete: boolean;
++}
++export interface TwsWorkspaceObservation {
++  readonly mode: "checkout" | "external";
++  readonly repoRoot: string | null;
++  readonly metadataRoot: string;
++  readonly features: ReadonlyArray<TwsFeatureObservation>;
++  readonly complete: boolean;
++}
++export interface TwsNodeObservation {
++  readonly name: string;
++  readonly gitBranch: string;
++  readonly archived: boolean;
++  readonly executionPath: string | null;
++}
++
++/** Normalize only public association fields; runtime/agent status never establishes context. */
++export function normalizeTwsStatus(report: TwsStatusReport): TwsWorkspaceObservation | null {
++  const decoded = decodeStatus(report.raw);
++  if (Option.isNone(decoded)) return null;
++  const value = decoded.value;
++  const features: TwsFeatureObservation[] = [];
++  let complete = !value.workspace.degraded && value.summary.features === value.features.length;
++  let entries = 0;
++  const names = new Set<string>();
++  const duplicates = new Set<string>();
++  for (const raw of value.features) {
++    const parsed = decodeFeature(raw);
++    if (Option.isNone(parsed)) {
++      complete = false;
++      continue;
++    }
++    const feature = parsed.value;
++    entries += feature.entries.length;
++    if (names.has(feature.feature)) {
++      complete = false;
++      duplicates.add(feature.feature);
++      continue;
++    }
++    names.add(feature.feature);
++    features.push({
++      name: feature.feature,
++      path: feature.path,
++      entries: feature.entries.map((entry) => ({ name: entry.name, gitBranch: entry.git_branch })),
++      complete:
++        feature.stack_state === "ok" &&
++        new Set(feature.entries.map((entry) => entry.name)).size === feature.entries.length,
++    });
++  }
++  return {
++    mode: value.workspace.mode,
++    repoRoot: value.workspace.repo_root,
++    metadataRoot: value.workspace.metadata_root,
++    features: features.map((feature) =>
++      duplicates.has(feature.name) ? { ...feature, complete: false } : feature,
++    ),
++    complete: complete && entries === value.summary.entries,
++  };
++}
++
++export function normalizeTwsStack(
++  workspace: TwsWorkspaceObservation,
++  feature: TwsFeatureObservation,
++  report: TwsStackStatusReport,
++): ReadonlyArray<TwsNodeObservation> | null {
++  const decoded = decodeStack(report.raw);
++  if (Option.isNone(decoded) || !feature.complete) return null;
++  const value = decoded.value;
++  if (
++    value.feature !== feature.name ||
++    value.workspace.mode !== workspace.mode ||
++    value.workspace.metadata_root !== workspace.metadataRoot ||
++    value.workspace.repository.dir !== workspace.repoRoot ||
++    value.summary.entries !== value.entries.length ||
++    value.entries.length !== feature.entries.length ||
++    new Set(value.entries.map((entry) => entry.name)).size !== value.entries.length
++  )
++    return null;
++  const expected = new Map(feature.entries.map((entry) => [entry.name, entry.gitBranch]));
++  if (value.entries.some((entry) => expected.get(entry.name) !== entry.git_branch)) return null;
++  return value.entries.map((entry) => {
++    const materialization = entry.materialization;
++    let executionPath: string | null = null;
++    if (
++      !entry.archived &&
++      entry.repo === null &&
++      entry.ref_exists === true &&
++      materialization.state === "present"
++    ) {
++      if (
++        materialization.kind === "worktree" &&
++        materialization.detached === false &&
++        materialization.checked_out_branch === entry.git_branch
++      )
++        executionPath = materialization.path;
++      if (
++        materialization.kind === "ref" &&
++        entry.is_current_checkout === true &&
++        value.workspace.checkout?.detached === false &&
++        value.workspace.checkout.branch === entry.git_branch
++      )
++        executionPath = value.workspace.checkout.path;
++    }
++    return {
++      name: entry.name,
++      gitBranch: entry.git_branch,
++      archived: entry.archived,
++      executionPath,
++    };
++  });
++}
+diff --git a/apps/server/src/tws/TwsTopologyRefresh.ts b/apps/server/src/tws/TwsTopologyRefresh.ts
+new file mode 100644
+index 000000000..ce2e80d40
+--- /dev/null
++++ b/apps/server/src/tws/TwsTopologyRefresh.ts
+@@ -0,0 +1,435 @@
++import * as NodeCrypto from "node:crypto";
++import {
++  TwsContextError,
++  TwsFeatureBindingId,
++  TwsStackNodeBindingId,
++  TwsWorkspaceBindingId,
++  type EnvironmentId,
++  type ProjectId,
++  type TwsObservationId,
++  type TwsWorkspaceBinding,
++} from "@t3tools/contracts";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Option from "effect/Option";
++import * as Path from "effect/Path";
++import * as Schema from "effect/Schema";
++import { TwsBindingRepository } from "../persistence/Services/TwsBindings.ts";
++import { TwsCliAdapter } from "./TwsCliAdapter.ts";
++import { TwsExecutionResolver } from "./TwsExecutionResolver.ts";
++import { mergeTwsLocators } from "./TwsBindingMatch.ts";
++import { normalizeTwsStack, normalizeTwsStatus } from "./TwsTopology.ts";
++import { twsRecordId, type TwsExecution, type TwsRecord } from "./TwsContextModel.ts";
++
++const encodeIdentityKey = Schema.encodeSync(Schema.fromJsonString(Schema.Array(Schema.String)));
++export const collectTwsTopology = Effect.fn("collectTwsTopology")(function* (input: {
++  environmentId: EnvironmentId;
++  observationId: TwsObservationId;
++  observedAt: string;
++  previous: ReadonlyArray<TwsRecord>;
++  projects: ReadonlyArray<{ readonly projectId: ProjectId; readonly workspaceRoot: string }>;
++}) {
++  const cli = yield* TwsCliAdapter;
++  const bindings = yield* TwsBindingRepository;
++  const resolver = yield* TwsExecutionResolver;
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const records = new Map<string, TwsRecord>(
++    input.previous.map((record) => [
++      twsRecordId(record),
++      {
++        ...record,
++        complete: false,
++        presence: "unknown" as const,
++        observationId: input.observationId,
++      },
++    ]),
++  );
++  let completeScopes = 0;
++  let incompleteScopes = 0;
++  const reportFailure = (scope: string) =>
++    Effect.logWarning("TWS scope could not be confirmed.", { scope });
++  const registryResult = yield* cli.probe({ refresh: true }).pipe(
++    Effect.andThen(cli.checkRegistry()),
++    Effect.tapError(() => reportFailure("registry")),
++    Effect.option,
++  );
++  if (Option.isNone(registryResult))
++    return {
++      records: [...records.values()],
++      completeScopes: 0,
++      incompleteScopes: 1,
++      status: "unavailable" as const,
++    };
++  const checks = registryResult.value;
++  if (new Set(checks.map((check) => check.entry.id)).size !== checks.length)
++    return yield* new TwsContextError({
++      reason: "unavailable",
++      message: "The TWS registry contains ambiguous identities.",
++    });
++  completeScopes++;
++  const executions = new Map<string, Effect.Effect<Option.Option<TwsExecution>, never>>();
++  const resolve = Effect.fn(function* (cwd: string) {
++    let cached = executions.get(cwd);
++    if (!cached) {
++      cached = yield* Effect.cached(
++        resolver.resolve(cwd).pipe(
++          Effect.tapError(() => reportFailure("execution")),
++          Effect.option,
++        ),
++      );
++      executions.set(cwd, cached);
++    }
++    return Option.getOrNull(yield* cached);
++  });
++  const projects = yield* Effect.forEach(
++    input.projects,
++    Effect.fn(function* (project) {
++      const execution = yield* resolve(project.workspaceRoot);
++      if (!execution) incompleteScopes++;
++      return { ...project, execution };
++    }),
++  );
++  const missing = (record: TwsRecord): TwsRecord => {
++    const evidence = {
++      complete: true,
++      presence: "missing" as const,
++      observationId: input.observationId,
++      missingObservations: [...new Set([...record.missingObservations, input.observationId])].slice(
++        -2,
++      ),
++    };
++    switch (record.kind) {
++      case "workspace":
++        return {
++          ...record,
++          ...evidence,
++          binding: { ...record.binding, retiredAt: record.binding.retiredAt ?? input.observedAt },
++        };
++      case "feature":
++        return {
++          ...record,
++          ...evidence,
++          binding: { ...record.binding, retiredAt: record.binding.retiredAt ?? input.observedAt },
++        };
++      case "node":
++        return {
++          ...record,
++          ...evidence,
++          binding: { ...record.binding, retiredAt: record.binding.retiredAt ?? input.observedAt },
++        };
++    }
++  };
++  const seenRegistry = new Set(checks.map((check) => check.entry.id));
++  for (const previous of input.previous) {
++    if (previous.kind !== "workspace") continue;
++    const registry = previous.binding.locators.find((locator) => locator.kind === "registry-entry");
++    if (registry && !seenRegistry.has(registry.value)) {
++      for (const row of input.previous.filter(
++        (row) => row.workspaceBindingId === previous.workspaceBindingId,
++      ))
++        records.set(twsRecordId(row), missing(row));
++    }
++  }
++  for (const check of checks) {
++    if (check.entry.kind === "repo" && check.status === "ok") continue;
++    if (
++      check.status !== "ok" ||
++      !["checkout-workspace", "external-workspace"].includes(check.entry.kind)
++    ) {
++      incompleteScopes++;
++      yield* reportFailure("workspace-registry");
++      continue;
++    }
++    const entry = check.entry;
++    const statusResult = yield* cli.readStatus({ cwd: entry.path }).pipe(
++      Effect.tapError(() => reportFailure("workspace")),
++      Effect.option,
++    );
++    const normalized = Option.isSome(statusResult) ? normalizeTwsStatus(statusResult.value) : null;
++    const canonicalPath = yield* fs.realPath(entry.path).pipe(Effect.option);
++    if (!normalized || Option.isNone(canonicalPath)) {
++      incompleteScopes++;
++      yield* reportFailure("workspace-report");
++      continue;
++    }
++    const reportedLocation =
++      normalized.mode === "external" ? normalized.metadataRoot : normalized.repoRoot;
++    const reportedPath =
++      reportedLocation === null
++        ? Option.none<string>()
++        : yield* fs.realPath(reportedLocation).pipe(Effect.option);
++    if (
++      Option.isNone(reportedPath) ||
++      reportedPath.value !== canonicalPath.value ||
++      (normalized.mode === "checkout") !== (entry.kind === "checkout-workspace")
++    ) {
++      incompleteScopes++;
++      yield* reportFailure("workspace-scope");
++      continue;
++    }
++    const identityKey = encodeIdentityKey([entry.id, entry.markerId, canonicalPath.value]);
++    const priorRecord = input.previous.find(
++      (record) => record.kind === "workspace" && record.identityKey === identityKey,
++    );
++    let prior: TwsWorkspaceBinding | undefined =
++      priorRecord?.kind === "workspace" ? priorRecord.binding : undefined;
++    let requiresConfirmation = priorRecord?.requiresConfirmation ?? false;
++    const marker = { kind: "stable-id" as const, value: `tws-marker:${entry.markerId}` };
++    if (!prior && entry.markerId) {
++      const matches = yield* bindings.findWorkspacesByLocator({
++        environmentId: input.environmentId,
++        locator: marker,
++        limit: 2,
++        includeRetired: true,
++      });
++      if (matches.length > 1) {
++        incompleteScopes++;
++        yield* reportFailure("workspace-identity");
++        continue;
++      }
++      prior = matches[0];
++      requiresConfirmation ||= input.previous.some(
++        (record) =>
++          record.kind === "workspace" &&
++          record.binding.workspaceBindingId === prior?.workspaceBindingId &&
++          record.requiresConfirmation,
++      );
++    }
++    if (!prior) {
++      const byRegistry = yield* bindings.findWorkspacesByLocator({
++        environmentId: input.environmentId,
++        locator: { kind: "registry-entry", value: entry.id },
++        limit: 2,
++        includeRetired: true,
++      });
++      const byPath = yield* bindings.findWorkspacesByLocator({
++        environmentId: input.environmentId,
++        locator: { kind: "path", value: canonicalPath.value },
++        limit: 2,
++        includeRetired: true,
++      });
++      requiresConfirmation = byRegistry.length > 0 || byPath.length > 0;
++    }
++    const workspaceBindingId =
++      prior?.workspaceBindingId ?? TwsWorkspaceBindingId.make(NodeCrypto.randomUUID());
++    const canonicalLocator = entry.markerId
++      ? marker
++      : { kind: "registry-entry" as const, value: entry.id };
++    const binding: TwsWorkspaceBinding = {
++      workspaceBindingId,
++      environmentId: input.environmentId,
++      canonicalLocator,
++      locators: mergeTwsLocators(
++        canonicalLocator,
++        [
++          { kind: "registry-entry", value: entry.id },
++          { kind: "path", value: canonicalPath.value },
++        ],
++        prior?.locators ?? [],
++      ),
++      repositoryIdentity: prior?.repositoryIdentity ?? null,
++      firstSeenAt: prior?.firstSeenAt ?? input.observedAt,
++      lastSeenAt: input.observedAt,
++      retiredAt: null,
++    };
++    const execution = normalized.repoRoot === null ? null : yield* resolve(normalized.repoRoot);
++    const projectIds = projects
++      .filter(
++        (project) => execution && project.execution?.commonDirectory === execution.commonDirectory,
++      )
++      .map((project) => project.projectId);
++    const metadata = {
++      workspaceBindingId,
++      complete: normalized.complete,
++      requiresConfirmation,
++      presence: "present" as const,
++      observationId: input.observationId,
++      lastConfirmedAt: input.observedAt,
++      missingObservations: [],
++    };
++    records.set(workspaceBindingId, {
++      ...metadata,
++      kind: "workspace",
++      binding,
++      execution,
++      projectIds,
++      identityKey,
++      label: (entry.aliases[0] || path.basename(canonicalPath.value) || entry.id).slice(0, 256),
++    });
++    if (normalized.complete) {
++      for (const oldWorkspace of input.previous) {
++        if (
++          oldWorkspace.kind !== "workspace" ||
++          oldWorkspace.workspaceBindingId === workspaceBindingId ||
++          !oldWorkspace.binding.locators.some(
++            (locator) => locator.kind === "registry-entry" && locator.value === entry.id,
++          )
++        )
++          continue;
++        for (const row of input.previous.filter(
++          (record) => record.workspaceBindingId === oldWorkspace.workspaceBindingId,
++        ))
++          records.set(twsRecordId(row), missing(row));
++      }
++    }
++    if (normalized.complete) completeScopes++;
++    else incompleteScopes++;
++    const featureNames = new Set(normalized.features.map((feature) => feature.name));
++    for (const feature of normalized.features) {
++      const matches = yield* bindings.findFeaturesByLocator({
++        environmentId: input.environmentId,
++        workspaceBindingId,
++        locator: { kind: "name", value: feature.name },
++        includeRetired: true,
++        limit: 2,
++      });
++      if (matches.length > 1) {
++        incompleteScopes++;
++        yield* reportFailure("feature-identity");
++        continue;
++      }
++      const old = matches[0];
++      const featureBindingId =
++        old?.featureBindingId ?? TwsFeatureBindingId.make(NodeCrypto.randomUUID());
++      const locator = { kind: "name" as const, value: feature.name };
++      const featureBinding = {
++        featureBindingId,
++        workspaceBindingId,
++        environmentId: input.environmentId,
++        canonicalLocator: locator,
++        locators: mergeTwsLocators(
++          locator,
++          [{ kind: "path", value: feature.path }],
++          old?.locators ?? [],
++        ),
++        repositoryIdentity: old?.repositoryIdentity ?? null,
++        firstSeenAt: old?.firstSeenAt ?? input.observedAt,
++        lastSeenAt: input.observedAt,
++        retiredAt: null,
++      };
++      const stackResult = feature.complete
++        ? yield* cli.readStackStatus({ cwd: entry.path, feature: feature.name }).pipe(
++            Effect.tapError(() => reportFailure("feature")),
++            Effect.option,
++          )
++        : Option.none();
++      const nodes = Option.isSome(stackResult)
++        ? normalizeTwsStack(normalized, feature, stackResult.value)
++        : null;
++      const nodeRecords: TwsRecord[] = [];
++      let featureComplete = nodes !== null;
++      for (const node of nodes ?? []) {
++        const nodeMatches = yield* bindings.findStackNodesByLocator({
++          environmentId: input.environmentId,
++          featureBindingId,
++          locator: { kind: "name", value: node.name },
++          includeRetired: true,
++          limit: 2,
++        });
++        if (nodeMatches.length > 1) {
++          featureComplete = false;
++          continue;
++        }
++        const oldNode = nodeMatches[0];
++        const nodeExecution =
++          node.executionPath === null ? null : yield* resolve(node.executionPath);
++        if (
++          node.executionPath !== null &&
++          (nodeExecution === null ||
++            nodeExecution.path !== nodeExecution.root ||
++            nodeExecution.branch !== node.gitBranch ||
++            nodeExecution.commonDirectory !== execution?.commonDirectory)
++        )
++          featureComplete = false;
++        const validExecution =
++          nodeExecution !== null &&
++          nodeExecution.path === nodeExecution.root &&
++          nodeExecution.branch === node.gitBranch &&
++          nodeExecution.commonDirectory === execution?.commonDirectory
++            ? nodeExecution
++            : null;
++        const stackNodeBindingId =
++          oldNode?.stackNodeBindingId ?? TwsStackNodeBindingId.make(NodeCrypto.randomUUID());
++        const nodeLocator = { kind: "name" as const, value: node.name };
++        nodeRecords.push({
++          ...metadata,
++          kind: "node",
++          label: node.name,
++          execution: validExecution,
++          complete: featureComplete,
++          binding: {
++            stackNodeBindingId,
++            featureBindingId,
++            projectId: projectIds.length === 1 ? projectIds[0]! : null,
++            environmentId: input.environmentId,
++            canonicalLocator: nodeLocator,
++            locators: mergeTwsLocators(
++              nodeLocator,
++              [
++                { kind: "git-branch", value: node.gitBranch },
++                ...(node.executionPath
++                  ? [{ kind: "path" as const, value: node.executionPath }]
++                  : []),
++              ],
++              oldNode?.locators ?? [],
++            ),
++            repositoryIdentity: oldNode?.repositoryIdentity ?? null,
++            gitBranch: node.gitBranch,
++            worktreePath: validExecution?.root ?? null,
++            archived: node.archived,
++            firstSeenAt: oldNode?.firstSeenAt ?? input.observedAt,
++            lastSeenAt: input.observedAt,
++            retiredAt: null,
++          },
++        });
++      }
++      records.set(featureBindingId, {
++        ...metadata,
++        kind: "feature",
++        binding: featureBinding,
++        label: feature.name,
++        complete: featureComplete,
++      });
++      for (const record of nodeRecords)
++        records.set(twsRecordId(record), { ...record, complete: featureComplete });
++      if (featureComplete) {
++        completeScopes++;
++        const nodeIds = new Set(nodeRecords.map(twsRecordId));
++        for (const oldRecord of input.previous) {
++          if (
++            oldRecord.kind === "node" &&
++            oldRecord.binding.featureBindingId === featureBindingId &&
++            !nodeIds.has(twsRecordId(oldRecord))
++          )
++            records.set(twsRecordId(oldRecord), missing(oldRecord));
++        }
++      } else {
++        incompleteScopes++;
++        yield* reportFailure("feature-coverage");
++      }
++    }
++    if (normalized.complete) {
++      for (const oldRecord of input.previous) {
++        if (oldRecord.workspaceBindingId !== workspaceBindingId || oldRecord.kind === "workspace")
++          continue;
++        const oldFeature =
++          oldRecord.kind === "feature"
++            ? oldRecord
++            : input.previous.find(
++                (record) =>
++                  record.kind === "feature" &&
++                  record.binding.featureBindingId === oldRecord.binding.featureBindingId,
++              );
++        if (oldFeature && !featureNames.has(oldFeature.label))
++          records.set(twsRecordId(oldRecord), missing(oldRecord));
++      }
++    }
++  }
++  return {
++    records: [...records.values()],
++    completeScopes,
++    incompleteScopes,
++    status: incompleteScopes > 0 ? ("degraded" as const) : ("ready" as const),
++  };
++});
+diff --git a/apps/server/src/tws/runtimeLayer.ts b/apps/server/src/tws/runtimeLayer.ts
+new file mode 100644
+index 000000000..9c1031419
+--- /dev/null
++++ b/apps/server/src/tws/runtimeLayer.ts
+@@ -0,0 +1,15 @@
++import * as Layer from "effect/Layer";
++import { layer as ProcessRunnerLive } from "../processRunner.ts";
++import { TwsBindingRepositoryLive } from "../persistence/Layers/TwsBindings.ts";
++import { TwsCliAdapterLive } from "./TwsCliAdapter.ts";
++import { TwsContextServiceLive } from "./TwsContextService.ts";
++import { TwsContextStoreLive } from "./TwsContextStore.ts";
++import { TwsExecutionResolverLive } from "./TwsExecutionResolver.ts";
++
++export const TwsContextLive = TwsContextServiceLive.pipe(
++  Layer.provide(TwsContextStoreLive),
++  Layer.provide(TwsBindingRepositoryLive),
++  Layer.provide(TwsExecutionResolverLive),
++  Layer.provide(TwsCliAdapterLive),
++  Layer.provide(ProcessRunnerLive),
++);
+diff --git a/apps/server/src/ws.ts b/apps/server/src/ws.ts
+index 3ac8d7348..6e15bc726 100644
+--- a/apps/server/src/ws.ts
++++ b/apps/server/src/ws.ts
+@@ -2,6 +2,7 @@ import { AttentionSyncError, AuthOrchestrationReadScope } from "@t3tools/contrac
+ import { makeAttentionStream } from "./orchestration/AttentionSync.ts";
+ import { ServerSecretStore } from "./auth/ServerSecretStore.ts";
+ import { AuthSessionRepository } from "./persistence/AuthSessions.ts";
++import { TwsContextService } from "./tws/TwsContextService.ts";
+ import {
+   sameUsageLimitCommandCoverage,
+   withUsageLimitsCommands,
+@@ -576,6 +577,7 @@ const makeWsRpcLayer = (
+       const config = yield* ServerConfig.ServerConfig;
+       const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
+       const serverSettings = yield* ServerSettings.ServerSettingsService;
++      const twsContext = yield* TwsContextService;
+       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
+       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
+       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
+@@ -2346,6 +2348,16 @@ const makeWsRpcLayer = (
+             ),
+             { "rpc.aggregate": "attention" },
+           ),
++        [WS_METHODS.twsRefresh]: () =>
++          observeRpcEffect(WS_METHODS.twsRefresh, twsContext.refresh()),
++        [WS_METHODS.twsQuery]: (input) =>
++          observeRpcEffect(WS_METHODS.twsQuery, twsContext.query(input)),
++        [WS_METHODS.twsGetContexts]: (input) =>
++          observeRpcEffect(WS_METHODS.twsGetContexts, twsContext.getContexts(input.threadIds)),
++        [WS_METHODS.twsSetContext]: (input) =>
++          observeRpcEffect(WS_METHODS.twsSetContext, twsContext.setContext(input)),
++        [WS_METHODS.twsProvenance]: (input) =>
++          observeRpcEffect(WS_METHODS.twsProvenance, twsContext.provenance(input.bindingId)),
+         [WS_METHODS.serverProbe]: (_input) =>
+           observeRpcEffect(WS_METHODS.serverProbe, Effect.succeed({}), {
+             "rpc.aggregate": "server",
+@@ -2590,6 +2602,18 @@ const makeWsRpcLayer = (
+                 ...patch,
+                 ...(deviceHosts ? { deviceHosts } : {}),
+               });
++              if (patch.twsIntegrationEnabled !== undefined) {
++                yield* twsContext
++                  .configure(settings.twsIntegrationEnabled)
++                  .pipe(
++                    Effect.catchTag("TwsContextError", (error) =>
++                      Effect.logWarning(
++                        "TWS integration preference saved, but cached observation invalidation failed.",
++                        { reason: error.reason },
++                      ),
++                    ),
++                  );
++              }
+               return ServerSettings.redactServerSettingsForClient(settings);
+             }),
+             {
+diff --git a/apps/web/src/components/settings/IntegrationsSettings.tsx b/apps/web/src/components/settings/IntegrationsSettings.tsx
+index db6276d94..7426bee5e 100644
+--- a/apps/web/src/components/settings/IntegrationsSettings.tsx
++++ b/apps/web/src/components/settings/IntegrationsSettings.tsx
+@@ -1,6 +1,7 @@
+ import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
+ import { ScopedSwitch } from "./ScopedSwitch";
+ import { DeviceHostsSettings } from "./DeviceHostsSettings";
++import { TwsIntegrationSettings } from "./TwsIntegrationSettings";
+ /**
+  * Integrations settings - preferences for surfaces T3 Code embeds rather than
+  * owns. Browser is the first section: the defaults a preview tab opens at,
+@@ -1333,6 +1334,7 @@ export function IntegrationsSettingsPanel() {
+ 
+   return (
+     <SettingsPageContainer>
++      <TwsIntegrationSettings />
+       {/* Server-authoritative agent access is scoped by the header selection;
+           the preview defaults below are device-local and ignore it. */}
+       <ProjectDefaultsSettings category="integrations" />
+diff --git a/apps/web/src/components/settings/TwsIntegrationSettings.tsx b/apps/web/src/components/settings/TwsIntegrationSettings.tsx
+new file mode 100644
+index 000000000..ef57d1aba
+--- /dev/null
++++ b/apps/web/src/components/settings/TwsIntegrationSettings.tsx
+@@ -0,0 +1,119 @@
++import { useEffect, useState } from "react";
++import type { TwsIntegrationState } from "@t3tools/contracts";
++import type { EnvironmentPresentation } from "../../state/environments";
++import { serverEnvironment } from "../../state/server";
++import { twsEnvironment } from "../../state/tws";
++import { useAtomCommand } from "../../state/use-atom-command";
++import { useSettingsScope } from "./SettingsScopeContext";
++import { SettingsRow, SettingsSection } from "./settingsLayout";
++import { searchableSetting } from "./settingsSearch";
++import { Switch } from "../ui/switch";
++import { Button } from "../ui/button";
++
++function TwsEnvironmentSetting({ environment }: { environment: EnvironmentPresentation }) {
++  const save = useAtomCommand(serverEnvironment.updateSettings);
++  const refresh = useAtomCommand(twsEnvironment.refresh, { reportFailure: false });
++  const enabled = environment.serverConfig?.settings.twsIntegrationEnabled === true;
++  const supported = environment.serverConfig?.environment.capabilities.twsContext === true;
++  const connected = environment.connection.phase === "connected";
++  const [pending, setPending] = useState(false);
++  const [observation, setObservation] = useState<TwsIntegrationState | null>(null);
++  const [failed, setFailed] = useState(false);
++  useEffect(() => {
++    if (!enabled || !supported || !connected) return;
++    let active = true;
++    void refresh({ environmentId: environment.environmentId, input: {} }).then((result) => {
++      if (!active) return;
++      if (result._tag === "Success") {
++        setObservation(result.value);
++        setFailed(false);
++      } else {
++        setFailed(true);
++      }
++    });
++    return () => {
++      active = false;
++    };
++  }, [connected, enabled, environment.environmentId, refresh, supported]);
++  return (
++    <SettingsRow
++      title={environment.label}
++      description={
++        !supported
++          ? "Update this server to configure TWS."
++          : !enabled
++            ? "Disabled. T3 Code bypasses TWS and keeps any saved context inactive."
++            : !connected
++              ? "Environment disconnected; the last observation is stale."
++              : failed || observation?.status === "unavailable"
++                ? "TWS is unavailable. Install v1.2.14 on this environment; native Windows should use a WSL environment."
++                : observation?.status === "degraded"
++                  ? "Some TWS scopes are incomplete. Last-known context is retained without guessing associations."
++                  : observation?.status === "ready"
++                    ? `Last confirmed ${observation.observedAt}. TWS is not continuously watched.`
++                    : "Waiting for a fresh TWS observation."
++      }
++      control={
++        <div className="flex items-center gap-3">
++          {enabled && supported && connected && (
++            <Button
++              size="sm"
++              variant="outline"
++              onClick={async () => {
++                const result = await refresh({
++                  environmentId: environment.environmentId,
++                  input: {},
++                });
++                if (result._tag === "Success") {
++                  setObservation(result.value);
++                  setFailed(false);
++                } else setFailed(true);
++              }}
++            >
++              Refresh
++            </Button>
++          )}
++          <Switch
++            aria-label={`Enable TWS integration: ${environment.label}`}
++            aria-checked={enabled}
++            checked={enabled}
++            disabled={pending || !connected || !supported}
++            onCheckedChange={async (checked) => {
++              setPending(true);
++              setObservation(null);
++              setFailed(false);
++              try {
++                await save({
++                  environmentId: environment.environmentId,
++                  input: { patch: { twsIntegrationEnabled: checked } },
++                });
++              } finally {
++                setPending(false);
++              }
++            }}
++          />
++        </div>
++      }
++    />
++  );
++}
++
++export function TwsIntegrationSettings() {
++  const { environments } = useSettingsScope();
++  return (
++    <SettingsSection {...searchableSetting("tws-integration")}>
++      <p className="text-sm text-muted-foreground">
++        Optional, read-only Tesseraworkspaces integration. Enable separately on each environment.
++        Disabling stops owned refresh work; it never changes checkouts, providers or TWS itself.
++      </p>
++      {environments.map((environment) => (
++        <TwsEnvironmentSetting key={environment.environmentId} environment={environment} />
++      ))}
++      {environments.length === 0 && (
++        <p className="text-sm text-muted-foreground">
++          Connect an environment to configure this add-on.
++        </p>
++      )}
++    </SettingsSection>
++  );
++}
+diff --git a/apps/web/src/components/settings/settingsSearch.ts b/apps/web/src/components/settings/settingsSearch.ts
+index 7e999417f..61048f405 100644
+--- a/apps/web/src/components/settings/settingsSearch.ts
++++ b/apps/web/src/components/settings/settingsSearch.ts
+@@ -243,6 +243,12 @@ export const SETTINGS_SEARCH_ITEMS = [
+     to: "/settings/general",
+     searchTerms: ["notification sound alert completion input approval desktop"],
+   },
++  {
++    id: "tws-integration",
++    title: "TWS integration",
++    to: "/settings/integrations",
++    searchTerms: ["tws tesseraworkspaces workspace feature stack optional addon plugin"],
++  },
+   {
+     id: "in-app-notifications",
+     title: "In-app notifications",
+diff --git a/apps/web/src/state/tws.ts b/apps/web/src/state/tws.ts
+new file mode 100644
+index 000000000..4107c2b73
+--- /dev/null
++++ b/apps/web/src/state/tws.ts
+@@ -0,0 +1,4 @@
++import { createTwsEnvironmentAtoms } from "@t3tools/client-runtime/state/tws";
++import { connectionAtomRuntime } from "../connection/runtime";
++
++export const twsEnvironment = createTwsEnvironmentAtoms(connectionAtomRuntime);
+diff --git a/docs/internals/tws-context.md b/docs/internals/tws-context.md
+new file mode 100644
+index 000000000..c5c43d03b
+--- /dev/null
++++ b/docs/internals/tws-context.md
+@@ -0,0 +1,58 @@
++# Optional environment-owned TWS context
++
++`twsIntegrationEnabled` is an environment-level server setting, false by
++default. The runtime is an optional sidecar to orchestration, not a provider
++or a plugin loader. Disabling cancels the owned scan, invalidates its generation
++and hides cached TWS results without discarding choices or affecting ordinary
++projects, threads, provider sessions or notification state.
++
++The source boundary uses only the pinned public v1.2.14 CLI. Every refresh
++re-probes the version; registry checks and status/stack reports retain the
++adapter's timeout and byte limits. `TwsTopology` validates the narrow association
++fields and count/parent consistency rather than treating raw report arrays as
++safe topology. Cross-repository unsupported observations remain non-executable.
++No `.tws` backing file, tmux internals, provider process state or remote
++client-supplied filesystem path is used as association authority.
++
++The public report's `stable_id` is path-derived, not move-stable. Registry
++marker identity is the persistent workspace proof. See the pinned
++[workspace identity implementation](https://github.com/jdbencardinop/tesseraworkspaces/blob/v1.2.14/internal/workspace.go#L68-L83).
++Feature and node identity use exact parent-scoped logical keys, never label
++similarity, branch-only matching or repository grouping. Conflicting markers
++create a distinct binding requiring confirmation, never a weaker-locator merge.
++An unchanged thread location with a newly named source cannot silently rewrite
++its existing automatic feature choice.
++
++Fork migration 49 adds observation, compact topology and context records beside
++the existing opaque binding tables. A partial creation-event index makes
++thread/project incarnation checks independent of conversation length.
++Context writes compare material revision, incarnation and server-owned location.
++Automatic refresh reuses the latest stored choice within its commit transaction,
++so it cannot undo a concurrent explicit clear. Fresh observations change evidence,
++not material revisions. Projection rebuilds do not erase sidecar choices.
++
++One environment-owned scan and one queued invalidation coalesce clients and
++execution changes. CLI work occurs outside SQLite transactions. A generation
++guard and re-read of project/thread metadata reject stale completion. Scan
++cancellation settles every waiting receipt and cannot cancel another client's
++connection or a provider process.
++
++Completeness is per workspace/feature. Independently complete positives survive
++partial scans; incomplete scopes preserve last-known data and never manufacture
++negative evidence. Missing entities record at most two distinct complete
++observation IDs for later consumers. Age alone does not revoke anything.
++The old binding repository's row limits are not enumeration or absence proof.
++
++`tws.refresh`, `tws.query`, `tws.contexts.get`, `tws.context.set` and
++`tws.provenance` use the existing authenticated environment RPC group.
++Reads/refresh use orchestration-read; explicit changes use orchestration-operate.
++The server chooses environment identity. Query pages contain at most 100 compact
++rows and a 60 KiB entry budget; a changed observation ID means pages may not be
++combined as one complete observation. Project membership lists signal overflow.
++Full locator paths are available only through a single-binding provenance read,
++never aggregate shell rows.
++
++Shared client-runtime commands and query atoms reuse environment leases.
++Web/desktop configuration refreshes on an enabled view/reconnect; mobile has
++the same contract/state exports for later presentation. There is no grouping,
++tag or provider-state inference in this slice.
+diff --git a/docs/user/tws.md b/docs/user/tws.md
+new file mode 100644
+index 000000000..2049fa265
+--- /dev/null
++++ b/docs/user/tws.md
+@@ -0,0 +1,38 @@
++# Optional TWS integration
++
++T3 Code does not require Tesseraworkspaces (TWS). The integration is **off by
++default**, separately for each environment.
++
++Open **Settings → Integrations → TWS integration** to enable an environment.
++That environment must have TWS **v1.2.14** installed. This version supports
++macOS and Linux; on Windows, use a WSL environment for TWS-backed work. The
++Windows T3 Code app and native Windows environments remain usable without TWS.
++
++When enabled, T3 reads TWS's public status and registry reports. **Refresh**
++requests a new observation. Opening the integration view, reconnecting, and
++changing a T3 execution location also request refreshes. There is no periodic
++polling or real-time watching.
++
++Disabling the integration cancels its refresh work and bypasses TWS for normal
++project and thread behavior. Saved bindings and explicit context choices are
++retained but inactive. Re-enabling requires a fresh observation before cached
++associations can be used.
++
++## Conservative context
++
++TWS context distinguishes a logical workspace/feature from the execution node
++currently proved by the environment's checkout and branch. Sharing a repository
++or project is not enough to assign a feature.
++
++Failed or incomplete reports retain last-known context as stale. Ambiguous,
++archived, unmaterialized and unsupported cross-repository nodes are not guessed.
++A changed checkout invalidates node evidence without rewriting an explicit
++logical feature choice. Unproved feature or node renames require reassignment.
++
++The context API supports explicit set/reassign, clear, and return to automatic
++association. Clear remains an opt-out until automatic association is explicitly
++restored. These choices change only T3 context: they do not move checkouts,
++change branches, select agents or modify TWS.
++
++The integration supplies context for later workspace grouping and tag surfaces.
++TWS's reported agent state is not used as coding-agent activity or attention.
+diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json
+index d1a13cac9..098225042 100644
+--- a/packages/client-runtime/package.json
++++ b/packages/client-runtime/package.json
+@@ -215,6 +215,10 @@
+       "types": "./src/state/threads.ts",
+       "default": "./src/state/threads.ts"
+     },
++    "./state/tws": {
++      "types": "./src/state/tws.ts",
++      "default": "./src/state/tws.ts"
++    },
+     "./state/subagentRuntime": {
+       "types": "./src/state/subagentRuntime.ts",
+       "default": "./src/state/subagentRuntime.ts"
+diff --git a/packages/client-runtime/src/state/tws.ts b/packages/client-runtime/src/state/tws.ts
+new file mode 100644
+index 000000000..0b1a2209b
+--- /dev/null
++++ b/packages/client-runtime/src/state/tws.ts
+@@ -0,0 +1,32 @@
++import { WS_METHODS } from "@t3tools/contracts";
++import type { Atom } from "effect/unstable/reactivity";
++import type { EnvironmentRegistry } from "../connection/registry.ts";
++import { createEnvironmentRpcCommand, createEnvironmentRpcQueryAtomFamily } from "./runtime.ts";
++
++/** All operations use the existing environment lease; callers mount only when the add-on is enabled. */
++export function createTwsEnvironmentAtoms<R, E>(
++  runtime: Atom.AtomRuntime<EnvironmentRegistry | R, E>,
++) {
++  return {
++    refresh: createEnvironmentRpcCommand(runtime, {
++      label: "tws:refresh",
++      tag: WS_METHODS.twsRefresh,
++    }),
++    setContext: createEnvironmentRpcCommand(runtime, {
++      label: "tws:set-context",
++      tag: WS_METHODS.twsSetContext,
++    }),
++    contexts: createEnvironmentRpcQueryAtomFamily(runtime, {
++      label: "tws:contexts",
++      tag: WS_METHODS.twsGetContexts,
++    }),
++    topology: createEnvironmentRpcQueryAtomFamily(runtime, {
++      label: "tws:topology",
++      tag: WS_METHODS.twsQuery,
++    }),
++    provenance: createEnvironmentRpcQueryAtomFamily(runtime, {
++      label: "tws:provenance",
++      tag: WS_METHODS.twsProvenance,
++    }),
++  };
++}
+diff --git a/packages/contracts/src/environment.ts b/packages/contracts/src/environment.ts
+index 7f77b5b7b..a970a4d68 100644
+--- a/packages/contracts/src/environment.ts
++++ b/packages/contracts/src/environment.ts
+@@ -76,6 +76,8 @@ export const ServerSelfUpdateCapability = Schema.Literals([
+ export type ServerSelfUpdateCapability = typeof ServerSelfUpdateCapability.Type;
+ 
+ export const ExecutionEnvironmentCapabilities = Schema.Struct({
++  /** Optional read-only TWS context API; use the environment setting to opt in. */
++  twsContext: Schema.optionalKey(Schema.Boolean),
+   /** Owned, paginated attention bootstrap/replay/live stream protocol v1. */
+   attentionSync: Schema.optionalKey(Schema.Boolean),
+   repositoryIdentity: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts
+index c18e9baa4..282a58b14 100644
+--- a/packages/contracts/src/index.ts
++++ b/packages/contracts/src/index.ts
+@@ -48,3 +48,4 @@ export * from "./resourceTelemetry.ts";
+ export * from "./usage.ts";
+ export * from "./rpc.ts";
+ export * from "./worktreeSetup.ts";
++export * from "./twsContext.ts";
+diff --git a/packages/contracts/src/rpc.ts b/packages/contracts/src/rpc.ts
+index 31db0f0d5..0d705d7f0 100644
+--- a/packages/contracts/src/rpc.ts
++++ b/packages/contracts/src/rpc.ts
+@@ -1,6 +1,18 @@
+ import * as Schema from "effect/Schema";
+ import * as Rpc from "effect/unstable/rpc/Rpc";
+ import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
++import {
++  TwsContextError,
++  TwsContextQuery,
++  TwsContextQueryResult,
++  TwsContextSetInput,
++  TwsThreadContext,
++  TwsIntegrationState,
++  TwsTopologyQuery,
++  TwsTopologyQueryResult,
++  TwsProvenanceInput,
++  TwsProvenance,
++} from "./twsContext.ts";
+ import {
+   AttentionSubscribeInput,
+   AttentionStreamMessage,
+@@ -275,6 +287,11 @@ import {
+ import { VcsError } from "./vcs.ts";
+ 
+ export const WS_METHODS = {
++  twsRefresh: "tws.refresh",
++  twsQuery: "tws.query",
++  twsGetContexts: "tws.contexts.get",
++  twsSetContext: "tws.context.set",
++  twsProvenance: "tws.provenance",
+   attentionSubscribe: "attention.subscribe",
+   // Project registry methods
+   projectsList: "projects.list",
+@@ -1364,6 +1381,31 @@ const WsSubscribeResourceTelemetryRpc = Rpc.make(WS_METHODS.subscribeResourceTel
+ });
+ 
+ export const WsRpcGroup = RpcGroup.make(
++  Rpc.make(WS_METHODS.twsRefresh, {
++    payload: Schema.Struct({}),
++    success: TwsIntegrationState,
++    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
++  }),
++  Rpc.make(WS_METHODS.twsQuery, {
++    payload: TwsTopologyQuery,
++    success: TwsTopologyQueryResult,
++    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
++  }),
++  Rpc.make(WS_METHODS.twsGetContexts, {
++    payload: TwsContextQuery,
++    success: TwsContextQueryResult,
++    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
++  }),
++  Rpc.make(WS_METHODS.twsSetContext, {
++    payload: TwsContextSetInput,
++    success: TwsThreadContext,
++    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
++  }),
++  Rpc.make(WS_METHODS.twsProvenance, {
++    payload: TwsProvenanceInput,
++    success: TwsProvenance,
++    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
++  }),
+   Rpc.make(WS_METHODS.attentionSubscribe, {
+     payload: AttentionSubscribeInput,
+     success: AttentionStreamMessage,
+diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts
+index 5388f49f5..90f348879 100644
+--- a/packages/contracts/src/settings.ts
++++ b/packages/contracts/src/settings.ts
+@@ -1050,6 +1050,7 @@ export const ProjectSettingsOverrides = Schema.Struct({
+ export type ProjectSettingsOverrides = typeof ProjectSettingsOverrides.Type;
+ 
+ export const ServerSettings = Schema.Struct({
++  twsIntegrationEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+   // How assistant text reaches clients during a turn. Deliberately a fresh
+   // key (was `enableLegacyTokenStreaming`, before that
+   // `enableAssistantStreaming`): decoding drops the old key, so everyone,
+@@ -1402,6 +1403,7 @@ const OpenCodeSettingsPatch = Schema.Struct({
+ });
+ 
+ export const ServerSettingsPatch = Schema.Struct({
++  twsIntegrationEnabled: Schema.optionalKey(Schema.Boolean),
+   // Server settings
+   responseStreamingMode: Schema.optionalKey(ResponseStreamingMode),
+   enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),
+diff --git a/packages/contracts/src/twsContext.test.ts b/packages/contracts/src/twsContext.test.ts
+new file mode 100644
+index 000000000..25fdabf63
+--- /dev/null
++++ b/packages/contracts/src/twsContext.test.ts
+@@ -0,0 +1,43 @@
++import { describe, expect, it } from "vite-plus/test";
++import * as Schema from "effect/Schema";
++import { ClientSettingsPatch, ServerSettings, ServerSettingsPatch } from "./settings.ts";
++import { TwsContextQuery, TwsContextSetInput, TwsTopologyQuery } from "./twsContext.ts";
++
++const settings = Schema.decodeUnknownSync(ServerSettings);
++const serverPatch = Schema.decodeUnknownSync(ServerSettingsPatch);
++const clientPatch = Schema.decodeUnknownSync(ClientSettingsPatch);
++const contextQuery = Schema.decodeUnknownSync(TwsContextQuery);
++const contextSet = Schema.decodeUnknownSync(TwsContextSetInput);
++const topologyQuery = Schema.decodeUnknownSync(TwsTopologyQuery);
++describe("optional TWS contracts", () => {
++  it("defaults off per environment and does not reset or create client-local preferences", () => {
++    expect(settings({}).twsIntegrationEnabled).toBe(false);
++    expect(serverPatch({})).not.toHaveProperty("twsIntegrationEnabled");
++    expect(serverPatch({ twsIntegrationEnabled: true })).toEqual({ twsIntegrationEnabled: true });
++    expect(clientPatch({ twsIntegrationEnabled: true })).not.toHaveProperty(
++      "twsIntegrationEnabled",
++    );
++    expect(() => serverPatch({ twsIntegrationEnabled: "true" })).toThrow();
++  });
++  it("bounds queries and never accepts a path or environment as context authority", () => {
++    expect(() =>
++      contextQuery({ threadIds: Array.from({ length: 101 }, (_, index) => `thread-${index}`) }),
++    ).toThrow();
++    expect(() => topologyQuery({ limit: 101 })).toThrow();
++    expect(
++      contextSet({
++        threadId: "thread",
++        expectedRevision: 1,
++        choice: { mode: "none" },
++        cwd: "/untrusted",
++        environmentId: "other",
++      }),
++    ).toEqual({ threadId: "thread", expectedRevision: 1, choice: { mode: "none" } });
++    expect(() =>
++      contextSet({ threadId: "thread", expectedRevision: -1, choice: { mode: "auto" } }),
++    ).toThrow();
++    expect(() =>
++      contextSet({ threadId: "thread", expectedRevision: 1, choice: { mode: "explicit" } }),
++    ).toThrow();
++  });
++});
+diff --git a/packages/contracts/src/twsContext.ts b/packages/contracts/src/twsContext.ts
+new file mode 100644
+index 000000000..8587bf96a
+--- /dev/null
++++ b/packages/contracts/src/twsContext.ts
+@@ -0,0 +1,139 @@
++import * as Schema from "effect/Schema";
++import {
++  EnvironmentId,
++  IsoDateTime,
++  NonNegativeInt,
++  ProjectId,
++  ThreadId,
++  TrimmedNonEmptyString,
++} from "./baseSchemas.ts";
++import {
++  TwsFeatureBindingId,
++  TwsStackNodeBindingId,
++  TwsWorkspaceBindingId,
++  TwsLocator,
++  TwsLocators,
++} from "./twsBindings.ts";
++
++export const TwsObservationId = TrimmedNonEmptyString.pipe(Schema.brand("TwsObservationId"));
++export type TwsObservationId = typeof TwsObservationId.Type;
++export const TwsContextFreshness = Schema.Literals(["confirmed", "stale", "unknown", "disabled"]);
++export const TwsContextReason = Schema.Literals([
++  "disabled",
++  "not-observed",
++  "source-unavailable",
++  "incomplete-scope",
++  "ambiguous",
++  "no-match",
++  "explicit",
++  "exact-execution",
++  "cleared",
++  "location-changed",
++  "source-identity-changed",
++  "thread-unavailable",
++]);
++export const TwsThreadContext = Schema.Struct({
++  environmentId: EnvironmentId,
++  threadId: ThreadId,
++  projectId: ProjectId,
++  revision: NonNegativeInt,
++  mode: Schema.Literals(["auto", "explicit", "none"]),
++  workspaceBindingId: Schema.NullOr(TwsWorkspaceBindingId),
++  featureBindingId: Schema.NullOr(TwsFeatureBindingId),
++  /** A stale reference is last-known evidence, never a current execution claim. */
++  stackNodeBindingId: Schema.NullOr(TwsStackNodeBindingId),
++  freshness: TwsContextFreshness,
++  reason: TwsContextReason,
++  observationId: Schema.NullOr(TwsObservationId),
++  lastConfirmedAt: Schema.NullOr(IsoDateTime),
++});
++export type TwsThreadContext = typeof TwsThreadContext.Type;
++export const TwsIntegrationState = Schema.Struct({
++  environmentId: EnvironmentId,
++  status: Schema.Literals([
++    "disabled",
++    "unknown",
++    "refreshing",
++    "ready",
++    "degraded",
++    "unavailable",
++  ]),
++  generation: NonNegativeInt,
++  observationId: Schema.NullOr(TwsObservationId),
++  observedAt: Schema.NullOr(IsoDateTime),
++  completeScopes: NonNegativeInt,
++  incompleteScopes: NonNegativeInt,
++});
++export type TwsIntegrationState = typeof TwsIntegrationState.Type;
++export const TwsContextQuery = Schema.Struct({
++  threadIds: Schema.Array(ThreadId).check(Schema.isMaxLength(100)),
++});
++export const TwsContextQueryResult = Schema.Struct({
++  integration: TwsIntegrationState,
++  contexts: Schema.Array(TwsThreadContext).check(Schema.isMaxLength(100)),
++  unavailableThreadIds: Schema.Array(ThreadId).check(Schema.isMaxLength(100)),
++});
++export const TwsContextChoice = Schema.Union([
++  Schema.Struct({
++    mode: Schema.Literal("explicit"),
++    workspaceBindingId: TwsWorkspaceBindingId,
++    featureBindingId: Schema.NullOr(TwsFeatureBindingId),
++  }),
++  Schema.Struct({ mode: Schema.Literal("auto") }),
++  Schema.Struct({ mode: Schema.Literal("none") }),
++]);
++export type TwsContextChoice = typeof TwsContextChoice.Type;
++export const TwsContextSetInput = Schema.Struct({
++  threadId: ThreadId,
++  expectedRevision: NonNegativeInt,
++  choice: TwsContextChoice,
++});
++export type TwsContextSetInput = typeof TwsContextSetInput.Type;
++export const TwsTopologyEntry = Schema.Struct({
++  kind: Schema.Literals(["workspace", "feature", "node"]),
++  bindingId: TrimmedNonEmptyString,
++  workspaceBindingId: TwsWorkspaceBindingId,
++  featureBindingId: Schema.NullOr(TwsFeatureBindingId),
++  projectIds: Schema.Array(ProjectId).check(Schema.isMaxLength(100)),
++  projectIdsOverflowed: Schema.Boolean,
++  label: TrimmedNonEmptyString.check(Schema.isMaxLength(256)),
++  archived: Schema.Boolean,
++  materialized: Schema.Boolean,
++  requiresConfirmation: Schema.Boolean,
++  complete: Schema.Boolean,
++  presence: Schema.Literals(["present", "missing", "unknown"]),
++  missingObservations: Schema.Array(TwsObservationId).check(Schema.isMaxLength(2)),
++  observationId: Schema.NullOr(TwsObservationId),
++  lastConfirmedAt: Schema.NullOr(IsoDateTime),
++});
++export type TwsTopologyEntry = typeof TwsTopologyEntry.Type;
++export const TwsTopologyQuery = Schema.Struct({
++  workspaceBindingId: Schema.optional(TwsWorkspaceBindingId),
++  featureBindingId: Schema.optional(TwsFeatureBindingId),
++  after: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(256))),
++  limit: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 }))),
++});
++export type TwsTopologyQuery = typeof TwsTopologyQuery.Type;
++export const TwsTopologyQueryResult = Schema.Struct({
++  integration: TwsIntegrationState,
++  entries: Schema.Array(TwsTopologyEntry).check(Schema.isMaxLength(100)),
++  nextCursor: Schema.NullOr(Schema.String),
++});
++export const TwsProvenanceInput = Schema.Struct({
++  bindingId: TrimmedNonEmptyString.check(Schema.isMaxLength(256)),
++});
++export const TwsProvenance = Schema.Struct({
++  bindingId: TrimmedNonEmptyString,
++  canonicalLocator: TwsLocator,
++  locators: TwsLocators,
++});
++export class TwsContextError extends Schema.TaggedError<TwsContextError>()("TwsContextError", {
++  reason: Schema.Literals([
++    "disabled",
++    "unavailable",
++    "conflict",
++    "invalid-selection",
++    "thread-unavailable",
++  ]),
++  message: Schema.String,
++}) {}

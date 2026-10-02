@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-package-payload-pruning",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "fbe5792c07855203fd0e308e62ce0542dbbc8c7e",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "99cbab8aa05211acf6d270e642f6189c2e8780f402d621db3f77d41df14fd1c7",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "ee3377d45c2895073315d4135ef104e53d8cb1ca",
       "upper": {
@@ -38,6 +38,51 @@
           "slug": "windows-portable-packaging-tests",
           "kind": "hard",
           "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "23c8db1aebbae84fa3971f607ef0bdcf0f7962495f2eff786798c3afe9fa7faa",
+          "parent_recipe_sha256": "5a531c8a1456697b19931438b9a14804c8998f95da3ed82ddd9758310fd8572e"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_5c3845d1603a",
+      "kind": "amend-refresh",
+      "patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+      "git_patch_id": "35038a4caef2cf167c4db1a50aa5594167de8b9d",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "acd69601918506de8a86754cb2aee73cc7afb085",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/operations/release.md",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "windows-portable-packaging-tests",
+          "kind": "hard",
+          "satisfied_by": "0a590fa01af66ec135d2ebf2d5542b08a37dc275",
           "parent_generation": 1,
           "parent_patch_sha256": "23c8db1aebbae84fa3971f607ef0bdcf0f7962495f2eff786798c3afe9fa7faa",
           "parent_recipe_sha256": "5a531c8a1456697b19931438b9a14804c8998f95da3ed82ddd9758310fd8572e"

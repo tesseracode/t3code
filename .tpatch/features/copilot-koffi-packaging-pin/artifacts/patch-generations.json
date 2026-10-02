@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-koffi-packaging-pin",
-  "current_generation": 1,
+  "current_generation": 6,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "50224dc8b0833ea8d3b6b32621cc599d9bc55658",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "19993702bf1cc11eeb0cee3e5aa32a1a0787b127fb8c663757ab49caa553d2c9",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "b8e2e0e8dc2d51f549224ed9c8ba815fd6eb4527",
       "upper": {
@@ -45,6 +45,245 @@
           "parent_generation": 1,
           "parent_patch_sha256": "a9135c35e2158a5a813dd57261e2da99d4a543a27e4f941f1a3066600c843dc5",
           "parent_recipe_sha256": "99cbab8aa05211acf6d270e642f6189c2e8780f402d621db3f77d41df14fd1c7"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_314f79b9479a",
+      "kind": "amend-refresh",
+      "patch_sha256": "925a7c862732bbff4edfa36c1e8c858cf6ca175b25ef5dc3b428e61d9e1cec51",
+      "git_patch_id": "bc9acd5a653b36b1ae79c70e2576894ff589be4b",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "3a20577073b589b3b688e9eebe17675a4d668c79232a417fb0f0ba003d7237a1",
+      "canonical_patch": "",
+      "audit_patch": "",
+      "base_commit": "47556adef3f46f5720869c423032ba0abba3c445",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/operations/release.md",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 3,
+      "generation_id": "pg_4707e94555a6",
+      "kind": "amend-refresh",
+      "patch_sha256": "c696d6d2f030c86652154e8c813c13e187ba54f1fbf9fe45f9a51d99fc1d0ca5",
+      "git_patch_id": "82e8c60c503f9bdca2c166a42b45a377c4691faf",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "ba3684eb82b6c1ecf8bb91f7ef9ddf97b19c6a68884eee9b22d47f7cdc1051f4",
+      "canonical_patch": "",
+      "audit_patch": "patches/003-record.patch",
+      "base_commit": "fc01e75770e4b92c4a72d29cc58d612894a5a995",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "pnpm-workspace.yaml"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 4,
+      "generation_id": "pg_0272ad6d4fb5",
+      "kind": "amend-refresh",
+      "patch_sha256": "c499b0c371f121301b51cf955b137373a3262f15f4a6694edfd004913d408654",
+      "git_patch_id": "e43bff19761b4047ee51780787f93f7edd576d83",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "2282bdba04fdd3f03c35bcbdc9ce27da6e402ecef363eea840ef5c2ee7dcbb0e",
+      "canonical_patch": "",
+      "audit_patch": "patches/004-record.patch",
+      "base_commit": "47556adef",
+      "upper": {
+        "kind": "commit",
+        "ref": "HEAD",
+        "commit": "b06224b6a9b6d4a40841482ba4540146c38c14f3"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          "docs/operations/release.md",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "scripts/build-cli-archive.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/operations/release.md",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 5,
+      "generation_id": "pg_848ceb88b28d",
+      "kind": "amend-refresh",
+      "patch_sha256": "8ac5c6cd33fe10c25fb98faebcadf344b4724d8f8d502959e0d21d153d651c03",
+      "git_patch_id": "4b009a125f839c3b9191378942d514596e9ad794",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "1f0f0693290422d99f680e40b7355bf677f7136a4bcd3b572453527f8f9ff15e",
+      "canonical_patch": "",
+      "audit_patch": "patches/005-record.patch",
+      "base_commit": "05855c535208a3ec527cb05064b97a0c4438d5c6",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "pnpm-lock.yaml"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 6,
+      "generation_id": "pg_ab6a7c671808",
+      "kind": "amend-refresh",
+      "patch_sha256": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306",
+      "git_patch_id": "16f9ca9adcb7314d7b9bc75738f9354abee4bd1b",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/006-record.patch",
+      "base_commit": "47556adef",
+      "upper": {
+        "kind": "commit",
+        "ref": "HEAD",
+        "commit": "9e10b9d3c5aa7eb2ba54082a624092e29ec91885"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          "docs/operations/release.md",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "scripts/build-cli-archive.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/operations/release.md",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
         }
       ],
       "refs": {

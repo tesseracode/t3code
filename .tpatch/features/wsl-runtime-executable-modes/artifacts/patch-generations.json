@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "wsl-runtime-executable-modes",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "4a94f6eb7428e4c4c58c85c795184c614983200a",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "04445f734b8dddf42e32e31e6f8a3cc1df42125fba45068a7733a5148404d38f",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "3adf3566f162434ce963eb64298210e1d1d47005",
       "upper": {
@@ -45,6 +45,54 @@
           "parent_generation": 1,
           "parent_patch_sha256": "a9135c35e2158a5a813dd57261e2da99d4a543a27e4f941f1a3066600c843dc5",
           "parent_recipe_sha256": "99cbab8aa05211acf6d270e642f6189c2e8780f402d621db3f77d41df14fd1c7"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_e6ba98c04603",
+      "kind": "amend-refresh",
+      "patch_sha256": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
+      "git_patch_id": "50ac4338df39edd9c7ed460a85173cdc4fe0bd20",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "7e207cbdaf060ce9f3400d22ad59bcc17bbfe7cb",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+        "docs/operations/release.md",
+        "packages/shared/package.json",
+        "packages/shared/src/copilotRuntime.test.ts",
+        "packages/shared/src/copilotRuntime.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
         }
       ],
       "refs": {

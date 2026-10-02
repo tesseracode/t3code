@@ -1,0 +1,47 @@
+# Implementation Record: attention-notifications
+
+**Recorded**: 2026-10-02T07:19:59Z
+**Files changed**: 30
+**Patch size**: 120855 bytes
+**Capture mode**: working-tree-all
+
+## Change Summary
+
+```
+ apps/web/src/components/AppSidebarLayout.tsx       |   2 +
+ apps/web/src/components/CommandPalette.tsx         |  16 +-
+ .../ThreadNotificationCoordinator.badge.test.tsx   |  31 +-
+ .../ThreadNotificationCoordinator.test.tsx         |  74 +++--
+ .../components/ThreadNotificationCoordinator.tsx   | 354 ++++++++++++++-------
+ .../components/settings/NotificationSettings.tsx   | 242 ++++++++++----
+ .../web/src/components/settings/SettingsPanels.tsx |   2 +-
+ apps/web/src/components/settings/settingsSearch.ts |  18 ++
+ apps/web/src/components/sidebar/SidebarChrome.tsx  |   6 +-
+ apps/web/src/routeTree.gen.ts                      |  21 ++
+ apps/web/src/threadNotifications.ts                |  43 ++-
+ docs/internals/overview.md                         |  23 ++
+ docs/user/keybindings.md                           |   7 +
+ docs/user/thread-sidebar.md                        |   5 +
+ packages/contracts/src/keybindings.ts              |   1 +
+ packages/contracts/src/settings.test.ts            |  35 ++
+ packages/contracts/src/settings.ts                 |  25 ++
+ 17 files changed, 694 insertions(+), 211 deletions(-)
+```
+
+## Capture Provenance
+
+- **capture_mode**: `working-tree-all`
+- **pathspecs**: (none)
+- **claim_ids**: (none)
+- **base_commit**: `c85a648522dea67a5744984cdad2b1d677e21dd4`
+- **upper_commit**: `working-tree`
+
+## Replay Instructions
+
+To re-apply this feature to a clean checkout:
+
+```bash
+# From the feature's artifacts directory:
+git apply .tpatch/features/attention-notifications/artifacts/post-apply.patch
+```
+

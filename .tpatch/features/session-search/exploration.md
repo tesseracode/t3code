@@ -1,65 +1,47 @@
-# Exploration: session-search
+# Exploration: session-search on v0.0.42
 
-## Existing Patterns to Follow
+## Current integration
 
-### Keybinding Registration
+- `packages/contracts/src/keybindings.ts` declares `chat.search`; the shared
+  defaults bind `mod+f` outside terminal and preview focus.
+- `routes/_chat.tsx` sends a scoped request and claims the shortcut only when a
+  current timeline accepts it. `sessionSearchBus.ts` carries the scoped key.
+- `CommandPalette.tsx` offers the same action and defers it until dialog close,
+  suppressing the otherwise unconditional composer focus restoration.
+- `sessionSearch.ts` preserves bounded NFKC/case-insensitive occurrence matching,
+  deterministic wrapped navigation and IME-safe keyboard behavior.
+- `MessagesTimeline.logic.ts` reuses the existing row projection to identify
+  searchable activities. `revealedEntryId` temporarily unfolds only its containing
+  turn and work group and participates in incremental projection invalidation.
+- `MessagesTimeline.tsx` retains nested tool-list virtualization and targets the
+  matching member of an expanded group. Only actual search navigation disables
+  live follow; ordinary scroll/disclosure state remains upstream-owned.
+- `ChatView.tsx` passes one interaction flag for the paint-only held timeline.
+  Both of that timeline's identity props can hold the prior key, so comparing
+  those keys alone cannot establish whether it may accept a search request.
+- `useAssistantCitationTarget.ts` exposes its existing dismissal logic to search.
+  A newer citation closes search; a search command dismisses older citation
+  positioning. Delayed search frames are cancelled on close or scope change.
+- `SessionSearchBar.tsx` focuses on command, exposes current counts and manual
+  earlier-history loading, and restores focus only if focus remains in search
+  or falls to the document body. It does not steal another control's focus.
 
-- File: `apps/server/src/keybindings.ts`
-- Pattern: `{ key: "mod+f", command: "chat.search", when: "!terminalFocus" }`
-- `mod+f` is currently unbound — no conflict
-- The `when: "!terminalFocus"` guard prevents intercepting terminal's Ctrl+F
+## Preserved bounds
 
-### Search UI Pattern (from ModelPickerContent.tsx)
+No full-history fetching, DOM walking, regex or inline Markdown rewriting.
+The loaded-window page sizes remain owned by client-runtime; this port uses
+`loadEarlier` rather than adding another loader. Unsent queue bubbles, setup-only
+rows, hidden tool output, binary assets and delegated-agent-only rows are not
+silently added to the searchable conversation scope.
 
-```typescript
-const [searchQuery, setSearchQuery] = useState("");
-const searchInputRef = useRef<HTMLInputElement>(null);
-// Focus on mount
-useEffect(() => {
-  searchInputRef.current?.focus();
-}, []);
-// Debounced filtering
-const isSearching = searchQuery.trim().length > 0;
-```
+## Validation surface
 
-### Command Handling (from ChatView.tsx)
+Focused search, timeline projection, dynamic timeline interactions, palette
+close coordination, keybindings and citation tests cover the port. Current
+web/contracts/shared typechecks and the web build cover integration. Real
+browser/computer use requires permission and is a separate integrated gate.
+Mobile native search remains deferred; desktop wraps the same web surface.
 
-- Commands are dispatched via `useKeybindings()` hook
-- ChatView already handles: `terminal.toggle`, `diff.toggle`, `commandPalette.toggle`, `modelPicker.toggle`
-- Add `chat.search` to the same handler
-
-### Message Data Available for Search
-
-```typescript
-// ChatMessage.text — user/assistant message content
-// WorkLogEntry.label — tool call labels
-// WorkLogEntry.detail — tool output details
-// WorkLogEntry.command — shell commands
-```
-
-### Timeline Structure (MessagesTimeline.tsx)
-
-- Renders `TimelineEntry[]` — each entry is a message or work log group
-- Messages render via `MarkdownRenderer` — search highlighting would wrap matched spans
-- Work log entries render labels/details as plain text — easier to highlight
-
-### Highlight Approach
-
-Two options:
-
-1. **CSS-based**: Add a `<mark>` wrapper around matched text via string splitting — simple but breaks markdown rendering
-2. **DOM-based**: After render, use `window.find()` or TreeWalker to highlight matches in the DOM — preserves rendering but more complex
-3. **Hybrid**: For plain text (work log), use string splitting. For markdown messages, use a custom rehype plugin or post-render DOM marking.
-
-**Recommended**: Start with option 1 for plain text content, extend to option 3 for markdown if needed.
-
-### Scroll-to-Match
-
-- `MessagesTimeline` uses a scroll container — `scrollIntoView({ behavior: "smooth", block: "center" })` on the matched element
-- Need to track matched element refs or use query selectors on `[data-search-match="N"]` attributes
-
-## Key Decisions
-
-- Search bar position: **top of chat area** (like VS Code's find widget) — stays visible while scrolling
-- Match navigation: **Enter = next, Shift+Enter = previous** (standard pattern)
-- Case sensitivity: **case-insensitive** by default (no toggle needed for v1)
+The original blocked automatic reconcile result remains real history. Manual
+resolution, source capture, regenerated recipe and scoped landing provide new
+evidence without manufacturing an automatic success.

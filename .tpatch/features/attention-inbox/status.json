@@ -1,0 +1,36 @@
+{
+  "id": "attention-inbox",
+  "slug": "attention-inbox",
+  "title": "ATT-05 (#7): add one virtualized web/desktop /attention inbox and persistent sidebar actionable-thread badge using Foundation shared attention state. Reuse sidebar variants, Settings, command palette, scoped routing and configurable attention.open command without a default shortcut. Scoped environment/project/kind/priority filters, explicit incomplete/stale/unavailable states, existing thread response UI, device-local reversible revision-based seen emphasis capped at 2000. No OS notifications, relay mutation, mobile UI, server authority or full-thread loads to render the inbox.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-09-29T07:33:34Z",
+  "updated_at": "2026-09-30T07:03:04Z",
+  "last_command": "record",
+  "notes": "landed at 2026-09-30T07:03:05Z",
+  "apply": {
+    "completed_at": "2026-09-30T07:03:04Z",
+    "base_commit": "26b7eb894d1ce095c3469b9451ea9f0c4172c1ae",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "phase1-foundation",
+      "kind": "hard"
+    },
+    {
+      "slug": "session-search",
+      "kind": "soft"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-09-29T07:54:33Z",
+    "passed": true,
+    "recipe_hash_at_verify": "2055d20b7900d8710d727bd7947a49c93f555ad9ee61cbf797058cddf7d548db",
+    "patch_hash_at_verify": "c817b3b2150735f0f64410a695df2b926d525b3df3c70f450366d4115c7d034a",
+    "parent_snapshot": {
+      "phase1-foundation": "applied"
+    }
+  }
+}
