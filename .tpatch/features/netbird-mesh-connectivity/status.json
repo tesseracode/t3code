@@ -1,0 +1,12 @@
+{
+  "id": "netbird-mesh-connectivity",
+  "slug": "netbird-mesh-connectivity",
+  "title": "Request optional NetBird-first private-network endpoint integration, reusing direct environment connections and existing advertised-endpoint seams; evaluate manual connectivity before introducing capability-based mesh adapters. Preserve Tailscale behavior, leave Headscale compatibility explicit, and keep this feature requested with no runtime implementation.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-02T05:50:57Z",
+  "updated_at": "2026-10-02T05:50:57Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}
