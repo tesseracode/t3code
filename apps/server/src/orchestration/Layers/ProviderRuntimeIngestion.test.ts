@@ -35,6 +35,7 @@ import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
+import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as Tracer from "effect/Tracer";
 import { it as effectIt } from "@effect/vitest";
 import { afterEach, describe, expect, it } from "vite-plus/test";
@@ -412,6 +413,26 @@ describe("ProviderRuntimeIngestion", () => {
             .pipe(Effect.map(Option.getOrThrow)),
         ),
       emit: provider.emit,
+      readAttention: () =>
+        testRuntime.runPromise(
+          Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            return {
+              summaries: yield* sql<{
+                readonly phase: string | null;
+                readonly failure_count: number;
+                readonly disconnect_count: number;
+              }>`
+            SELECT phase, failure_count, disconnect_count FROM projection_thread_awareness WHERE thread_id = 'thread-1'`,
+              items: yield* sql<{
+                readonly kind: string;
+                readonly status: string;
+                readonly reason_code: string;
+              }>`
+            SELECT kind, status, reason_code FROM projection_thread_attention_lifecycle WHERE thread_id = 'thread-1' ORDER BY kind`,
+            };
+          }),
+        ),
       advanceClock: (ms: number) => {
         clockOffsetMs += ms;
       },
@@ -421,6 +442,88 @@ describe("ProviderRuntimeIngestion", () => {
       drain,
     };
   }
+
+  it("persists accepted provider lifecycle scope through the decider into attention", async () => {
+    const harness = await createHarness();
+    const base = {
+      provider: ProviderDriverKind.make("codex"),
+      threadId: asThreadId("thread-1"),
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    const turnId = asTurnId("lifecycle-turn");
+    await harness.emitAndDrain([
+      { ...base, type: "turn.started", eventId: asEventId("life-start"), turnId, payload: {} },
+    ]);
+    expect((await harness.readAttention()).summaries[0]?.phase).toBe("running");
+    await harness.emitAndDrain([
+      {
+        ...base,
+        type: "runtime.error",
+        eventId: asEventId("life-loss"),
+        turnId,
+        payload: { class: "transport_error", message: "private transport detail" },
+      },
+    ]);
+    expect((await harness.readAttention()).summaries[0]).toMatchObject({
+      phase: "stale",
+      disconnect_count: 1,
+    });
+    await harness.emitAndDrain([
+      {
+        ...base,
+        type: "session.state.changed",
+        eventId: asEventId("life-reconnect"),
+        turnId,
+        payload: { state: "running" },
+      },
+    ]);
+    expect((await harness.readAttention()).summaries[0]).toMatchObject({
+      phase: "running",
+      disconnect_count: 0,
+    });
+    await harness.emitAndDrain([
+      {
+        ...base,
+        type: "turn.completed",
+        eventId: asEventId("life-failed"),
+        turnId,
+        payload: { state: "failed", errorMessage: "private failure" },
+      },
+    ]);
+    expect((await harness.readAttention()).summaries[0]).toMatchObject({
+      phase: "failed",
+      failure_count: 1,
+    });
+    await harness.emitAndDrain([
+      {
+        ...base,
+        type: "turn.completed",
+        eventId: asEventId("life-old-complete"),
+        turnId: asTurnId("unrelated"),
+        payload: { state: "completed" },
+      },
+    ]);
+    expect((await harness.readAttention()).summaries[0]?.failure_count).toBe(1);
+    await harness.emitAndDrain([
+      { ...base, type: "turn.started", eventId: asEventId("life-retry"), turnId, payload: {} },
+    ]);
+    await harness.emitAndDrain([
+      {
+        ...base,
+        type: "turn.completed",
+        eventId: asEventId("life-complete"),
+        turnId,
+        payload: { state: "completed" },
+      },
+    ]);
+    const final = await harness.readAttention();
+    expect(final.summaries[0]).toMatchObject({
+      phase: "completed",
+      failure_count: 0,
+      disconnect_count: 0,
+    });
+    expect(final.items.every((item) => item.status === "resolved")).toBe(true);
+  });
 
   it("maps turn started/completed events into thread session updates", async () => {
     const harness = await createHarness();

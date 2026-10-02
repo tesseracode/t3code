@@ -59,6 +59,7 @@ const makeProjectionStateRepository = Effect.gen(function* () {
             DO UPDATE SET
               last_applied_sequence = excluded.last_applied_sequence,
               updated_at = excluded.updated_at
+            WHERE excluded.last_applied_sequence >= projection_state.last_applied_sequence
           `,
   });
 

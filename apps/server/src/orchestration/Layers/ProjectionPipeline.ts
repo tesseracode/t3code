@@ -1,5 +1,4 @@
 import {
-  ApprovalRequestId,
   isImportedAgentSessionMessageId,
   UserInputAttachmentAnswerPayload,
   type ChatAttachment,
@@ -22,10 +21,16 @@ import {
 } from "@t3tools/shared/threadPullRequests";
 
 import { toPersistenceSqlError, type ProjectionRepositoryError } from "../../persistence/Errors.ts";
+import {
+  CURRENT_ATTENTION_PROJECTOR,
+  ProjectionThreadAttentionCurrentRepository,
+} from "../../persistence/Services/ProjectionThreadAttentionCurrent.ts";
+import { ProjectionThreadAttentionCurrentRepositoryLive } from "../../persistence/Layers/ProjectionThreadAttentionCurrent.ts";
 import { OrchestrationEventStore } from "../../persistence/Services/OrchestrationEventStore.ts";
 import { ProjectionPendingApprovalRepository } from "../../persistence/Services/ProjectionPendingApprovals.ts";
 import { ProjectionProjectRepository } from "../../persistence/Services/ProjectionProjects.ts";
 import { ProjectionStateRepository } from "../../persistence/Services/ProjectionState.ts";
+import { ProjectionThreadAttentionAuditRepository } from "../../persistence/Services/ProjectionThreadAttentionAudit.ts";
 import { ProjectionThreadActivityRepository } from "../../persistence/Services/ProjectionThreadActivities.ts";
 import { type ProjectionThreadActivity } from "../../persistence/Services/ProjectionThreadActivities.ts";
 import {
@@ -46,6 +51,7 @@ import { ProjectionThreadRepository } from "../../persistence/Services/Projectio
 import { ProjectionPendingApprovalRepositoryLive } from "../../persistence/Layers/ProjectionPendingApprovals.ts";
 import { ProjectionProjectRepositoryLive } from "../../persistence/Layers/ProjectionProjects.ts";
 import { ProjectionStateRepositoryLive } from "../../persistence/Layers/ProjectionState.ts";
+import { ProjectionThreadAttentionAuditRepositoryLive } from "../../persistence/Layers/ProjectionThreadAttentionAudit.ts";
 import { ProjectionThreadActivityRepositoryLive } from "../../persistence/Layers/ProjectionThreadActivities.ts";
 import { ProjectionThreadMessageRepositoryLive } from "../../persistence/Layers/ProjectionThreadMessages.ts";
 import { ProjectionThreadProposedPlanRepositoryLive } from "../../persistence/Layers/ProjectionThreadProposedPlans.ts";
@@ -58,6 +64,10 @@ import {
   type OrchestrationProjectionPipelineShape,
 } from "../Services/ProjectionPipeline.ts";
 import {
+  approvalRequestIdFromActivityPayload,
+  threadAttentionAuditEntryFromEvent,
+} from "../ThreadAttentionAudit.ts";
+import {
   attachmentRelativePath,
   parseAttachmentIdFromRelativePath,
   parseThreadSegmentFromAttachmentId,
@@ -65,11 +75,13 @@ import {
 } from "../../attachmentStore.ts";
 
 export const ORCHESTRATION_PROJECTOR_NAMES = {
+  threadAttentionCurrent: CURRENT_ATTENTION_PROJECTOR,
   projects: "projection.projects",
   threads: "projection.threads",
   threadMessages: "projection.thread-messages",
   threadProposedPlans: "projection.thread-proposed-plans",
   threadActivities: "projection.thread-activities",
+  threadAttentionAudit: "projection.thread-attention-audit",
   threadSessions: "projection.thread-sessions",
   threadTurns: "projection.thread-turns",
   checkpoints: "projection.checkpoints",
@@ -120,14 +132,6 @@ const materializeAttachmentsForProjection = Effect.fn("materializeAttachmentsFor
     Effect.succeed(input.attachments.length === 0 ? [] : input.attachments),
 );
 
-function extractActivityRequestId(payload: unknown): ApprovalRequestId | null {
-  if (typeof payload !== "object" || payload === null) {
-    return null;
-  }
-  const requestId = (payload as Record<string, unknown>).requestId;
-  return typeof requestId === "string" ? ApprovalRequestId.make(requestId) : null;
-}
-
 function isStalePendingApprovalFailureDetail(detail: string | null): boolean {
   if (detail === null) {
     return false;
@@ -169,7 +173,7 @@ function derivePendingUserInputCountFromActivities(
   );
 
   for (const activity of ordered) {
-    const requestId = extractActivityRequestId(activity.payload);
+    const requestId = approvalRequestIdFromActivityPayload(activity.payload);
     if (requestId === null) {
       continue;
     }
@@ -481,12 +485,15 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     const sql = yield* SqlClient.SqlClient;
     const eventStore = yield* OrchestrationEventStore;
     const projectionStateRepository = yield* ProjectionStateRepository;
+    const currentAttention = yield* ProjectionThreadAttentionCurrentRepository;
     const projectionProjectRepository = yield* ProjectionProjectRepository;
     const projectionThreadRepository = yield* ProjectionThreadRepository;
     const projectionThreadMessageRepository = yield* ProjectionThreadMessageRepository;
     const projectionThreadProposedPlanRepository = yield* ProjectionThreadProposedPlanRepository;
     const projectionThreadPullRequestRepository =
       yield* ProjectionThreadPullRequests.ProjectionThreadPullRequestRepository;
+    const projectionThreadAttentionAuditRepository =
+      yield* ProjectionThreadAttentionAuditRepository;
     const projectionThreadActivityRepository = yield* ProjectionThreadActivityRepository;
     const projectionThreadSessionRepository = yield* ProjectionThreadSessionRepository;
     const projectionTurnRepository = yield* ProjectionTurnRepository;
@@ -1335,6 +1342,22 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
       }
     });
 
+    const applyThreadAttentionAuditProjection: ProjectorDefinition["apply"] = Effect.fn(
+      "applyThreadAttentionAuditProjection",
+    )(function* (event, _attachmentSideEffects) {
+      if (event.type === "thread.created") {
+        yield* projectionThreadAttentionAuditRepository.deleteByThreadId({
+          threadId: event.payload.threadId,
+        });
+        return;
+      }
+
+      const entry = threadAttentionAuditEntryFromEvent(event);
+      if (entry !== null) {
+        yield* projectionThreadAttentionAuditRepository.upsert(entry);
+      }
+    });
+
     const applyThreadSessionsProjection: ProjectorDefinition["apply"] = Effect.fn(
       "applyThreadSessionsProjection",
     )(function* (event, _attachmentSideEffects) {
@@ -1404,7 +1427,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             if (
               Option.isNone(pendingTurnStart) ||
               String(pendingTurnStart.value.messageId) !==
-                extractActivityRequestId(event.payload.activity.payload)
+                approvalRequestIdFromActivityPayload(event.payload.activity.payload)
             ) {
               return;
             }
@@ -1418,7 +1441,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           if (
             Option.isNone(pendingTurnStart) ||
             String(pendingTurnStart.value.messageId) !==
-              extractActivityRequestId(event.payload.activity.payload)
+              approvalRequestIdFromActivityPayload(event.payload.activity.payload)
           ) {
             return;
           }
@@ -1765,7 +1788,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
 
         case "thread.activity-appended": {
           const requestId =
-            extractActivityRequestId(event.payload.activity.payload) ??
+            approvalRequestIdFromActivityPayload(event.payload.activity.payload) ??
             event.metadata.requestId ??
             null;
           if (requestId === null) {
@@ -1841,7 +1864,9 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             // already closed it, including a reply from another client.
             const requestActivities = (yield* projectionThreadActivityRepository.listByThreadId({
               threadId: existingRow.value.threadId,
-            })).filter((activity) => extractActivityRequestId(activity.payload) === requestId);
+            })).filter(
+              (activity) => approvalRequestIdFromActivityPayload(activity.payload) === requestId,
+            );
             const wasRequested = requestActivities.some(
               (activity) => activity.kind === "approval.requested",
             );
@@ -1923,6 +1948,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     });
 
     const projectors: ReadonlyArray<ProjectorDefinition> = [
+      { name: CURRENT_ATTENTION_PROJECTOR, apply: (event) => currentAttention.project(event) },
       {
         name: ORCHESTRATION_PROJECTOR_NAMES.projects,
         apply: applyProjectsProjection,
@@ -1938,6 +1964,10 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
       {
         name: ORCHESTRATION_PROJECTOR_NAMES.threadActivities,
         apply: applyThreadActivitiesProjection,
+      },
+      {
+        name: ORCHESTRATION_PROJECTOR_NAMES.threadAttentionAudit,
+        apply: applyThreadAttentionAuditProjection,
       },
       {
         name: ORCHESTRATION_PROJECTOR_NAMES.threadSessions,
@@ -2105,6 +2135,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     });
 
     const bootstrap: OrchestrationProjectionPipelineShape["bootstrap"] = Effect.gen(function* () {
+      yield* currentAttention.beginRebuild;
       const cleanupProjector = "projection.attachment-cleanup";
       const states = yield* projectionStateRepository.listAll();
       const byProjector = new Map(states.map((state) => [state.projector, state]));
@@ -2121,6 +2152,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         updatedAt: cleanupState?.updatedAt ?? "1970-01-01T00:00:00.000Z",
       });
       yield* Effect.forEach(projectors, bootstrapProjector, { concurrency: 1, discard: true });
+      yield* currentAttention.finishRebuild;
 
       // Cleanup has its own cursor so retries never have to replay committed text.
       // All message and activity references are current before any files are removed.
@@ -2187,9 +2219,11 @@ export const OrchestrationProjectionPipelineLive = Layer.effect(
   Layer.provideMerge(ProjectionThreadMessageRepositoryLive),
   Layer.provideMerge(ProjectionThreadProposedPlanRepositoryLive),
   Layer.provideMerge(ProjectionThreadPullRequests.layer),
+  Layer.provideMerge(ProjectionThreadAttentionAuditRepositoryLive),
   Layer.provideMerge(ProjectionThreadActivityRepositoryLive),
   Layer.provideMerge(ProjectionThreadSessionRepositoryLive),
   Layer.provideMerge(ProjectionTurnRepositoryLive),
   Layer.provideMerge(ProjectionPendingApprovalRepositoryLive),
   Layer.provideMerge(ProjectionStateRepositoryLive),
+  Layer.provideMerge(ProjectionThreadAttentionCurrentRepositoryLive),
 );

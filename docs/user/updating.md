@@ -21,6 +21,19 @@ interrupted, and threads without saved provider resume state need a new message.
 If you previously enabled continuation for updates, enable this setting once
 to allow recovery without a connected client.
 
+### Upgrading this fork's original foundation
+
+Before the first upgrade from the original foundation build, stop the environment
+and back up its T3 home on that machine. The upgrade preserves local attention
+history, TWS bindings and native session references while separating the fork's
+database history from upstream's.
+
+If startup reports incompatible migration history, keep the backup and use a
+compatible build or obtain help repairing the inconsistent database. Do not
+delete migration records to force startup. Do not manually open an upgraded
+database with an older build; restore its matching backup first. Service updates
+that support rollback restore their own database snapshot.
+
 ## Update a connected server
 
 The offered action depends on how the server runs:

@@ -1868,6 +1868,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         payload: {
           threadId: command.threadId,
           session: command.session,
+          ...(command.lifecycle ? { lifecycle: command.lifecycle } : {}),
         },
       };
       // Only a session coming alive is activity worth waking a settled thread

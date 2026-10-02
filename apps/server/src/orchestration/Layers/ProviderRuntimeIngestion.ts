@@ -1,3 +1,4 @@
+import { providerLifecycleEvidence } from "../providerLifecycle.ts";
 import {
   ApprovalRequestId,
   CommandId,
@@ -1606,6 +1607,7 @@ const make = Effect.gen(function* () {
       const now = event.createdAt;
       const eventTurnId = toTurnId(event.turnId);
       const activeTurnId = thread.session?.activeTurnId ?? null;
+      const lifecycle = providerLifecycleEvidence(event, activeTurnId);
       const isTerminalTurn = event.type === "turn.completed" || event.type === "turn.aborted";
       const isCompactedThreadState =
         event.type === "thread.state.changed" && event.payload.state === "compacted";
@@ -1751,6 +1753,7 @@ const make = Effect.gen(function* () {
             type: "thread.session.set",
             commandId: yield* providerCommandId(event, "thread-session-set"),
             threadId: thread.id,
+            ...(lifecycle ? { lifecycle } : {}),
             session: {
               threadId: thread.id,
               status,
@@ -2047,6 +2050,7 @@ const make = Effect.gen(function* () {
             type: "thread.session.set",
             commandId: yield* providerCommandId(event, "runtime-error-session-set"),
             threadId: thread.id,
+            ...(lifecycle ? { lifecycle } : {}),
             session: {
               threadId: thread.id,
               status: "error",
