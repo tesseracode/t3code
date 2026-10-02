@@ -1,6 +1,6 @@
 # Implementation Record: copilot-sdk-license-notice
 
-**Recorded**: 2026-10-02T07:19:43Z
+**Recorded**: 2026-10-02T07:22:43Z
 **Files changed**: 1
 **Patch size**: 654 bytes
 **Capture mode**: working-tree-all
@@ -17,7 +17,7 @@
 - **capture_mode**: `working-tree-all`
 - **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `0828cf9a59f325af57afc1a8f8912550101cfa86`
+- **base_commit**: `d918b950b9462ea923164bd970a516dbdc825981`
 - **upper_commit**: `working-tree`
 
 ## Replay Instructions
