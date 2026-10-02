@@ -1,6 +1,6 @@
 # Implementation Record: copilot-cli-provider
 
-**Recorded**: 2026-10-02T07:19:39Z
+**Recorded**: 2026-10-02T07:21:46Z
 **Files changed**: 38
 **Patch size**: 317992 bytes
 **Capture mode**: working-tree-all
@@ -41,7 +41,7 @@
 - **capture_mode**: `working-tree-all`
 - **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `bce43f3e0f12e0cba6630b034e7c97b3c42ce796`
+- **base_commit**: `d531667fe40facba5e8fb14418031972a6edfccf`
 - **upper_commit**: `working-tree`
 
 ## Replay Instructions
