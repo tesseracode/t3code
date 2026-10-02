@@ -11,6 +11,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { buildRemoteNodeEnvScript } from "@t3tools/ssh/tunnel";
 import { satisfiesSemverRange } from "@t3tools/shared/semver";
+import { buildCopilotExecutableReadinessScript } from "@t3tools/shared/copilotRuntime";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { parseWslDistroList, type WslDistro } from "./wslPathParsing.ts";
@@ -307,6 +308,7 @@ export const buildWslRuntimeInstallScript = (
     "runtime_entry_runs() {",
     '  [ -x "$1/t3" ] && "$1/t3" --version >/dev/null 2>&1',
     "}",
+    buildCopilotExecutableReadinessScript(),
     // Hashing the entry is what tells a working cache from one whose `t3` was
     // swapped or half-written after install: the file is still there and may
     // even still run, and launch then picks an executable that is not what
@@ -314,11 +316,20 @@ export const buildWslRuntimeInstallScript = (
     // milliseconds inside the distro, once per launch, against a cold
     // reinstall of a few hundred megabytes.
     "runtime_server_entry_digest() {",
-    `  sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1`,
+    `  entry_digest=$(sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1)`,
+    '  [ -n "$entry_digest" ] || return 1',
+    // Remember that the verified archive required Copilot even if a damaged
+    // warm cache later loses every SDK/platform file.
+    '  if copilot_payload_present "$1"; then',
+    "    printf '%s:copilot\\n' \"$entry_digest\"",
+    "  else",
+    "    printf '%s\\n' \"$entry_digest\"",
+    "  fi",
     "}",
     "runtime_is_ready() {",
     '  [ -f "$ready_marker" ] &&',
     '    runtime_entry_runs "$runtime_root" &&',
+    '    copilot_executable_payload_ready "$runtime_root" &&',
     // An empty or unreadable marker is a miss, not a pass: that is what a
     // runtime installed before the marker carried a digest looks like, and one
     // reinstall is the cheapest way to make it verifiable from then on.
@@ -384,6 +395,7 @@ export const buildWslRuntimeInstallScript = (
     // The release archive has one top-level `t3-<version>-linux-<arch>/`
     // directory; strip it so the executable lands at `$runtime_root/t3`.
     `tar -xzf ${shellQuote(linuxArchivePath)} -C "$runtime_tmp" --strip-components=1`,
+    'normalize_copilot_executable_modes "$runtime_tmp"',
     // Never write the ready marker over a tree whose executable does not run.
     // Failing here drops out to the mounted-tree fallback, which is
     // recoverable; promoting it would mark the defect ready and cache it.

@@ -1,6 +1,6 @@
 # Implementation Record: copilot-runtime-packaging
 
-**Recorded**: 2026-10-02T07:19:44Z
+**Recorded**: 2026-10-02T07:22:44Z
 **Files changed**: 13
 **Patch size**: 84443 bytes
 **Capture mode**: working-tree-all
@@ -25,7 +25,7 @@
 - **capture_mode**: `working-tree-all`
 - **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `d340defd7d42700361ca5ae6c9bbeaaaccfadafd`
+- **base_commit**: `e8ddcd271cd5521f5230e9effbd460354a62dd14`
 - **upper_commit**: `working-tree`
 
 ## Replay Instructions
