@@ -1,3 +1,5 @@
+ .tpatch/features/session-search/record.md          |   4 +-
+ .tpatch/features/session-search/status.json        |   6 +-
  apps/web/src/components/ChatView.tsx               |   1 +
  .../src/components/CommandPalette.logic.test.ts    |  31 ++
  apps/web/src/components/CommandPalette.logic.ts    |  36 +++
@@ -16,4 +18,4 @@
  packages/contracts/src/keybindings.test.ts         |   7 +
  packages/contracts/src/keybindings.ts              |   1 +
  packages/shared/src/keybindings.ts                 |   1 +
- 18 files changed, 992 insertions(+), 39 deletions(-)
+ 20 files changed, 997 insertions(+), 44 deletions(-)

@@ -21,6 +21,19 @@ on macOS and Ctrl on Windows and Linux, including GNOME, KDE Plasma, Niri, and
 Hyprland. If a custom desktop shortcut takes the same keys, choose another binding
 in Settings.
 
+## Search within a thread
+
+On web and desktop, use `Cmd+F` on macOS or `Ctrl+F` on Windows/Linux, or choose
+**Search current thread** in the command palette. Enter and Shift+Enter move
+between matches in the search field; Escape closes search even when one of its
+buttons has focus. Terminal and preview focus keep their
+own shortcuts. Customize the binding in **Settings → Keybindings**.
+
+Results cover loaded messages, proposed plans and visible activity labels.
+Use **Load earlier** to include older turns; search does not automatically fetch
+the entire conversation. The containing row is highlighted, not individual
+words inside rendered Markdown. Project file-content search remains `mod+shift+f`.
+
 ## Copy pull request references
 
 With a PR open in the right panel or on the Pull Requests page, use `mod+shift+c`

@@ -1,6 +1,6 @@
 # Implementation Record: session-search
 
-**Recorded**: 2026-10-02T07:19:41Z
+**Recorded**: 2026-10-02T07:22:41Z
 **Files changed**: 22
 **Patch size**: 94383 bytes
 **Capture mode**: working-tree-all
@@ -8,6 +8,8 @@
 ## Change Summary
 
 ```
+ .tpatch/features/session-search/record.md          |   4 +-
+ .tpatch/features/session-search/status.json        |   6 +-
  apps/web/src/components/ChatView.tsx               |   1 +
  .../src/components/CommandPalette.logic.test.ts    |  31 ++
  apps/web/src/components/CommandPalette.logic.ts    |  36 +++
@@ -26,7 +28,7 @@
  packages/contracts/src/keybindings.test.ts         |   7 +
  packages/contracts/src/keybindings.ts              |   1 +
  packages/shared/src/keybindings.ts                 |   1 +
- 18 files changed, 992 insertions(+), 39 deletions(-)
+ 20 files changed, 997 insertions(+), 44 deletions(-)
 ```
 
 ## Capture Provenance
@@ -34,7 +36,7 @@
 - **capture_mode**: `working-tree-all`
 - **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `1686d8ebf2b1e99d651a40c4d2c09798cc21a4b6`
+- **base_commit**: `0ac29bd2bd5251a3e50ab86e90b89cb3988447b9`
 - **upper_commit**: `working-tree`
 
 ## Replay Instructions

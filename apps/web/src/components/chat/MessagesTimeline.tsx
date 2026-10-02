@@ -65,6 +65,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useReducer,
   useState,
   type KeyboardEvent,
   type MouseEvent,
@@ -149,6 +150,15 @@ import {
   SnapShotAttachmentDetails,
 } from "./SnapShotAttachmentDetails";
 import { ProposedPlanCard } from "./ProposedPlanCard";
+import { SessionSearchBar } from "./SessionSearchBar";
+import { onOpenSessionSearch } from "../../sessionSearchBus";
+import {
+  deriveSessionSearchMatches,
+  INITIAL_SESSION_SEARCH_STATE,
+  navigateSessionSearchMatch,
+  reduceSessionSearchState,
+  resolveSessionSearchMatchIndex,
+} from "./sessionSearch";
 import { ChangedFilesCard } from "./ChangedFilesTree";
 import {
   CHAT_TIMELINE_ANCHOR_OFFSET,
@@ -167,6 +177,8 @@ import {
 import { useAssistantCitationTarget, type CitationHistoryPage } from "./useAssistantCitationTarget";
 import {
   computeStableMessagesTimelineRows,
+  findMessagesTimelineRowIndex,
+  messagesTimelineRowContainsEntry,
   deriveMessagesTimelineRowsWithState,
   type MessagesTimelineRowsProjection,
   liveWorkEntryLabel,
@@ -256,6 +268,8 @@ import {
 // ---------------------------------------------------------------------------
 
 interface TimelineRowSharedState {
+  searchEntryId: string | null;
+  searchMatchKey: string | null;
   citationRequest: AssistantCitationTarget | null;
   listRef: React.RefObject<LegendListRef | null>;
   timestampFormat: TimestampFormat;
@@ -374,6 +388,7 @@ const TIMELINE_MAINTAIN_SCROLL_AT_END_SMOOTH = {
 // ---------------------------------------------------------------------------
 
 interface MessagesTimelineProps {
+  allowSessionSearch?: boolean;
   citationRequest?: AssistantCitationRequest | null;
   citationHistoryLoading?: boolean;
   onCiteAssistantText?: (
@@ -451,6 +466,7 @@ interface MessagesTimelineProps {
 // ---------------------------------------------------------------------------
 
 export const MessagesTimeline = memo(function MessagesTimeline({
+  allowSessionSearch = true,
   citationRequest = null,
   citationHistoryLoading = false,
   onCiteAssistantText,
@@ -508,6 +524,24 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     new Set(),
   );
   const listIdentityKey = displayThreadKey ?? routeThreadKey;
+  const canSearch = allowSessionSearch && listIdentityKey === routeThreadKey;
+  const [search, dispatchSearch] = useReducer(
+    reduceSessionSearchState,
+    INITIAL_SESSION_SEARCH_STATE,
+  );
+  const [searchScope, setSearchScope] = useState({
+    threadKey: listIdentityKey,
+    citationKey: citationRequest?.key,
+  });
+  if (
+    searchScope.threadKey !== listIdentityKey ||
+    searchScope.citationKey !== citationRequest?.key ||
+    (!canSearch && search.open)
+  ) {
+    setSearchScope({ threadKey: listIdentityKey, citationKey: citationRequest?.key });
+    dispatchSearch({ type: "thread-changed" });
+  }
+  const searchOpen = canSearch && search.open;
   const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const listIdentityRef = useRef(listIdentityKey);
   const previousLatestTurnRef = useRef(latestTurn);
@@ -708,6 +742,42 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         : new Set(liveAgentTaskKey.length > 0 ? liveAgentTaskKey.split("\n") : []),
     [liveAgentTaskKey],
   );
+  const searchMatches = useMemo(
+    () =>
+      searchOpen
+        ? deriveSessionSearchMatches(timelineEntries, search.query, {
+            isWorking,
+            latestTurn,
+            runningTurnId,
+            workspaceRoot,
+            liveAgentTaskIds,
+          })
+        : [],
+    [
+      searchOpen,
+      search.query,
+      timelineEntries,
+      isWorking,
+      latestTurn,
+      runningTurnId,
+      workspaceRoot,
+      liveAgentTaskIds,
+    ],
+  );
+  const searchMatchIndex = resolveSessionSearchMatchIndex(searchMatches, search.activeMatchKey);
+  const activeSearchMatch = searchMatches[searchMatchIndex] ?? null;
+  const searchEntryId = activeSearchMatch?.entryId ?? null;
+  const searchMatchKey = activeSearchMatch?.key ?? null;
+  const navigateSearch = useCallback(
+    (direction: "next" | "previous") => {
+      const match = navigateSessionSearchMatch(searchMatches, search.activeMatchKey, direction);
+      if (match) {
+        onManualNavigation();
+        dispatchSearch({ type: "select-match", matchKey: match.key });
+      }
+    },
+    [searchMatches, search.activeMatchKey, onManualNavigation],
+  );
   const rawRows = useMemo(() => {
     const previous = rowsProjectionRef.current;
     const projection = deriveMessagesTimelineRowsWithState(
@@ -717,6 +787,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         runningTurnId,
         expandedTurnIds: paintedExpandedTurnIds,
         expandedWorkGroupIds: paintedExpandedWorkGroupIds,
+        revealedEntryId: searchEntryId,
         isWorking,
         activeTurnStartedAt,
         turnDiffSummaries,
@@ -740,6 +811,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     runningTurnId,
     paintedExpandedTurnIds,
     paintedExpandedWorkGroupIds,
+    searchEntryId,
     isWorking,
     activeTurnStartedAt,
     turnDiffSummaries,
@@ -758,6 +830,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     positioning: citationPositioning,
     onListLoad: onCitationListLoad,
     alwaysRender: citationAlwaysRender,
+    dismiss: dismissCitation,
   } = useAssistantCitationTarget({
     request: citationRequest,
     entries: timelineEntries,
@@ -769,6 +842,31 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     onExpandTurn: expandCitedTurn,
     onManualNavigation,
   });
+  useLayoutEffect(
+    () =>
+      onOpenSessionSearch((threadKey) => {
+        if (!canSearch || threadKey !== listIdentityKey) return false;
+        dismissCitation();
+        onManualNavigation();
+        dispatchSearch({ type: "open" });
+        return true;
+      }),
+    [canSearch, listIdentityKey, dismissCitation, onManualNavigation],
+  );
+  const searchRowIndex =
+    searchEntryId === null ? -1 : findMessagesTimelineRowIndex(rows, searchEntryId);
+  useEffect(() => {
+    if (!searchOpen || searchMatchKey === null || searchRowIndex < 0) return;
+    const frame = window.requestAnimationFrame(() => {
+      onManualNavigation();
+      void listRef.current?.scrollToIndex({
+        index: searchRowIndex,
+        animated: false,
+        viewOffset: 56,
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchOpen, searchMatchKey, searchRowIndex, listRef, onManualNavigation]);
   const [minimapHasPersistentGutter, setMinimapHasPersistentGutter] = useState(false);
   const [minimapHitStripWidth, setMinimapHitStripWidth] = useState(0);
   const [minimapCurrentIndex, setMinimapCurrentIndex] = useState<number | null>(null);
@@ -913,6 +1011,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 
   const sharedState = useMemo<TimelineRowSharedState>(
     () => ({
+      searchEntryId,
+      searchMatchKey,
       citationRequest: readyCitationRequest,
       listRef,
       timestampFormat,
@@ -947,6 +1047,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       onRemoveQueuedMessage,
     }),
     [
+      searchEntryId,
+      searchMatchKey,
       readyCitationRequest,
       listRef,
       timestampFormat,
@@ -1002,7 +1104,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     [],
   );
 
-  if (rows.length === 0 && !isWorking) {
+  if (rows.length === 0 && !isWorking && !searchOpen) {
     if (hideEmptyPlaceholder) {
       // Occupy the pane with the theme surface so a thread switch cannot
       // punch a hole through to the window chrome (white in light mode).
@@ -1023,6 +1125,21 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           className="relative h-full min-h-0"
           data-assistant-citation-viewport="true"
         >
+          {searchOpen ? (
+            <SessionSearchBar
+              query={search.query}
+              onQueryChange={(query) => dispatchSearch({ type: "query-changed", query })}
+              matchCount={searchMatches.length}
+              currentMatchIndex={searchMatchIndex}
+              focusRequestId={search.focusRequestId}
+              onNext={() => navigateSearch("next")}
+              onPrevious={() => navigateSearch("previous")}
+              onClose={() => dispatchSearch({ type: "close" })}
+              hasUnloadedHistory={loadEarlier !== null}
+              loadingEarlierHistory={loadEarlier?.loading ?? false}
+              onLoadEarlierHistory={loadEarlier?.onLoadEarlier}
+            />
+          ) : null}
           {onCiteAssistantText && citationThreadRef ? (
             <AssistantSelectionToolbar
               viewport={timelineViewportElement}
@@ -1043,9 +1160,12 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             {...(readyCitationRequest ? { dataVersion: readyCitationRequest.key } : {})}
             {...(citationAlwaysRender ? { alwaysRender: citationAlwaysRender } : {})}
             onLoad={onCitationListLoad}
-            {...(anchoredEndSpace ? { anchoredEndSpace } : {})}
-            contentInsetEndAdjustment={anchoredEndSpace ? contentInsetEndAdjustment : 0}
+            {...(anchoredEndSpace && !searchOpen ? { anchoredEndSpace } : {})}
+            contentInsetEndAdjustment={
+              anchoredEndSpace && !searchOpen ? contentInsetEndAdjustment : 0
+            }
             maintainScrollAtEnd={
+              searchOpen ||
               citationPositioning ||
               anchoredEndSpace ||
               !liveFollowEnabled ||
@@ -1411,6 +1531,9 @@ type TimelineWorkEntry = Extract<MessagesTimelineRow, { kind: "work" }>["grouped
 type TimelineRow = MessagesTimelineRow;
 
 const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: TimelineRow }) {
+  const { searchEntryId } = use(TimelineRowCtx);
+  const searchActive =
+    searchEntryId !== null && messagesTimelineRowContainsEntry(row, searchEntryId);
   const isExpandedToolGroup = row.kind === "work" && row.isExpandedToolGroup;
   const isExpandedToolGroupHeader =
     (row.kind === "work-toggle" && row.expanded) || (row.kind === "work-live" && row.expanded);
@@ -1418,6 +1541,7 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
   return (
     <div
       className={cn(
+        searchActive && "rounded-md bg-primary/10 ring-1 ring-inset ring-primary/50",
         // Commentary (non-terminal assistant) rows carry no metadata row, so
         // they sit closer to the work that follows them.
         isExpandedToolGroup
@@ -1442,6 +1566,8 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
           : null,
       )}
       data-timeline-row-id={row.id}
+      data-session-search-active={searchActive || undefined}
+      aria-current={searchActive ? "true" : undefined}
       data-timeline-row-kind={row.kind}
       data-message-id={
         row.kind === "message" || row.kind === "assistant-meta" ? row.message.id : undefined
@@ -1939,6 +2065,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         ) : null}
         <div onCopyCapture={onBodyCopyCapture}>
           <CollapsibleUserMessageBody
+            forceExpanded={ctx.searchEntryId === row.id}
             text={resolvedContext.text}
             renderContextReference={renderContextReference}
             skills={ctx.skills}
@@ -2199,6 +2326,7 @@ function ProposedPlanTimelineRow({
   return (
     <div className="min-w-0 px-1 py-0.5">
       <ProposedPlanCard
+        forceExpanded={ctx.searchEntryId === row.id}
         planMarkdown={row.proposedPlan.planMarkdown}
         environmentId={ctx.activeThreadEnvironmentId}
         threadRef={ctx.threadRef ?? undefined}
@@ -2359,10 +2487,19 @@ function ExpandedWorkGroupEntries({
   entries: TimelineWorkEntry[];
   workspaceRoot: string | undefined;
 }) {
-  const { workGroupViewState: viewState, onToggleWorkEntry } = use(TimelineRowCtx);
+  const {
+    workGroupViewState: viewState,
+    onToggleWorkEntry,
+    searchEntryId,
+    searchMatchKey,
+  } = use(TimelineRowCtx);
+  const searchIndex = entries.findIndex((entry) => entry.id === searchEntryId);
   const [initialScrollIndex] = useState(() =>
-    resolveWorkGroupScrollIndex(entries, viewState.scrollPositions.get(anchorKey)),
+    searchIndex >= 0
+      ? { index: searchIndex, viewOffset: 0 }
+      : resolveWorkGroupScrollIndex(entries, viewState.scrollPositions.get(anchorKey)),
   );
+  const [loaded, setLoaded] = useState(false);
   const [restoringPosition, setRestoringPosition] = useState(initialScrollIndex !== undefined);
   const listRef = useRef<LegendListRef>(null);
   const [fades, setFades] = useState({ top: false, bottom: false, viewportHeight: 0 });
@@ -2428,7 +2565,13 @@ function ExpandedWorkGroupEntries({
       }
     }
     setRestoringPosition(false);
+    setLoaded(true);
   }, [initialScrollIndex]);
+
+  useLayoutEffect(() => {
+    if (!loaded || searchMatchKey === null || searchIndex < 0) return;
+    void listRef.current?.scrollToIndex({ index: searchIndex, animated: false, viewOffset: 8 });
+  }, [loaded, searchIndex, searchMatchKey]);
 
   useLayoutEffect(() => {
     const element = listRef.current?.getScrollableNode();
@@ -2465,7 +2608,9 @@ function ExpandedWorkGroupEntries({
         recycleItems
         {...(initialScrollIndex ? { initialScrollIndex } : {})}
         maintainScrollAtEnd={
-          appendState.follow ? { animated: false, on: { dataChange: true } } : false
+          searchIndex < 0 && appendState.follow
+            ? { animated: false, on: { dataChange: true } }
+            : false
         }
         maintainScrollAtEndThreshold={1 / Math.max(1, fades.viewportHeight)}
         // Measure the restored row even when an intra-row offset puts its
@@ -3351,6 +3496,7 @@ function shouldCollapseUserMessage(text: string): boolean {
 
 const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(props: {
   text: string;
+  forceExpanded?: boolean;
   renderContextReference: (reference: ChatMarkdownContextReference) => ReactNode;
   skills: ReadonlyArray<Pick<ServerProviderSkill, "name" | "displayName">>;
   markdownCwd: string | undefined;
@@ -3359,7 +3505,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
   const [expanded, setExpanded] = useState(false);
   const hasVisibleBody = props.text.trim().length > 0;
   const canCollapse = hasVisibleBody && shouldCollapseUserMessage(props.text);
-  const isCollapsed = canCollapse && !expanded;
+  const isCollapsed = canCollapse && !expanded && !props.forceExpanded;
 
   return (
     <div>
@@ -3395,7 +3541,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
           )}
           data-user-message-footer="true"
         >
-          {canCollapse ? (
+          {canCollapse && !props.forceExpanded ? (
             <Button
               type="button"
               size="xs"
@@ -4169,7 +4315,8 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
   onToggleEntry?: ((collapsed: boolean) => void) | undefined;
 }) {
   const { workEntry, workspaceRoot, isExpandedToolGroupEntry, displayLabel } = props;
-  const { threadRef, onImageExpand } = use(TimelineRowCtx);
+  const { threadRef, onImageExpand, searchEntryId } = use(TimelineRowCtx);
+  const searchActive = searchEntryId === workEntry.id;
   const groupView = use(WorkGroupViewCtx);
   const [expanded, setExpanded] = useState(
     () => groupView?.state.expandedEntries.has(workEntry.id) ?? false,
@@ -4197,7 +4344,9 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
     showWarningIndicator || showDestructiveRowStyle
       ? undefined
       : (workEntry.toolIcon ?? workEntry.toolSource?.icon);
-  const previewText = displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot);
+  const previewText = searchActive
+    ? workEntryDisplayLabel(workEntry, workspaceRoot)
+    : (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
   const answerPreview = workEntry.questionAnswer
     ? getQuestionAnswerPreview(workEntry.questionAnswer)
     : null;
@@ -4272,11 +4421,14 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
     <div
       className={cn(
         "flex flex-col rounded-md px-0.5 transition-colors",
+        searchActive && "bg-primary/10 ring-1 ring-inset ring-primary/50",
         isExpandedToolGroupEntry ? "py-0" : "py-0.5",
         expanded && "mb-1",
         canExpand &&
           "cursor-pointer hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70",
       )}
+      data-session-search-entry-active={searchActive || undefined}
+      aria-current={searchActive ? "true" : undefined}
       {...rowToggleProps}
     >
       <div className="flex select-none items-center gap-1.5 transition-[opacity,translate] duration-200">
@@ -4298,7 +4450,9 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
               <span
                 className={cn(
                   answerPreview ? "shrink-0" : "min-w-0 flex-1",
-                  expanded ? "whitespace-pre-wrap break-words select-text" : "truncate",
+                  expanded || searchActive
+                    ? "whitespace-pre-wrap break-words select-text"
+                    : "truncate",
                   headingClass,
                 )}
                 onClick={expanded ? stopRowToggleWhileSelectingText : undefined}
