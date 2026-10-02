@@ -35,3 +35,13 @@ Focused regressions and targeted package typechecks pass. macOS arm64 standalone
   protocol, renderer, notification coordinator or provider-specific UI changes
   are needed. Other provider adapters and local/remote transport ownership are
   unchanged. This is not a new Windows/mobile/native-package qualification.
+- The first in-place landing made dependent historical replay anchors stale.
+  A descendant replay also produced ambiguous historical landing candidates.
+  Both attempts remain on separate local branches. A clean first-landing replay
+  on `fix/copilot-turn-lifecycle` preserves all six complete maintained roots;
+  their integrity checks pass and the final product tree is byte-identical to
+  the tested integration at 42d6f112bb9438e4a9b63ffb79e44fdd8d858461.
+  The provider's replay base is now a metadata seed with the original stable
+  product bytes, not a new upstream release. Foundation's duplicated lockfile
+  pin hunk is supplied by packaging in the explicit replay order; no product
+  pins, dependencies or runtime bytes were changed by that reanchoring.

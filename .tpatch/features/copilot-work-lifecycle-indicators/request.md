@@ -5,10 +5,13 @@
 
 ## Status and baseline
 
-Requested only, on the explicitly approved provider research branch
+Initially requested on the explicitly approved provider research branch
 `feature/copilot-observability`, based on
-`982929e9323f00ded5c7ca943f22a0bcef669a6f`. No runtime fix or lifecycle
-advancement is authorized in this slice. Hard parent: `copilot-cli-provider`.
+`982929e9323f00ded5c7ca943f22a0bcef669a6f`. Implementation was subsequently
+approved in issue #20, explicitly as a maintenance fixup of the complete
+`copilot-cli-provider` root rather than an overlapping new backend root.
+This standalone request is superseded by that implementation; its research
+history is retained. Hard parent: `copilot-cli-provider`.
 Issue #20 owns investigation evidence and implementation decisions.
 
 ## Problem and verified premise
