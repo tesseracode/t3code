@@ -109,6 +109,11 @@ The linked pull request participates in automatic settlement.
 
 ## Find and reference work
 
+The sidebar's [attention inbox](./attention.md) badge counts threads with open
+approvals, input requests, failures or provider disconnections across enabled
+environments. A `?` marks an incomplete total; opening or marking an item seen
+does not resolve it.
+
 On web and desktop, open the command palette with `Cmd/Ctrl+K` to search threads
 across connected environments. Message search starts after two characters and
 includes your messages and final agent responses.

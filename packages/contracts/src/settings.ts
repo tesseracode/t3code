@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import {
   ForwardCompatibleNullable,
+  EnvironmentId,
   ProjectId,
   TrimmedNonEmptyString,
   TrimmedString,
@@ -287,11 +288,32 @@ export const LoadBalancingWeights = Schema.Record(
 
 export const DiffColorScheme = Schema.Literals(["red-green", "blue-orange"]);
 
+const NotificationCategories = Schema.Array(
+  Schema.Literals(["approval", "user_input", "failure", "disconnect", "completion"]),
+);
+const NotificationMutedEnvironments = Schema.Array(EnvironmentId);
+const NotificationQuietHours = Schema.Struct({
+  enabled: Schema.Boolean,
+  start: Schema.String.check(Schema.isPattern(/^([01]\d|2[0-3]):[0-5]\d$/)),
+  end: Schema.String.check(Schema.isPattern(/^([01]\d|2[0-3]):[0-5]\d$/)),
+});
+
 export const ClientSettingsSchema = Schema.Struct({
   notificationMode: NotificationMode.pipe(
     Schema.withDecodingDefault(Effect.succeed("off" as const)),
   ),
   inAppNotificationsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  notificationCategories: NotificationCategories.pipe(
+    Schema.withDecodingDefault(
+      Effect.succeed(["approval", "user_input", "failure", "completion"] as const),
+    ),
+  ),
+  notificationMutedEnvironments: NotificationMutedEnvironments.pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
+  notificationQuietHours: NotificationQuietHours.pipe(
+    Schema.withDecodingDefault(Effect.succeed({ enabled: false, start: "22:00", end: "08:00" })),
+  ),
   diffColorScheme: DiffColorScheme.pipe(
     Schema.withDecodingDefault(Effect.succeed("red-green" as const)),
   ),
@@ -1502,6 +1524,9 @@ export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;
 export const ClientSettingsPatch = Schema.Struct({
   notificationMode: Schema.optionalKey(NotificationMode),
   inAppNotificationsEnabled: Schema.optionalKey(Schema.Boolean),
+  notificationCategories: Schema.optionalKey(NotificationCategories),
+  notificationMutedEnvironments: Schema.optionalKey(NotificationMutedEnvironments),
+  notificationQuietHours: Schema.optionalKey(NotificationQuietHours),
   diffColorScheme: Schema.optionalKey(DiffColorScheme),
   loadBalancingEnabled: Schema.optionalKey(Schema.Boolean),
   loadBalancingWeights: Schema.optionalKey(LoadBalancingWeights),
