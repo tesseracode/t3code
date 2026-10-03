@@ -38,6 +38,7 @@ import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import * as OrchestrationReactor from "./orchestration/Services/OrchestrationReactor.ts";
+import { TwsContextService } from "./tws/TwsContextService.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerSettings from "./serverSettings.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
@@ -903,6 +904,7 @@ export const make = (options?: StartupOptions) =>
     const serverConfig = yield* ServerConfig.ServerConfig;
     const keybindings = yield* Keybindings.Keybindings;
     const orchestrationReactor = yield* OrchestrationReactor.OrchestrationReactor;
+    const twsContext = yield* TwsContextService;
     const providerSessionReaper = yield* ProviderSessionReaper.ProviderSessionReaper;
     const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
     const serverSettings = yield* ServerSettings.ServerSettingsService;
@@ -965,6 +967,14 @@ export const make = (options?: StartupOptions) =>
         "reactors.start",
         Effect.gen(function* () {
           yield* orchestrationReactor.start().pipe(Scope.provide(reactorScope));
+          yield* twsContext.start.pipe(
+            Scope.provide(reactorScope),
+            Effect.catchTag("TwsContextError", (error) =>
+              Effect.logWarning("Optional TWS integration is unavailable.", {
+                reason: error.reason,
+              }),
+            ),
+          );
           yield* providerSessionReaper.start().pipe(Scope.provide(reactorScope));
         }),
       );

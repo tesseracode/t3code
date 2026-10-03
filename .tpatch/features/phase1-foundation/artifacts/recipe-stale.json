@@ -1,5 +1,5 @@
 {
   "stale": true,
   "reason": "recipe references files absent from patch: pnpm-lock.yaml",
-  "detected_at": "2026-10-03T03:54:27Z"
+  "detected_at": "2026-10-03T03:56:25Z"
 }

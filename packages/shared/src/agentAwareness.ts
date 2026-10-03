@@ -3,16 +3,10 @@ import type {
   OrchestrationProjectShell,
   OrchestrationThreadShell,
   ThreadId,
+  ThreadAwarenessPhase,
 } from "@t3tools/contracts";
 
-export type AgentAwarenessPhase =
-  | "starting"
-  | "running"
-  | "waiting_for_approval"
-  | "waiting_for_input"
-  | "completed"
-  | "failed"
-  | "stale";
+export type AgentAwarenessPhase = ThreadAwarenessPhase;
 
 export interface AgentAwarenessState {
   readonly environmentId: EnvironmentId;

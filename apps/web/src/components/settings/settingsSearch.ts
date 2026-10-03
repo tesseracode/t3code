@@ -244,6 +244,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["notification sound alert completion input approval desktop"],
   },
   {
+    id: "tws-integration",
+    title: "TWS integration",
+    to: "/settings/integrations",
+    searchTerms: ["tws tesseraworkspaces workspace feature stack optional addon plugin"],
+  },
+  {
     id: "in-app-notifications",
     title: "In-app notifications",
     to: "/settings/general",

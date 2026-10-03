@@ -42,6 +42,7 @@ import * as RepositoryIdentityResolver from "../src/project/RepositoryIdentityRe
 import * as ServerLifecycleEvents from "../src/serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "../src/serverRuntimeStartup.ts";
 import * as ServerSettings from "../src/serverSettings.ts";
+import { TwsContextService } from "../src/tws/TwsContextService.ts";
 import * as AnalyticsService from "../src/telemetry/AnalyticsService.ts";
 import * as GitVcsDriver from "../src/vcs/GitVcsDriver.ts";
 
@@ -69,6 +70,7 @@ const makePersistedRuntimeLayer = (dbPath: string) => {
 };
 
 const startupDependencies = Layer.mergeAll(
+  Layer.mock(TwsContextService)({ start: Effect.void }),
   Layer.mock(Keybindings.Keybindings)({
     start: Effect.void,
   }),
