@@ -39,6 +39,7 @@ export class DesktopEnvironment extends Context.Service<
     readonly processArch: string;
     readonly isPackaged: boolean;
     readonly isDevelopment: boolean;
+    readonly isolatedPreview: boolean;
     readonly appVersion: string;
     readonly appPath: string;
     readonly resourcesPath: string;
@@ -173,10 +174,10 @@ const make = Effect.fn("desktop.environment.make")(function* (
     input.isPackaged && input.platform === "win32"
       ? path.join(input.resourcesPath, "server.asar")
       : appRoot;
-  const branding = resolveDesktopAppBranding({
-    isDevelopment,
-    appVersion: input.appVersion,
-  });
+  const branding = {
+    ...resolveDesktopAppBranding({ isDevelopment, appVersion: input.appVersion }),
+    ...(config.isolatedPreview ? { displayName: "T3 Code Fork Preview" } : {}),
+  };
   const displayName = branding.displayName;
   const stateDir = resolveDesktopStateDir({
     baseDir,
@@ -199,6 +200,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
     processArch: input.processArch,
     isPackaged: input.isPackaged,
     isDevelopment,
+    isolatedPreview: config.isolatedPreview,
     appVersion: input.appVersion,
     appPath: input.appPath,
     resourcesPath,

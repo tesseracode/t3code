@@ -741,6 +741,19 @@ const resolveWslStartConfig = Effect.fn("desktop.backendConfiguration.resolveWsl
   // probed Node's bin dir so the server cannot pick up a different node than
   // the one node-pty was probed with.
   const runtime = preflight.runtime;
+  const previewHome = environment.isolatedPreview
+    ? yield* wslEnvironment.getUserHome(distroForConfig)
+    : Option.none<string>();
+  if (environment.isolatedPreview && Option.isNone(previewHome)) {
+    return {
+      ...baseConfig,
+      args: [...distroArgs, "--", "node", "--version"],
+      preflightFailure: Option.some({
+        fatal: true,
+        reason: "Fork preview could not resolve the Linux home needed for an isolated WSL profile.",
+      }),
+    } satisfies DesktopBackendManager.DesktopBackendStartConfig;
+  }
   const launchPath =
     runtime.kind === "executable"
       ? `${WSL_SERVER_SYSTEM_PATH}:${preflight.resolvedPath}`
@@ -757,6 +770,9 @@ const resolveWslStartConfig = Effect.fn("desktop.backendConfiguration.resolveWsl
       "--exec",
       "env",
       `PATH=${launchPath}`,
+      ...(Option.isSome(previewHome)
+        ? [`T3CODE_HOME=${previewHome.value.replace(/\/$/, "")}/.t3-fork-preview`]
+        : []),
       ...command,
       "--bootstrap-fd",
       "0",
