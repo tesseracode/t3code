@@ -2,11 +2,11 @@
   "id": "copilot-work-lifecycle-indicators",
   "slug": "copilot-work-lifecycle-indicators",
   "title": "Investigate and reproduce Copilot thinking versus working/tools/background work and authoritative completion; correlate native CLI/SDK events, T3 projections and user-visible indicators across GPT models. Record the request on the provider follow-up branch; no runtime fix is authorized in this research slice.",
-  "state": "requested",
+  "state": "rejected",
   "compatibility": "unknown",
   "requested_at": "2026-10-02T05:50:57Z",
-  "updated_at": "2026-10-02T05:50:57Z",
-  "last_command": "add",
+  "updated_at": "2026-10-02T07:24:08Z",
+  "last_command": "reject",
   "apply": {},
   "reconcile": {},
   "depends_on": [
@@ -14,5 +14,27 @@
       "slug": "copilot-cli-provider",
       "kind": "hard"
     }
-  ]
+  ],
+  "rejection": {
+    "reason": "superseded",
+    "note": "Issue #20 was approved and implemented as a genuine fixup of the complete maintained copilot-cli-provider root. This standalone overlapping feature is superseded, not applied; preserve its request and research history. Implementation branch: fix/copilot-turn-lifecycle.",
+    "actor": "jdbencardinop@unal.edu.co",
+    "related": "copilot-cli-provider",
+    "evidence": [
+      {
+        "path": ".tpatch/features/copilot-cli-provider/artifacts/manual-validation.md",
+        "sha256": "73fe46ab448e988545e3b746fdabccf5e624733bfcdc6ac7dc3853215ae6f2fc"
+      },
+      {
+        "path": ".tpatch/features/copilot-cli-provider/artifacts/post-apply.patch",
+        "sha256": "594351aad9377f74290908f0dc209a2f0f869c49d2bcf33192b2d525d0609ff8"
+      },
+      {
+        "path": ".tpatch/features/copilot-cli-provider/spec.md",
+        "sha256": "1d438b6e44a943ec05e8734159b9a2434c686d7e4914132103eff5017ac721d8"
+      }
+    ],
+    "rejected_at": "2026-10-02T07:24:08Z",
+    "prior_state": "requested"
+  }
 }
