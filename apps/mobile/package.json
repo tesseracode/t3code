@@ -47,6 +47,7 @@
   "dependencies": {
     "@clerk/expo": "catalog:",
     "@effect/atom-react": "catalog:",
+    "@formatjs/intl-segmenter": "12.2.15",
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo/metro-runtime": "~57.0.14",
     "@expo/ui": "~57.0.14",

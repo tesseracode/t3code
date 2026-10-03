@@ -20,6 +20,13 @@ T3 Connect is optional and disabled in a fresh clone. Public configuration belon
 repository-root `.env` or `.env.local`, not an `apps/mobile/.env` file. See
 [`../../.env.example`](../../.env.example).
 
+## Runtime initialization
+
+The mobile entry loads `src/polyfills.ts` before the app and shared contracts.
+Hermes does not provide `Intl.Segmenter`; the conditional polyfill preserves
+Unicode grapheme validation without changing server/web behavior. Keep this
+initialization ahead of imports that construct contract schemas.
+
 ## Development
 
 For simulator/emulator development, select and boot a device, then ensure its native client matches

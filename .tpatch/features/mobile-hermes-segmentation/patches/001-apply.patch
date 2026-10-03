@@ -1,0 +1,89 @@
+diff --git a/apps/mobile/README.md b/apps/mobile/README.md
+index 20f98c6c9..934fce21d 100644
+--- a/apps/mobile/README.md
++++ b/apps/mobile/README.md
+@@ -20,6 +20,13 @@ T3 Connect is optional and disabled in a fresh clone. Public configuration belon
+ repository-root `.env` or `.env.local`, not an `apps/mobile/.env` file. See
+ [`../../.env.example`](../../.env.example).
+ 
++## Runtime initialization
++
++The mobile entry loads `src/polyfills.ts` before the app and shared contracts.
++Hermes does not provide `Intl.Segmenter`; the conditional polyfill preserves
++Unicode grapheme validation without changing server/web behavior. Keep this
++initialization ahead of imports that construct contract schemas.
++
+ ## Development
+ 
+ For simulator/emulator development, select and boot a device, then ensure its native client matches
+diff --git a/apps/mobile/index.ts b/apps/mobile/index.ts
+index 9b887f58a..bebca06ba 100644
+--- a/apps/mobile/index.ts
++++ b/apps/mobile/index.ts
+@@ -1,4 +1,5 @@
+ import { registerRootComponent } from "expo";
++import "./src/polyfills";
+ import "react-native-gesture-handler";
+ import { LogBox } from "react-native";
+ import { featureFlags } from "react-native-screens";
+diff --git a/apps/mobile/package.json b/apps/mobile/package.json
+index b1d736621..a423487e3 100644
+--- a/apps/mobile/package.json
++++ b/apps/mobile/package.json
+@@ -47,6 +47,7 @@
+   "dependencies": {
+     "@clerk/expo": "catalog:",
+     "@effect/atom-react": "catalog:",
++    "@formatjs/intl-segmenter": "12.2.15",
+     "@expo-google-fonts/dm-sans": "^0.4.2",
+     "@expo/metro-runtime": "~57.0.14",
+     "@expo/ui": "~57.0.14",
+diff --git a/apps/mobile/src/polyfills.test.ts b/apps/mobile/src/polyfills.test.ts
+new file mode 100644
+index 000000000..4f799d94a
+--- /dev/null
++++ b/apps/mobile/src/polyfills.test.ts
+@@ -0,0 +1,36 @@
++import { afterEach, describe, expect, it, vi } from "vite-plus/test";
++
++afterEach(() => {
++  vi.unstubAllGlobals();
++  vi.resetModules();
++});
++
++describe("mobile Intl bootstrap", () => {
++  it("loads contracts without native Segmenter and preserves grapheme validation", async () => {
++    vi.resetModules();
++    const runtimeIntl = Object.create(Intl);
++    Object.defineProperty(runtimeIntl, "Segmenter", {
++      value: undefined,
++      configurable: true,
++      writable: true,
++    });
++    vi.stubGlobal("Intl", runtimeIntl);
++    await import("./polyfills");
++    const [{ ProjectMonogramText }, Schema] = await Promise.all([
++      import("@t3tools/contracts"),
++      import("effect/Schema"),
++    ]);
++    const decode = Schema.decodeUnknownSync(ProjectMonogramText);
++    expect(decode("a\u0301b")).toBe("a\u0301b");
++    expect(decode("AB")).toBe("AB");
++    expect(() => decode("ABC")).toThrow();
++    expect(() => decode("A B")).toThrow();
++  });
++
++  it("preserves a supported native Segmenter", async () => {
++    vi.resetModules();
++    const native = Intl.Segmenter;
++    await import("./polyfills");
++    expect(Intl.Segmenter).toBe(native);
++  });
++});
+diff --git a/apps/mobile/src/polyfills.ts b/apps/mobile/src/polyfills.ts
+new file mode 100644
+index 000000000..8513fd35e
+--- /dev/null
++++ b/apps/mobile/src/polyfills.ts
+@@ -0,0 +1 @@
++import "@formatjs/intl-segmenter/polyfill.js";
