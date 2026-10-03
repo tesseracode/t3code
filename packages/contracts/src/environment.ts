@@ -76,6 +76,10 @@ export const ServerSelfUpdateCapability = Schema.Literals([
 export type ServerSelfUpdateCapability = typeof ServerSelfUpdateCapability.Type;
 
 export const ExecutionEnvironmentCapabilities = Schema.Struct({
+  /** Optional read-only TWS context API; use the environment setting to opt in. */
+  twsContext: Schema.optionalKey(Schema.Boolean),
+  /** Owned, paginated attention bootstrap/replay/live stream protocol v1. */
+  attentionSync: Schema.optionalKey(Schema.Boolean),
   repositoryIdentity: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   connectionProbe: Schema.optionalKey(Schema.Boolean),
   /** Missing on older servers, which still accept inline image attachments. */
@@ -95,6 +99,8 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
       Absent on servers from before inline context shipped, which drop the records and forward
       the links as literal text -- so a client must serialize context the legacy way for them. */
   inlineMessageContext: Schema.optionalKey(Schema.Boolean),
+  /** Server exposes provider-neutral GitHub Issue / Azure Boards work-item APIs. */
+  workItems: Schema.optionalKey(Schema.Boolean),
   /** Server understands thread.settle / thread.unsettle commands. Absent on
       pre-settlement servers, so clients treat missing as unsupported and
       never send the commands under version skew. */

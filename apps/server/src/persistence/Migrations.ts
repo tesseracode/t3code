@@ -10,6 +10,9 @@
 
 import * as Migrator from "effect/unstable/sql/Migrator";
 import * as Effect from "effect/Effect";
+import * as SqlClient from "effect/unstable/sql/SqlClient";
+
+import { bridgeLegacyForkMigrations, runForkMigrations } from "./ForkMigrations.ts";
 
 // Import all migrations statically
 import Migration0001 from "./Migrations/001_OrchestrationEvents.ts";
@@ -157,17 +160,47 @@ export interface RunMigrationsOptions {
  * Creates the migrations tracking table (effect_sql_migrations) if it doesn't exist,
  * then runs any migrations with ID greater than the latest recorded migration.
  *
- * Returns array of [id, name] tuples for migrations that were run.
+ * Fork migrations use a separate ledger. Legacy collisions and both migration
+ * streams commit together; the return value contains upstream migrations only.
  *
  * @returns Effect containing array of executed migrations
  */
 export const runMigrations = Effect.fn("runMigrations")(function* ({
   toMigrationInclusive,
 }: RunMigrationsOptions = {}) {
-  const executedMigrations = yield* run({ loader: makeMigrationLoader(toMigrationInclusive) });
-  const migrations = executedMigrations.map(([id, name]) => `${id}_${name}`);
-  yield* migrations.length === 0
+  const sql = yield* SqlClient.SqlClient;
+  const completed = yield* sql.withTransaction(
+    Effect.gen(function* () {
+      const repaired = yield* bridgeLegacyForkMigrations(migrationManifest, toMigrationInclusive);
+      const executed = yield* run({ loader: makeMigrationLoader(toMigrationInclusive) });
+      const history = yield* sql<{ readonly migration_id: number; readonly name: string }>`
+        SELECT migration_id, name FROM effect_sql_migrations
+      `;
+      // The generic migrator treats insert constraint failures as a concurrent
+      // migration. Do not report success unless the required history exists.
+      if (
+        migrationManifest.some(
+          ([id, name]) =>
+            (toMigrationInclusive === undefined || id <= toMigrationInclusive) &&
+            !history.some((row) => row.migration_id === id && row.name === name),
+        )
+      ) {
+        return yield* new Migrator.MigrationError({
+          kind: "BadState",
+          message: "Upstream migrations did not reach the required version.",
+        });
+      }
+      // The explicit bound is used to build upstream-only migration fixtures.
+      const fork = toMigrationInclusive === undefined ? yield* runForkMigrations() : [];
+      return { upstream: [...repaired, ...executed], fork };
+    }),
+  );
+  const migrations = completed.upstream.map(([id, name]) => `${id}_${name}`);
+  const forkMigrations = completed.fork.map(([id, name]) => `${id}_${name}`);
+  yield* migrations.length === 0 && forkMigrations.length === 0
     ? Effect.logDebug("Database schema is current")
-    : Effect.log("Migrations ran successfully").pipe(Effect.annotateLogs({ migrations }));
-  return executedMigrations;
+    : Effect.log("Migrations ran successfully").pipe(
+        Effect.annotateLogs({ migrations, forkMigrations }),
+      );
+  return completed.upstream;
 });

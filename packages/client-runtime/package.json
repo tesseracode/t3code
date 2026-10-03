@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./attention-sync": {
+      "types": "./src/attentionSync.ts",
+      "default": "./src/attentionSync.ts"
+    },
     "./load-balancing": {
       "types": "./src/load-balancing.ts",
       "default": "./src/load-balancing.ts"
@@ -94,6 +98,10 @@
     "./state/auth": {
       "types": "./src/state/auth.ts",
       "default": "./src/state/auth.ts"
+    },
+    "./state/attention": {
+      "types": "./src/state/attention.ts",
+      "default": "./src/state/attention.ts"
     },
     "./state/assets": {
       "types": "./src/state/assets.ts",
@@ -206,6 +214,10 @@
     "./state/threads": {
       "types": "./src/state/threads.ts",
       "default": "./src/state/threads.ts"
+    },
+    "./state/tws": {
+      "types": "./src/state/tws.ts",
+      "default": "./src/state/tws.ts"
     },
     "./state/subagentRuntime": {
       "types": "./src/state/subagentRuntime.ts",

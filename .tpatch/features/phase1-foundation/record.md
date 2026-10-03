@@ -1,8 +1,8 @@
 # Implementation Record: phase1-foundation
 
-**Recorded**: 2026-10-02T07:22:46Z
-**Files changed**: 98
-**Patch size**: 646361 bytes
+**Recorded**: 2026-10-03T02:34:21Z
+**Files changed**: 97
+**Patch size**: 645717 bytes
 **Capture mode**: staged-index
 
 ## Capture Provenance
@@ -10,9 +10,9 @@
 - **capture_mode**: `staged-index`
 - **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `02e63679c4d0774c59573bb6ff1d5c00750a0717`
+- **base_commit**: `8419528d1e6394e6b54056118ea51c7cafbee79c`
 - **upper_commit**: `working-tree`
-- **dirty_state**: 98 staged paths, 0 unrelated unstaged paths
+- **dirty_state**: 97 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
