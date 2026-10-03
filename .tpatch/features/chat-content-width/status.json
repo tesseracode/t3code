@@ -1,0 +1,12 @@
+{
+  "id": "chat-content-width",
+  "slug": "chat-content-width",
+  "title": "Add a client-local Standard, Wide or Full width preference for aligned conversation and composer layout.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-03T06:03:34Z",
+  "updated_at": "2026-10-03T06:03:34Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}
