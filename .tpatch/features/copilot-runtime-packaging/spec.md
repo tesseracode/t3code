@@ -71,7 +71,35 @@
 5. The replacement and other maintained roots verify; the DAG has no
    violations. Focused regression tests preserve behavior.
 
-## Separate qualification gates and non-goals
+## Isolated native preview extension
+
+1. Preview builds opt into the reviewed `--fork-preview` overlay: distinct
+   installer/app identity, T3/Electron/WSL profiles and single-instance lock;
+   no stock URL registration or update feed. Ordinary builds remain unchanged.
+2. Provider homes remain independently configurable, not a filesystem sandbox.
+   Isolated unsigned previews explicitly do not offer desktop cloud OAuth or
+   native passkeys. Automated packaging checks do not invoke provider turns.
+3. The complete extended packaging intent contains 27 paths, retaining all
+   original 13-path dependency/payload/WSL behavior plus preview packaging.
+   Keep the original recipe representation and real replay provenance.
+4. The 20261003 batch freezes product at
+   1af644681d931d77fdbda8a014d7c28fdd9ffdab, including issue #20, and uses
+   version 0.0.42-preview.20261003.2 after the receiving-host home-probe repair.
+   Manifests record the product base, exact
+   build SHA, authorized four-manifest version transform and artifact hashes.
+5. Mac arm64 is built locally. Linux x64 runtime and Windows x64 installer use
+   build-only CI, at most two attempts per target for this approved batch.
+   Windows embeds the independently built Linux archive byte-for-byte.
+6. No release/tag/npm publication, signing, deployment or live-profile writes.
+   Native Windows/WSL installed-app qualification remains a receiving-host
+   gate; prior passes cannot qualify the refreshed packages automatically.
+7. Resolve the selected WSL account home using a bounded stdin script through
+   `wsl.exe --exec sh -s`, not nested shell quotes in Windows argv. The Linux
+   account database remains authoritative even when HOME is overridden.
+   Empty/relative/multiline output and failed probes cannot bypass the isolated
+   profile gate. Preserve transport/exit diagnostics and do not cache failures.
+
+## Qualification limits
 
 Full native macOS/Linux/Windows/WSL artifacts, complete installer execution,
 Windows whole-app file count and real native-session continuity remain
