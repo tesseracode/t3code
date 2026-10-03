@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-runtime-packaging",
-  "current_generation": 5,
+  "current_generation": 6,
   "generations": [
     {
       "generation": 1,
@@ -361,9 +361,110 @@
       "git_patch_id": "296400b923ee945affc144651aeb9ccb2eb96ff9",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "2aa04209a0f669be11fed6cb36d298cc05dde5c09f819e51d0dbcf15626a3ea9",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/005-fixup.patch",
       "base_commit": "71266a2664c23ac267a0e817eee6b86bc0ba672a",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/workflows/fork-native-preview.yml",
+        "apps/desktop/src/app/DesktopAppIdentity.test.ts",
+        "apps/desktop/src/app/DesktopAppIdentity.ts",
+        "apps/desktop/src/app/DesktopClerk.test.ts",
+        "apps/desktop/src/app/DesktopClerk.ts",
+        "apps/desktop/src/app/DesktopConfig.ts",
+        "apps/desktop/src/app/DesktopEnvironment.ts",
+        "apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+        "apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+        "docs/operations/fork-native-preview.md",
+        "docs/operations/release.md",
+        "packages/shared/package.json",
+        "packages/shared/src/copilotRuntime.test.ts",
+        "packages/shared/src/copilotRuntime.ts",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/fork-preview-bootstrap.cjs",
+        "scripts/fork-preview-manifest.mjs",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts",
+        "scripts/lib/fork-preview.test.ts",
+        "scripts/lib/fork-preview.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 15,
+          "parent_patch_sha256": "594351aad9377f74290908f0dc209a2f0f869c49d2bcf33192b2d525d0609ff8",
+          "parent_recipe_sha256": "282642299c8ef7784a95f43850e8aa9cee8b1b8023d9b16dcd87bb89ca88ed6d"
+        },
+        {
+          "slug": "copilot-koffi-packaging-pin",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 6,
+          "parent_patch_sha256": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306",
+          "parent_recipe_sha256": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8"
+        },
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        },
+        {
+          "slug": "windows-portable-packaging-tests",
+          "kind": "hard",
+          "satisfied_by": "0a590fa01af66ec135d2ebf2d5542b08a37dc275",
+          "parent_generation": 1,
+          "parent_patch_sha256": "23c8db1aebbae84fa3971f607ef0bdcf0f7962495f2eff786798c3afe9fa7faa",
+          "parent_recipe_sha256": "5a531c8a1456697b19931438b9a14804c8998f95da3ed82ddd9758310fd8572e"
+        },
+        {
+          "slug": "wsl-runtime-executable-modes",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
+          "parent_recipe_sha256": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 6,
+      "generation_id": "pg_86664bcd8462",
+      "kind": "amend-fixup",
+      "reason": "WSL home stdin probe with exact frozen lockfile; retain complete preview packaging intent",
+      "fixup_of_generation": "pg_a2a02c520c0f",
+      "patch_sha256": "8654aa3b3b93203ae1df677a643b0f91ec09881952a8359afd422b1706aeada7",
+      "git_patch_id": "d049e95db3d06429a908f5da38f450d3b719a1dc",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "707b2e939a9bf1584f389b4c663f139b9ecb8fe2863e49718815476b5302f1f1",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/006-fixup.patch",
+      "base_commit": "59ed26eff8ee9ae23faad874a73d4e85778a748d",
       "upper": {
         "kind": "working-tree",
         "ref": "working-tree",

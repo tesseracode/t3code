@@ -1,0 +1,160 @@
+name: Fork native preview (build only)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/fork-native-preview-20261003-r2]
+    paths:
+      - .github/workflows/fork-native-preview.yml
+      - scripts/fork-preview-*
+      - scripts/lib/fork-preview*
+      - scripts/build-desktop-artifact.ts
+      - apps/desktop/src/app/DesktopConfig.ts
+      - apps/desktop/src/app/DesktopEnvironment.ts
+      - apps/desktop/src/app/DesktopAppIdentity.ts
+      - apps/desktop/src/app/DesktopClerk.ts
+      - apps/desktop/src/backend/DesktopBackendConfiguration.ts
+      - apps/desktop/src/wsl/DesktopWslEnvironment.ts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-native-preview
+  cancel-in-progress: false
+
+env:
+  PREVIEW_VERSION: 0.0.42-preview.20261003.2
+  PRODUCT_BASE: 1af644681d931d77fdbda8a014d7c28fdd9ffdab
+  T3CODE_CLERK_PUBLISHABLE_KEY: ""
+  T3CODE_CLERK_JWT_TEMPLATE: ""
+  T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ""
+  T3CODE_RELAY_URL: ""
+  CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+jobs:
+  linux:
+    name: Linux x64 WSL runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact source without credentials or vendored gitlinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA" "$PRODUCT_BASE"
+          git sparse-checkout set --no-cone '/*' '!/.repos/'
+          git checkout --detach "$GITHUB_SHA"
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+        with:
+          node-version-file: package.json
+          run-install: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: stable
+          targets: x86_64-unknown-linux-gnu
+      - name: Install locked build dependencies
+        run: vp install --frozen-lockfile --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+      - name: Align preview version and build JS
+        run: |
+          node scripts/update-release-package-versions.ts "$PREVIEW_VERSION"
+          vp run --filter t3 build
+      - name: Build native resource monitor
+        run: |
+          cargo build --locked --release --target x86_64-unknown-linux-gnu --manifest-path native/resource-monitor/Cargo.toml
+          mkdir -p preview-monitor/linux-x64
+          cp native/resource-monitor/target/x86_64-unknown-linux-gnu/release/t3-resource-monitor preview-monitor/linux-x64/
+      - name: Build Linux single-executable
+        env:
+          VP_NODE_VERSION: "26.8.2"
+        run: node apps/server/scripts/cli.ts build-exe --verbose
+      - name: Package and smoke the WSL runtime
+        run: |
+          node scripts/build-cli-archive.ts --platform linux --arch x64 --version "$PREVIEW_VERSION" --resource-monitor-dir preview-monitor --output-dir preview-linux
+          node scripts/smoke-cli-archive.ts --archive "preview-linux/t3-$PREVIEW_VERSION-linux-x64.tar.gz" --expect-version "$PREVIEW_VERSION"
+          node scripts/fork-preview-manifest.mjs --directory preview-linux --target linux-x64 --version "$PREVIEW_VERSION"
+      - name: Upload runtime and provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fork-preview-linux-x64
+          path: preview-linux/*
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows x64 desktop
+    needs: linux
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: C:\t3\s
+    env:
+      TEMP: C:\t3\tmp
+      TMP: C:\t3\tmp
+    steps:
+      - name: Checkout exact source into a short path
+        working-directory: ${{ github.workspace }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force C:\t3\s, C:\t3\tmp | Out-Null
+          Set-Location C:\t3\s
+          git init .
+          git remote add origin "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin $env:GITHUB_SHA $env:PRODUCT_BASE
+          if ($LASTEXITCODE -ne 0) { throw 'Checkout fetch failed' }
+          git sparse-checkout set --no-cone '/*' '!/.repos/'
+          git checkout --detach $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Checkout failed' }
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+        with:
+          node-version-file: C:/t3/s/package.json
+          cache: false
+          run-install: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+      - name: Install Spectre-mitigated MSVC libraries
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installPath = & $vswhere -products * -latest -property installationPath
+          $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          $result = Start-Process -FilePath $setup -ArgumentList 'modify','--installPath',"`"$installPath`"",'--add','Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre','--quiet','--norestart' -Wait -PassThru -NoNewWindow
+          if ($result.ExitCode -ne 0) { throw "MSVC setup failed: $($result.ExitCode)" }
+      - name: Install locked dependencies
+        run: |
+          vp install --frozen-lockfile --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: fork-preview-linux-x64
+          path: C:\t3\wsl
+      - name: Verify embedded runtime input and align versions
+        run: |
+          $manifest = Get-Content C:\t3\wsl\manifest.json -Raw | ConvertFrom-Json
+          if ($manifest.buildCommit -ne $env:GITHUB_SHA -or $manifest.version -ne $env:PREVIEW_VERSION) { throw 'WSL provenance mismatch' }
+          $archive = "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz"
+          $expected = $manifest.artifacts | Where-Object { $_.name -eq (Split-Path $archive -Leaf) }
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected.sha256) { throw 'WSL digest mismatch' }
+          node scripts/update-release-package-versions.ts $env:PREVIEW_VERSION
+          if ($LASTEXITCODE -ne 0) { throw 'Version transform failed' }
+      - name: Build isolated unsigned Windows installer
+        run: |
+          node scripts/build-desktop-artifact.ts --platform win --arch x64 --target nsis --fork-preview --build-version $env:PREVIEW_VERSION --wsl-runtime "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz" --output-dir C:\t3\release --keep-stage --verbose
+          if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed' }
+          node scripts/fork-preview-manifest.mjs --directory C:\t3\release --target windows-x64 --version $env:PREVIEW_VERSION --wsl-archive "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz"
+          if ($LASTEXITCODE -ne 0) { throw 'Manifest verification failed' }
+      - name: Upload installer and provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fork-preview-windows-x64
+          path: |
+            C:\t3\release\*.exe
+            C:\t3\release\manifest.json
+            C:\t3\release\SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14

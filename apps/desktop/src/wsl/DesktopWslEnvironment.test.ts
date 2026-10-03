@@ -6,6 +6,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
@@ -24,9 +25,21 @@ import {
   parseToolchainReport,
   parseWslRuntimeRoot,
   probeWslDistros,
+  probeWslUserHome,
 } from "./DesktopWslEnvironment.ts";
 
 const encoder = new TextEncoder();
+
+it("keeps preview runtime installation, pruning and invalidation outside the stock cache", () => {
+  for (const script of [
+    buildWslRuntimeInstallScript("/tmp/runtime.tar.gz", "sha256-preview", "a".repeat(64), true),
+    buildWslRuntimePruneScript("sha256-preview", true),
+    buildWslRuntimeInvalidateScript("sha256-preview", true),
+  ]) {
+    expect(script).toContain("$HOME/.t3-fork-preview/wsl-runtime");
+    expect(script).not.toContain("$HOME/.t3/wsl-runtime");
+  }
+});
 
 // The install script only fails the way this file cares about when a real shell
 // runs it, so find one that has the tools it needs: bash directly on Linux, and
@@ -34,17 +47,13 @@ const encoder = new TextEncoder();
 // else the executed suite skips and the generated-text assertions stand alone.
 const REQUIRED_SHELL_TOOLS = ["flock", "sha256sum", "tar", "mktemp"] as const;
 
-const posixShellRunner = (() => {
+const findShellRunner = (probe: string) => {
   // Candidates rather than a platform switch: wsl.exe simply fails to spawn
   // where it does not exist, which is the same answer as a shell missing flock.
   const candidates = [
     { file: "bash", args: [] as ReadonlyArray<string> },
     { file: "wsl.exe", args: ["-e", "bash"] as ReadonlyArray<string> },
   ];
-  const probe = [
-    "[ -d /proc/1 ] || exit 1",
-    ...REQUIRED_SHELL_TOOLS.map((tool) => `command -v ${tool} >/dev/null || exit 1`),
-  ].join("\n");
   return (
     candidates.find((candidate) => {
       const result = NodeChildProcess.spawnSync(candidate.file, [...candidate.args, "-c", probe], {
@@ -53,17 +62,30 @@ const posixShellRunner = (() => {
       return result.status === 0;
     }) ?? null
   );
-})();
+};
 
-const runShell = (script: string) => {
-  if (posixShellRunner === null) throw new Error("no POSIX shell runner available");
+const posixShellRunner = findShellRunner(
+  [
+    "[ -d /proc/1 ] || exit 1",
+    ...REQUIRED_SHELL_TOOLS.map((tool) => `command -v ${tool} >/dev/null || exit 1`),
+  ].join("\n"),
+);
+const readinessShellRunner = findShellRunner(
+  [
+    'case "$(uname -s)" in Linux|Darwin) ;; *) exit 1 ;; esac',
+    'case "$(uname -m)" in x86_64|amd64|aarch64|arm64) ;; *) exit 1 ;; esac',
+    "command -v sha256sum >/dev/null && command -v mktemp >/dev/null",
+  ].join("\n"),
+);
+
+const runShell = (script: string, runner = posixShellRunner) => {
+  if (runner === null) throw new Error("no POSIX shell runner available");
   // The install script arrives on stdin in production too, which is what lets
   // its own /proc scan not match itself.
-  const result = NodeChildProcess.spawnSync(
-    posixShellRunner.file,
-    [...posixShellRunner.args, "-s"],
-    { input: script, encoding: "utf8" },
-  );
+  const result = NodeChildProcess.spawnSync(runner.file, [...runner.args, "-s"], {
+    input: script,
+    encoding: "utf8",
+  });
   return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 };
 
@@ -78,6 +100,57 @@ const readField = (stdout: string, field: string) => {
 // Stands in for the release's self-contained `t3` executable: the install
 // script only asks it for `--version`.
 const SERVER_ENTRY_SOURCE = '#!/bin/sh\necho "t3code wsl runtime test server 0.0.0"\n';
+
+describe.skipIf(readinessShellRunner === null)(
+  "WSL cache readiness functions (executed without Linux installation)",
+  () => {
+    it("remembers a Copilot-bearing archive when its entire payload disappears", () => {
+      const prefix = buildWslRuntimeInstallScript("/unused", "test", "0".repeat(64)).split(
+        'mkdir -p "$runtime_parent"',
+      )[0]!;
+      // Create, inspect and execute inside the same selected shell/filesystem,
+      // including when Windows reaches that shell through wsl.exe.
+      const result = runShell(
+        [
+          "set -eu",
+          "fixture_home=$(mktemp -d)",
+          `trap 'rm -rf "$fixture_home"' EXIT`,
+          'export HOME="$fixture_home"',
+          'case "$(uname -m)" in x86_64|amd64) arch=x64 ;; aarch64|arm64) arch=arm64 ;; *) exit 1 ;; esac',
+          prefix,
+          'mkdir -p "$runtime_root"',
+          `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$runtime_root/t3"`,
+          'chmod 0755 "$runtime_root/t3"',
+          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"',
+          "runtime_is_ready",
+          'for name in copilot copilot-sdk "copilot-linux-$arch"; do',
+          '  mkdir -p "$runtime_root/node_modules/@github/$name"',
+          "  printf '{}\\n' > \"$runtime_root/node_modules/@github/$name/package.json\"",
+          "done",
+          'platform_root="$runtime_root/node_modules/@github/copilot-linux-$arch"',
+          'mkdir -p "$platform_root/ripgrep/bin/linux-$arch" "$platform_root/tgrep/bin/linux-$arch"',
+          'for command in "$platform_root/copilot" "$platform_root/ripgrep/bin/linux-$arch/rg" "$platform_root/tgrep/bin/linux-$arch/tgrep"; do',
+          `  printf '#!/bin/sh\\nexit 0\\n' > "$command"`,
+          '  chmod 0755 "$command"',
+          "done",
+          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"',
+          "runtime_is_ready",
+          "grep -Eq '^[a-f0-9]{64}:copilot$' \"$ready_marker\"",
+          'chmod 0644 "$platform_root/ripgrep/bin/linux-$arch/rg"',
+          'if runtime_is_ready; then printf "Damaged mode was accepted\\n" >&2; exit 1; fi',
+          'normalize_copilot_executable_modes "$runtime_root"',
+          "runtime_is_ready",
+          'rm -r "$runtime_root/node_modules/@github"',
+          'if runtime_is_ready; then printf "Missing Copilot payload was accepted\\n" >&2; exit 1; fi',
+          'printf "cache-readiness:passed\\n"',
+        ].join("\n"),
+        readinessShellRunner,
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toBe("cache-readiness:passed\n");
+    });
+  },
+);
 
 const makeDistroListSpawner = (result: { readonly stdout?: string; readonly exitCode?: number }) =>
   ChildProcessSpawner.make(() =>
@@ -139,6 +212,102 @@ describe("probeWslDistros", () => {
       const error = yield* Fiber.join(fiber);
       expect(error).toBeInstanceOf(DesktopWslDistroListError);
       expect(error.message).toContain("timed out");
+    }).pipe(Effect.provide(layer));
+  });
+});
+
+const homeProbeShellRunner = findShellRunner("command -v cut >/dev/null");
+
+describe("probeWslUserHome", () => {
+  for (const distro of [null, "Ubuntu-24.04"] as const) {
+    it.effect.skipIf(homeProbeShellRunner === null)(
+      `reads the account home through stdin for ${distro ?? "the default distro"}`,
+      () =>
+        Effect.gen(function* () {
+          const spawner = ChildProcessSpawner.make((command) =>
+            Effect.gen(function* () {
+              if (command._tag !== "StandardCommand") return yield* Effect.die("Unexpected pipe");
+              expect(command.command).toBe("wsl.exe");
+              expect(command.args).toEqual([
+                ...(distro === null ? [] : ["-d", distro]),
+                "--exec",
+                "sh",
+                "-s",
+              ]);
+              const stdin = command.options.stdin;
+              if (!Stream.isStream(stdin)) {
+                return yield* Effect.die("The home probe must not send shell code in Windows argv");
+              }
+              const script = yield* stdin.pipe(
+                Stream.decodeText(),
+                Stream.runFold(
+                  () => "",
+                  (text, chunk) => text + chunk,
+                ),
+              );
+              const result = runShell(
+                [
+                  "export HOME='/wrong/inherited/home'",
+                  "id() { printf '%s\\n' '1234'; }",
+                  "getent() {",
+                  '  [ "$1" = passwd ] && [ "$2" = 1234 ] || return 1',
+                  `  printf '%s\\n' 'fixture:x:1234:1234::/home/fixture user:/bin/sh'`,
+                  "}",
+                  script,
+                ].join("\n"),
+                homeProbeShellRunner,
+              );
+              expect(result.status, result.stderr).toBe(0);
+              return yield* makeDistroListSpawner({
+                stdout: result.stdout,
+                exitCode: result.status ?? 1,
+              }).spawn(command);
+            }),
+          );
+          const home = yield* probeWslUserHome(distro).pipe(
+            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+          );
+          expect(home).toEqual(Option.some("/home/fixture user"));
+        }),
+    );
+  }
+
+  for (const stdout of ["", "C:\\Users\\fixture", "relative/home", "/home/fixture\nunexpected"]) {
+    it.effect(`refuses invalid home output ${JSON.stringify(stdout)}`, () =>
+      Effect.gen(function* () {
+        const home = yield* probeWslUserHome("Ubuntu").pipe(
+          Effect.provideService(
+            ChildProcessSpawner.ChildProcessSpawner,
+            makeDistroListSpawner({ stdout, exitCode: 0 }),
+          ),
+        );
+        expect(Option.isNone(home)).toBe(true);
+      }),
+    );
+  }
+
+  it.effect("does not accept output from a failed probe", () =>
+    Effect.gen(function* () {
+      const home = yield* probeWslUserHome("Ubuntu").pipe(
+        Effect.provideService(
+          ChildProcessSpawner.ChildProcessSpawner,
+          makeDistroListSpawner({ stdout: "/home/fixture", exitCode: 1 }),
+        ),
+      );
+      expect(Option.isNone(home)).toBe(true);
+    }),
+  );
+
+  it.effect("bounds a stalled home probe", () => {
+    const layer = Layer.merge(
+      TestClock.layer(),
+      Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, makeDistroListSpawner({})),
+    );
+    return Effect.gen(function* () {
+      const fiber = yield* probeWslUserHome("Ubuntu").pipe(Effect.forkScoped);
+      yield* Effect.yieldNow;
+      yield* TestClock.adjust(Duration.seconds(5));
+      expect(Option.isNone(yield* Fiber.join(fiber))).toBe(true);
     }).pipe(Effect.provide(layer));
   });
 });
@@ -284,7 +453,8 @@ describe("WSL runtime cache", () => {
       "b".repeat(64),
     );
 
-    expect(script).toContain(`  sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1`);
+    expect(script).toContain(`entry_digest=$(sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1)`);
+    expect(script).toContain("printf '%s:copilot\\n'");
     expect(script).toContain(
       '    [ "$recorded_entry_digest" = "$(runtime_server_entry_digest "$runtime_root")" ]',
     );
@@ -402,7 +572,7 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
     fixtures.length = 0;
   });
 
-  const createFixture = () => {
+  const createFixture = (copilot = false) => {
     const result = runShell(
       [
         "set -eu",
@@ -414,6 +584,20 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$stage/t3"`,
         'chmod +x "$stage/t3"',
         `printf '%s' 'pty-native-payload' > "$stage/node_modules/node-pty/build/Release/pty.node"`,
+        ...(copilot
+          ? [
+              'case "$(uname -m)" in x86_64|amd64) copilot_arch=x64 ;; *) copilot_arch=arm64 ;; esac',
+              'copilot_root="$stage/node_modules/@github/copilot-linux-$copilot_arch"',
+              'mkdir -p "$stage/node_modules/@github/copilot-sdk" "$stage/node_modules/@github/copilot" "$copilot_root/ripgrep/bin/linux-$copilot_arch" "$copilot_root/tgrep/bin/linux-$copilot_arch"',
+              'printf "{}" > "$stage/node_modules/@github/copilot-sdk/package.json"',
+              'printf "{}" > "$stage/node_modules/@github/copilot/package.json"',
+              'printf "{}" > "$copilot_root/package.json"',
+              `printf '%s' ${sh("#!/bin/sh\nprintf 'copilot\\n'\n")} > "$copilot_root/copilot"`,
+              `printf '%s' ${sh("#!/bin/sh\nprintf 'rg\\n'\n")} > "$copilot_root/ripgrep/bin/linux-$copilot_arch/rg"`,
+              `printf '%s' ${sh("#!/bin/sh\nprintf 'tgrep\\n'\n")} > "$copilot_root/tgrep/bin/linux-$copilot_arch/tgrep"`,
+              'chmod 0644 "$copilot_root/copilot" "$copilot_root/ripgrep/bin/linux-$copilot_arch/rg" "$copilot_root/tgrep/bin/linux-$copilot_arch/tgrep"',
+            ]
+          : []),
         `tar -czf "$work/wsl-runtime.tar.gz" -C "$work/stage" t3-0.0.0-linux-x64`,
         `printf 'work:%s\\n' "$work"`,
         `printf 'archiveSha:%s\\n' "$(sha256sum "$work/wsl-runtime.tar.gz" | cut -d ' ' -f 1)"`,
@@ -466,6 +650,34 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         buildWslRuntimeProbeScript(fixture.runtimeRoot),
       ].join("\n"),
     );
+
+  it("repairs Copilot command modes and detects a warm cache that lost its whole Copilot payload", () => {
+    const fixture = createFixture(true);
+    const installed = fixture.install();
+    expect(installed.status, installed.stderr).toBe(0);
+    const commands = (prefix: string) =>
+      runShell(
+        [
+          "set -eu",
+          `root=${sh(fixture.runtimeRoot)}`,
+          'for package in "$root"/node_modules/@github/copilot-linux-*; do',
+          `${prefix} "$package/copilot"`,
+          'for tool in "$package"/ripgrep/bin/linux-*/rg "$package"/tgrep/bin/linux-*/tgrep; do',
+          `${prefix} "$tool"`,
+          "done",
+          "done",
+        ].join("\n"),
+      );
+    expect(commands("test -x").status).toBe(0);
+    expect(commands("chmod 0644").status).toBe(0);
+    expect(fixture.install().status).toBe(0);
+    expect(commands("test -x").status).toBe(0);
+    expect(
+      runShell(`set -eu\nrm -r ${sh(`${fixture.runtimeRoot}/node_modules/@github`)}`).status,
+    ).toBe(0);
+    expect(fixture.install().status).toBe(0);
+    expect(commands("test -x").status).toBe(0);
+  });
 
   it("discovers version-managed Node for providers with a standalone runtime", () => {
     const fixture = createFixture();

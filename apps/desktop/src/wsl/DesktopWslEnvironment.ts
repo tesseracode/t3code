@@ -11,6 +11,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { buildRemoteNodeEnvScript } from "@t3tools/ssh/tunnel";
 import { satisfiesSemverRange } from "@t3tools/shared/semver";
+import { buildCopilotExecutableReadinessScript } from "@t3tools/shared/copilotRuntime";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { parseWslDistroList, type WslDistro } from "./wslPathParsing.ts";
@@ -293,11 +294,12 @@ export const buildWslRuntimeInstallScript = (
   linuxArchivePath: string,
   runtimeId: string,
   archiveSha256: string,
+  isolatedPreview = false,
 ): string => {
   const safeRuntimeId = sanitizeWslRuntimeId(runtimeId);
   return [
     "set -eu",
-    'runtime_parent="$HOME/.t3/wsl-runtime"',
+    `runtime_parent="$HOME/${isolatedPreview ? ".t3-fork-preview" : ".t3"}/wsl-runtime"`,
     `runtime_root="$runtime_parent/${safeRuntimeId}"`,
     `ready_marker="$runtime_root/${WSL_RUNTIME_READY_MARKER}"`,
     // The runtime is a self-contained `t3` executable with Node inside, so the
@@ -307,6 +309,7 @@ export const buildWslRuntimeInstallScript = (
     "runtime_entry_runs() {",
     '  [ -x "$1/t3" ] && "$1/t3" --version >/dev/null 2>&1',
     "}",
+    buildCopilotExecutableReadinessScript(),
     // Hashing the entry is what tells a working cache from one whose `t3` was
     // swapped or half-written after install: the file is still there and may
     // even still run, and launch then picks an executable that is not what
@@ -314,11 +317,20 @@ export const buildWslRuntimeInstallScript = (
     // milliseconds inside the distro, once per launch, against a cold
     // reinstall of a few hundred megabytes.
     "runtime_server_entry_digest() {",
-    `  sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1`,
+    `  entry_digest=$(sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1)`,
+    '  [ -n "$entry_digest" ] || return 1',
+    // Remember that the verified archive required Copilot even if a damaged
+    // warm cache later loses every SDK/platform file.
+    '  if copilot_payload_present "$1"; then',
+    "    printf '%s:copilot\\n' \"$entry_digest\"",
+    "  else",
+    "    printf '%s\\n' \"$entry_digest\"",
+    "  fi",
     "}",
     "runtime_is_ready() {",
     '  [ -f "$ready_marker" ] &&',
     '    runtime_entry_runs "$runtime_root" &&',
+    '    copilot_executable_payload_ready "$runtime_root" &&',
     // An empty or unreadable marker is a miss, not a pass: that is what a
     // runtime installed before the marker carried a digest looks like, and one
     // reinstall is the cheapest way to make it verifiable from then on.
@@ -384,6 +396,7 @@ export const buildWslRuntimeInstallScript = (
     // The release archive has one top-level `t3-<version>-linux-<arch>/`
     // directory; strip it so the executable lands at `$runtime_root/t3`.
     `tar -xzf ${shellQuote(linuxArchivePath)} -C "$runtime_tmp" --strip-components=1`,
+    'normalize_copilot_executable_modes "$runtime_tmp"',
     // Never write the ready marker over a tree whose executable does not run.
     // Failing here drops out to the mounted-tree fallback, which is
     // recoverable; promoting it would mark the defect ready and cache it.
@@ -418,11 +431,11 @@ export const buildWslRuntimeInstallScript = (
 // any live install while still bounding how long an orphan survives.
 const ORPHANED_RUNTIME_SCRATCH_MAX_AGE_MINUTES = 120;
 
-export const buildWslRuntimePruneScript = (runtimeId: string): string => {
+export const buildWslRuntimePruneScript = (runtimeId: string, isolatedPreview = false): string => {
   const safeRuntimeId = sanitizeWslRuntimeId(runtimeId);
   return [
     "set -eu",
-    'runtime_parent="$HOME/.t3/wsl-runtime"',
+    `runtime_parent="$HOME/${isolatedPreview ? ".t3-fork-preview" : ".t3"}/wsl-runtime"`,
     `current_runtime="$runtime_parent/${safeRuntimeId}"`,
     '[ -d "$runtime_parent" ] || exit 0',
     // Serialize the whole retention decision so two backends cannot select
@@ -482,11 +495,14 @@ export const buildWslRuntimePruneScript = (runtimeId: string): string => {
 // forever and fail on every launch. Only the probe can see that, so the probe
 // is what revokes the marker. The tree itself is left in place: the install
 // script moves an unready root aside before extracting.
-export const buildWslRuntimeInvalidateScript = (runtimeId: string): string => {
+export const buildWslRuntimeInvalidateScript = (
+  runtimeId: string,
+  isolatedPreview = false,
+): string => {
   const safeRuntimeId = sanitizeWslRuntimeId(runtimeId);
   return [
     "set -eu",
-    `rm -f "$HOME/.t3/wsl-runtime/${safeRuntimeId}/${WSL_RUNTIME_READY_MARKER}"`,
+    `rm -f "$HOME/${isolatedPreview ? ".t3-fork-preview" : ".t3"}/wsl-runtime/${safeRuntimeId}/${WSL_RUNTIME_READY_MARKER}"`,
   ].join("\n");
 };
 
@@ -897,6 +913,7 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
     distro: string | null,
     windowsPath: string,
   ) => Effect.Effect<Option.Option<string>>,
+  isolatedPreview = false,
 ): Effect.fn.Return<PrepareWslRuntimeResult, never, ChildProcessSpawner.ChildProcessSpawner> {
   const linuxArchivePath = yield* windowsToWslPath(distro, archive.windowsPath);
   if (Option.isNone(linuxArchivePath)) {
@@ -908,7 +925,12 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
 
   const install = yield* runWslShell(
     distro,
-    buildWslRuntimeInstallScript(linuxArchivePath.value, archive.runtimeId, archive.sha256),
+    buildWslRuntimeInstallScript(
+      linuxArchivePath.value,
+      archive.runtimeId,
+      archive.sha256,
+      isolatedPreview,
+    ),
     RUNTIME_INSTALL_TIMEOUT,
     { resolveNode: false },
   );
@@ -941,10 +963,11 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
 const pruneWslRuntimesImpl = Effect.fn("desktop.wsl.pruneRuntimesImpl")(function* (
   distro: string | null,
   runtimeId: string,
+  isolatedPreview = false,
 ): Effect.fn.Return<void, never, ChildProcessSpawner.ChildProcessSpawner> {
   const result = yield* runWslShell(
     distro,
-    buildWslRuntimePruneScript(runtimeId),
+    buildWslRuntimePruneScript(runtimeId, isolatedPreview),
     RUNTIME_PRUNE_TIMEOUT,
     { resolveNode: false },
   );
@@ -961,10 +984,11 @@ const pruneWslRuntimesImpl = Effect.fn("desktop.wsl.pruneRuntimesImpl")(function
 const invalidateWslRuntimeImpl = Effect.fn("desktop.wsl.invalidateRuntimeImpl")(function* (
   distro: string | null,
   runtimeId: string,
+  isolatedPreview = false,
 ): Effect.fn.Return<void, never, ChildProcessSpawner.ChildProcessSpawner> {
   const result = yield* runWslShell(
     distro,
-    buildWslRuntimeInvalidateScript(runtimeId),
+    buildWslRuntimeInvalidateScript(runtimeId, isolatedPreview),
     RUNTIME_INVALIDATE_TIMEOUT,
     { resolveNode: false },
   );
@@ -1117,43 +1141,39 @@ const getDistroIpImpl = (
     Effect.orElseSucceed(() => Option.none<string>()),
   );
 
-const getUserHomeImpl = (
+export const probeWslUserHome = Effect.fn("desktop.wsl.probeUserHome")(function* (
   distro: string | null,
-): Effect.Effect<Option.Option<string>, never, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const command = ChildProcess.make(
-        "wsl.exe",
-        // printf so there's no trailing newline noise; getent so we get the
-        // real home from /etc/passwd even if $HOME is unset for some reason.
-        [
-          ...buildDistroArgs(distro),
-          "--",
-          "sh",
-          "-c",
-          'printf "%s" "$(getent passwd "$(id -un)" | cut -d: -f6)"',
-        ],
-        {
-          stdin: "ignore",
-          stdout: "pipe",
-          stderr: "ignore",
-          killSignal: "SIGTERM",
-          forceKillAfter: PROCESS_TERMINATE_GRACE,
-        },
-      );
-      const handle = yield* spawner.spawn(command);
-      const stdoutBytes = yield* Stream.runCollect(handle.stdout);
-      const exitCode = yield* handle.exitCode;
-      if ((exitCode as unknown as number) !== 0) return Option.none<string>();
-      const home = decodeUtf8(concatChunks(stdoutBytes)).trim();
-      return home.startsWith("/") ? Option.some(home) : Option.none<string>();
-    }),
-  ).pipe(
-    Effect.timeoutOption(USER_HOME_TIMEOUT),
-    Effect.map(Option.flatten),
-    Effect.orElseSucceed(() => Option.none<string>()),
+) {
+  // Keep shell quotes on stdin, not in Windows argv; use the account database,
+  // not an inherited HOME or a login profile, as the Linux home authority.
+  const result = yield* runWslShell(
+    distro,
+    [
+      "set -eu",
+      "user_id=$(id -u)",
+      'account=$(getent passwd "$user_id")',
+      'printf "%s\\n" "$account" | cut -d: -f6',
+      "",
+    ].join("\n"),
+    USER_HOME_TIMEOUT,
+    { resolveNode: false },
   );
+  if (result.exitCode !== 0) {
+    yield* Effect.logWarning("Could not resolve the WSL account home.", {
+      distro,
+      exitCode: result.exitCode,
+      transportFailure: result.transportFailure,
+      stderr: result.stderr.trim().slice(-500),
+    });
+    return Option.none<string>();
+  }
+  const home = result.stdout.trim();
+  if (!home.startsWith("/") || /[\r\n\0]/.test(home)) {
+    yield* Effect.logWarning("WSL account home probe returned an invalid Linux path.", { distro });
+    return Option.none<string>();
+  }
+  return Option.some(home);
+});
 
 const makeIsAvailable = (
   platform: NodeJS.Platform,
@@ -1277,7 +1297,7 @@ export const layer = Layer.effect(
         const key = distro ?? "__default__";
         const cached = userHomeCache.get(key);
         if (cached !== undefined) return Option.some(cached);
-        const resolved = yield* provideSpawner(getUserHomeImpl(distro));
+        const resolved = yield* provideSpawner(probeWslUserHome(distro));
         if (Option.isSome(resolved)) userHomeCache.set(key, resolved.value);
         return resolved;
       }).pipe(Effect.withSpan("desktop.wsl.getUserHome"));
@@ -1302,17 +1322,17 @@ export const layer = Layer.effect(
       getUserHome,
       getDistroIp,
       prepareRuntime: (distro, archive) =>
-        provideSpawner(prepareWslRuntimeImpl(distro, archive, windowsToWslPath)).pipe(
-          Effect.withSpan("desktop.wsl.prepareRuntime"),
-        ),
+        provideSpawner(
+          prepareWslRuntimeImpl(distro, archive, windowsToWslPath, environment.isolatedPreview),
+        ).pipe(Effect.withSpan("desktop.wsl.prepareRuntime")),
       pruneRuntimes: (distro, runtimeId) =>
-        provideSpawner(pruneWslRuntimesImpl(distro, runtimeId)).pipe(
+        provideSpawner(pruneWslRuntimesImpl(distro, runtimeId, environment.isolatedPreview)).pipe(
           Effect.withSpan("desktop.wsl.pruneRuntimes"),
         ),
       invalidateRuntime: (distro, runtimeId) =>
-        provideSpawner(invalidateWslRuntimeImpl(distro, runtimeId)).pipe(
-          Effect.withSpan("desktop.wsl.invalidateRuntime"),
-        ),
+        provideSpawner(
+          invalidateWslRuntimeImpl(distro, runtimeId, environment.isolatedPreview),
+        ).pipe(Effect.withSpan("desktop.wsl.invalidateRuntime")),
       probeRuntime: (distro, linuxAppRoot) =>
         provideSpawner(probeWslRuntimeImpl(distro, linuxAppRoot)).pipe(
           Effect.withSpan("desktop.wsl.probeRuntime"),

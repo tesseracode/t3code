@@ -146,6 +146,20 @@ const withIdentity = <A, E, R>(
 };
 
 describe("DesktopAppIdentity", () => {
+  it.effect("isolates preview userData without probing the ordinary profile", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        assert.equal(yield* identity.resolveUserDataPath, "/tmp/fork-preview/electron");
+      }),
+      {
+        environment: {
+          env: { T3CODE_HOME: "/tmp/fork-preview", T3CODE_DESKTOP_ISOLATED_PREVIEW: "true" },
+        },
+        legacyPathExists: true,
+      },
+    ),
+  );
   it.effect("keeps using the legacy userData path when it already exists", () =>
     withIdentity(
       Effect.gen(function* () {
