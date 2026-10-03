@@ -1,0 +1,12 @@
+{
+  "id": "windows-titlebar-menu",
+  "slug": "windows-titlebar-menu",
+  "title": "Restore predictable Windows desktop menu access and title-bar dragging without obstructing chat controls.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-03T06:02:00Z",
+  "updated_at": "2026-10-03T06:02:00Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}
