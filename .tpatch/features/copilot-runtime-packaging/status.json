@@ -5,8 +5,8 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-24T19:06:30Z",
-  "updated_at": "2026-10-03T03:56:18Z",
-  "last_command": "record",
+  "updated_at": "2026-10-03T03:57:00Z",
+  "last_command": "verify",
   "notes": "landed at 2026-10-03T03:56:22Z",
   "apply": {
     "completed_at": "2026-09-26T04:58:56Z",
@@ -38,10 +38,10 @@
     }
   ],
   "verify": {
-    "verified_at": "2026-10-03T03:55:00Z",
+    "verified_at": "2026-10-03T03:56:56Z",
     "passed": true,
-    "recipe_hash_at_verify": "2aa04209a0f669be11fed6cb36d298cc05dde5c09f819e51d0dbcf15626a3ea9",
-    "patch_hash_at_verify": "e73f838801954827f1b71d78f95f7f25e734934b10847ee7d3d977d3c9b31627",
+    "recipe_hash_at_verify": "707b2e939a9bf1584f389b4c663f139b9ecb8fe2863e49718815476b5302f1f1",
+    "patch_hash_at_verify": "8654aa3b3b93203ae1df677a643b0f91ec09881952a8359afd422b1706aeada7",
     "parent_snapshot": {
       "copilot-cli-provider": "applied",
       "windows-portable-packaging-tests": "upstream_merged"
