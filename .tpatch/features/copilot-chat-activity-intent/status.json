@@ -1,0 +1,12 @@
+{
+  "id": "copilot-chat-activity-intent",
+  "slug": "copilot-chat-activity-intent",
+  "title": "Show Copilot-provided current-work descriptions beside the in-chat brain indicator on web, desktop and mobile; retain concise sidebar statuses. Requested only, with verified SDK and fork-path investigation; implementation is not approved.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-04T17:32:43Z",
+  "updated_at": "2026-10-04T17:32:43Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}
