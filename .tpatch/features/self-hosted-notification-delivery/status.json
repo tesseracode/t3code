@@ -1,0 +1,12 @@
+{
+  "id": "self-hosted-notification-delivery",
+  "slug": "self-hosted-notification-delivery",
+  "title": "Evaluate optional notification delivery for the fork: compare existing T3 Connect, open-source self-hosted services, a minimal custom delivery bridge, and keeping mobile push disabled. Prefer self-hostable software and low recurring costs; preserve environment authority and direct connectivity. Requested only.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-05T06:37:08Z",
+  "updated_at": "2026-10-05T06:37:08Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {}
+}
