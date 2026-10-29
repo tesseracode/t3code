@@ -1,0 +1,253 @@
+diff --git a/docs/internals/providers.md b/docs/internals/providers.md
+index f652afdba..25469266c 100644
+--- a/docs/internals/providers.md
++++ b/docs/internals/providers.md
+@@ -28,6 +28,10 @@ successful native receipt on that runtime. Startup/closed requests remain denied
+ through the SDK handler. Questions and plan approval retain the SDK callback
+ handoff boundary; that callback alone is not a native RPC acknowledgement.
+ The adapter never re-emits app-owned reply resolution or delivery state.
++Reply ownership is marked before awaiting native delivery. Answered requests stay
++out of pending snapshots, terminal cleanup, and stale turn-item publication even
++when the receipt fails or root idle arrives first. Identical in-flight permission
++replies share one receipt; conflicting replies are rejected.
+ 
+ Only a root `session.idle` successfully terminates a user turn.
+ `assistant.turn_end`, `assistant.idle`, and all child events are non-terminal.
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index cda0e3fa5..79455b273 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -356,6 +356,104 @@ describe("native Copilot V2", () => {
+       ),
+   );
+ 
++  it.effect.each(["applied", "already-resolved", "transport-error"] as const)(
++    "keeps V2-owned answers intact when idle precedes a %s permission receipt",
++    (outcome) =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { runtime, start, drain, emitted, takeEvent } = yield* setup(fake);
++          yield* start();
++          fake.emit("permission.requested", {
++            requestId: "native-idle-race",
++            permissionRequest: { kind: "read", path: "/workspace/data", intention: "Read input" },
++          });
++          const request = (yield* drain()).runtimeRequests[0]!;
++          yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "approval_request" &&
++              event.turnItem.requestId === request.id,
++          );
++          const called = promiseGate();
++          const receipt = promiseGate();
++          fake.setPermissionResponse(async () => {
++            called.resolve();
++            await receipt.promise;
++            if (outcome === "transport-error") throw new Error("Permission transport failed.");
++            return { success: outcome === "applied" };
++          });
++          const observedBeforeReply = emitted.length;
++          const replying = yield* Effect.forkChild(
++            runtime
++              .respondToRuntimeRequest({
++                requestId: request.id,
++                decision: "accept",
++              })
++              .pipe(Effect.exit),
++          );
++          yield* Effect.promise(() => called.promise);
++          const duplicate = yield* Effect.forkChild(
++            runtime
++              .respondToRuntimeRequest({
++                requestId: request.id,
++                decision: "accept",
++              })
++              .pipe(Effect.exit),
++          );
++          const conflicting = yield* Effect.forkChild(
++            runtime
++              .respondToRuntimeRequest({
++                requestId: request.id,
++                decision: "decline",
++              })
++              .pipe(Effect.exit),
++          );
++          const duringDelivery = yield* drain();
++          fake.emit("session.idle");
++          yield* takeEvent((event) => event.type === "turn.terminal");
++          assert.equal(
++            emitted
++              .slice(observedBeforeReply)
++              .filter(
++                (event) =>
++                  event.type === "runtime_request.updated" ||
++                  (event.type === "node.updated" && event.node.runtimeRequestId === request.id) ||
++                  (event.type === "turn_item.updated" &&
++                    (event.turnItem.type === "approval_request" ||
++                      event.turnItem.type === "user_input_request") &&
++                    event.turnItem.requestId === request.id),
++              ).length,
++            0,
++          );
++          assert.equal(duringDelivery.runtimeRequests.length, 0);
++          assert.equal((yield* drain()).runtimeRequests.length, 0);
++          assert.isUndefined(replying.pollUnsafe());
++          receipt.resolve();
++          const firstResult = yield* Fiber.join(replying);
++          const duplicateResult = yield* Fiber.join(duplicate);
++          assert.equal(Exit.isSuccess(firstResult), outcome === "applied");
++          assert.equal(Exit.isSuccess(duplicateResult), outcome === "applied");
++          assert.isTrue(Exit.isFailure(yield* Fiber.join(conflicting)));
++          assert.equal(fake.permissionReplies.length, 1);
++          assert.equal((yield* drain()).runtimeRequests.length, 0);
++          if (outcome !== "applied") {
++            assert.isTrue(
++              Exit.isFailure(
++                yield* runtime
++                  .respondToRuntimeRequest({
++                    requestId: request.id,
++                    decision: "accept",
++                  })
++                  .pipe(Effect.exit),
++              ),
++            );
++            assert.equal(fake.permissionReplies.length, 2);
++          }
++        }),
++      ),
++  );
++
+   it.effect(
+     "does not publish empty tool-only assistant rows and preserves streamed whitespace",
+     () =>
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+index e45a57736..87517fe9a 100644
+--- a/packages/provider-copilot/src/server/adapter.ts
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -115,6 +115,9 @@ interface ActiveTurn {
+ type PendingResponse = {
+   readonly owner: ActiveTurn;
+   readonly nativePermissionId?: string;
++  responseOwnedByV2?: true;
++  permissionReplyKey?: string;
++  permissionReplyReceipt?: Deferred.Deferred<void, ProviderAdapter.ProviderAdapterV2Error>;
+   readonly request: OrchestrationV2RuntimeRequest;
+   readonly item: OrchestrationV2TurnItem;
+   readonly node: OrchestrationV2ExecutionNode;
+@@ -282,7 +285,9 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+       });
+       const settlePending = Effect.fnUntraced(function* () {
+         const now = yield* DateTime.now;
+-        for (const entry of pending.values()) {
++        for (const [requestId, entry] of pending) {
++          if (entry.responseOwnedByV2) continue;
++          pending.delete(requestId);
+           entry.cancel();
+           entry.owner.items.set(entry.request.id, {
+             ...entry.item,
+@@ -307,7 +312,6 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             node: { ...entry.node, status: "cancelled", completedAt: now },
+           });
+         }
+-        pending.clear();
+       });
+       yield* Effect.addFinalizer(() =>
+         Effect.gen(function* () {
+@@ -377,6 +381,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+         yield* settlePending();
+         for (const [key, item] of turn.items) {
+           if (item.type === "subagent") continue;
++          if (
++            (item.type === "approval_request" || item.type === "user_input_request") &&
++            pending.get(item.requestId)?.responseOwnedByV2
++          )
++            continue;
+           if (item.status !== "running" && item.status !== "pending") continue;
+           yield* putItem(turn, key, {
+             ...item,
+@@ -1480,28 +1489,52 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+                 ),
+               });
+             }
+-            const now = yield* DateTime.now;
++            if (entry.responseOwnedByV2) {
++              if (!entry.nativePermissionId || entry.permissionReplyKey !== permissionReplyKey) {
++                return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({
++                  driver: COPILOT_DRIVER,
++                  requestId: response.requestId,
++                });
++              }
++              if (entry.permissionReplyReceipt)
++                return yield* Deferred.await(entry.permissionReplyReceipt);
++            }
++            // V2 already recorded the answer. Ownership must survive even a failed native receipt.
++            entry.responseOwnedByV2 = true;
++            const receipt = Deferred.makeUnsafe<void, ProviderAdapter.ProviderAdapterV2Error>();
+             if (entry.nativePermissionId) {
+-              yield* decidePermission(
+-                entry.nativePermissionId,
+-                response.decision === "accept"
+-                  ? { kind: "approve-once" }
+-                  : {
+-                      kind: "reject",
+-                      ...(response.feedback ? { feedback: response.feedback } : {}),
+-                    },
+-              );
+-              confirmedPermissionReplies.set(response.requestId, permissionReplyKey);
++              entry.permissionReplyKey = permissionReplyKey;
++              entry.permissionReplyReceipt = receipt;
+             }
+-            pending.delete(response.requestId);
+-            entry.owner.items.set(response.requestId, {
+-              ...entry.item,
+-              status: "completed",
+-              completedAt: now,
+-              updatedAt: now,
+-            });
+-            // The decider owns resolution and delivery state; callback handoff is the last operation.
+-            if (!entry.nativePermissionId) entry.resolve(response);
++            return yield* Effect.gen(function* () {
++              const now = yield* DateTime.now;
++              if (entry.nativePermissionId) {
++                yield* decidePermission(
++                  entry.nativePermissionId,
++                  response.decision === "accept"
++                    ? { kind: "approve-once" }
++                    : {
++                        kind: "reject",
++                        ...(response.feedback ? { feedback: response.feedback } : {}),
++                      },
++                );
++                confirmedPermissionReplies.set(response.requestId, permissionReplyKey);
++              }
++              pending.delete(response.requestId);
++              entry.owner.items.set(response.requestId, {
++                ...entry.item,
++                status: "completed",
++                completedAt: now,
++                updatedAt: now,
++              });
++              // The decider owns resolution and delivery state; callback handoff is the last operation.
++              if (!entry.nativePermissionId) entry.resolve(response);
++            }).pipe(
++              Effect.onExit((exit) => {
++                delete entry.permissionReplyReceipt;
++                return Deferred.done(receipt, exit);
++              }),
++            );
+           },
+         ),
+         readThreadSnapshot: Effect.fn("CopilotAdapter.readThreadSnapshot")(function* () {
+@@ -1515,7 +1548,9 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             providerThread,
+             providerTurns: [...turns.values()],
+             messages: [...messages.values()],
+-            runtimeRequests: [...pending.values()].map((entry) => entry.request),
++            runtimeRequests: [...pending.values()]
++              .filter((entry) => !entry.responseOwnedByV2)
++              .map((entry) => entry.request),
+           };
+         }),
+         rollbackThread: (rollback) =>

@@ -1,0 +1,825 @@
+diff --git a/docs/operations/release.md b/docs/operations/release.md
+index fe8a8e208..c265623bc 100644
+--- a/docs/operations/release.md
++++ b/docs/operations/release.md
+@@ -276,6 +276,29 @@ available.
+   - `electron-updater` reads `latest-mac.yml` on stable and `nightly-mac.yml` on nightly, for both Intel and Apple Silicon.
+   - The workflow merges the per-arch mac manifests into one channel-specific mac manifest before publishing the GitHub Release.
+ 
++### Copilot SDK payloads
++
++Copilot-bearing desktop stages and standalone CLI archives use the same
++reviewed SDK-server payload pruning before packing. Each stage contains only
++its target platform (both target CPUs for a universal macOS desktop build),
++not the old combined Windows/Linux tree. Windows embeds the already-built
++Linux CLI archive verbatim for WSL; it never prunes or repacks that archive.
++
++The current layout review covers SDK `1.0.8`, CLI `1.0.75` and Koffi `3.3.1`.
++The stage resolves packages from their actual owning dependency contexts and
++rejects paths outside the stage, unexpected native layouts and version drift
++before removing anything. Keep the CLI, core natives, target `rg`/`tgrep`,
++specialized clipboard bindings/loaders, target Koffi and Windows computer-use
++executables. Only duplicate generic clipboard natives, non-target search
++binaries, glibc-inapplicable Koffi musl bindings and the reviewed interactive
++voice/webview/Foundry directories are removed. No-Copilot stages are untouched.
++
++Source lock resolution is not proof that a fresh generated stage resolves
++the same transitive versions. The separate dependency-closure gate must pin
++and validate every Copilot-bearing stage. Real target-host execution and the
++complete Windows file-count gate remain required; a fixture, cross-platform
++file inspection or Copilot-only ASAR count does not replace them.
++
+ ### Windows payload topology and update validation
+ 
+ Windows packages the bundled server and only its runtime-external/native
+diff --git a/scripts/build-cli-archive.ts b/scripts/build-cli-archive.ts
+index c70ffe4e0..18e34cc3a 100644
+--- a/scripts/build-cli-archive.ts
++++ b/scripts/build-cli-archive.ts
+@@ -41,6 +41,7 @@ import {
+   STAGE_INSTALL_ARGS,
+ } from "./build-desktop-artifact.ts";
+ import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
++import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
+ import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
+ 
+ const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
+@@ -218,6 +219,12 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+     }),
+     "vp install --prod (cli archive runtime externals)",
+   );
++  yield* pruneCopilotSdkServerPayload({
++    stageDir: input.stageDir,
++    platform: input.platform,
++    arch: input.arch,
++    dependencies,
++  });
+ 
+   // pnpm's bookkeeping and the manifest only matter to pnpm; the runtime
+   // resolves packages by directory. node-pty ships every platform's prebuilds
+diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
+index cb47e40b8..de81fb95f 100644
+--- a/scripts/build-desktop-artifact.ts
++++ b/scripts/build-desktop-artifact.ts
+@@ -29,6 +29,7 @@ import {
+   type WebAssetBrand,
+ } from "./lib/brand-assets.ts";
+ import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
++import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
+ import {
+   findInlinedExternalPackages,
+   selectCliRuntimeExternalDependencies,
+@@ -2957,6 +2958,12 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
+   );
+ 
+   yield* Effect.log("[desktop-artifact] Packing server.asar...");
++  yield* pruneCopilotSdkServerPayload({
++    stageDir: serverStageDir,
++    platform: "win",
++    arch: input.arch,
++    dependencies: sidecarDependencies,
++  });
+   yield* fs.makeDirectory(path.dirname(input.asarPath), { recursive: true });
+   yield* packWindowsServerAsar({
+     sourceDir: serverStageDir,
+@@ -3705,6 +3712,12 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
+   );
+   yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
+   yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
++  yield* pruneCopilotSdkServerPayload({
++    stageDir: stageAppDir,
++    platform: options.platform,
++    arch: options.arch,
++    dependencies: stageDependencies,
++  });
+ 
+   // Only the Windows artifact carries the server sidecar and the WSL runtime;
+   // other platforms ignore the --wsl-runtime input.
+diff --git a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts
+new file mode 100644
+index 000000000..c202c8a5c
+--- /dev/null
++++ b/scripts/lib/copilot-payload.test.ts
+@@ -0,0 +1,372 @@
++import * as NodeServices from "@effect/platform-node/NodeServices";
++import { assert, it } from "@effect/vitest";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import * as Schema from "effect/Schema";
++
++import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
++import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
++import { pruneCopilotSdkServerPayload } from "./copilot-payload.ts";
++
++const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
++const dependencies = { "@github/copilot-sdk": "1.0.8" };
++const targets = [
++  {
++    platform: "win",
++    arch: "x64",
++    target: "win32-x64",
++    suffix: "-msvc",
++    recorder: "windows/amd64",
++    removed: 9,
++  },
++  {
++    platform: "win",
++    arch: "arm64",
++    target: "win32-arm64",
++    suffix: "-msvc",
++    recorder: "windows/arm64",
++    foreign: "win32-x64",
++    removed: 11,
++  },
++  {
++    platform: "linux",
++    arch: "x64",
++    target: "linux-x64",
++    suffix: "-gnu",
++    recorder: "linux/x86_64",
++    removed: 10,
++  },
++  {
++    platform: "linux",
++    arch: "arm64",
++    target: "linux-arm64",
++    suffix: "-gnu",
++    foreign: "linux-x64",
++    removed: 11,
++  },
++  {
++    platform: "mac",
++    arch: "arm64",
++    target: "darwin-arm64",
++    suffix: "",
++    recorder: "mac/arm64",
++    removed: 9,
++  },
++  {
++    platform: "mac",
++    arch: "x64",
++    target: "darwin-x64",
++    suffix: "",
++    recorder: "mac/x86_64",
++    foreign: "darwin-arm64",
++    removed: 10,
++  },
++] as const;
++
++const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
++  platform: BuildPlatform,
++  arch: BuildArch,
++) {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const stageDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-copilot-payload-" });
++  const write = Effect.fn("test.writeCopilotPayload")(function* (
++    relative: string,
++    text = relative,
++  ) {
++    const file = path.join(stageDir, relative);
++    yield* fs.makeDirectory(path.dirname(file), { recursive: true });
++    yield* fs.writeFileString(file, text);
++    return file;
++  });
++  yield* write("package.json", encodeJson({ name: "stage", private: true, dependencies }));
++  for (const [name, version] of [
++    ["@github/copilot-sdk", "1.0.8"],
++    ["@github/copilot", "1.0.75"],
++    ["koffi", "3.3.1"],
++  ]) {
++    yield* write(
++      `node_modules/${name}/package.json`,
++      encodeJson({ name, version, main: "index.js" }),
++    );
++    yield* write(`node_modules/${name}/index.js`, "module.exports = {};");
++  }
++  const retained: string[] = [];
++  const removed: string[] = [];
++  for (const target of targets.filter(
++    (target) => target.platform === platform && (arch === "universal" || target.arch === arch),
++  )) {
++    const root = `node_modules/@github/copilot-${target.target}`;
++    const exe = platform === "win" ? ".exe" : "";
++    yield* write(
++      `${root}/package.json`,
++      encodeJson({
++        name: `@github/copilot-${target.target}`,
++        version: "1.0.75",
++        main: `copilot${exe}`,
++      }),
++    );
++    for (const file of [
++      `copilot${exe}`,
++      `prebuilds/${target.target}/cli-native.node`,
++      `prebuilds/${target.target}/runtime.node`,
++      `ripgrep/bin/${target.target}/rg${exe}`,
++      `tgrep/bin/${target.target}/tgrep${exe}`,
++      `clipboard/node_modules/@teddyzhu/clipboard-${target.target}${target.suffix}/clipboard.${target.target}${target.suffix}.node`,
++      "sdk/index.js",
++      "clipboard/index.js",
++      "clipboard/node_modules/@teddyzhu/clipboard/index.js",
++      ...(platform === "win"
++        ? [
++            `builtin-plugins/computer-use/0.1.71/${target.target}/computer-use-mcp.exe`,
++            `builtin-plugins/computer-use/0.1.71/${target.target}/CopilotComputerUse.exe`,
++          ]
++        : []),
++    ])
++      retained.push(yield* write(`${root}/${file}`));
++    for (const clipboard of [
++      "darwin-arm64",
++      "darwin-x64",
++      "linux-arm64-gnu",
++      "linux-x64-gnu",
++      "win32-arm64-msvc",
++      "win32-x64-msvc",
++    ]) {
++      removed.push(
++        yield* write(
++          `${root}/clipboard/node_modules/@teddyzhu/clipboard/clipboard.${clipboard}.node`,
++        ),
++      );
++    }
++    if (!(platform === "mac" && target.arch === "x64")) {
++      removed.push(
++        yield* write(
++          `${root}/foundry-local-sdk/node_modules/foundry-local-sdk/prebuilds/${target.target}/foundry_local_napi.node`,
++        ),
++      );
++    }
++    if ("recorder" in target)
++      removed.push(
++        yield* write(
++          `${root}/pvrecorder/node_modules/@picovoice/pvrecorder-node/lib/${target.recorder}/pv_recorder.node`,
++        ),
++      );
++    removed.push(
++      yield* write(
++        `${root}/webview/node_modules/@webviewjs/webview-${target.target}${target.suffix}/webview.${target.target}${target.suffix}.node`,
++      ),
++    );
++    if ("foreign" in target) {
++      removed.push(yield* write(`${root}/ripgrep/bin/${target.foreign}/rg${exe}`));
++      removed.push(yield* write(`${root}/tgrep/bin/${target.foreign}/tgrep${exe}`));
++    }
++    const binding = `node_modules/@koromix/koffi-${target.target}`;
++    yield* write(
++      `${binding}/package.json`,
++      encodeJson({ name: `@koromix/koffi-${target.target}`, version: "3.3.1" }),
++    );
++    retained.push(yield* write(`${binding}/${target.target.replace("-", "_")}/koffi.node`));
++    if (platform === "linux")
++      removed.push(yield* write(`${binding}/musl_${target.arch}/koffi.node`));
++  }
++  return { stageDir, retained, removed, write };
++});
++
++it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
++  for (const target of targets) {
++    it.effect(
++      `preserves ${target.target} runtime bytes and removes exactly ${target.removed} unreachable natives`,
++      () =>
++        Effect.scoped(
++          Effect.gen(function* () {
++            const fs = yield* FileSystem.FileSystem;
++            const stage = yield* makeStage(target.platform, target.arch);
++            const result = yield* pruneCopilotSdkServerPayload({
++              ...stage,
++              platform: target.platform,
++              arch: target.arch,
++              dependencies,
++            });
++            assert.equal(result.pruned, true);
++            assert.lengthOf(result.removedNativeFiles, target.removed);
++            for (const file of stage.retained)
++              assert.equal(
++                yield* fs.readFileString(file),
++                file.slice(stage.stageDir.length + 1).replaceAll("\\", "/"),
++              );
++            for (const file of stage.removed) assert.isFalse(yield* fs.exists(file));
++            const second = yield* pruneCopilotSdkServerPayload({
++              ...stage,
++              platform: target.platform,
++              arch: target.arch,
++              dependencies,
++            });
++            assert.deepEqual(second.removedNativeFiles, []);
++          }),
++        ),
++    );
++  }
++  it.effect("retains both target architectures for universal macOS", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("mac", "universal");
++        const result = yield* pruneCopilotSdkServerPayload({
++          ...stage,
++          platform: "mac",
++          arch: "universal",
++          dependencies,
++        });
++        assert.lengthOf(result.removedNativeFiles, 19);
++        for (const file of stage.retained) assert.isTrue(yield* fs.exists(file));
++      }),
++    ),
++  );
++  it.effect("leaves stages that do not declare Copilot untouched", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("win", "x64");
++        const result = yield* pruneCopilotSdkServerPayload({
++          ...stage,
++          platform: "win",
++          arch: "x64",
++          dependencies: {},
++        });
++        assert.deepEqual(result, { pruned: false, removedNativeFiles: [] });
++        for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++      }),
++    ),
++  );
++  for (const fault of [
++    "runtime-version",
++    "platform-version",
++    "koffi-version",
++    "missing-required",
++    "unexpected-native",
++    "partial-prune",
++    "foreign-package",
++    "foreign-koffi",
++    "missing-sdk",
++    "missing-clipboard-loader",
++  ] as const) {
++    it.effect(`refuses ${fault} before deleting any remaining files`, () =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const stage = yield* makeStage("win", "x64");
++          switch (fault) {
++            case "runtime-version":
++              yield* stage.write(
++                "node_modules/@github/copilot/package.json",
++                encodeJson({ name: "@github/copilot", version: "1.0.76" }),
++              );
++              break;
++            case "platform-version":
++              yield* stage.write(
++                "node_modules/@github/copilot-win32-x64/package.json",
++                encodeJson({
++                  name: "@github/copilot-win32-x64",
++                  version: "1.0.76",
++                  main: "copilot.exe",
++                }),
++              );
++              break;
++            case "koffi-version":
++              yield* stage.write(
++                "node_modules/koffi/package.json",
++                encodeJson({ name: "koffi", version: "99.0.0" }),
++              );
++              break;
++            case "missing-required":
++              yield* fs.remove(stage.retained[0]!);
++              break;
++            case "unexpected-native":
++              yield* stage.write("node_modules/@github/copilot-win32-x64/unreviewed.node");
++              break;
++            case "partial-prune":
++              yield* fs.remove(stage.removed[0]!);
++              break;
++            case "foreign-package":
++              yield* stage.write(
++                "node_modules/@github/copilot-linux-x64/package.json",
++                encodeJson({
++                  name: "@github/copilot-linux-x64",
++                  version: "1.0.75",
++                  main: "copilot",
++                }),
++              );
++              yield* stage.write("node_modules/@github/copilot-linux-x64/copilot");
++              break;
++            case "missing-sdk":
++              yield* fs.remove(`${stage.stageDir}/node_modules/@github/copilot-sdk/package.json`);
++              break;
++            case "foreign-koffi":
++              yield* stage.write(
++                "node_modules/@koromix/koffi-linux-x64/package.json",
++                encodeJson({ name: "@koromix/koffi-linux-x64", version: "3.3.1" }),
++              );
++              yield* stage.write("node_modules/@koromix/koffi-linux-x64/linux_x64/koffi.node");
++              break;
++            case "missing-clipboard-loader":
++              yield* fs.remove(
++                `${stage.stageDir}/node_modules/@github/copilot-win32-x64/clipboard/node_modules/@teddyzhu/clipboard/index.js`,
++              );
++              break;
++          }
++          const result = yield* Effect.flip(
++            pruneCopilotSdkServerPayload({ ...stage, platform: "win", arch: "x64", dependencies }),
++          );
++          assert.equal(result._tag, "CopilotPayloadError");
++          for (const file of fault === "partial-prune" ? stage.removed.slice(1) : stage.removed) {
++            assert.isTrue(yield* fs.exists(file));
++          }
++        }),
++      ),
++    );
++  }
++  it.effect("validates every universal target before removing the first architecture", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("mac", "universal");
++        yield* fs.remove(`${stage.stageDir}/node_modules/@github/copilot-darwin-x64/copilot`);
++        const error = yield* Effect.flip(
++          pruneCopilotSdkServerPayload({
++            ...stage,
++            platform: "mac",
++            arch: "universal",
++            dependencies,
++          }),
++        );
++        assert.equal(error._tag, "CopilotPayloadError");
++        for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++      }),
++    ),
++  );
++  it.effect.skipIf(!symlinksSupported)(
++    "refuses an out-of-stage symlink without touching its target",
++    () =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const path = yield* Path.Path;
++          const stage = yield* makeStage("win", "x64");
++          const outside = yield* fs.makeTempDirectoryScoped({ prefix: "t3-copilot-outside-" });
++          const outsideFile = path.join(outside, "keep.node");
++          yield* fs.writeFileString(outsideFile, "untouched");
++          yield* fs.symlink(
++            outsideFile,
++            path.join(stage.stageDir, "node_modules/@github/copilot-win32-x64/escape.node"),
++          );
++          const error = yield* Effect.flip(
++            pruneCopilotSdkServerPayload({ ...stage, platform: "win", arch: "x64", dependencies }),
++          );
++          assert.equal(error._tag, "CopilotPayloadError");
++          assert.equal(yield* fs.readFileString(outsideFile), "untouched");
++          for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++        }),
++      ),
++  );
++});
+diff --git a/scripts/lib/copilot-payload.ts b/scripts/lib/copilot-payload.ts
+new file mode 100644
+index 000000000..114304a79
+--- /dev/null
++++ b/scripts/lib/copilot-payload.ts
+@@ -0,0 +1,344 @@
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodeModule from "node:module";
++
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import * as Schema from "effect/Schema";
++
++import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
++
++export const COPILOT_PAYLOAD_VERSIONS = {
++  sdk: "1.0.8",
++  runtime: "1.0.75",
++  koffi: "3.3.1",
++} as const;
++
++const PackageManifest = Schema.Struct({
++  name: Schema.optional(Schema.String),
++  version: Schema.optional(Schema.String),
++});
++const decodeManifest = Schema.decodeUnknownEffect(Schema.fromJsonString(PackageManifest));
++const NATIVE_FILE = /\.(?:node|dll|exe|dylib|so(?:\.\d+)*)$/u;
++const GENERIC_CLIPBOARD_TARGETS = [
++  "darwin-arm64",
++  "darwin-x64",
++  "linux-arm64-gnu",
++  "linux-x64-gnu",
++  "win32-arm64-msvc",
++  "win32-x64-msvc",
++] as const;
++const INTERACTIVE_DIRECTORIES = ["foundry-local-sdk", "pvrecorder", "webview"] as const;
++
++export class CopilotPayloadError extends Schema.TaggedError<CopilotPayloadError>()(
++  "CopilotPayloadError",
++  { stageDir: Schema.String, detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
++) {
++  override get message(): string {
++    return `Copilot payload validation failed: ${this.detail}`;
++  }
++}
++
++function resolvePackageEntry(loader: ReturnType<typeof NodeModule.createRequire>, name: string) {
++  try {
++    return loader.resolve(`${name}/package.json`);
++  } catch (cause) {
++    if (
++      cause instanceof Error &&
++      "code" in cause &&
++      cause.code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
++    ) {
++      return loader.resolve(name);
++    }
++    throw cause;
++  }
++}
++
++function targetLayout(platform: BuildPlatform, arch: "x64" | "arm64") {
++  const os = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
++  const target = `${os}-${arch}`;
++  const suffix = os === "win32" ? "-msvc" : os === "linux" ? "-gnu" : "";
++  const extension = os === "win32" ? ".exe" : "";
++  const required = [
++    `copilot${extension}`,
++    `prebuilds/${target}/cli-native.node`,
++    `prebuilds/${target}/runtime.node`,
++    `ripgrep/bin/${target}/rg${extension}`,
++    `tgrep/bin/${target}/tgrep${extension}`,
++    `clipboard/node_modules/@teddyzhu/clipboard-${target}${suffix}/clipboard.${target}${suffix}.node`,
++    ...(os === "win32"
++      ? [
++          `builtin-plugins/computer-use/0.1.71/${target}/computer-use-mcp.exe`,
++          `builtin-plugins/computer-use/0.1.71/${target}/CopilotComputerUse.exe`,
++        ]
++      : []),
++  ];
++  const removed: string[] = GENERIC_CLIPBOARD_TARGETS.map(
++    (name) => `clipboard/node_modules/@teddyzhu/clipboard/clipboard.${name}.node`,
++  );
++  if (!(os === "darwin" && arch === "x64")) {
++    removed.push(
++      `foundry-local-sdk/node_modules/foundry-local-sdk/prebuilds/${target}/foundry_local_napi.node`,
++    );
++  }
++  if (!(os === "linux" && arch === "arm64")) {
++    const recorderTarget =
++      os === "win32"
++        ? `windows/${arch === "x64" ? "amd64" : "arm64"}`
++        : os === "darwin"
++          ? `mac/${arch === "x64" ? "x86_64" : "arm64"}`
++          : "linux/x86_64";
++    removed.push(
++      `pvrecorder/node_modules/@picovoice/pvrecorder-node/lib/${recorderTarget}/pv_recorder.node`,
++    );
++  }
++  const webviewSuffix = os === "darwin" ? "" : suffix;
++  removed.push(
++    `webview/node_modules/@webviewjs/webview-${target}${webviewSuffix}/webview.${target}${webviewSuffix}.node`,
++  );
++  const foreignSearchTarget =
++    os === "darwin" && arch === "x64"
++      ? "darwin-arm64"
++      : os !== "darwin" && arch === "arm64"
++        ? `${os}-x64`
++        : null;
++  if (foreignSearchTarget) {
++    removed.push(
++      `ripgrep/bin/${foreignSearchTarget}/rg${extension}`,
++      `tgrep/bin/${foreignSearchTarget}/tgrep${extension}`,
++    );
++  }
++  return { target, os, arch, required, removed, foreignSearchTarget };
++}
++
++/**
++ * Prune only a reviewed SDK-server payload in an isolated production stage.
++ * Validate every target before deleting anything; never prune a package store
++ * reached outside the stage through Node resolution or a symlink.
++ */
++export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayload")(
++  function* (input: {
++    readonly stageDir: string;
++    readonly platform: BuildPlatform;
++    readonly arch: BuildArch;
++    readonly dependencies: Readonly<Record<string, string>>;
++  }) {
++    if (input.dependencies["@github/copilot-sdk"] === undefined) {
++      return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> };
++    }
++    const fs = yield* FileSystem.FileSystem;
++    const path = yield* Path.Path;
++    const failure = (detail: string, cause?: unknown) =>
++      new CopilotPayloadError({
++        stageDir: input.stageDir,
++        detail,
++        ...(cause === undefined ? {} : { cause }),
++      });
++    if (input.arch === "universal" && input.platform !== "mac") {
++      return yield* failure("universal Copilot payloads are supported only on macOS");
++    }
++    const root = yield* fs.realPath(input.stageDir);
++    const contained = (candidate: string) => {
++      const relative = path.relative(root, candidate);
++      return (
++        relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
++      );
++    };
++    const realInside = Effect.fn("copilotPayload.realInside")(function* (candidate: string) {
++      const real = yield* fs
++        .realPath(candidate)
++        .pipe(
++          Effect.mapError((cause) =>
++            failure(`missing or unreadable staged path ${candidate}`, cause),
++          ),
++        );
++      if (!contained(real)) return yield* failure(`path resolves outside the stage: ${candidate}`);
++      return real;
++    });
++    const resolvePackage = Effect.fn("copilotPayload.resolvePackage")(function* (
++      loader: ReturnType<typeof NodeModule.createRequire>,
++      name: string,
++      version: string,
++    ) {
++      const entry = yield* Effect.try({
++        try: () => resolvePackageEntry(loader, name),
++        catch: (cause) => failure(`cannot resolve ${name} from its staged owner`, cause),
++      });
++      let directory = path.dirname(yield* realInside(entry));
++      while (contained(directory)) {
++        const manifestPath = path.join(directory, "package.json");
++        if (yield* fs.exists(manifestPath)) {
++          yield* realInside(manifestPath);
++          const manifest = yield* fs.readFileString(manifestPath).pipe(
++            Effect.flatMap(decodeManifest),
++            Effect.mapError((cause) => failure(`invalid package manifest for ${name}`, cause)),
++          );
++          if (manifest.name === name) {
++            if (manifest.version !== version)
++              return yield* failure(
++                `unreviewed ${name} version ${manifest.version ?? "missing"}; expected ${version}`,
++              );
++            return { directory, loader: NodeModule.createRequire(manifestPath) };
++          }
++        }
++        const parent = path.dirname(directory);
++        if (parent === directory) break;
++        directory = parent;
++      }
++      return yield* failure(`could not identify staged package ${name}`);
++    });
++    const sdk = yield* resolvePackage(
++      NodeModule.createRequire(path.join(root, "package.json")),
++      "@github/copilot-sdk",
++      COPILOT_PAYLOAD_VERSIONS.sdk,
++    );
++    const runtime = yield* resolvePackage(
++      sdk.loader,
++      "@github/copilot",
++      COPILOT_PAYLOAD_VERSIONS.runtime,
++    );
++    const koffi = yield* resolvePackage(sdk.loader, "koffi", COPILOT_PAYLOAD_VERSIONS.koffi);
++    const layouts = (input.arch === "universal" ? (["arm64", "x64"] as const) : [input.arch]).map(
++      (arch) => targetLayout(input.platform, arch),
++    );
++    const removals = new Set<string>();
++    const removedNativeFiles: string[] = [];
++    const isNative = (file: string) =>
++      NATIVE_FILE.test(file) || ["copilot", "rg", "tgrep"].includes(path.basename(file));
++    const nativeFiles = Effect.fn("copilotPayload.nativeFiles")(function* (packageRoot: string) {
++      const pending = [packageRoot];
++      const files: string[] = [];
++      while (pending.length > 0) {
++        const directory = pending.pop()!;
++        for (const name of yield* fs.readDirectory(directory)) {
++          const file = path.join(directory, name);
++          const real = yield* realInside(file);
++          if (real !== file) return yield* failure(`unexpected symlink inside payload: ${file}`);
++          const info = yield* fs.stat(real);
++          if (info.type === "Directory") pending.push(real);
++          else if (info.type === "File" && isNative(real))
++            files.push(path.relative(packageRoot, real).split(path.sep).join("/"));
++          else if (info.type !== "File")
++            return yield* failure(`unexpected file type in payload: ${file}`);
++        }
++      }
++      return files;
++    });
++    const requireFile = Effect.fn("copilotPayload.requireFile")(function* (file: string) {
++      const real = yield* realInside(file);
++      if ((yield* fs.stat(real)).type !== "File")
++        return yield* failure(`required payload is not a file: ${file}`);
++    });
++    for (const layout of layouts) {
++      const platform = yield* resolvePackage(
++        runtime.loader,
++        `@github/copilot-${layout.target}`,
++        COPILOT_PAYLOAD_VERSIONS.runtime,
++      );
++      const actual = yield* nativeFiles(platform.directory);
++      const missing = layout.required.filter((file) => !actual.includes(file));
++      const unexpected = actual.filter(
++        (file) => !layout.required.includes(file) && !layout.removed.includes(file),
++      );
++      const candidates = actual.filter((file) => layout.removed.includes(file));
++      if (
++        missing.length > 0 ||
++        unexpected.length > 0 ||
++        (candidates.length !== 0 && candidates.length !== layout.removed.length)
++      ) {
++        return yield* failure(
++          `unreviewed ${layout.target} layout; missing [${missing.join(", ")}], unexpected [${unexpected.join(", ")}], removable ${candidates.length}/${layout.removed.length}`,
++        );
++      }
++      for (const file of [
++        "sdk/index.js",
++        "clipboard/index.js",
++        "clipboard/node_modules/@teddyzhu/clipboard/index.js",
++      ]) {
++        yield* requireFile(path.join(platform.directory, file));
++      }
++      for (const file of candidates) {
++        removedNativeFiles.push(
++          path.relative(root, path.join(platform.directory, file)).split(path.sep).join("/"),
++        );
++        if (file.startsWith("clipboard/")) removals.add(path.join(platform.directory, file));
++      }
++      for (const directory of INTERACTIVE_DIRECTORIES) {
++        const candidate = path.join(platform.directory, directory);
++        if (yield* fs.exists(candidate)) removals.add(candidate);
++      }
++      if (layout.foreignSearchTarget) {
++        for (const tool of ["ripgrep", "tgrep"]) {
++          const candidate = path.join(platform.directory, tool, "bin", layout.foreignSearchTarget);
++          if (yield* fs.exists(candidate)) removals.add(candidate);
++        }
++      }
++      const binding = yield* resolvePackage(
++        koffi.loader,
++        `@koromix/koffi-${layout.target}`,
++        COPILOT_PAYLOAD_VERSIONS.koffi,
++      );
++      yield* requireFile(path.join(binding.directory, `${layout.os}_${layout.arch}`, "koffi.node"));
++      const bindingFiles = yield* nativeFiles(binding.directory);
++      const allowedBindings = new Set([
++        `${layout.os}_${layout.arch}/koffi.node`,
++        ...(layout.os === "linux" ? [`musl_${layout.arch}/koffi.node`] : []),
++      ]);
++      if (bindingFiles.some((file) => !allowedBindings.has(file)))
++        return yield* failure(`unreviewed Koffi layout for ${layout.target}`);
++      if (layout.os === "linux" && bindingFiles.includes(`musl_${layout.arch}/koffi.node`)) {
++        removals.add(path.join(binding.directory, `musl_${layout.arch}`));
++        removedNativeFiles.push(
++          path
++            .relative(root, path.join(binding.directory, `musl_${layout.arch}`, "koffi.node"))
++            .split(path.sep)
++            .join("/"),
++        );
++      }
++    }
++    // The selected artifacts are single-platform (or two macOS architectures), not
++    // the old combined Windows/Linux server tree. Reject accidental platform leaks.
++    for (const os of ["darwin", "win32", "linux", "linuxmusl"]) {
++      for (const arch of ["arm64", "x64"]) {
++        if (layouts.some((layout) => layout.target === `${os}-${arch}`)) continue;
++        const packages = [
++          { name: `@github/copilot-${os}-${arch}`, loader: runtime.loader },
++          ...(os === "linuxmusl"
++            ? []
++            : [{ name: `@koromix/koffi-${os}-${arch}`, loader: koffi.loader }]),
++        ];
++        for (const pkg of packages) {
++          const resolved = yield* Effect.try({
++            try: () => {
++              try {
++                return resolvePackageEntry(pkg.loader, pkg.name);
++              } catch (cause) {
++                if (cause instanceof Error && "code" in cause && cause.code === "MODULE_NOT_FOUND")
++                  return null;
++                throw cause;
++              }
++            },
++            catch: (cause) => failure("cannot inspect foreign platform packages", cause),
++          });
++          if (resolved !== null && contained(resolved)) {
++            return yield* failure(`unexpected installed native package ${pkg.name}`);
++          }
++        }
++      }
++    }
++    for (const file of removals) {
++      const real = yield* realInside(file);
++      if (real !== file) return yield* failure(`pruning path changed before removal: ${file}`);
++      yield* fs.remove(real, { recursive: true });
++    }
++    removedNativeFiles.sort();
++    yield* Effect.log("Pruned reviewed Copilot SDK-server payload").pipe(
++      Effect.annotateLogs({
++        platform: input.platform,
++        arch: input.arch,
++        removedNativeFiles: removedNativeFiles.length,
++      }),
++    );
++    return { pruned: true, removedNativeFiles };
++  },
++);

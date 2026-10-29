@@ -1,0 +1,8 @@
+{
+  "slug": "fork-maintenance-policy",
+  "completed_at": "2026-10-29T08:40:11Z",
+  "base_commit": "f595ef56ebb18ccb6a1ddacdd862b9de97e3fb5e",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Approved policy content unchanged; exact one-file canonical application. Documentation-only, no product behavior changed."
+}

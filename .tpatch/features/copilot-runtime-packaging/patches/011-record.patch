@@ -1,0 +1,3629 @@
+diff --git a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml
+new file mode 100644
+index 000000000..a466c1bc0
+--- /dev/null
++++ b/.github/workflows/fork-native-preview.yml
+@@ -0,0 +1,154 @@
++name: Fork native preview (build only)
++
++on:
++  workflow_dispatch:
++    inputs:
++      version:
++        description: Unsigned preview version (leave empty for a unique run version)
++        required: false
++        type: string
++
++permissions:
++  contents: read
++
++concurrency:
++  group: fork-native-preview
++  cancel-in-progress: false
++
++env:
++  PREVIEW_VERSION: ${{ inputs.version || format('0.1.3-preview.{0}.{1}', github.run_number, github.run_attempt) }}
++  PRODUCT_BASE: d2c440312e5f39d59827ed466838a623516454d6
++  T3CODE_CLERK_PUBLISHABLE_KEY: ""
++  T3CODE_CLERK_JWT_TEMPLATE: ""
++  T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ""
++  T3CODE_RELAY_URL: ""
++  CSC_IDENTITY_AUTO_DISCOVERY: "false"
++
++jobs:
++  linux:
++    name: Linux x64 WSL runtime
++    runs-on: ubuntu-24.04
++    timeout-minutes: 45
++    steps:
++      - name: Checkout exact source without credentials or vendored gitlinks
++        shell: bash
++        run: |
++          set -euo pipefail
++          git init .
++          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
++          git fetch --no-tags origin "$GITHUB_SHA" "$PRODUCT_BASE"
++          git sparse-checkout set --no-cone '/*' '!/.repos/'
++          git checkout --detach "$GITHUB_SHA"
++      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
++        with:
++          node-version-file: package.json
++          run-install: false
++      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
++        with:
++          toolchain: stable
++          targets: x86_64-unknown-linux-gnu
++      - name: Install locked build dependencies
++        run: vp install --frozen-lockfile --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
++      - name: Align preview version and build JS
++        run: |
++          node scripts/update-release-package-versions.ts "$PREVIEW_VERSION"
++          vp run --filter t3 build
++      - name: Build native resource monitor
++        run: |
++          cargo build --locked --release --target x86_64-unknown-linux-gnu --manifest-path native/resource-monitor/Cargo.toml
++          mkdir -p preview-monitor/linux-x64
++          cp native/resource-monitor/target/x86_64-unknown-linux-gnu/release/t3-resource-monitor preview-monitor/linux-x64/
++      - name: Build Linux single-executable
++        env:
++          VP_NODE_VERSION: "26.12.1"
++        run: node apps/server/scripts/cli.ts build-exe --verbose
++      - name: Package and smoke the WSL runtime
++        run: |
++          node scripts/build-cli-archive.ts --platform linux --arch x64 --version "$PREVIEW_VERSION" --resource-monitor-dir preview-monitor --output-dir preview-linux
++          node scripts/smoke-cli-archive.ts --archive "preview-linux/t3-$PREVIEW_VERSION-linux-x64.tar.gz" --expect-version "$PREVIEW_VERSION"
++          node scripts/fork-preview-manifest.mjs --directory preview-linux --target linux-x64 --version "$PREVIEW_VERSION"
++      - name: Upload runtime and provenance
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
++        with:
++          name: fork-preview-linux-x64
++          path: preview-linux/*
++          if-no-files-found: error
++          retention-days: 14
++
++  windows:
++    name: Windows x64 desktop
++    needs: linux
++    runs-on: windows-2025
++    timeout-minutes: 60
++    defaults:
++      run:
++        shell: pwsh
++        working-directory: C:\t3\s
++    env:
++      TEMP: C:\t3\tmp
++      TMP: C:\t3\tmp
++      TMPDIR: C:\t3\tmp
++    steps:
++      - name: Checkout exact source into a short path
++        working-directory: ${{ github.workspace }}
++        run: |
++          $ErrorActionPreference = 'Stop'
++          New-Item -ItemType Directory -Force C:\t3\s, C:\t3\tmp | Out-Null
++          Set-Location C:\t3\s
++          git init .
++          git remote add origin "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY.git"
++          git fetch --no-tags origin $env:GITHUB_SHA $env:PRODUCT_BASE
++          if ($LASTEXITCODE -ne 0) { throw 'Checkout fetch failed' }
++          git sparse-checkout set --no-cone '/*' '!/.repos/'
++          git checkout --detach $env:GITHUB_SHA
++          if ($LASTEXITCODE -ne 0) { throw 'Checkout failed' }
++      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
++        with:
++          node-version-file: C:/t3/s/package.json
++          cache: false
++          run-install: false
++      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
++        with:
++          toolchain: stable
++          targets: x86_64-pc-windows-msvc
++      - name: Install Spectre-mitigated MSVC libraries
++        run: |
++          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
++          $installPath = & $vswhere -products * -latest -property installationPath
++          $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
++          $result = Start-Process -FilePath $setup -ArgumentList 'modify','--installPath',"`"$installPath`"",'--add','Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre','--quiet','--norestart' -Wait -PassThru -NoNewWindow
++          if ($result.ExitCode -ne 0) { throw "MSVC setup failed: $($result.ExitCode)" }
++      - name: Install locked dependencies
++        run: |
++          vp install --frozen-lockfile --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
++          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
++      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
++        with:
++          name: fork-preview-linux-x64
++          path: C:\t3\wsl
++      - name: Verify embedded runtime input and align versions
++        run: |
++          $manifest = Get-Content C:\t3\wsl\manifest.json -Raw | ConvertFrom-Json
++          if ($manifest.buildCommit -ne $env:GITHUB_SHA -or $manifest.productBase -ne $env:PRODUCT_BASE -or $manifest.target -ne 'linux-x64' -or $manifest.version -ne $env:PREVIEW_VERSION) { throw 'WSL provenance mismatch' }
++          $archive = "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz"
++          $expected = @($manifest.artifacts | Where-Object { $_.name -eq (Split-Path $archive -Leaf) })
++          if ($expected.Count -ne 1) { throw 'Missing or ambiguous WSL archive identity' }
++          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected.sha256) { throw 'WSL digest mismatch' }
++          node scripts/update-release-package-versions.ts $env:PREVIEW_VERSION
++          if ($LASTEXITCODE -ne 0) { throw 'Version transform failed' }
++      - name: Build isolated unsigned Windows installer
++        run: |
++          node scripts/build-desktop-artifact.ts --platform win --arch x64 --target nsis --fork-preview --build-version $env:PREVIEW_VERSION --wsl-runtime "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz" --output-dir C:\t3\release --keep-stage --verbose
++          if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed' }
++          node scripts/fork-preview-manifest.mjs --directory C:\t3\release --target windows-x64 --version $env:PREVIEW_VERSION --wsl-archive "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz"
++          if ($LASTEXITCODE -ne 0) { throw 'Manifest verification failed' }
++      - name: Upload installer and provenance
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
++        with:
++          name: fork-preview-windows-x64
++          path: |
++            C:\t3\release\*.exe
++            C:\t3\release\manifest.json
++            C:\t3\release\SHA256SUMS
++          if-no-files-found: error
++          retention-days: 14
+diff --git a/apps/desktop/src/app/DesktopClerk.test.ts b/apps/desktop/src/app/DesktopClerk.test.ts
+index a244ff4b3..cd3b44420 100644
+--- a/apps/desktop/src/app/DesktopClerk.test.ts
++++ b/apps/desktop/src/app/DesktopClerk.test.ts
+@@ -56,10 +56,13 @@ const layerDesktopClerk = (
+     copyText: () => Effect.void,
+   },
+   listeners = new Map<string, (...args: unknown[]) => void>(),
++  isolatedPreview = false,
+ ) => {
+   const environment = DesktopEnvironment.DesktopEnvironment.of({
+     stateDir: "/tmp/t3-state",
+     isDevelopment,
++    isolatedPreview,
++    baseDir: "/tmp/fork-preview",
+     appDataDirectory: "/tmp/app-data",
+     platform,
+   } as unknown as DesktopEnvironment.DesktopEnvironment["Service"]);
+@@ -108,6 +111,28 @@ describe("DesktopClerk", () => {
+     requestSingleInstanceLockMock.mockReset().mockReturnValue(true);
+     storageMock.mockReset();
+   });
++  it.effect("does not claim a stock URL scheme or passkey support for the isolated preview", () => {
++    storageMock.mockReturnValue(storageAdapter);
++    createClerkBridgeMock.mockReturnValue({ cleanup: vi.fn(), isPrimaryInstance: true });
++    const events: string[] = [];
++    return Effect.gen(function* () {
++      yield* Effect.scoped(
++        Layer.build(
++          layerDesktopClerk(false, events, "darwin", undefined, undefined, undefined, true),
++        ),
++      );
++      assert.deepEqual(createClerkBridgeMock.mock.calls[0]?.[0], {
++        storage: storageAdapter,
++        manageSingleInstanceLock: false,
++        passkeys: false,
++      });
++      assert.deepEqual(events, [
++        "setPath:userData:/tmp/fork-preview/electron",
++        "requestSingleInstanceLock",
++        "on:second-instance",
++      ]);
++    });
++  });
+ 
+   it.each([
+     {
+diff --git a/apps/desktop/src/app/DesktopClerk.ts b/apps/desktop/src/app/DesktopClerk.ts
+index 3e0d753d1..4442d3f1a 100644
+--- a/apps/desktop/src/app/DesktopClerk.ts
++++ b/apps/desktop/src/app/DesktopClerk.ts
+@@ -83,15 +83,23 @@ export const desktopClerkFrontendApiHostname = resolveDesktopClerkFrontendApiHos
+     : __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__,
+ );
+ 
+-function createDesktopClerkBridge(stateDir: string, isDevelopment: boolean) {
++function createDesktopClerkBridge(
++  stateDir: string,
++  isDevelopment: boolean,
++  isolatedPreview: boolean,
++) {
+   return createClerkBridge({
+     storage: storage({ path: stateDir }),
+     manageSingleInstanceLock: false,
+-    passkeys: true,
+-    renderer: {
+-      scheme: ElectronProtocol.getDesktopScheme(isDevelopment),
+-      host: ElectronProtocol.DESKTOP_HOST,
+-    },
++    passkeys: !isolatedPreview,
++    ...(isolatedPreview
++      ? {}
++      : {
++          renderer: {
++            scheme: ElectronProtocol.getDesktopScheme(isDevelopment),
++            host: ElectronProtocol.DESKTOP_HOST,
++          },
++        }),
+   });
+ }
+ 
+@@ -121,7 +129,12 @@ export const make = Effect.gen(function* () {
+ 
+   yield* Effect.acquireRelease(
+     Effect.try({
+-      try: () => createDesktopClerkBridge(environment.stateDir, environment.isDevelopment),
++      try: () =>
++        createDesktopClerkBridge(
++          environment.stateDir,
++          environment.isDevelopment,
++          environment.isolatedPreview,
++        ),
+       catch: (cause) =>
+         new DesktopClerkBridgeInitializationError({
+           stateDir: environment.stateDir,
+diff --git a/apps/desktop/src/app/DesktopConfig.ts b/apps/desktop/src/app/DesktopConfig.ts
+index 11f975a6b..9fa9072de 100644
+--- a/apps/desktop/src/app/DesktopConfig.ts
++++ b/apps/desktop/src/app/DesktopConfig.ts
+@@ -58,6 +58,7 @@ export const DesktopConfig = Config.all({
+   desktopLauncherPath: trimmedString("T3CODE_DESKTOP_LAUNCHER_PATH"),
+   appImagePath: trimmedString("APPIMAGE"),
+   disableAutoUpdate: optionalBoolean("T3CODE_DISABLE_AUTO_UPDATE"),
++  isolatedPreview: optionalBoolean("T3CODE_DESKTOP_ISOLATED_PREVIEW"),
+   mockUpdates: optionalBoolean("T3CODE_DESKTOP_MOCK_UPDATES"),
+   mockUpdateServerPort: Config.Port("T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT").pipe(
+     Config.withDefault(3000),
+diff --git a/apps/desktop/src/app/DesktopEnvironment.ts b/apps/desktop/src/app/DesktopEnvironment.ts
+index 1066198b8..294324117 100644
+--- a/apps/desktop/src/app/DesktopEnvironment.ts
++++ b/apps/desktop/src/app/DesktopEnvironment.ts
+@@ -39,6 +39,7 @@ export class DesktopEnvironment extends Context.Service<
+     readonly processArch: string;
+     readonly isPackaged: boolean;
+     readonly isDevelopment: boolean;
++    readonly isolatedPreview: boolean;
+     readonly appVersion: string;
+     readonly appPath: string;
+     readonly resourcesPath: string;
+@@ -168,10 +169,10 @@ const make = Effect.fn("desktop.environment.make")(function* (
+     input.isPackaged && input.platform === "win32"
+       ? path.join(input.resourcesPath, "server.asar")
+       : appRoot;
+-  const branding = resolveDesktopAppBranding({
+-    isDevelopment,
+-    appVersion: input.appVersion,
+-  });
++  const branding = {
++    ...resolveDesktopAppBranding({ isDevelopment, appVersion: input.appVersion }),
++    ...(config.isolatedPreview ? { displayName: "T3 Code Fork Preview" } : {}),
++  };
+   const displayName = branding.displayName;
+   const stateDir = resolveDesktopStateDir({
+     baseDir,
+@@ -192,6 +193,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
+     processArch: input.processArch,
+     isPackaged: input.isPackaged,
+     isDevelopment,
++    isolatedPreview: config.isolatedPreview,
+     appVersion: input.appVersion,
+     appPath: input.appPath,
+     resourcesPath,
+diff --git a/apps/desktop/src/app/DesktopUserData.test.ts b/apps/desktop/src/app/DesktopUserData.test.ts
+index 78bab4085..1f938aeca 100644
+--- a/apps/desktop/src/app/DesktopUserData.test.ts
++++ b/apps/desktop/src/app/DesktopUserData.test.ts
+@@ -6,6 +6,27 @@ import * as Path from "effect/Path";
+ 
+ import { resolveUserDataPath } from "./DesktopUserData.ts";
+ 
++it.effect("uses only the preview profile without reading ordinary Chromium credential keys", () =>
++  Effect.gen(function* () {
++    const result = yield* resolveUserDataPath({
++      appDataDirectory: "/owned/ordinary",
++      isDevelopment: false,
++      platform: "win32",
++      isolatedPreview: true,
++      baseDir: "/owned/preview",
++    }).pipe(
++      Effect.provideService(
++        FileSystem.FileSystem,
++        FileSystem.makeNoop({
++          exists: () => Effect.die("The ordinary profile must not be inspected."),
++        }),
++      ),
++      Effect.provideService(Path.Path, yield* Path.Path),
++    );
++    assert.equal(result, "/owned/preview/electron");
++  }).pipe(Effect.provide(NodeServices.layer)),
++);
++
+ it.effect.each(["t3code", "T3 Code (Alpha)"])(
+   "preserves Windows credential keys from %s without copying browser databases",
+   (sourceName) =>
+diff --git a/apps/desktop/src/app/DesktopUserData.ts b/apps/desktop/src/app/DesktopUserData.ts
+index 99a082b43..c4e5c21dd 100644
+--- a/apps/desktop/src/app/DesktopUserData.ts
++++ b/apps/desktop/src/app/DesktopUserData.ts
+@@ -36,9 +36,22 @@ export const resolveUserDataPath = Effect.fn("desktop.userData.resolveUserDataPa
+     readonly appDataDirectory: string;
+     readonly isDevelopment: boolean;
+     readonly platform: NodeJS.Platform;
++    readonly isolatedPreview?: boolean;
++    readonly baseDir?: string;
+   }) {
+     const fs = yield* FileSystem.FileSystem;
+     const path = yield* Path.Path;
++    if (input.isolatedPreview) {
++      if (!input.baseDir) {
++        return yield* new DesktopUserDataInitializationError({
++          operation: "inspect",
++          resourcePath: input.appDataDirectory,
++          category: "InvalidArgument",
++          cause: new Error("An isolated preview requires its own T3 home."),
++        });
++      }
++      return path.join(input.baseDir, "electron");
++    }
+     const names = input.isDevelopment
+       ? { current: "t3code-dev", legacy: "T3 Code (Dev)" }
+       : { current: "t3code-v2", legacy: "T3 Code (Alpha)" };
+diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.test.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.test.ts
+index 7464d8fbe..112397698 100644
+--- a/apps/desktop/src/backend/DesktopBackendConfiguration.test.ts
++++ b/apps/desktop/src/backend/DesktopBackendConfiguration.test.ts
+@@ -56,6 +56,7 @@ function layerEnvironment(
+     readonly otlpTracesUrl?: string;
+     readonly otlpMetricsUrl?: string;
+     readonly otlpLogsUrl?: string;
++    readonly isolatedPreview?: boolean;
+   },
+ ) {
+   return DesktopEnvironment.layer({
+@@ -81,6 +82,7 @@ function layerEnvironment(
+           T3CODE_OTLP_TRACES_URL: options?.otlpTracesUrl,
+           T3CODE_OTLP_METRICS_URL: options?.otlpMetricsUrl,
+           T3CODE_OTLP_LOGS_URL: options?.otlpLogsUrl,
++          T3CODE_DESKTOP_ISOLATED_PREVIEW: options?.isolatedPreview ? "true" : undefined,
+         }),
+       ),
+     ),
+@@ -143,6 +145,7 @@ const withPackagedWslHarness = <A, E, R>(
+     readonly forbidFallback?: string;
+     readonly cleanupLegacy?: Effect.Effect<void>;
+     readonly forbidCleanup?: string;
++    readonly isolatedPreview?: boolean;
+   },
+   effect: (
+     context: PackagedWslHarnessContext,
+@@ -210,6 +213,9 @@ const withPackagedWslHarness = <A, E, R>(
+               appPath: baseDir,
+               platform: "win32",
+               resourcesPath: baseDir,
++              ...(input.isolatedPreview === undefined
++                ? {}
++                : { isolatedPreview: input.isolatedPreview }),
+             }),
+           ),
+         ),
+@@ -731,6 +737,30 @@ describe("DesktopBackendConfiguration", () => {
+     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+   );
+ 
++  it.effect("preview WSL uses a Linux-owned separate data home", () =>
++    withPackagedWslHarness(
++      {
++        archiveHash: "a".repeat(64),
++        isolatedPreview: true,
++        wsl: () => ({
++          prepareRuntime: () => ({
++            ok: true,
++            linuxAppRoot: "/home/preview/.t3-fork-preview/wsl-runtime/fixture",
++          }),
++          getUserHome: () => Option.some("/home/preview"),
++        }),
++      },
++      ({ baseDir }) =>
++        Effect.gen(function* () {
++          const configuration = yield* DesktopBackendConfiguration.DesktopBackendConfiguration;
++          const config = yield* configuration.resolveWsl({ port: 5050, distro: null });
++          assert.isTrue(Option.isNone(config.preflightFailure));
++          assert.include(config.args, "T3CODE_HOME=/home/preview/.t3-fork-preview");
++          assert.notInclude(config.args, `T3CODE_HOME=${baseDir}`);
++        }),
++    ),
++  );
++
+   it.effect("resolveWsl preserves existing WSLENV entries when forwarding backend secrets", () =>
+     Effect.gen(function* () {
+       const fileSystem = yield* FileSystem.FileSystem;
+diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
+index ca69f5d02..da7dcfed7 100644
+--- a/apps/desktop/src/backend/DesktopBackendConfiguration.ts
++++ b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
+@@ -687,6 +687,19 @@ const resolveWslStartConfig = Effect.fn("desktop.backendConfiguration.resolveWsl
+ 
+   // wsl.exe --exec omits the login-shell PATH needed to find provider CLIs and npm.
+   const runtime = preflight.runtime;
++  const previewHome = environment.isolatedPreview
++    ? yield* wslEnvironment.getUserHome(distroForConfig)
++    : Option.none<string>();
++  if (environment.isolatedPreview && Option.isNone(previewHome)) {
++    return {
++      ...baseConfig,
++      args: [...distroArgs, "--", "node", "--version"],
++      preflightFailure: Option.some({
++        fatal: true,
++        reason: "Fork preview could not resolve the Linux home needed for an isolated WSL profile.",
++      }),
++    } satisfies DesktopBackendManager.DesktopBackendStartConfig;
++  }
+   const launchPath =
+     runtime.kind === "executable"
+       ? `${WSL_SERVER_SYSTEM_PATH}:${preflight.resolvedPath}`
+@@ -703,6 +716,9 @@ const resolveWslStartConfig = Effect.fn("desktop.backendConfiguration.resolveWsl
+       "--exec",
+       "env",
+       `PATH=${launchPath}`,
++      ...(Option.isSome(previewHome)
++        ? [`T3CODE_HOME=${previewHome.value.replace(/\/$/, "")}/.t3-fork-preview`]
++        : []),
+       ...command,
+       "--bootstrap-fd",
+       "0",
+diff --git a/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
+index 67549f6b8..c30376e0d 100644
+--- a/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
++++ b/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
+@@ -2,6 +2,15 @@
+ import { describe, it } from "@effect/vitest";
+ import { afterAll, expect } from "vite-plus/test";
+ import * as NodeChildProcess from "node:child_process";
++import * as Duration from "effect/Duration";
++import * as Effect from "effect/Effect";
++import * as Fiber from "effect/Fiber";
++import * as Layer from "effect/Layer";
++import * as Option from "effect/Option";
++import * as Sink from "effect/Sink";
++import * as Stream from "effect/Stream";
++import * as TestClock from "effect/testing/TestClock";
++import { ChildProcessSpawner } from "effect/process";
+ 
+ import {
+   buildWslRuntimeInstallScript,
+@@ -10,23 +19,35 @@ import {
+   buildWslRuntimeProbeScript,
+   parseResolvedPath,
+   parseWslRuntimeRoot,
++  probeWslUserHome,
+ } from "./DesktopWslEnvironment.ts";
+ 
++const encoder = new TextEncoder();
++
++it("keeps preview runtime installation, pruning and invalidation outside the stock cache", () => {
++  for (const script of [
++    buildWslRuntimeInstallScript("/tmp/runtime.tar.gz", "sha256-preview", "a".repeat(64), true),
++    buildWslRuntimePruneScript("sha256-preview", true),
++    buildWslRuntimeInvalidateScript("sha256-preview", true),
++  ]) {
++    expect(script).toContain("$HOME/.t3-fork-preview/wsl-runtime");
++    expect(script).not.toContain("$HOME/.t3/wsl-runtime");
++  }
++});
++
+ // The install script only fails the way this file cares about when a real shell
+ // runs it, so find one that has the tools it needs: bash directly on Linux, and
+ // the WSL distro on a Windows dev box, where Git Bash ships no flock. Anywhere
+ // else the executed suite skips and the generated-text assertions stand alone.
+ const REQUIRED_SHELL_TOOLS = ["flock", "sha256sum", "tar", "mktemp"] as const;
+ 
+-const posixShellRunner = (() => {
++const findShellRunner = (probe: string) => {
++  // Candidates rather than a platform switch: wsl.exe simply fails to spawn
++  // where it does not exist, which is the same answer as a shell missing flock.
+   const candidates = [
+     { file: "bash", args: [] as ReadonlyArray<string> },
+     { file: "wsl.exe", args: ["-e", "bash"] as ReadonlyArray<string> },
+   ];
+-  const probe = [
+-    "[ -d /proc/1 ] || exit 1",
+-    ...REQUIRED_SHELL_TOOLS.map((tool) => `command -v ${tool} >/dev/null || exit 1`),
+-  ].join("\n");
+   return (
+     candidates.find((candidate) => {
+       const result = NodeChildProcess.spawnSync(candidate.file, [...candidate.args, "-c", probe], {
+@@ -35,16 +56,30 @@ const posixShellRunner = (() => {
+       return result.status === 0;
+     }) ?? null
+   );
+-})();
+-
+-const runShell = (script: string) => {
+-  if (posixShellRunner === null) throw new Error("no POSIX shell runner available");
+-  // Pass the script on stdin, as production does, to avoid matching its own /proc scan.
+-  const result = NodeChildProcess.spawnSync(
+-    posixShellRunner.file,
+-    [...posixShellRunner.args, "-s"],
+-    { input: script, encoding: "utf8" },
+-  );
++};
++
++const posixShellRunner = findShellRunner(
++  [
++    "[ -d /proc/1 ] || exit 1",
++    ...REQUIRED_SHELL_TOOLS.map((tool) => `command -v ${tool} >/dev/null || exit 1`),
++  ].join("\n"),
++);
++const readinessShellRunner = findShellRunner(
++  [
++    'case "$(uname -s)" in Linux|Darwin) ;; *) exit 1 ;; esac',
++    'case "$(uname -m)" in x86_64|amd64|aarch64|arm64) ;; *) exit 1 ;; esac',
++    "command -v sha256sum >/dev/null && command -v mktemp >/dev/null",
++  ].join("\n"),
++);
++
++const runShell = (script: string, runner = posixShellRunner) => {
++  if (runner === null) throw new Error("no POSIX shell runner available");
++  // The install script arrives on stdin in production too, which is what lets
++  // its own /proc scan not match itself.
++  const result = NodeChildProcess.spawnSync(runner.file, [...runner.args, "-s"], {
++    input: script,
++    encoding: "utf8",
++  });
+   return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+ };
+ 
+@@ -74,6 +109,180 @@ const readField = (stdout: string, field: string) => {
+ 
+ const SERVER_ENTRY_SOURCE = '#!/bin/sh\necho "t3code wsl runtime test server 0.0.0"\n';
+ 
++describe.skipIf(readinessShellRunner === null)(
++  "WSL cache readiness functions (executed without Linux installation)",
++  () => {
++    it("remembers a Copilot-bearing archive when its entire payload disappears", () => {
++      const prefix = buildWslRuntimeInstallScript("/unused", "test", "0".repeat(64)).split(
++        'mkdir -p "$runtime_parent"',
++      )[0]!;
++      // Create, inspect and execute inside the same selected shell/filesystem,
++      // including when Windows reaches that shell through wsl.exe.
++      const result = runShell(
++        [
++          "set -eu",
++          "fixture_home=$(mktemp -d)",
++          `trap 'rm -rf "$fixture_home"' EXIT`,
++          'export HOME="$fixture_home"',
++          'case "$(uname -m)" in x86_64|amd64) arch=x64 ;; aarch64|arm64) arch=arm64 ;; *) exit 1 ;; esac',
++          prefix,
++          'mkdir -p "$runtime_root"',
++          `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$runtime_root/t3"`,
++          'chmod 0755 "$runtime_root/t3"',
++          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"',
++          "runtime_is_ready",
++          'for name in copilot copilot-sdk "copilot-linux-$arch"; do',
++          '  mkdir -p "$runtime_root/node_modules/@github/$name"',
++          "  printf '{}\\n' > \"$runtime_root/node_modules/@github/$name/package.json\"",
++          "done",
++          'platform_root="$runtime_root/node_modules/@github/copilot-linux-$arch"',
++          'mkdir -p "$platform_root/ripgrep/bin/linux-$arch" "$platform_root/tgrep/bin/linux-$arch"',
++          'for command in "$platform_root/copilot" "$platform_root/ripgrep/bin/linux-$arch/rg" "$platform_root/tgrep/bin/linux-$arch/tgrep"; do',
++          `  printf '#!/bin/sh\\nexit 0\\n' > "$command"`,
++          '  chmod 0755 "$command"',
++          "done",
++          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"',
++          "runtime_is_ready",
++          "grep -Eq '^[a-f0-9]{64}:copilot$' \"$ready_marker\"",
++          'chmod 0644 "$platform_root/ripgrep/bin/linux-$arch/rg"',
++          'if runtime_is_ready; then printf "Damaged mode was accepted\\n" >&2; exit 1; fi',
++          'normalize_copilot_executable_modes "$runtime_root"',
++          "runtime_is_ready",
++          'rm -r "$runtime_root/node_modules/@github"',
++          'if runtime_is_ready; then printf "Missing Copilot payload was accepted\\n" >&2; exit 1; fi',
++          'printf "cache-readiness:passed\\n"',
++        ].join("\n"),
++        readinessShellRunner,
++      );
++      expect(result.status, result.stderr).toBe(0);
++      expect(result.stdout).toBe("cache-readiness:passed\n");
++    });
++  },
++);
++
++const makeDistroListSpawner = (result: { readonly stdout?: string; readonly exitCode?: number }) =>
++  ChildProcessSpawner.make(() =>
++    Effect.succeed(
++      ChildProcessSpawner.makeHandle({
++        pid: ChildProcessSpawner.ProcessId(1),
++        exitCode:
++          result.exitCode === undefined
++            ? Effect.never
++            : Effect.succeed(ChildProcessSpawner.ExitCode(result.exitCode)),
++        isRunning: Effect.succeed(result.exitCode === undefined),
++        kill: () => Effect.void,
++        unref: Effect.succeed(Effect.void),
++        stdin: Sink.drain,
++        stdout: Stream.make(encoder.encode(result.stdout ?? "")),
++        stderr: Stream.empty,
++        all: Stream.empty,
++        getInputFd: () => Sink.drain,
++        getOutputFd: () => Stream.empty,
++      }),
++    ),
++  );
++
++const homeProbeShellRunner = findShellRunner("command -v cut >/dev/null");
++
++describe("probeWslUserHome", () => {
++  for (const distro of [null, "Ubuntu-24.04"] as const) {
++    it.effect.skipIf(homeProbeShellRunner === null)(
++      `reads the account home through stdin for ${distro ?? "the default distro"}`,
++      () =>
++        Effect.gen(function* () {
++          const spawner = ChildProcessSpawner.make((command) =>
++            Effect.gen(function* () {
++              if (command._tag !== "StandardCommand") return yield* Effect.die("Unexpected pipe");
++              expect(command.command).toBe("wsl.exe");
++              expect(command.args).toEqual([
++                ...(distro === null ? [] : ["-d", distro]),
++                "--exec",
++                "sh",
++                "-s",
++              ]);
++              const stdin = command.options.stdin;
++              if (!Stream.isStream(stdin)) {
++                return yield* Effect.die("The home probe must not send shell code in Windows argv");
++              }
++              const script = yield* stdin.pipe(
++                Stream.decodeText(),
++                Stream.runFold(
++                  () => "",
++                  (text, chunk) => text + chunk,
++                ),
++              );
++              const result = runShell(
++                [
++                  "export HOME='/wrong/inherited/home'",
++                  "id() { printf '%s\\n' '1234'; }",
++                  "getent() {",
++                  '  [ "$1" = passwd ] && [ "$2" = 1234 ] || return 1',
++                  `  printf '%s\\n' 'fixture:x:1234:1234::/home/fixture user:/bin/sh'`,
++                  "}",
++                  script,
++                ].join("\n"),
++                homeProbeShellRunner,
++              );
++              expect(result.status, result.stderr).toBe(0);
++              return yield* makeDistroListSpawner({
++                stdout: result.stdout,
++                exitCode: result.status ?? 1,
++              }).spawn(command);
++            }),
++          );
++          const home = yield* probeWslUserHome(distro).pipe(
++            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
++          );
++          expect(home).toEqual(Option.some("/home/fixture user"));
++        }),
++    );
++  }
++
++  it.effect.each([
++    "",
++    "C:\\Users\\fixture",
++    "relative/home",
++    "/home/fixture\nunexpected",
++    "/home/fixture\n\n",
++    "\n/home/fixture\n",
++  ])("refuses invalid home output %j", (stdout) =>
++    Effect.gen(function* () {
++      const home = yield* probeWslUserHome("Ubuntu").pipe(
++        Effect.provideService(
++          ChildProcessSpawner.ChildProcessSpawner,
++          makeDistroListSpawner({ stdout, exitCode: 0 }),
++        ),
++      );
++      expect(Option.isNone(home)).toBe(true);
++    }),
++  );
++
++  it.effect("does not accept output from a failed probe", () =>
++    Effect.gen(function* () {
++      const home = yield* probeWslUserHome("Ubuntu").pipe(
++        Effect.provideService(
++          ChildProcessSpawner.ChildProcessSpawner,
++          makeDistroListSpawner({ stdout: "/home/fixture", exitCode: 1 }),
++        ),
++      );
++      expect(Option.isNone(home)).toBe(true);
++    }),
++  );
++
++  it.effect("bounds a stalled home probe", () => {
++    const layer = Layer.merge(
++      TestClock.layer(),
++      Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, makeDistroListSpawner({})),
++    );
++    return Effect.gen(function* () {
++      const fiber = yield* probeWslUserHome("Ubuntu").pipe(Effect.forkScoped);
++      yield* Effect.yieldNow;
++      yield* TestClock.adjust(Duration.seconds(5));
++      expect(Option.isNone(yield* Fiber.join(fiber))).toBe(true);
++    }).pipe(Effect.provide(layer));
++  });
++});
++
+ describe("WSL runtime cache", () => {
+   it.each([
+     [
+@@ -98,7 +307,7 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
+     fixtures.length = 0;
+   });
+ 
+-  const createFixture = (serverEntry = SERVER_ENTRY_SOURCE) => {
++  const createFixture = (serverEntry = SERVER_ENTRY_SOURCE, copilot = false) => {
+     const result = runShell(
+       [
+         "set -eu",
+@@ -108,6 +317,20 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
+         `printf '%s' ${sh(serverEntry)} > "$stage/t3"`,
+         'chmod +x "$stage/t3"',
+         `printf '%s' 'pty-native-payload' > "$stage/node_modules/node-pty/build/Release/pty.node"`,
++        ...(copilot
++          ? [
++              'case "$(uname -m)" in x86_64|amd64) copilot_arch=x64 ;; *) copilot_arch=arm64 ;; esac',
++              'copilot_root="$stage/node_modules/@github/copilot-linux-$copilot_arch"',
++              'mkdir -p "$stage/node_modules/@github/copilot-sdk" "$stage/node_modules/@github/copilot" "$copilot_root/ripgrep/bin/linux-$copilot_arch" "$copilot_root/tgrep/bin/linux-$copilot_arch"',
++              'printf "{}" > "$stage/node_modules/@github/copilot-sdk/package.json"',
++              'printf "{}" > "$stage/node_modules/@github/copilot/package.json"',
++              'printf "{}" > "$copilot_root/package.json"',
++              `printf '%s' ${sh("#!/bin/sh\nprintf 'copilot\\n'\n")} > "$copilot_root/copilot"`,
++              `printf '%s' ${sh("#!/bin/sh\nprintf 'rg\\n'\n")} > "$copilot_root/ripgrep/bin/linux-$copilot_arch/rg"`,
++              `printf '%s' ${sh("#!/bin/sh\nprintf 'tgrep\\n'\n")} > "$copilot_root/tgrep/bin/linux-$copilot_arch/tgrep"`,
++              'chmod 0644 "$copilot_root/copilot" "$copilot_root/ripgrep/bin/linux-$copilot_arch/rg" "$copilot_root/tgrep/bin/linux-$copilot_arch/tgrep"',
++            ]
++          : []),
+         `tar -czf "$work/wsl-runtime.tar.gz" -C "$work/stage" t3-0.0.0-linux-x64`,
+         `printf 'work:%s\\n' "$work"`,
+         `printf 'archiveSha:%s\\n' "$(sha256sum "$work/wsl-runtime.tar.gz" | cut -d ' ' -f 1)"`,
+@@ -158,6 +381,34 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
+       ].join("\n"),
+     );
+ 
++  it("repairs Copilot command modes and detects a warm cache that lost its whole Copilot payload", () => {
++    const fixture = createFixture(SERVER_ENTRY_SOURCE, true);
++    const installed = fixture.install();
++    expect(installed.status, installed.stderr).toBe(0);
++    const commands = (prefix: string) =>
++      runShell(
++        [
++          "set -eu",
++          `root=${sh(fixture.runtimeRoot)}`,
++          'for package in "$root"/node_modules/@github/copilot-linux-*; do',
++          `${prefix} "$package/copilot"`,
++          'for tool in "$package"/ripgrep/bin/linux-*/rg "$package"/tgrep/bin/linux-*/tgrep; do',
++          `${prefix} "$tool"`,
++          "done",
++          "done",
++        ].join("\n"),
++      );
++    expect(commands("test -x").status).toBe(0);
++    expect(commands("chmod 0644").status).toBe(0);
++    expect(fixture.install().status).toBe(0);
++    expect(commands("test -x").status).toBe(0);
++    expect(
++      runShell(`set -eu\nrm -r ${sh(`${fixture.runtimeRoot}/node_modules/@github`)}`).status,
++    ).toBe(0);
++    expect(fixture.install().status).toBe(0);
++    expect(commands("test -x").status).toBe(0);
++  });
++
+   it("discovers version-managed Node for providers with a standalone runtime", () => {
+     const fixture = createFixture();
+     expect(fixture.install().status).toBe(0);
+diff --git a/apps/desktop/src/wsl/DesktopWslEnvironment.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.ts
+index 369397296..789d0500b 100644
+--- a/apps/desktop/src/wsl/DesktopWslEnvironment.ts
++++ b/apps/desktop/src/wsl/DesktopWslEnvironment.ts
+@@ -11,6 +11,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
+ 
+ import { buildRemoteNodeEnvScript } from "@t3tools/ssh/tunnel";
+ import { satisfiesSemverRange } from "@t3tools/shared/semver";
++import { buildCopilotExecutableReadinessScript } from "@t3tools/shared/copilotRuntime";
+ 
+ import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+ import { parseWslDistroList, type WslDistro } from "./wslPathParsing.ts";
+@@ -259,23 +260,34 @@ export const buildWslRuntimeInstallScript = (
+   linuxArchivePath: string,
+   runtimeId: string,
+   archiveSha256: string,
++  isolatedPreview = false,
+ ): string => {
+   const safeRuntimeId = sanitizeWslRuntimeId(runtimeId);
+   return [
+     "set -eu",
+-    'runtime_parent="$HOME/.t3/wsl-runtime"',
++    `runtime_parent="$HOME/${isolatedPreview ? ".t3-fork-preview" : ".t3"}/wsl-runtime"`,
+     `runtime_root="$runtime_parent/${safeRuntimeId}"`,
+     `ready_marker="$runtime_root/${WSL_RUNTIME_READY_MARKER}"`,
+     "runtime_entry_runs() {",
+     '  [ -x "$1/t3" ] && "$1/t3" --version >/dev/null',
+     "}",
++    buildCopilotExecutableReadinessScript(),
+     // Hash the entry to detect a swapped or partially written executable, even if it still runs.
+     "runtime_server_entry_digest() {",
+-    `  sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1`,
++    `  entry_digest=$(sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1)`,
++    '  [ -n "$entry_digest" ] || return 1',
++    // Remember that the verified archive required Copilot even if a damaged
++    // warm cache later loses every SDK/platform file.
++    '  if copilot_payload_present "$1"; then',
++    "    printf '%s:copilot\\n' \"$entry_digest\"",
++    "  else",
++    "    printf '%s\\n' \"$entry_digest\"",
++    "  fi",
+     "}",
+     "runtime_is_ready() {",
+     '  [ -f "$ready_marker" ] &&',
+     '    runtime_entry_runs "$runtime_root" 2>/dev/null &&',
++    '    copilot_executable_payload_ready "$runtime_root" &&',
+     `    recorded_entry_digest=$(tr -d '[:space:]' < "$ready_marker" 2>/dev/null) &&`,
+     '    [ -n "$recorded_entry_digest" ] &&',
+     '    [ "$recorded_entry_digest" = "$(runtime_server_entry_digest "$runtime_root")" ]',
+@@ -322,6 +334,7 @@ export const buildWslRuntimeInstallScript = (
+     'cleanup_runtime_install() { rm -rf "$runtime_tmp"; }',
+     "trap cleanup_runtime_install EXIT",
+     `tar -xzf ${shellQuote(linuxArchivePath)} -C "$runtime_tmp" --strip-components=1`,
++    'normalize_copilot_executable_modes "$runtime_tmp"',
+     'if ! runtime_entry_runs "$runtime_tmp"; then',
+     "  printf 'WSL runtime archive does not contain a working t3 executable\\n' >&2",
+     "  exit 1",
+@@ -348,11 +361,11 @@ export const buildWslRuntimeInstallScript = (
+ // Two hours exceeds cold-install time while bounding orphan retention.
+ const ORPHANED_RUNTIME_SCRATCH_MAX_AGE_MINUTES = 120;
+ 
+-export const buildWslRuntimePruneScript = (runtimeId: string): string => {
++export const buildWslRuntimePruneScript = (runtimeId: string, isolatedPreview = false): string => {
+   const safeRuntimeId = sanitizeWslRuntimeId(runtimeId);
+   return [
+     "set -eu",
+-    'runtime_parent="$HOME/.t3/wsl-runtime"',
++    `runtime_parent="$HOME/${isolatedPreview ? ".t3-fork-preview" : ".t3"}/wsl-runtime"`,
+     `current_runtime="$runtime_parent/${safeRuntimeId}"`,
+     '[ -d "$runtime_parent" ] || exit 0',
+     // Serialize pruning so backends cannot select and delete different previous caches.
+@@ -399,11 +412,14 @@ export const buildWslRuntimePruneScript = (runtimeId: string): string => {
+ };
+ 
+ // Invalidate trees that pass install checks but fail launch probes, or each launch reuses the broken cache.
+-export const buildWslRuntimeInvalidateScript = (runtimeId: string): string => {
++export const buildWslRuntimeInvalidateScript = (
++  runtimeId: string,
++  isolatedPreview = false,
++): string => {
+   const safeRuntimeId = sanitizeWslRuntimeId(runtimeId);
+   return [
+     "set -eu",
+-    `rm -f "$HOME/.t3/wsl-runtime/${safeRuntimeId}/${WSL_RUNTIME_READY_MARKER}"`,
++    `rm -f "$HOME/${isolatedPreview ? ".t3-fork-preview" : ".t3"}/wsl-runtime/${safeRuntimeId}/${WSL_RUNTIME_READY_MARKER}"`,
+   ].join("\n");
+ };
+ 
+@@ -782,6 +798,7 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
+     distro: string | null,
+     windowsPath: string,
+   ) => Effect.Effect<Option.Option<string>>,
++  isolatedPreview = false,
+ ): Effect.fn.Return<PrepareWslRuntimeResult, never, ChildProcessSpawner.ChildProcessSpawner> {
+   const linuxArchivePath = yield* windowsToWslPath(distro, archive.windowsPath);
+   if (Option.isNone(linuxArchivePath)) {
+@@ -793,7 +810,12 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
+ 
+   const install = yield* runWslShell(
+     distro,
+-    buildWslRuntimeInstallScript(linuxArchivePath.value, archive.runtimeId, archive.sha256),
++    buildWslRuntimeInstallScript(
++      linuxArchivePath.value,
++      archive.runtimeId,
++      archive.sha256,
++      isolatedPreview,
++    ),
+     RUNTIME_INSTALL_TIMEOUT,
+     { resolveNode: false },
+   );
+@@ -826,10 +848,11 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
+ const pruneWslRuntimesImpl = Effect.fn("desktop.wsl.pruneRuntimesImpl")(function* (
+   distro: string | null,
+   runtimeId: string,
++  isolatedPreview = false,
+ ): Effect.fn.Return<void, never, ChildProcessSpawner.ChildProcessSpawner> {
+   const result = yield* runWslShell(
+     distro,
+-    buildWslRuntimePruneScript(runtimeId),
++    buildWslRuntimePruneScript(runtimeId, isolatedPreview),
+     RUNTIME_PRUNE_TIMEOUT,
+     { resolveNode: false },
+   );
+@@ -846,10 +869,11 @@ const pruneWslRuntimesImpl = Effect.fn("desktop.wsl.pruneRuntimesImpl")(function
+ const invalidateWslRuntimeImpl = Effect.fn("desktop.wsl.invalidateRuntimeImpl")(function* (
+   distro: string | null,
+   runtimeId: string,
++  isolatedPreview = false,
+ ): Effect.fn.Return<void, never, ChildProcessSpawner.ChildProcessSpawner> {
+   const result = yield* runWslShell(
+     distro,
+-    buildWslRuntimeInvalidateScript(runtimeId),
++    buildWslRuntimeInvalidateScript(runtimeId, isolatedPreview),
+     RUNTIME_INVALIDATE_TIMEOUT,
+     { resolveNode: false },
+   );
+@@ -993,41 +1017,39 @@ const getDistroIpImpl = (
+     Effect.orElseSucceed(() => Option.none<string>()),
+   );
+ 
+-const getUserHomeImpl = (
++export const probeWslUserHome = Effect.fn("desktop.wsl.probeUserHome")(function* (
+   distro: string | null,
+-): Effect.Effect<Option.Option<string>, never, ChildProcessSpawner.ChildProcessSpawner> =>
+-  Effect.scoped(
+-    Effect.gen(function* () {
+-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+-      const command = ChildProcess.make(
+-        "wsl.exe",
+-        [
+-          ...buildDistroArgs(distro),
+-          "--",
+-          "sh",
+-          "-c",
+-          'printf "%s" "$(getent passwd "$(id -un)" | cut -d: -f6)"',
+-        ],
+-        {
+-          stdin: "ignore",
+-          stdout: "pipe",
+-          stderr: "ignore",
+-          killSignal: "SIGTERM",
+-          forceKillAfter: PROCESS_TERMINATE_GRACE,
+-        },
+-      );
+-      const handle = yield* spawner.spawn(command);
+-      const stdoutBytes = yield* Stream.runCollect(handle.stdout);
+-      const exitCode = yield* handle.exitCode;
+-      if ((exitCode as unknown as number) !== 0) return Option.none<string>();
+-      const home = decodeUtf8(concatChunks(stdoutBytes)).trim();
+-      return home.startsWith("/") ? Option.some(home) : Option.none<string>();
+-    }),
+-  ).pipe(
+-    Effect.timeoutOption(USER_HOME_TIMEOUT),
+-    Effect.map(Option.flatten),
+-    Effect.orElseSucceed(() => Option.none<string>()),
++) {
++  // Keep shell quotes on stdin, not in Windows argv; use the account database,
++  // not an inherited HOME or a login profile, as the Linux home authority.
++  const result = yield* runWslShell(
++    distro,
++    [
++      "set -eu",
++      "user_id=$(id -u)",
++      'account=$(getent passwd "$user_id")',
++      'printf "%s\\n" "$account" | cut -d: -f6',
++      "",
++    ].join("\n"),
++    USER_HOME_TIMEOUT,
++    { resolveNode: false },
+   );
++  if (result.exitCode !== 0) {
++    yield* Effect.logWarning("Could not resolve the WSL account home.", {
++      distro,
++      exitCode: result.exitCode,
++      transportFailure: result.transportFailure,
++      stderr: result.stderr.trim().slice(-500),
++    });
++    return Option.none<string>();
++  }
++  const home = result.stdout.replace(/\r?\n$/, "");
++  if (!home.startsWith("/") || /[\r\n\0]/.test(home)) {
++    yield* Effect.logWarning("WSL account home probe returned an invalid Linux path.", { distro });
++    return Option.none<string>();
++  }
++  return Option.some(home);
++});
+ 
+ const makeIsAvailable = Effect.fn("DesktopWslEnvironment.makeIsAvailable")(function* (
+   platform: NodeJS.Platform,
+@@ -1156,7 +1178,7 @@ export const layer = Layer.effect(
+       const key = distro ?? "__default__";
+       const cached = userHomeCache.get(key);
+       if (cached !== undefined) return Option.some(cached);
+-      const resolved = yield* provideSpawner(getUserHomeImpl(distro));
++      const resolved = yield* provideSpawner(probeWslUserHome(distro));
+       if (Option.isSome(resolved)) userHomeCache.set(key, resolved.value);
+       return resolved;
+     });
+@@ -1182,13 +1204,17 @@ export const layer = Layer.effect(
+       getUserHome,
+       getDistroIp,
+       prepareRuntime: Effect.fn("desktop.wsl.prepareRuntime")(function (distro, archive) {
+-        return provideSpawner(prepareWslRuntimeImpl(distro, archive, windowsToWslPath));
++        return provideSpawner(
++          prepareWslRuntimeImpl(distro, archive, windowsToWslPath, environment.isolatedPreview),
++        );
+       }),
+       pruneRuntimes: Effect.fn("desktop.wsl.pruneRuntimes")(function (distro, runtimeId) {
+-        return provideSpawner(pruneWslRuntimesImpl(distro, runtimeId));
++        return provideSpawner(pruneWslRuntimesImpl(distro, runtimeId, environment.isolatedPreview));
+       }),
+       invalidateRuntime: Effect.fn("desktop.wsl.invalidateRuntime")(function (distro, runtimeId) {
+-        return provideSpawner(invalidateWslRuntimeImpl(distro, runtimeId));
++        return provideSpawner(
++          invalidateWslRuntimeImpl(distro, runtimeId, environment.isolatedPreview),
++        );
+       }),
+       probeRuntime: Effect.fn("desktop.wsl.probeRuntime")(function (distro, linuxAppRoot) {
+         return provideSpawner(probeWslRuntimeImpl(distro, linuxAppRoot));
+diff --git a/docs/operations/fork-native-preview.md b/docs/operations/fork-native-preview.md
+new file mode 100644
+index 000000000..155631579
+--- /dev/null
++++ b/docs/operations/fork-native-preview.md
+@@ -0,0 +1,109 @@
++# Personal fork native previews
++
++These are unsigned personal previews of stable `v0.1.3`, not releases.
++Each artifact's generated `manifest.json` records the full upstream product-base
++commit, actual build commit, source-overlay paths, version-only release transform,
++and artifact hashes. Historical v0.0.42 evidence does not qualify this port.
++
++## Isolation and limits
++
++Build desktop artifacts with `--fork-preview` and a preview version such as
++`0.1.3-preview.20261029.1`. The installer identity is
++`com.tesseracode.t3code.preview`, named **T3 Code Fork Preview**.
++
++The packaged bootstrap selects `~/.t3-fork-preview`, with Electron state below
++its `electron` directory. It ignores an ambient ordinary T3 home and refuses
++known live-profile paths. For an owned test directory, set
++`T3CODE_FORK_PREVIEW_HOME` before launching. Do not set it to an existing install.
++The preview keeps a separate single-instance lock, disables automatic updates
++and does not register the stock T3 URL schemes.
++
++Desktop cloud OAuth and native passkeys are intentionally unavailable in this
++isolated unsigned profile. Use local/direct connections. Do not use managed
++remote installation/update flows against an existing production environment.
++Provider sessions use their configured provider homes; choose separate homes
++for isolation. Automated checks must disable providers or use owned provider
++homes and must not run provider turns.
++
++WSL uses its Linux user's `~/.t3-fork-preview` for both data and runtime cache.
++The Windows path is never forwarded as the Linux data directory. Runtime
++installation, pruning and invalidation stay outside the stock WSL cache.
++Account-home probes send their shell script on stdin, avoiding Windows/WSL
++argument re-quoting. They read the Linux account database, not an inherited
++`HOME`. A failed probe stops isolated startup rather than using the ordinary
++profile; its transport/exit details are logged.
++
++## Build
++
++Use the repository's Node **26.12.1** and pnpm **12.14.0**, with the existing
++native prerequisites in the development runbook. In a
++dedicated build checkout, install locked dependencies, then use
++`scripts/update-release-package-versions.ts` to align the four release manifests.
++Do not commit that build-time version transform.
++
++```sh
++node scripts/build-desktop-artifact.ts \
++  --platform mac --arch arm64 --target dmg \
++  --build-version 0.1.3-preview.20261029.1 --fork-preview --keep-stage
++node scripts/fork-preview-manifest.mjs \
++  --directory release --target mac-arm64 --version 0.1.3-preview.20261029.1 \
++  --product-base v0.1.3
++```
++
++Windows uses the same builder with `--platform win --arch x64 --target nsis`
++and `--wsl-runtime <matching-linux-x64-archive>`. Build the Linux single-executable
++and archive on Linux using the existing CLI builders, then smoke it before
++embedding it. The build verifies the reviewed native dependency closure,
++Windows payload budget, and embedded archive digest; those gates are not optional.
++
++`.github/workflows/fork-native-preview.yml` is manual-dispatch-only and build-only.
++There are no push, tag, pull-request, scheduled or reusable-workflow triggers.
++It uploads Linux and
++Windows artifacts without release tags, npm publication, signing or deployment.
++The approved v0.1.3 batch permits at most **four build-only CI attempts per target**
++(Linux x64 and Windows x64), including reruns and new dispatches. Record each
++attempt's run URL, exact source commit, target, result and remaining budget before
++retrying; never retry automatically. The parent/integration operator owns dispatch.
++The upstream release and signed macOS PR-preview workflows are not appropriate:
++they can publish or sign.
++
++## Install, inspect and roll back
++
++Verify `SHA256SUMS` before using a download. Mac previews can be copied from the
++DMG to a separately named application location. Windows installs under the fork
++preview identity, not the ordinary app identity. Unsigned downloads may show OS
++warnings; never disable Gatekeeper or SmartScreen globally.
++
++First launch should show **T3 Code Fork Preview**, a fresh profile and TWS disabled.
++Check the native environment before adding a separate test project. On Windows,
++exercise WSL explicitly in Connections and confirm it is a distinct environment.
++The independently smoked Linux archive alone does not qualify WSL integration.
++
++Quit only the preview, then uninstall/remove that preview application to roll
++back. Preserve `~/.t3-fork-preview` unless deliberately discarding preview work;
++do not copy it over the normal profile. Do not mix backend versions against the
++same database.
++
++Build success, CLI smoke, native UI checks and receiving-host Windows/WSL
++qualification are separate gates. Keep unrun gates marked pending. No artifacts
++from this workflow are a signed/notarized release or an automatic update.
++
++## Required qualification report
++
++Attach actual manifests, hashes and command transcripts, not reconstructed
++snapshots. Report separately:
++
++- Native macOS arm64 candidate build and explicitly authorized UI verification.
++- Linux x64 build and archive smoke on native Linux.
++- Windows x64 installer execution, complete unpacked-application file count
++  (maximum **80**), native dependency load and separate preview instance/profile.
++- Receiving-host WSL/Ubuntu cold installation, executable `copilot`/`rg`/`tgrep`
++  modes, warm-cache reuse and repair, account-home probing, and isolated state.
++- Native Copilot session continuity on each receiving host, using authorized,
++  isolated provider homes; automated packaging must not run provider turns.
++
++An unavailable Windows/WSL/Ubuntu receiving host is **pending**, not passed.
++POSIX readiness fixtures on macOS and archive smoke do not qualify installed WSL.
++Self-containment probes must run where no ancestor `node_modules` is visible;
++the builder deliberately refuses otherwise. If filesystem policy permits only
++an in-worktree directory, report that gate as blocked instead of weakening it.
+diff --git a/docs/operations/release.md b/docs/operations/release.md
+index 6f1c39539..377460b4b 100644
+--- a/docs/operations/release.md
++++ b/docs/operations/release.md
+@@ -57,6 +57,29 @@ the version.
+   - nightly releases are aliased to the `nightly` hosted app channel
+ - Signing is optional and auto-detected per platform from secrets.
+ 
++## Isolated fork previews and Copilot runtime stages
++
++[Personal fork previews](fork-native-preview.md) use a separate, unsigned,
++manual build-only workflow. They do not use the release train or the signed
++PR-preview publisher below.
++
++Copilot's reviewed packaging boundary is SDK 1.0.8, CLI/platform packages
++1.0.75, Koffi/native bindings 3.3.1, vscode-jsonrpc 8.2.1, Zod 4.4.3 and
++detect-libc 2.1.2. Carry all five owner-scoped overrides into generated
++desktop, Windows sidecar and CLI stages. A source lockfile alone cannot pin
++those independent production installs. External roots follow the server's
++reachable workspace owners, including provider packages; reading only the
++server manifest loses native runtimes after package extraction.
++
++Before pruning, validate the SDK-owner dependency closure and complete native
++inventory. Pruning is limited to the reviewed CLI payload and glibc-only musl
++exclusions; retain universal macOS CPUs, specialized clipboard bindings and
++Windows computer-use executables. Do not remove upstream bundle/native probes,
++locks, TLS checks, archive hashes or the complete Windows 80-file budget.
++WSL validates and repairs Copilot command modes before promotion and rechecks
++warm-cache readiness. Full installed-platform qualification remains separate
++from fixture tests.
++
+ ## Pull request macOS previews
+ 
+ Labeling a PR `preview:mac` publishes a signed, notarized Apple Silicon DMG with T3 Connect enabled
+diff --git a/packages/shared/package.json b/packages/shared/package.json
+index f968d2768..28c58ca77 100644
+--- a/packages/shared/package.json
++++ b/packages/shared/package.json
+@@ -3,6 +3,10 @@
+   "private": true,
+   "type": "module",
+   "exports": {
++    "./copilotRuntime": {
++      "types": "./src/copilotRuntime.ts",
++      "import": "./src/copilotRuntime.ts"
++    },
+     "./changedFileKind": {
+       "types": "./src/changedFileKind.ts",
+       "import": "./src/changedFileKind.ts"
+diff --git a/packages/shared/src/copilotRuntime.test.ts b/packages/shared/src/copilotRuntime.test.ts
+new file mode 100644
+index 000000000..ab7f6a773
+--- /dev/null
++++ b/packages/shared/src/copilotRuntime.test.ts
+@@ -0,0 +1,140 @@
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodeChildProcess from "node:child_process";
++import * as NodeFS from "node:fs";
++import * as NodeOS from "node:os";
++import * as NodePath from "node:path";
++import { afterEach, describe, expect, it } from "vite-plus/test";
++
++import {
++  buildCopilotExecutableReadinessScript,
++  copilotLinuxExecutableMembers,
++  validateCopilotLinuxArchiveMembers,
++} from "./copilotRuntime.ts";
++
++const roots: string[] = [];
++afterEach(() => {
++  for (const root of roots.splice(0)) NodeFS.rmSync(root, { recursive: true, force: true });
++});
++const uname = NodeChildProcess.spawnSync("uname", ["-m"], { encoding: "utf8" });
++const arch = ["arm64", "aarch64"].includes(uname.stdout?.trim()) ? "arm64" : "x64";
++
++function fixture(withCopilot = true) {
++  const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-copilot-modes-"));
++  roots.push(root);
++  const write = (relative: string, source = "{}") => {
++    const file = NodePath.join(root, relative);
++    NodeFS.mkdirSync(NodePath.dirname(file), { recursive: true });
++    NodeFS.writeFileSync(file, source, { mode: 0o644 });
++    return file;
++  };
++  if (withCopilot) {
++    for (const name of ["copilot", "copilot-sdk", `copilot-linux-${arch}`]) {
++      write(`node_modules/@github/${name}/package.json`);
++    }
++    for (const [index, relative] of copilotLinuxExecutableMembers(arch).entries()) {
++      write(relative, `#!/bin/sh\nprintf '${["copilot", "rg", "tgrep"][index]}\\n'\n`);
++    }
++  }
++  const run = (action: string) =>
++    NodeChildProcess.spawnSync(
++      "bash",
++      [
++        "-c",
++        `set -eu\n${buildCopilotExecutableReadinessScript()}\n${action}`,
++        "readiness-test",
++        root,
++      ],
++      { encoding: "utf8" },
++    );
++  return { root, write, run };
++}
++
++describe("Copilot Linux archive members", () => {
++  const archiveMembers = (arch: "x64" | "arm64") => [
++    ...["copilot", "copilot-sdk", `copilot-linux-${arch}`].map(
++      (name) => `node_modules/@github/${name}/package.json`,
++    ),
++    ...copilotLinuxExecutableMembers(arch),
++  ];
++  it.each(["x64", "arm64"] as const)("accepts a complete %s payload", (arch) => {
++    const members = archiveMembers(arch);
++    expect(validateCopilotLinuxArchiveMembers(members, arch)).toBeNull();
++    expect(validateCopilotLinuxArchiveMembers([], arch)).toBeNull();
++  });
++  it.each(["x64", "arm64"] as const)(
++    "rejects missing, duplicate, wrong-platform and non-target %s commands",
++    (arch) => {
++      const members = archiveMembers(arch);
++      for (const broken of [
++        members.slice(1),
++        members.slice(0, -1),
++        [...members, members.at(-1)!],
++        [...members, "node_modules/@github/copilot-win32-x64/copilot.exe"],
++        [...members, `node_modules/@github/copilot-linux-${arch}/ripgrep/bin/linux-wrong/rg`],
++      ])
++        expect(validateCopilotLinuxArchiveMembers(broken, arch)).not.toBeNull();
++    },
++  );
++});
++
++describe.skipIf(uname.status !== 0 || NodeOS.type() === "Windows_NT")(
++  "production Copilot mode functions (executed)",
++  () => {
++    it("normalizes all three commands and preserves explicit newline fixture output", () => {
++      const stage = fixture();
++      expect(stage.run('copilot_executable_payload_ready "$1"').status).not.toBe(0);
++      const result = stage.run(
++        'normalize_copilot_executable_modes "$1"\n"$copilot_package_dir/copilot"\n"$copilot_package_dir/ripgrep/bin/$copilot_target/rg"\n"$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"',
++      );
++      expect(result.status, result.stderr).toBe(0);
++      expect(result.stdout).toBe("copilot\nrg\ntgrep\n");
++      for (const file of copilotLinuxExecutableMembers(arch)) {
++        expect(NodeFS.statSync(NodePath.join(stage.root, file)).mode & 0o777).toBe(0o755);
++      }
++      NodeFS.chmodSync(NodePath.join(stage.root, copilotLinuxExecutableMembers(arch)[1]!), 0o644);
++      expect(stage.run('copilot_executable_payload_ready "$1"').status).not.toBe(0);
++      expect(stage.run('normalize_copilot_executable_modes "$1"').status).toBe(0);
++    });
++
++    it("checks the complete layout before chmod and rejects ambiguous targets", () => {
++      const stage = fixture();
++      NodeFS.rmSync(NodePath.join(stage.root, copilotLinuxExecutableMembers(arch)[2]!));
++      expect(stage.run('normalize_copilot_executable_modes "$1"').status).not.toBe(0);
++      expect(
++        NodeFS.statSync(NodePath.join(stage.root, copilotLinuxExecutableMembers(arch)[0]!)).mode &
++          0o777,
++      ).toBe(0o644);
++      stage.write(copilotLinuxExecutableMembers(arch)[2]!);
++      stage.write(
++        `node_modules/@github/copilot-linux-${arch === "x64" ? "arm64" : "x64"}/package.json`,
++      );
++      expect(stage.run('normalize_copilot_executable_modes "$1"').status).not.toBe(0);
++    });
++
++    it("does not follow a command symlink or silently accept a missing SDK", () => {
++      const stage = fixture();
++      const executable = NodePath.join(stage.root, copilotLinuxExecutableMembers(arch)[0]!);
++      const target = stage.write("outside-command", "#!/bin/sh\nexit 0\n");
++      NodeFS.rmSync(executable);
++      NodeFS.symlinkSync(target, executable);
++      expect(stage.run('normalize_copilot_executable_modes "$1"').status).not.toBe(0);
++      expect(NodeFS.statSync(target).mode & 0o777).toBe(0o644);
++      NodeFS.rmSync(executable);
++      stage.write(copilotLinuxExecutableMembers(arch)[0]!);
++      NodeFS.rmSync(NodePath.join(stage.root, "node_modules/@github/copilot-sdk"), {
++        recursive: true,
++      });
++      expect(stage.run('normalize_copilot_executable_modes "$1"').status).not.toBe(0);
++    });
++
++    it("leaves non-Copilot runtimes unchanged", () => {
++      const stage = fixture(false);
++      const before = NodeFS.readdirSync(stage.root);
++      expect(
++        stage.run('normalize_copilot_executable_modes "$1"\ncopilot_executable_payload_ready "$1"')
++          .status,
++      ).toBe(0);
++      expect(NodeFS.readdirSync(stage.root)).toEqual(before);
++    });
++  },
++);
+diff --git a/packages/shared/src/copilotRuntime.ts b/packages/shared/src/copilotRuntime.ts
+new file mode 100644
+index 000000000..e19c44f78
+--- /dev/null
++++ b/packages/shared/src/copilotRuntime.ts
+@@ -0,0 +1,121 @@
++export function copilotLinuxExecutableMembers(arch: "x64" | "arm64"): ReadonlyArray<string> {
++  const root = `node_modules/@github/copilot-linux-${arch}`;
++  return [
++    `${root}/copilot`,
++    `${root}/ripgrep/bin/linux-${arch}/rg`,
++    `${root}/tgrep/bin/linux-${arch}/tgrep`,
++  ];
++}
++
++/** Members are relative to the single top-level Linux CLI archive directory. */
++export function validateCopilotLinuxArchiveMembers(
++  members: ReadonlyArray<string>,
++  arch: "x64" | "arm64",
++): string | null {
++  const prefix = "node_modules/@github/";
++  const packages = new Set(
++    members.flatMap((member) => {
++      if (!member.startsWith(prefix)) return [];
++      const name = member.slice(prefix.length).split("/")[0]!;
++      return name === "copilot" || name.startsWith("copilot-") ? [name] : [];
++    }),
++  );
++  if (packages.size === 0) return null;
++  const expected = new Set(["copilot", "copilot-sdk", `copilot-linux-${arch}`]);
++  if (packages.size !== expected.size || [...packages].some((name) => !expected.has(name))) {
++    return "Copilot archive must contain its SDK, runtime and exactly one matching Linux platform package.";
++  }
++  const required = [
++    ...[...expected].map((name) => `${prefix}${name}/package.json`),
++    ...copilotLinuxExecutableMembers(arch),
++  ];
++  if (required.some((file) => members.filter((member) => member === file).length !== 1)) {
++    return "Copilot archive has missing or duplicate runtime manifests or commands.";
++  }
++  const platformRoot = `${prefix}copilot-linux-${arch}/`;
++  const commands = members.filter(
++    (member) =>
++      member.startsWith(platformRoot) &&
++      /\/(?:copilot(?:\.exe)?|(?:ripgrep|tgrep)\/bin\/[^/]+\/(?:rg|tgrep)(?:\.exe)?)$/.test(member),
++  );
++  const expectedCommands = new Set(copilotLinuxExecutableMembers(arch));
++  if (commands.length !== 3 || commands.some((member) => !expectedCommands.has(member))) {
++    return "Copilot archive contains unexpected platform commands.";
++  }
++  return null;
++}
++
++/** The same POSIX checks are used before cache promotion and on every warm reuse. */
++export function buildCopilotExecutableReadinessScript(): string {
++  return [
++    "copilot_payload_present() {",
++    '  for candidate in "$1/node_modules/@github/copilot" "$1"/node_modules/@github/copilot-*; do',
++    '    if [ -e "$candidate" ] || [ -L "$candidate" ]; then return 0; fi',
++    "  done",
++    "  return 1",
++    "}",
++    "copilot_payload_layout() {",
++    '  [ -d "$1/node_modules" ] && [ ! -L "$1/node_modules" ] || return 1',
++    '  [ -d "$1/node_modules/@github" ] && [ ! -L "$1/node_modules/@github" ] || return 1',
++    '  for candidate in "$1/node_modules/@github/copilot" "$1/node_modules/@github/copilot-sdk"; do',
++    '    [ -d "$candidate" ] && [ ! -L "$candidate" ] && [ -f "$candidate/package.json" ] && [ ! -L "$candidate/package.json" ] || return 1',
++    "  done",
++    "  copilot_package_count=0",
++    '  for candidate in "$1"/node_modules/@github/copilot-*; do',
++    '    [ -e "$candidate" ] || [ -L "$candidate" ] || continue',
++    '    case "$candidate" in',
++    "      */copilot-sdk) continue ;;",
++    "      */copilot-linux-x64) copilot_target=linux-x64 ;;",
++    "      */copilot-linux-arm64) copilot_target=linux-arm64 ;;",
++    "      *) return 1 ;;",
++    "    esac",
++    '    [ -d "$candidate" ] && [ ! -L "$candidate" ] || return 1',
++    '    copilot_package_dir="$candidate"',
++    "    copilot_package_count=$((copilot_package_count + 1))",
++    "  done",
++    '  [ "$copilot_package_count" -eq 1 ] || return 1',
++    '  case "$(uname -m)" in',
++    '    x86_64|amd64) [ "$copilot_target" = linux-x64 ] || return 1 ;;',
++    '    aarch64|arm64) [ "$copilot_target" = linux-arm64 ] || return 1 ;;',
++    "    *) return 1 ;;",
++    "  esac",
++    '  [ -f "$copilot_package_dir/package.json" ] && [ ! -L "$copilot_package_dir/package.json" ] || return 1',
++    '  for directory in "$copilot_package_dir/ripgrep" "$copilot_package_dir/ripgrep/bin" "$copilot_package_dir/ripgrep/bin/$copilot_target" "$copilot_package_dir/tgrep" "$copilot_package_dir/tgrep/bin" "$copilot_package_dir/tgrep/bin/$copilot_target"; do',
++    '    [ -d "$directory" ] && [ ! -L "$directory" ] || return 1',
++    "  done",
++    '  for command_dir in "$copilot_package_dir"/ripgrep/bin/* "$copilot_package_dir"/tgrep/bin/*; do',
++    '    [ "${command_dir##*/}" = "$copilot_target" ] || return 1',
++    "  done",
++    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
++    '    [ -f "$executable" ] && [ ! -L "$executable" ] || return 1',
++    "  done",
++    "}",
++    "copilot_executable_payload_ready() {",
++    '  copilot_payload_present "$1" || return 0',
++    '  if ! copilot_payload_layout "$1"; then',
++    "    printf 'Linux Copilot payload has a missing, ambiguous, or incompatible layout\\n' >&2",
++    "    return 1",
++    "  fi",
++    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
++    '    if [ ! -x "$executable" ]; then',
++    "      printf 'Linux Copilot command is not executable: %s\\n' \"$executable\" >&2",
++    "      return 1",
++    "    fi",
++    "  done",
++    "}",
++    "normalize_copilot_executable_modes() {",
++    '  copilot_payload_present "$1" || return 0',
++    '  if ! copilot_payload_layout "$1"; then',
++    "    printf 'Linux Copilot payload has a missing, ambiguous, or incompatible layout\\n' >&2",
++    "    return 1",
++    "  fi",
++    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
++    '    if ! chmod 0755 "$executable"; then',
++    "      printf 'Could not make Linux Copilot command executable: %s\\n' \"$executable\" >&2",
++    "      return 1",
++    "    fi",
++    "  done",
++    '  copilot_executable_payload_ready "$1"',
++    "}",
++  ].join("\n");
++}
+diff --git a/scripts/build-cli-archive.ts b/scripts/build-cli-archive.ts
+index dfe1de081..b63767551 100644
+--- a/scripts/build-cli-archive.ts
++++ b/scripts/build-cli-archive.ts
+@@ -26,9 +26,10 @@ import {
+   resolveFffNativeDependencies,
+   STAGE_INSTALL_ARGS,
+ } from "./build-desktop-artifact.ts";
+-import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
++import { collectCliRuntimeExternalDependencies } from "./lib/runtime-external-dependencies.ts";
+ import { signWithJsign } from "./lib/windows-jsign.ts";
+ import { windowsSystemTar } from "./lib/windows-tar.ts";
++import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
+ import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
+ 
+ const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
+@@ -134,6 +135,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+     yield* fs.readFileString(path.join(input.repoRoot, "pnpm-workspace.yaml")),
+   );
+   const catalog = workspace.catalog ?? {};
++  const overrides = resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server");
+   const serverDependencies = resolveCatalogDependencies(
+     serverPackageJson.dependencies,
+     catalog,
+@@ -147,7 +149,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+     });
+   }
+   const dependencies = {
+-    ...selectCliRuntimeExternalDependencies(serverDependencies),
++    ...(yield* collectCliRuntimeExternalDependencies(input.repoRoot)),
+     ...resolveFffNativeDependencies(input.platform, input.arch, fffNodeVersion),
+   };
+   const patchedDependencies = createStagePatchedDependencies(
+@@ -173,7 +175,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+         arch: input.arch,
+         ...(workspace.allowBuilds ? { allowBuilds: workspace.allowBuilds } : {}),
+         patchedDependencies,
+-        overrides: resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server"),
++        overrides,
+       }),
+       nodeLinker: "hoisted",
+     }),
+@@ -192,6 +194,13 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+     }),
+     "vp install --prod (cli archive runtime externals)",
+   );
++  yield* pruneCopilotSdkServerPayload({
++    stageDir: input.stageDir,
++    platform: input.platform,
++    arch: input.arch,
++    dependencies,
++    overrides,
++  });
+ 
+   const platformKey = cliArchivePlatformKey(input.platform, input.arch);
+   const prebuildsDir = path.join(input.stageDir, "node_modules/node-pty/prebuilds");
+diff --git a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts
+index 6ad4413ad..91d53748e 100644
+--- a/scripts/build-desktop-artifact.test.ts
++++ b/scripts/build-desktop-artifact.test.ts
+@@ -15,8 +15,8 @@ import * as Layer from "effect/Layer";
+ import * as PlatformError from "effect/PlatformError";
+ import * as Option from "effect/Option";
+ import * as Path from "effect/Path";
+-import * as Sink from "effect/Sink";
+ import * as Schema from "effect/Schema";
++import * as Sink from "effect/Sink";
+ import * as Stream from "effect/Stream";
+ import { ChildProcess, ChildProcessSpawner } from "effect/process";
+ 
+@@ -52,6 +52,8 @@ import {
+   WindowsDesktopBuildPrerequisitesMissingError,
+   WindowsPackagedPayloadValidationError,
+   stageCursorSdkPlatformPackages,
++  stageLinuxCaptureHelper,
++  createStageWorkspaceConfig,
+   WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT,
+   WINDOWS_SERVER_ASAR_IGNORE_GLOBS,
+   WINDOWS_SERVER_ASAR_RESOURCE,
+@@ -67,6 +69,9 @@ import {
+ } from "./update-release-package-versions.ts";
+ import * as HostProcess from "@t3tools/shared/HostProcess";
+ import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
++import { SpawnExecutableResolution } from "@t3tools/shared/shell";
++import { fromYaml } from "@t3tools/shared/schemaYaml";
++import { COPILOT_DEPENDENCY_OVERRIDES } from "./lib/copilot-payload.ts";
+ 
+ const encodeModuleUrl = Schema.encodeEffect(Schema.fromJsonString(Schema.String));
+ const decodePackageVersion = Schema.decodeUnknownEffect(
+@@ -134,6 +139,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
+   readonly wslRuntime?: "valid" | "loose-server-tree" | "missing-pty" | "bad-digest";
+   readonly targetArch?: "x64" | "arm64";
+   readonly ptyPrebuildArch?: "x64" | "arm64";
++  readonly wslExtraMembers?: ReadonlyArray<string>;
+ }) {
+   const fs = yield* FileSystem.FileSystem;
+   const path = yield* Path.Path;
+@@ -183,6 +189,9 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
+         : yield* makeLinuxCliArchiveFixture({
+             root: path.join(tempDir, "wsl-runtime"),
+             stem,
++            ...(input.wslExtraMembers
++              ? { extraMembers: input.wslExtraMembers.map((member) => `${stem}/${member}`) }
++              : {}),
+             ...(input.wslRuntime === "missing-pty" || input.ptyPrebuildArch !== undefined
+               ? { omitMembers: [`${stem}/node_modules/node-pty/build/Release/pty.node`] }
+               : {}),
+@@ -288,6 +297,37 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+       }
+     }),
+   );
++  it.effect("keeps source SDK and generated stage overrides on the reviewed closure", () =>
++    Effect.gen(function* () {
++      const fs = yield* FileSystem.FileSystem;
++      const path = yield* Path.Path;
++      const file = yield* path.fromFileUrl(new URL("../pnpm-workspace.yaml", import.meta.url));
++      const workspace = yield* Schema.decodeEffect(
++        fromYaml(Schema.Struct({ overrides: Schema.Record(Schema.String, Schema.String) })),
++      )(yield* fs.readFileString(file));
++      for (const platform of ["win", "linux", "mac"] as const) {
++        const arches =
++          platform === "mac"
++            ? (["x64", "arm64", "universal"] as const)
++            : (["x64", "arm64"] as const);
++        for (const arch of arches) {
++          const staged = createStageWorkspaceConfig({
++            platform,
++            arch,
++            overrides: { ...workspace.overrides },
++          });
++          for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
++            assert.equal(staged.overrides?.[selector], version, selector);
++          }
++          for (const cpu of ["x64", "arm64"]) {
++            const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${cpu}`;
++            assert.equal(staged.overrides?.[selector], platform === "linux" ? "-" : undefined);
++            assert.isUndefined(workspace.overrides[selector]);
++          }
++        }
++      }
++    }),
++  );
+ 
+   it.effect("restores manifests and releases the checkout lock after interruption", () =>
+     Effect.gen(function* () {
+@@ -641,67 +681,71 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+     ),
+   );
+ 
+-  it.effect("unpacks target Windows natives while excluding the other architecture", () =>
+-    Effect.scoped(
+-      Effect.gen(function* () {
+-        const fs = yield* FileSystem.FileSystem;
+-        const path = yield* Path.Path;
+-        const tempDir = yield* fs.makeTempDirectoryScoped({
+-          prefix: "t3-windows-architecture-test-",
+-        });
+-        const sourceDir = path.join(tempDir, "server");
+-        const nativeFiles = [
+-          "node_modules/node-pty/prebuilds/win32-x64/conpty/OpenConsole.exe",
+-          "node_modules/node-pty/prebuilds/win32-arm64/conpty/OpenConsole.exe",
+-          "node_modules/node-pty/third_party/conpty/1.0.0/win10-x64/OpenConsole.exe",
+-          "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64/OpenConsole.exe",
+-          "node_modules/node-pty/prebuilds/win32-x64/pty.node",
+-          "node_modules/node-pty/prebuilds/linux-x64/pty.node",
+-        ];
+-
+-        for (const nativeFile of nativeFiles) {
+-          const nativePath = path.join(sourceDir, nativeFile);
+-          yield* fs.makeDirectory(path.dirname(nativePath), { recursive: true });
+-          yield* fs.writeFileString(nativePath, nativeFile.includes("linux") ? "\x7fELF" : "MZ");
+-        }
+-
+-        const asarPath = path.join(tempDir, "server.asar");
+-        yield* packWindowsServerAsar({ sourceDir, asarPath, arch: "x64" });
+-        const unpackedRoot = `${asarPath}.unpacked`;
++  it.effect(
++    "unpacks target Windows natives from hidden stages while excluding the other architecture",
++    () =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const path = yield* Path.Path;
++          const tempDir = yield* fs.makeTempDirectoryScoped({
++            prefix: "t3-windows-architecture-test-",
++          });
++          const sourceDir = path.join(tempDir, ".server");
++          const nativeFiles = [
++            "node_modules/node-pty/prebuilds/win32-x64/conpty/OpenConsole.exe",
++            "node_modules/node-pty/prebuilds/win32-arm64/conpty/OpenConsole.exe",
++            "node_modules/node-pty/third_party/conpty/1.0.0/win10-x64/OpenConsole.exe",
++            "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64/OpenConsole.exe",
++            "node_modules/node-pty/prebuilds/win32-x64/pty.node",
++            "node_modules/node-pty/prebuilds/linux-x64/pty.node",
++          ];
++
++          for (const nativeFile of nativeFiles) {
++            const nativePath = path.join(sourceDir, nativeFile);
++            yield* fs.makeDirectory(path.dirname(nativePath), { recursive: true });
++            yield* fs.writeFileString(nativePath, nativeFile.includes("linux") ? "\x7fELF" : "MZ");
++          }
++
++          const asarPath = path.join(tempDir, "server.asar");
++          yield* packWindowsServerAsar({ sourceDir, asarPath, arch: "x64" });
++          const unpackedRoot = `${asarPath}.unpacked`;
+ 
+-        assert.isTrue(
+-          yield* fs.exists(
+-            path.join(
+-              unpackedRoot,
+-              "node_modules/node-pty/prebuilds/win32-x64/conpty/OpenConsole.exe",
++          assert.isTrue(
++            yield* fs.exists(
++              path.join(
++                unpackedRoot,
++                "node_modules/node-pty/prebuilds/win32-x64/conpty/OpenConsole.exe",
++              ),
+             ),
+-          ),
+-        );
+-        assert.isTrue(
+-          yield* fs.exists(
+-            path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-x64/pty.node"),
+-          ),
+-        );
+-        assert.isFalse(
+-          yield* fs.exists(path.join(unpackedRoot, "node_modules/node-pty/prebuilds/linux-x64")),
+-        );
+-        assert.equal(
+-          extractFile(
+-            asarPath,
+-            path.join("node_modules", "node-pty", "prebuilds", "linux-x64", "pty.node"),
+-          ).toString(),
+-          "\x7fELF",
+-        );
+-        assert.isFalse(
+-          yield* fs.exists(path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-arm64")),
+-        );
+-        assert.isFalse(
+-          yield* fs.exists(
+-            path.join(unpackedRoot, "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64"),
+-          ),
+-        );
+-      }),
+-    ),
++          );
++          assert.isTrue(
++            yield* fs.exists(
++              path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-x64/pty.node"),
++            ),
++          );
++          assert.isFalse(
++            yield* fs.exists(path.join(unpackedRoot, "node_modules/node-pty/prebuilds/linux-x64")),
++          );
++          assert.equal(
++            extractFile(
++              asarPath,
++              path.join("node_modules", "node-pty", "prebuilds", "linux-x64", "pty.node"),
++            ).toString(),
++            "\x7fELF",
++          );
++          assert.isFalse(
++            yield* fs.exists(
++              path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-arm64"),
++            ),
++          );
++          assert.isFalse(
++            yield* fs.exists(
++              path.join(unpackedRoot, "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64"),
++            ),
++          );
++        }),
++      ),
+   );
+ 
+   it.effect("reports missing Windows toolchain capabilities before building", () =>
+@@ -835,6 +879,101 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+     ),
+   );
+ 
++  it.effect("builds and stages native capture helpers for each Linux architecture", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const path = yield* Path.Path;
++        const actualHost = yield* HostProcess.Platform;
++        const repoRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-kde-stage-test-" });
++        const protocols = path.join(repoRoot, "native/hyprland-snap-shot/protocols");
++        yield* fs.makeDirectory(protocols, { recursive: true });
++        yield* fs.writeFileString(path.join(protocols, "capture.xml"), "BSD protocol notice");
++        for (const hostPlatform of ["linux", "win32"] as const) {
++          for (const backend of ["kde", "hyprland"] as const) {
++            for (const [arch, target] of [
++              ["x64", "x86_64-unknown-linux-gnu"],
++              ["arm64", "aarch64-unknown-linux-gnu"],
++            ] as const) {
++              const binary = path.join(
++                repoRoot,
++                `native/${backend}-snap-shot/target`,
++                target,
++                `release/t3-${backend}-snap-shot`,
++              );
++              const stageResourcesDir = path.join(repoRoot, "stage", hostPlatform, backend, arch);
++              const cargo = hostPlatform === "win32" ? "C:\\Rustup Tools\\bin\\cargo.EXE" : "cargo";
++              const chmodCalls: Array<{ file: string; mode: number }> = [];
++              const spawner = Layer.succeed(
++                ChildProcessSpawner.ChildProcessSpawner,
++                ChildProcessSpawner.make((command) =>
++                  Effect.gen(function* () {
++                    assert.equal(command._tag, "StandardCommand");
++                    if (command._tag !== "StandardCommand") return mockProcess(1);
++                    assert.equal(command.command, cargo);
++                    assert.deepEqual(command.args, [
++                      "build",
++                      "--locked",
++                      "--release",
++                      "--manifest-path",
++                      path.join(repoRoot, `native/${backend}-snap-shot/Cargo.toml`),
++                      "--target",
++                      target,
++                    ]);
++                    yield* fs.makeDirectory(path.dirname(binary), { recursive: true });
++                    yield* fs.writeFileString(binary, `helper-${arch}`);
++                    return mockProcess(0);
++                  }),
++                ),
++              );
++              yield* stageLinuxCaptureHelper({
++                backend,
++                repoRoot,
++                stageResourcesDir,
++                arch,
++                verbose: false,
++              }).pipe(
++                Effect.provide(spawner),
++                Effect.provideService(HostProcess.Platform, hostPlatform),
++                Effect.provideService(SpawnExecutableResolution, (name) => {
++                  assert.equal(name, "cargo");
++                  return cargo;
++                }),
++                Effect.provideService(FileSystem.FileSystem, {
++                  ...fs,
++                  chmod: (file, mode) =>
++                    fs.chmod(file, mode).pipe(
++                      Effect.tap(() =>
++                        Effect.sync(() => {
++                          chmodCalls.push({ file, mode });
++                        }),
++                      ),
++                    ),
++                }),
++                Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }))),
++              );
++              const installed = path.join(
++                stageResourcesDir,
++                `${backend}-capture/t3-${backend}-snap-shot`,
++              );
++              assert.equal(yield* fs.readFileString(installed), `helper-${arch}`);
++              assert.deepEqual(chmodCalls, [{ file: installed, mode: 0o755 }]);
++              if (actualHost !== "win32")
++                assert.equal((yield* fs.stat(installed)).mode & 0o777, 0o755);
++              if (backend === "hyprland")
++                assert.equal(
++                  yield* fs.readFileString(
++                    path.join(stageResourcesDir, "hyprland-capture/protocols/capture.xml"),
++                  ),
++                  "BSD protocol notice",
++                );
++            }
++          }
++        }
++      }),
++    ),
++  );
++
+   // The fixture's t3code.exe is a text placeholder, not an executable. These
+   // cases reach the native-load probe, so pin only that host-platform check to
+   // Linux. Host-native paths and the real Windows tar/archive checks still run.
+@@ -919,6 +1058,54 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+       ),
+   );
+ 
++  it.effect("validates Copilot commands in the embedded Linux CLI archive", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const required = [
++          "node_modules/@github/copilot-sdk/package.json",
++          "node_modules/@github/copilot/package.json",
++          "node_modules/@github/copilot-linux-x64/package.json",
++          "node_modules/@github/copilot-linux-x64/copilot",
++          "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg",
++          "node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep",
++        ];
++        const cases = [
++          { members: required, valid: true },
++          ...required.map((missing) => ({
++            members: required.filter((file) => file !== missing),
++            valid: false,
++          })),
++          ...[
++            "node_modules/@github/copilot-linux-arm64/package.json",
++            "node_modules/@github/copilot-win32-x64/copilot.exe",
++            "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-arm64/rg",
++          ].map((extra) => ({ members: [...required, extra], valid: false })),
++        ];
++        for (const testCase of cases) {
++          const fixture = yield* makeWindowsPayloadFixture({
++            copyUnpackedNatives: true,
++            wslRuntime: "valid",
++            wslExtraMembers: testCase.members,
++          });
++          const validation = validateWindowsPackagedPayload({
++            stageDistDir: fixture.stageDistDir,
++            appExecutableName: fixture.appExecutableName,
++            targetArch: "x64",
++            appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
++            expectWslRuntime: true,
++          });
++          if (testCase.valid) {
++            assert.equal((yield* validation).packagedAppDir, fixture.packagedAppDir);
++          } else {
++            const error = yield* validation.pipe(Effect.flip);
++            assert.instanceOf(error, WindowsPackagedPayloadValidationError);
++            assert.equal(error.reason, "wsl-runtime-invalid");
++          }
++        }
++      }),
++    ).pipe(Effect.provideService(HostProcess.Platform, "linux")),
++  );
++
+   it.effect("rejects an embedded archive built for a different release version", () =>
+     Effect.scoped(
+       Effect.gen(function* () {
+diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
+index ac2ed7826..7bbdeed3d 100644
+--- a/scripts/build-desktop-artifact.ts
++++ b/scripts/build-desktop-artifact.ts
+@@ -36,6 +36,8 @@ import {
+   type WebAssetBrand,
+ } from "./lib/brand-assets.ts";
+ import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
++import { validateCopilotLinuxArchiveMembers } from "@t3tools/shared/copilotRuntime";
++import { COPILOT_PAYLOAD_VERSIONS, pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
+ import {
+   findInlinedExternalPackages,
+   selectCliRuntimeExternalDependencies,
+@@ -43,6 +45,8 @@ import {
+ import { loadRepoEnv } from "./lib/public-config.ts";
+ import { selectDesktopRuntimeExternalDependencies } from "./lib/desktop-external-packages.ts";
+ import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
++import { forkPreviewBuildConfig, FORK_PREVIEW_PRODUCT_NAME } from "./lib/fork-preview.ts";
++import { collectCliRuntimeExternalDependencies } from "./lib/runtime-external-dependencies.ts";
+ 
+ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
+ import * as NodeServices from "@effect/platform-node/NodeServices";
+@@ -64,6 +68,14 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
+ const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
+ const DESKTOP_APP_ID = "com.t3tools.t3code";
+ const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
++export class ForkPreviewConfigurationError extends Schema.TaggedError<ForkPreviewConfigurationError>()(
++  "ForkPreviewConfigurationError",
++  { detail: Schema.String },
++) {
++  override get message() {
++    return this.detail;
++  }
++}
+ 
+ const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
+ const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
+@@ -188,6 +200,7 @@ interface BuildCliInput {
+   readonly mockUpdates: Option.Option<boolean>;
+   readonly mockUpdateServerPort: Option.Option<number>;
+   readonly wslRuntime: Option.Option<string>;
++  readonly forkPreview?: Option.Option<boolean>;
+ }
+ 
+ function detectHostBuildPlatform(hostPlatform: string): typeof BuildPlatform.Type | undefined {
+@@ -938,6 +951,7 @@ const resolvePythonForNodeGyp = Effect.fn("resolvePythonForNodeGyp")(function* (
+ });
+ 
+ interface ResolvedBuildOptions {
++  readonly forkPreview?: boolean;
+   readonly platform: typeof BuildPlatform.Type;
+   readonly target: string;
+   readonly arch: typeof BuildArch.Type;
+@@ -1574,6 +1588,19 @@ export function createStageWorkspaceConfig(input: {
+   readonly overrides?: Record<string, string>;
+ }): StageWorkspaceConfig {
+   const { platform, arch, allowBuilds, patchedDependencies, overrides } = input;
++  // pnpm's cross-host install can include both libc variants despite the
++  // glibc target below. Exclude musl only in generated glibc stages, not source.
++  const stageOverrides =
++    platform === "linux" &&
++    overrides?.[`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`] !== undefined
++      ? {
++          ...overrides,
++          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-x64`]:
++            "-",
++          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-arm64`]:
++            "-",
++        }
++      : overrides;
+   const hostOs = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
+   const hostCpu = arch === "universal" ? ["arm64", "x64"] : [arch];
+   // Linux AppImages require glibc native optional dependencies; tell pnpm explicitly.
+@@ -1595,7 +1622,9 @@ export function createStageWorkspaceConfig(input: {
+     ...(patchedDependencies && Object.keys(patchedDependencies).length > 0
+       ? { patchedDependencies }
+       : {}),
+-    ...(overrides && Object.keys(overrides).length > 0 ? { overrides } : {}),
++    ...(stageOverrides && Object.keys(stageOverrides).length > 0
++      ? { overrides: stageOverrides }
++      : {}),
+     packageExtensions: STAGE_PACKAGE_EXTENSIONS,
+   };
+ }
+@@ -1631,6 +1660,7 @@ const AzureTrustedSigningOptionsConfig = Config.all({
+ });
+ 
+ const BuildEnvConfig = Config.all({
++  forkPreview: Config.Boolean("T3CODE_DESKTOP_FORK_PREVIEW").pipe(Config.withDefault(false)),
+   platform: Config.schema(BuildPlatform, "T3CODE_DESKTOP_PLATFORM").pipe(Config.option),
+   target: Config.String("T3CODE_DESKTOP_TARGET").pipe(Config.option),
+   arch: Config.schema(BuildArch, "T3CODE_DESKTOP_ARCH").pipe(Config.option),
+@@ -1737,6 +1767,7 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
+     Option.getOrUndefined(input.wslRuntime) ?? Option.getOrUndefined(env.wslRuntime);
+ 
+   return {
++    forkPreview: resolveBooleanFlag(input.forkPreview ?? Option.none(), env.forkPreview),
+     platform,
+     target,
+     arch,
+@@ -3049,7 +3080,16 @@ export const packWindowsServerAsar = Effect.fn("packWindowsServerAsar")(function
+     try: () =>
+       createPackageWithOptions(input.sourceDir, input.asarPath, {
+         dot: true,
+-        unpack: `{${unpackGlobs.join(",")}}`,
++        // ASAR matches absolute filenames without dot:true; an owned .t3 stage must be literal.
++        unpack: `{${unpackGlobs
++          .map(
++            (pattern) =>
++              `${input.sourceDir
++                .split(path.sep)
++                .join("/")
++                .replace(/[?*[\]{}()+@!]/g, "\\$&")}/${pattern}`,
++          )
++          .join(",")}}`,
+         // glob 13 (@electron/asar 4) resolves ignores against cwd; anchor them at the source.
+         globOptions: {
+           cwd: input.sourceDir,
+@@ -3139,6 +3179,13 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
+   );
+ 
+   yield* Effect.log("[desktop-artifact] Packing server.asar...");
++  yield* pruneCopilotSdkServerPayload({
++    stageDir: serverStageDir,
++    platform: "win",
++    arch: input.arch,
++    dependencies: sidecarDependencies,
++    overrides: input.overrides,
++  });
+   yield* fs.makeDirectory(path.dirname(input.asarPath), { recursive: true });
+   yield* packWindowsServerAsar({
+     sourceDir: serverStageDir,
+@@ -3490,6 +3537,13 @@ export const validateWindowsPackagedPayload = Effect.fn(
+         cause: new Error("WSL runtime archive is not a Linux CLI release archive"),
+       });
+     }
++    const copilotProblem = validateCopilotLinuxArchiveMembers(
++      members
++        .filter((member) => member.startsWith(`${stem}/`))
++        .map((member) => member.slice(stem.length + 1)),
++      input.targetArch === "arm64" ? "arm64" : "x64",
++    );
++    if (copilotProblem !== null) return yield* invalidWslRuntime(new Error(copilotProblem));
+     const bundleEntry = members.find((member) => member.endsWith("/bin.mjs"));
+     if (bundleEntry !== undefined) {
+       return yield* invalidWslRuntime(
+@@ -3544,6 +3598,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+     });
+   }
+   const workspaceConfig = yield* readWorkspaceConfig();
++  if (
++    options.forkPreview &&
++    (options.platform === "linux" ||
++      options.signed ||
++      options.mockUpdates ||
++      !isDesktopPreviewVersion(options.version ?? desktopPackageJson.version))
++  ) {
++    return yield* new ForkPreviewConfigurationError({
++      detail:
++        "Fork desktop previews require Mac/Windows, an unsigned preview version and no mock updates.",
++    });
++  }
+   const workspaceCatalog = workspaceConfig.catalog ?? {};
+   const workspaceOverrides = workspaceConfig.overrides ?? {};
+   const workspacePatchedDependencies = workspaceConfig.patchedDependencies ?? {};
+@@ -3575,17 +3641,17 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+       }),
+   });
+ 
+-  const resolvedServerDependencies = yield* Effect.try({
+-    try: () => resolveCatalogDependencies(serverDependencies, workspaceCatalog, "apps/server"),
+-    catch: (cause) =>
+-      new DesktopBuildDependencyResolutionError({
+-        kind: "server-production",
+-        manifestPath: "apps/server/package.json",
+-        cause,
+-      }),
+-  });
+-  const resolvedServerRuntimeExternalDependencies = selectCliRuntimeExternalDependencies(
+-    resolvedServerDependencies,
++  const resolvedServerRuntimeExternalDependencies = yield* collectCliRuntimeExternalDependencies(
++    repoRoot,
++  ).pipe(
++    Effect.mapError(
++      (cause) =>
++        new DesktopBuildDependencyResolutionError({
++          kind: "server-production",
++          manifestPath: "apps/server/package.json",
++          cause,
++        }),
++    ),
+   );
+   const resolvedDesktopRuntimeDependencies = yield* Effect.try({
+     try: () => resolveDesktopRuntimeDependencies(desktopPackageJson.dependencies, workspaceCatalog),
+@@ -3802,7 +3868,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+       ? { ...resolvedDesktopRuntimeDependencies }
+       : resolveMergedStageDependencies({
+           platform: options.platform,
+-          serverDependencies: resolvedServerDependencies,
++          serverDependencies: resolvedServerRuntimeExternalDependencies,
+           desktopDependencies: resolvedDesktopRuntimeDependencies,
+           arch: options.arch,
+           fffNodeVersion: serverPackageJson.dependencies["@ff-labs/fff-node"],
+@@ -3816,7 +3882,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
+       : undefined;
+   const stagePackageJson: StagePackageJson = {
+-    name: "t3code",
++    name: options.forkPreview ? "t3code-fork-preview" : "t3code",
+     version: appVersion,
+     buildVersion: appVersion,
+     t3codeCommitHash: commitHash,
+@@ -3829,7 +3895,9 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+     license: "MIT",
+     homepage: "https://t3.codes",
+     author: "T3 Tools",
+-    main: "apps/desktop/dist-electron/boot.cjs",
++    main: options.forkPreview
++      ? "fork-preview-bootstrap.cjs"
++      : "apps/desktop/dist-electron/boot.cjs",
+     build: yield* createBuildConfig(
+       options.platform,
+       options.target,
+@@ -3851,8 +3919,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+       electron: electronVersion,
+     },
+   };
++  if (options.forkPreview) {
++    yield* fs.copyFile(
++      path.join(repoRoot, "scripts/fork-preview-bootstrap.cjs"),
++      path.join(stageAppDir, "fork-preview-bootstrap.cjs"),
++    );
++  }
+ 
+-  const stagePackageJsonString = yield* encodeJsonString(stagePackageJson);
++  const stagePackageJsonString = yield* encodeJsonString(
++    options.forkPreview
++      ? { ...stagePackageJson, build: forkPreviewBuildConfig(stagePackageJson.build) }
++      : stagePackageJson,
++  );
+   yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
+   const stageWorkspaceConfig = createStageWorkspaceConfig({
+     platform: options.platform,
+@@ -3882,6 +3960,13 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+   );
+   yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
+   yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
++  yield* pruneCopilotSdkServerPayload({
++    stageDir: stageAppDir,
++    platform: options.platform,
++    arch: options.arch,
++    dependencies: stageDependencies,
++    overrides: resolvedOverrides,
++  });
+ 
+   if (options.platform === "win" && windowsServerAsarPath) {
+     yield* stageWindowsServerSidecar({
+@@ -4006,7 +4091,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+   if (options.platform === "win") {
+     yield* validateWindowsPackagedPayload({
+       stageDistDir,
+-      appExecutableName: `${resolveDesktopProductName(appVersion)}.exe`,
++      appExecutableName: `${options.forkPreview ? FORK_PREVIEW_PRODUCT_NAME : resolveDesktopProductName(appVersion)}.exe`,
+       targetArch: options.arch,
+       appVersion,
+       expectWslRuntime: bundlesWslRuntime({
+@@ -4092,6 +4177,12 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
+     ),
+     Flag.optional,
+   ),
++  forkPreview: Flag.Boolean("fork-preview").pipe(
++    Flag.withDescription(
++      "Build a separate unsigned fork preview with isolated state and no stock protocol/update registration.",
++    ),
++    Flag.optional,
++  ),
+   verbose: Flag.Boolean("verbose").pipe(
+     Flag.withDescription("Stream subprocess stdout (env: T3CODE_DESKTOP_VERBOSE)."),
+     Flag.optional,
+diff --git a/scripts/fork-preview-bootstrap.cjs b/scripts/fork-preview-bootstrap.cjs
+new file mode 100644
+index 000000000..f7fb06e0c
+--- /dev/null
++++ b/scripts/fork-preview-bootstrap.cjs
+@@ -0,0 +1,69 @@
++"use strict";
++
++const fs = require("node:fs");
++const os = require("node:os");
++const path = require("node:path");
++const { app } = require("electron");
++
++const home = os.homedir();
++const root = path.resolve(
++  process.env.T3CODE_FORK_PREVIEW_HOME || path.join(home, ".t3-fork-preview"),
++);
++const appData = process.env.APPDATA || path.join(home, "AppData", "Roaming");
++const protectedRoots = [
++  path.join(home, ".t3"),
++  ...(process.env.T3CODE_DESKTOP_ISOLATED_PREVIEW === "true" ? [] : [process.env.T3CODE_HOME]),
++  ...["t3code", "t3code-v2", "t3code-dev", "T3 Code (Alpha)", "T3 Code (Dev)"].flatMap((name) => [
++    path.join(home, "Library", "Application Support", name),
++    path.join(home, ".config", name),
++    path.join(appData, name),
++  ]),
++]
++  .filter(Boolean)
++  .map((value) => path.resolve(value));
++const canonical = (value) => {
++  if (fs.existsSync(value)) return fs.realpathSync(value);
++  const parent = path.dirname(value);
++  return parent === value ? value : path.join(canonical(parent), path.basename(value));
++};
++const resolved = canonical(root);
++if (
++  resolved === canonical(home) ||
++  protectedRoots.some((value) => {
++    const protectedRoot = canonical(value);
++    return resolved === protectedRoot || resolved.startsWith(protectedRoot + path.sep);
++  })
++) {
++  throw new Error("Fork preview refuses to use the ordinary T3 profile or home directory.");
++}
++const userData = path.join(root, "electron");
++if (fs.existsSync(userData) && fs.lstatSync(userData).isSymbolicLink()) {
++  throw new Error("Fork preview refuses a symlinked Electron profile.");
++}
++process.env.T3CODE_HOME = root;
++process.env.T3CODE_DESKTOP_ISOLATED_PREVIEW = "true";
++process.env.T3CODE_DISABLE_AUTO_UPDATE = "true";
++process.env.T3CODE_DESKTOP_APP_USER_MODEL_ID = "com.tesseracode.t3code.preview";
++delete process.env.VITE_DEV_SERVER_URL;
++delete process.env.T3CODE_DEV_REMOTE_T3_SERVER_ENTRY_PATH;
++delete process.env.T3CODE_PORT;
++delete process.env.T3CODE_COMMIT_HASH;
++fs.mkdirSync(userData, { recursive: true });
++app.setPath("userData", userData);
++if (app.requestSingleInstanceLock()) {
++  // boot.cjs enables a shared cache unless this process already selected its preview cache.
++  const modules = require("node:module");
++  const cacheRoot = path.join(root, "compile-cache");
++  const cache = modules.enableCompileCache(cacheRoot);
++  if (
++    cache.status === modules.constants.compileCacheStatus.FAILED ||
++    (cache.directory &&
++      canonical(cache.directory) !== canonical(cacheRoot) &&
++      !canonical(cache.directory).startsWith(canonical(cacheRoot) + path.sep))
++  ) {
++    throw new Error("Fork preview could not select an isolated compile cache.");
++  }
++  require("./apps/desktop/dist-electron/boot.cjs");
++} else {
++  app.quit();
++}
+diff --git a/scripts/fork-preview-manifest.mjs b/scripts/fork-preview-manifest.mjs
+new file mode 100644
+index 000000000..155269e89
+--- /dev/null
++++ b/scripts/fork-preview-manifest.mjs
+@@ -0,0 +1,95 @@
++import * as NodeFSP from "node:fs/promises";
++import * as NodePath from "node:path";
++import * as NodeCrypto from "node:crypto";
++import * as NodeChildProcess from "node:child_process";
++import * as NodeUtil from "node:util";
++
++const { values } = NodeUtil.parseArgs({
++  options: {
++    directory: { type: "string" },
++    target: { type: "string" },
++    version: { type: "string" },
++    "wsl-archive": { type: "string" },
++    "product-base": { type: "string" },
++  },
++});
++if (!values.directory || !values.target || !values.version)
++  throw new Error("directory, target and version are required");
++const baseRef = values["product-base"] || process.env.PRODUCT_BASE || "v0.1.3";
++const base = NodeChildProcess.execFileSync("git", ["rev-parse", `${baseRef}^{commit}`], {
++  encoding: "utf8",
++}).trim();
++const commit = NodeChildProcess.execFileSync("git", ["rev-parse", "HEAD"], {
++  encoding: "utf8",
++}).trim();
++NodeChildProcess.execFileSync("git", ["merge-base", "--is-ancestor", base, commit]);
++if (!/^0\.1\.3-preview\.[0-9A-Za-z.-]+$/.test(values.version))
++  throw new Error("An explicit v0.1.3 preview version is required");
++const versionFiles = [
++  "apps/server/package.json",
++  "apps/desktop/package.json",
++  "apps/web/package.json",
++  "packages/contracts/package.json",
++];
++const changed = NodeChildProcess.execFileSync("git", ["diff", "--name-only", "HEAD"], {
++  encoding: "utf8",
++})
++  .trim()
++  .split("\n")
++  .filter(Boolean);
++if (changed.some((file) => !versionFiles.includes(file)))
++  throw new Error(`Unexpected build-time source changes: ${changed}`);
++for (const file of versionFiles) {
++  const before = JSON.parse(
++    NodeChildProcess.execFileSync("git", ["show", `HEAD:${file}`], { encoding: "utf8" }),
++  );
++  const after = JSON.parse(await NodeFSP.readFile(file, "utf8"));
++  if (after.version !== values.version) throw new Error(`Incorrect version in ${file}`);
++  after.version = before.version;
++  if (JSON.stringify(after) !== JSON.stringify(before))
++    throw new Error(`Non-version change in ${file}`);
++}
++async function identity(file) {
++  const bytes = await NodeFSP.readFile(file);
++  return {
++    name: NodePath.basename(file),
++    bytes: bytes.length,
++    sha256: NodeCrypto.createHash("sha256").update(bytes).digest("hex"),
++  };
++}
++const directory = NodePath.resolve(values.directory);
++const entries = await NodeFSP.readdir(directory, { withFileTypes: true });
++const artifacts = await Promise.all(
++  entries
++    .filter((entry) => entry.isFile() && /\.(dmg|exe|zip|tar\.gz)$/.test(entry.name))
++    .map((entry) => identity(NodePath.join(directory, entry.name))),
++);
++if (artifacts.length === 0) throw new Error("No native artifacts were produced");
++const manifest = {
++  schemaVersion: 1,
++  productBase: base,
++  buildCommit: commit,
++  version: values.version,
++  target: values.target,
++  sourceOverlayPaths: NodeChildProcess.execFileSync("git", ["diff", "--name-only", base, commit], {
++    encoding: "utf8",
++  })
++    .trim()
++    .split("\n")
++    .filter(Boolean),
++  releaseTransform: { verified: true, files: versionFiles },
++  artifacts,
++  wslRuntime: values["wsl-archive"] ? await identity(values["wsl-archive"]) : null,
++  signing: "unsigned",
++  publication: "build-artifacts-only",
++  interactiveQualification: "pending",
++};
++await NodeFSP.writeFile(
++  NodePath.join(directory, "manifest.json"),
++  JSON.stringify(manifest, null, 2) + "\n",
++);
++await NodeFSP.writeFile(
++  NodePath.join(directory, "SHA256SUMS"),
++  artifacts.map((entry) => `${entry.sha256}  ${entry.name}\n`).join(""),
++);
++console.log(JSON.stringify({ target: manifest.target, buildCommit: commit, artifacts }, null, 2));
+diff --git a/scripts/lib/cli-external-packages.test.ts b/scripts/lib/cli-external-packages.test.ts
+index b55e3a9c1..fecfd3b17 100644
+--- a/scripts/lib/cli-external-packages.test.ts
++++ b/scripts/lib/cli-external-packages.test.ts
+@@ -35,6 +35,13 @@ describe("shouldBundleCliDependency", () => {
+       "@napi-rs/keyring",
+       "@clerk/electron-passkeys",
+       "node-addon-api",
++      "@github/copilot-sdk",
++      "@github/copilot",
++      "@github/copilot-win32-x64",
++      "koffi",
++      "@koromix/koffi-linux-x64",
++      "vscode-jsonrpc/node",
++      "detect-libc",
+     ]) {
+       assert.strictEqual(shouldBundleCliDependency(id), false, id);
+     }
+diff --git a/scripts/lib/cli-external-packages.ts b/scripts/lib/cli-external-packages.ts
+index baddb437b..a8b4c71f9 100644
+--- a/scripts/lib/cli-external-packages.ts
++++ b/scripts/lib/cli-external-packages.ts
+@@ -1,6 +1,10 @@
+ /** Keep bundler externals and staged runtime dependency roots aligned. */
+ // Filesystem-loaded externals need dependencies outside the bundle.
+ export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
++  // The native SDK resolves its CLI and Koffi bindings relative to installed package files.
++  "@github/copilot",
++  "koffi",
++  "@koromix/koffi-",
+   // Cursor ships computed Webpack imports and platform helper packages.
+   "@cursor/sdk",
+   // Playwright reads package.json and browsers.json beside its runtime modules.
+@@ -30,10 +34,13 @@ const CURSOR_RUNTIME_DEPENDENCIES = [
+   "@fastify/busboy",
+ ] as const;
+ 
++const COPILOT_RUNTIME_DEPENDENCIES = ["vscode-jsonrpc", "detect-libc"] as const;
++
+ export function isRuntimeExternalCliDependency(id: string): boolean {
+   return (
+     CLI_RUNTIME_EXTERNAL_PREFIXES.some((prefix) => id.startsWith(prefix)) ||
+-    CURSOR_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`))
++    CURSOR_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`)) ||
++    COPILOT_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`))
+   );
+ }
+ 
+diff --git a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts
+new file mode 100644
+index 000000000..220751e54
+--- /dev/null
++++ b/scripts/lib/copilot-payload.test.ts
+@@ -0,0 +1,487 @@
++import * as NodeServices from "@effect/platform-node/NodeServices";
++import { assert, it } from "@effect/vitest";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import * as Schema from "effect/Schema";
++
++import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
++import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
++import {
++  COPILOT_DEPENDENCY_OVERRIDES,
++  pruneCopilotSdkServerPayload,
++  resolveCopilotDependencyClosure,
++} from "./copilot-payload.ts";
++
++const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
++const dependencies = { "@github/copilot-sdk": "1.0.8" };
++const targets = [
++  {
++    platform: "win",
++    arch: "x64",
++    target: "win32-x64",
++    suffix: "-msvc",
++    recorder: "windows/amd64",
++    removed: 9,
++  },
++  {
++    platform: "win",
++    arch: "arm64",
++    target: "win32-arm64",
++    suffix: "-msvc",
++    recorder: "windows/arm64",
++    foreign: "win32-x64",
++    removed: 11,
++  },
++  {
++    platform: "linux",
++    arch: "x64",
++    target: "linux-x64",
++    suffix: "-gnu",
++    recorder: "linux/x86_64",
++    removed: 10,
++  },
++  {
++    platform: "linux",
++    arch: "arm64",
++    target: "linux-arm64",
++    suffix: "-gnu",
++    foreign: "linux-x64",
++    removed: 11,
++  },
++  {
++    platform: "mac",
++    arch: "arm64",
++    target: "darwin-arm64",
++    suffix: "",
++    recorder: "mac/arm64",
++    removed: 9,
++  },
++  {
++    platform: "mac",
++    arch: "x64",
++    target: "darwin-x64",
++    suffix: "",
++    recorder: "mac/x86_64",
++    foreign: "darwin-arm64",
++    removed: 10,
++  },
++] as const;
++
++const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
++  platform: BuildPlatform,
++  arch: BuildArch,
++) {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const stageDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-copilot-payload-" });
++  const write = Effect.fn("test.writeCopilotPayload")(function* (
++    relative: string,
++    text = relative,
++  ) {
++    const file = path.join(stageDir, relative);
++    yield* fs.makeDirectory(path.dirname(file), { recursive: true });
++    yield* fs.writeFileString(file, text);
++    return file;
++  });
++  yield* write("package.json", encodeJson({ name: "stage", private: true, dependencies }));
++  for (const [name, version] of [
++    ["@github/copilot-sdk", "1.0.8"],
++    ["@github/copilot", "1.0.75"],
++    ["koffi", "3.3.1"],
++    ["vscode-jsonrpc", "8.2.1"],
++    ["zod", "4.4.3"],
++    ["detect-libc", "2.1.2"],
++  ]) {
++    yield* write(
++      `node_modules/${name}/package.json`,
++      encodeJson({ name, version, main: "index.js" }),
++    );
++    yield* write(`node_modules/${name}/index.js`, "module.exports = {};");
++  }
++  const retained: string[] = [];
++  const removed: string[] = [];
++  for (const target of targets.filter(
++    (target) => target.platform === platform && (arch === "universal" || target.arch === arch),
++  )) {
++    const root = `node_modules/@github/copilot-${target.target}`;
++    const exe = platform === "win" ? ".exe" : "";
++    yield* write(
++      `${root}/package.json`,
++      encodeJson({
++        name: `@github/copilot-${target.target}`,
++        version: "1.0.75",
++        main: `copilot${exe}`,
++      }),
++    );
++    for (const file of [
++      `copilot${exe}`,
++      `prebuilds/${target.target}/cli-native.node`,
++      `prebuilds/${target.target}/runtime.node`,
++      `ripgrep/bin/${target.target}/rg${exe}`,
++      `tgrep/bin/${target.target}/tgrep${exe}`,
++      `clipboard/node_modules/@teddyzhu/clipboard-${target.target}${target.suffix}/clipboard.${target.target}${target.suffix}.node`,
++      "sdk/index.js",
++      "clipboard/index.js",
++      "clipboard/node_modules/@teddyzhu/clipboard/index.js",
++      ...(platform === "win"
++        ? [
++            `builtin-plugins/computer-use/0.1.71/${target.target}/computer-use-mcp.exe`,
++            `builtin-plugins/computer-use/0.1.71/${target.target}/CopilotComputerUse.exe`,
++          ]
++        : []),
++    ])
++      retained.push(yield* write(`${root}/${file}`));
++    for (const clipboard of [
++      "darwin-arm64",
++      "darwin-x64",
++      "linux-arm64-gnu",
++      "linux-x64-gnu",
++      "win32-arm64-msvc",
++      "win32-x64-msvc",
++    ]) {
++      removed.push(
++        yield* write(
++          `${root}/clipboard/node_modules/@teddyzhu/clipboard/clipboard.${clipboard}.node`,
++        ),
++      );
++    }
++    if (!(platform === "mac" && target.arch === "x64")) {
++      removed.push(
++        yield* write(
++          `${root}/foundry-local-sdk/node_modules/foundry-local-sdk/prebuilds/${target.target}/foundry_local_napi.node`,
++        ),
++      );
++    }
++    if ("recorder" in target)
++      removed.push(
++        yield* write(
++          `${root}/pvrecorder/node_modules/@picovoice/pvrecorder-node/lib/${target.recorder}/pv_recorder.node`,
++        ),
++      );
++    removed.push(
++      yield* write(
++        `${root}/webview/node_modules/@webviewjs/webview-${target.target}${target.suffix}/webview.${target.target}${target.suffix}.node`,
++      ),
++    );
++    if ("foreign" in target) {
++      removed.push(yield* write(`${root}/ripgrep/bin/${target.foreign}/rg${exe}`));
++      removed.push(yield* write(`${root}/tgrep/bin/${target.foreign}/tgrep${exe}`));
++    }
++    const binding = `node_modules/@koromix/koffi-${target.target}`;
++    yield* write(
++      `${binding}/package.json`,
++      encodeJson({ name: `@koromix/koffi-${target.target}`, version: "3.3.1" }),
++    );
++    retained.push(yield* write(`${binding}/${target.target.replace("-", "_")}/koffi.node`));
++    if (platform === "linux")
++      removed.push(yield* write(`${binding}/musl_${target.arch}/koffi.node`));
++  }
++  return { stageDir, retained, removed, write, overrides: COPILOT_DEPENDENCY_OVERRIDES };
++});
++
++it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
++  it.effect("rejects missing overrides and SDK anchor drift before pruning", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("win", "x64");
++        for (const selector of Object.keys(COPILOT_DEPENDENCY_OVERRIDES)) {
++          for (const drift of [undefined, "99.0.0"]) {
++            const overrides: Record<string, string> = { ...stage.overrides };
++            if (drift === undefined) delete overrides[selector];
++            else overrides[selector] = drift;
++            const error = yield* pruneCopilotSdkServerPayload({
++              ...stage,
++              platform: "win",
++              arch: "x64",
++              dependencies,
++              overrides,
++            }).pipe(Effect.flip);
++            assert.include(error.message, `workspace override ${selector}`);
++          }
++        }
++        const error = yield* resolveCopilotDependencyClosure({
++          ...stage,
++          dependencies: { "@github/copilot-sdk": "^1.0.8" },
++        }).pipe(Effect.flip);
++        assert.include(error.message, "SDK dependency must be exactly");
++        for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++      }),
++    ),
++  );
++
++  it.effect.each([
++    ["koffi", "3.3.1", "@github/copilot-sdk"],
++    ["vscode-jsonrpc", "8.2.1", "@github/copilot-sdk"],
++    ["zod", "4.4.3", "@github/copilot-sdk"],
++    ["detect-libc", "2.1.2", "@github/copilot"],
++  ] as const)(
++    "refuses missing or owner-local drift in %s, despite a correct root copy",
++    ([name, version, owner]) =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const stage = yield* makeStage("win", "x64");
++          const ownerPath = `node_modules/${owner}/node_modules/${name}`;
++          yield* stage.write(`${ownerPath}/package.json`, encodeJson({ name, version: "99.0.0" }));
++          const drift = yield* pruneCopilotSdkServerPayload({
++            ...stage,
++            platform: "win",
++            arch: "x64",
++            dependencies,
++          }).pipe(Effect.flip);
++          assert.include(drift.message, `unreviewed ${name} version 99.0.0`);
++          yield* stage.write(`${ownerPath}/package.json`, encodeJson({ name, version }));
++          assert.isNotNull(yield* resolveCopilotDependencyClosure({ ...stage, dependencies }));
++          yield* fs.remove(`${stage.stageDir}/${ownerPath}`, { recursive: true });
++          yield* fs.remove(`${stage.stageDir}/node_modules/${name}`, { recursive: true });
++          const missing = yield* resolveCopilotDependencyClosure({ ...stage, dependencies }).pipe(
++            Effect.flip,
++          );
++          assert.include(missing.message, name);
++          assert.match(missing.message, /cannot resolve|missing or unreadable/);
++          for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++        }),
++      ),
++  );
++
++  it.effect.skipIf(!symlinksSupported)(
++    "resolves strict in-stage owner links and refuses escaping transitives",
++    () =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const path = yield* Path.Path;
++          for (const escape of [false, true]) {
++            const stage = yield* makeStage("win", "x64");
++            const sdk = path.join(stage.stageDir, "node_modules/@github/copilot-sdk");
++            const physical = path.join(
++              stage.stageDir,
++              "node_modules/.pnpm/sdk/node_modules/@github/copilot-sdk",
++            );
++            yield* fs.makeDirectory(path.dirname(physical), { recursive: true });
++            yield* fs.rename(sdk, physical);
++            yield* fs.symlink(physical, sdk);
++            if (escape) {
++              const outside = yield* fs.makeTempDirectoryScoped({
++                prefix: "t3-copilot-transitive-",
++              });
++              yield* fs.writeFileString(
++                path.join(outside, "package.json"),
++                encodeJson({ name: "zod", version: "4.4.3" }),
++              );
++              yield* fs.makeDirectory(path.join(physical, "node_modules"), { recursive: true });
++              yield* fs.symlink(outside, path.join(physical, "node_modules/zod"));
++              const error = yield* resolveCopilotDependencyClosure({ ...stage, dependencies }).pipe(
++                Effect.flip,
++              );
++              assert.include(error.message, "outside the stage");
++            } else {
++              assert.isNotNull(yield* resolveCopilotDependencyClosure({ ...stage, dependencies }));
++            }
++          }
++        }),
++      ),
++  );
++
++  it.effect.each(targets)(
++    "preserves $target runtime bytes and removes exactly $removed unreachable natives",
++    (target) =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const stage = yield* makeStage(target.platform, target.arch);
++          const result = yield* pruneCopilotSdkServerPayload({
++            ...stage,
++            platform: target.platform,
++            arch: target.arch,
++            dependencies,
++          });
++          assert.equal(result.pruned, true);
++          assert.lengthOf(result.removedNativeFiles, target.removed);
++          for (const file of stage.retained)
++            assert.equal(
++              yield* fs.readFileString(file),
++              file.slice(stage.stageDir.length + 1).replaceAll("\\", "/"),
++            );
++          for (const file of stage.removed) assert.isFalse(yield* fs.exists(file));
++          const second = yield* pruneCopilotSdkServerPayload({
++            ...stage,
++            platform: target.platform,
++            arch: target.arch,
++            dependencies,
++          });
++          assert.deepEqual(second.removedNativeFiles, []);
++        }),
++      ),
++  );
++  it.effect("retains both target architectures for universal macOS", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("mac", "universal");
++        const result = yield* pruneCopilotSdkServerPayload({
++          ...stage,
++          platform: "mac",
++          arch: "universal",
++          dependencies,
++        });
++        assert.lengthOf(result.removedNativeFiles, 19);
++        for (const file of stage.retained) assert.isTrue(yield* fs.exists(file));
++      }),
++    ),
++  );
++  it.effect("leaves stages that do not declare Copilot untouched", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("win", "x64");
++        const result = yield* pruneCopilotSdkServerPayload({
++          ...stage,
++          platform: "win",
++          arch: "x64",
++          dependencies: {},
++          overrides: {},
++        });
++        assert.deepEqual(result, { pruned: false, removedNativeFiles: [] });
++        for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++      }),
++    ),
++  );
++  it.effect.each([
++    "sdk-version",
++    "runtime-version",
++    "platform-version",
++    "koffi-version",
++    "missing-required",
++    "unexpected-native",
++    "partial-prune",
++    "foreign-package",
++    "foreign-koffi",
++    "missing-sdk",
++    "missing-clipboard-loader",
++  ] as const)("refuses %s before deleting any remaining files", (fault) =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("win", "x64");
++        switch (fault) {
++          case "sdk-version":
++            yield* stage.write(
++              "node_modules/@github/copilot-sdk/package.json",
++              encodeJson({ name: "@github/copilot-sdk", version: "1.0.9", main: "index.js" }),
++            );
++            break;
++          case "runtime-version":
++            yield* stage.write(
++              "node_modules/@github/copilot/package.json",
++              encodeJson({ name: "@github/copilot", version: "1.0.76" }),
++            );
++            break;
++          case "platform-version":
++            yield* stage.write(
++              "node_modules/@github/copilot-win32-x64/package.json",
++              encodeJson({
++                name: "@github/copilot-win32-x64",
++                version: "1.0.76",
++                main: "copilot.exe",
++              }),
++            );
++            break;
++          case "koffi-version":
++            yield* stage.write(
++              "node_modules/koffi/package.json",
++              encodeJson({ name: "koffi", version: "99.0.0" }),
++            );
++            break;
++          case "missing-required":
++            yield* fs.remove(stage.retained[0]!);
++            break;
++          case "unexpected-native":
++            yield* stage.write("node_modules/@github/copilot-win32-x64/unreviewed.node");
++            break;
++          case "partial-prune":
++            yield* fs.remove(stage.removed[0]!);
++            break;
++          case "foreign-package":
++            yield* stage.write(
++              "node_modules/@github/copilot-linux-x64/package.json",
++              encodeJson({
++                name: "@github/copilot-linux-x64",
++                version: "1.0.75",
++                main: "copilot",
++              }),
++            );
++            yield* stage.write("node_modules/@github/copilot-linux-x64/copilot");
++            break;
++          case "missing-sdk":
++            yield* fs.remove(`${stage.stageDir}/node_modules/@github/copilot-sdk/package.json`);
++            break;
++          case "foreign-koffi":
++            yield* stage.write(
++              "node_modules/@koromix/koffi-linux-x64/package.json",
++              encodeJson({ name: "@koromix/koffi-linux-x64", version: "3.3.1" }),
++            );
++            yield* stage.write("node_modules/@koromix/koffi-linux-x64/linux_x64/koffi.node");
++            break;
++          case "missing-clipboard-loader":
++            yield* fs.remove(
++              `${stage.stageDir}/node_modules/@github/copilot-win32-x64/clipboard/node_modules/@teddyzhu/clipboard/index.js`,
++            );
++            break;
++        }
++        const result = yield* Effect.flip(
++          pruneCopilotSdkServerPayload({ ...stage, platform: "win", arch: "x64", dependencies }),
++        );
++        assert.equal(result._tag, "CopilotPayloadError");
++        for (const file of fault === "partial-prune" ? stage.removed.slice(1) : stage.removed) {
++          assert.isTrue(yield* fs.exists(file));
++        }
++      }),
++    ),
++  );
++  it.effect("validates every universal target before removing the first architecture", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("mac", "universal");
++        yield* fs.remove(`${stage.stageDir}/node_modules/@github/copilot-darwin-x64/copilot`);
++        const error = yield* Effect.flip(
++          pruneCopilotSdkServerPayload({
++            ...stage,
++            platform: "mac",
++            arch: "universal",
++            dependencies,
++          }),
++        );
++        assert.equal(error._tag, "CopilotPayloadError");
++        for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++      }),
++    ),
++  );
++  it.effect.skipIf(!symlinksSupported)(
++    "refuses an out-of-stage symlink without touching its target",
++    () =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const path = yield* Path.Path;
++          const stage = yield* makeStage("win", "x64");
++          const outside = yield* fs.makeTempDirectoryScoped({ prefix: "t3-copilot-outside-" });
++          const outsideFile = path.join(outside, "keep.node");
++          yield* fs.writeFileString(outsideFile, "untouched");
++          yield* fs.symlink(
++            outsideFile,
++            path.join(stage.stageDir, "node_modules/@github/copilot-win32-x64/escape.node"),
++          );
++          const error = yield* Effect.flip(
++            pruneCopilotSdkServerPayload({ ...stage, platform: "win", arch: "x64", dependencies }),
++          );
++          assert.equal(error._tag, "CopilotPayloadError");
++          assert.equal(yield* fs.readFileString(outsideFile), "untouched");
++          for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++        }),
++      ),
++  );
++});
+diff --git a/scripts/lib/copilot-payload.ts b/scripts/lib/copilot-payload.ts
+new file mode 100644
+index 000000000..a6b2426bb
+--- /dev/null
++++ b/scripts/lib/copilot-payload.ts
+@@ -0,0 +1,386 @@
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodeModule from "node:module";
++
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import * as Schema from "effect/Schema";
++
++import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
++
++export const COPILOT_PAYLOAD_VERSIONS = {
++  sdk: "1.0.8",
++  runtime: "1.0.75",
++  koffi: "3.3.1",
++  jsonrpc: "8.2.1",
++  zod: "4.4.3",
++  detectLibc: "2.1.2",
++} as const;
++
++export const COPILOT_DEPENDENCY_OVERRIDES = {
++  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`]:
++    COPILOT_PAYLOAD_VERSIONS.runtime,
++  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>koffi`]: COPILOT_PAYLOAD_VERSIONS.koffi,
++  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>vscode-jsonrpc`]:
++    COPILOT_PAYLOAD_VERSIONS.jsonrpc,
++  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>zod`]: COPILOT_PAYLOAD_VERSIONS.zod,
++  [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>detect-libc`]:
++    COPILOT_PAYLOAD_VERSIONS.detectLibc,
++};
++
++const PackageManifest = Schema.Struct({
++  name: Schema.optional(Schema.String),
++  version: Schema.optional(Schema.String),
++});
++const decodeManifest = Schema.decodeUnknownEffect(Schema.fromJsonString(PackageManifest));
++const NATIVE_FILE = /\.(?:node|dll|exe|dylib|so(?:\.\d+)*)$/u;
++const GENERIC_CLIPBOARD_TARGETS = [
++  "darwin-arm64",
++  "darwin-x64",
++  "linux-arm64-gnu",
++  "linux-x64-gnu",
++  "win32-arm64-msvc",
++  "win32-x64-msvc",
++] as const;
++const INTERACTIVE_DIRECTORIES = ["foundry-local-sdk", "pvrecorder", "webview"] as const;
++
++export class CopilotPayloadError extends Schema.TaggedError<CopilotPayloadError>()(
++  "CopilotPayloadError",
++  { stageDir: Schema.String, detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
++) {
++  override get message(): string {
++    return `Copilot payload validation failed: ${this.detail}`;
++  }
++}
++
++function resolvePackageEntry(loader: ReturnType<typeof NodeModule.createRequire>, name: string) {
++  try {
++    return loader.resolve(`${name}/package.json`);
++  } catch (cause) {
++    if (
++      cause instanceof Error &&
++      "code" in cause &&
++      cause.code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
++    ) {
++      return loader.resolve(name);
++    }
++    throw cause;
++  }
++}
++
++function targetLayout(platform: BuildPlatform, arch: "x64" | "arm64") {
++  const os = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
++  const target = `${os}-${arch}`;
++  const suffix = os === "win32" ? "-msvc" : os === "linux" ? "-gnu" : "";
++  const extension = os === "win32" ? ".exe" : "";
++  const required = [
++    `copilot${extension}`,
++    `prebuilds/${target}/cli-native.node`,
++    `prebuilds/${target}/runtime.node`,
++    `ripgrep/bin/${target}/rg${extension}`,
++    `tgrep/bin/${target}/tgrep${extension}`,
++    `clipboard/node_modules/@teddyzhu/clipboard-${target}${suffix}/clipboard.${target}${suffix}.node`,
++    ...(os === "win32"
++      ? [
++          `builtin-plugins/computer-use/0.1.71/${target}/computer-use-mcp.exe`,
++          `builtin-plugins/computer-use/0.1.71/${target}/CopilotComputerUse.exe`,
++        ]
++      : []),
++  ];
++  const removed: string[] = GENERIC_CLIPBOARD_TARGETS.map(
++    (name) => `clipboard/node_modules/@teddyzhu/clipboard/clipboard.${name}.node`,
++  );
++  if (!(os === "darwin" && arch === "x64")) {
++    removed.push(
++      `foundry-local-sdk/node_modules/foundry-local-sdk/prebuilds/${target}/foundry_local_napi.node`,
++    );
++  }
++  if (!(os === "linux" && arch === "arm64")) {
++    const recorderTarget =
++      os === "win32"
++        ? `windows/${arch === "x64" ? "amd64" : "arm64"}`
++        : os === "darwin"
++          ? `mac/${arch === "x64" ? "x86_64" : "arm64"}`
++          : "linux/x86_64";
++    removed.push(
++      `pvrecorder/node_modules/@picovoice/pvrecorder-node/lib/${recorderTarget}/pv_recorder.node`,
++    );
++  }
++  const webviewSuffix = os === "darwin" ? "" : suffix;
++  removed.push(
++    `webview/node_modules/@webviewjs/webview-${target}${webviewSuffix}/webview.${target}${webviewSuffix}.node`,
++  );
++  const foreignSearchTarget =
++    os === "darwin" && arch === "x64"
++      ? "darwin-arm64"
++      : os !== "darwin" && arch === "arm64"
++        ? `${os}-x64`
++        : null;
++  if (foreignSearchTarget) {
++    removed.push(
++      `ripgrep/bin/${foreignSearchTarget}/rg${extension}`,
++      `tgrep/bin/${foreignSearchTarget}/tgrep${extension}`,
++    );
++  }
++  return { target, os, arch, required, removed, foreignSearchTarget };
++}
++
++/** Read-only closure validation shared with payload pruning, resolved from each package owner. */
++export const resolveCopilotDependencyClosure = Effect.fn("resolveCopilotDependencyClosure")(
++  function* (input: {
++    readonly stageDir: string;
++    readonly dependencies: Readonly<Record<string, string>>;
++    readonly overrides: Readonly<Record<string, string>>;
++  }) {
++    if (input.dependencies["@github/copilot-sdk"] === undefined) {
++      return null;
++    }
++    const fs = yield* FileSystem.FileSystem;
++    const path = yield* Path.Path;
++    const failure = (detail: string, cause?: unknown) =>
++      new CopilotPayloadError({
++        stageDir: input.stageDir,
++        detail,
++        ...(cause === undefined ? {} : { cause }),
++      });
++    if (input.dependencies["@github/copilot-sdk"] !== COPILOT_PAYLOAD_VERSIONS.sdk) {
++      return yield* failure(`SDK dependency must be exactly ${COPILOT_PAYLOAD_VERSIONS.sdk}`);
++    }
++    for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
++      if (input.overrides[selector] !== version) {
++        return yield* failure(`workspace override ${selector} must be exactly ${version}`);
++      }
++    }
++    const root = yield* fs.realPath(input.stageDir);
++    const contained = (candidate: string) => {
++      const relative = path.relative(root, candidate);
++      return (
++        relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
++      );
++    };
++    const realInside = Effect.fn("copilotPayload.realInside")(function* (candidate: string) {
++      const real = yield* fs
++        .realPath(candidate)
++        .pipe(
++          Effect.mapError((cause) =>
++            failure(`missing or unreadable staged path ${candidate}`, cause),
++          ),
++        );
++      if (!contained(real)) return yield* failure(`path resolves outside the stage: ${candidate}`);
++      return real;
++    });
++    const resolvePackage = Effect.fn("copilotPayload.resolvePackage")(function* (
++      loader: ReturnType<typeof NodeModule.createRequire>,
++      name: string,
++      version: string,
++    ) {
++      const entry = yield* Effect.try({
++        try: () => resolvePackageEntry(loader, name),
++        catch: (cause) => failure(`cannot resolve ${name} from its staged owner`, cause),
++      });
++      let directory = path.dirname(yield* realInside(entry));
++      while (contained(directory)) {
++        const manifestPath = path.join(directory, "package.json");
++        if (yield* fs.exists(manifestPath)) {
++          yield* realInside(manifestPath);
++          const manifest = yield* fs.readFileString(manifestPath).pipe(
++            Effect.flatMap(decodeManifest),
++            Effect.mapError((cause) => failure(`invalid package manifest for ${name}`, cause)),
++          );
++          if (manifest.name === name) {
++            if (manifest.version !== version)
++              return yield* failure(
++                `unreviewed ${name} version ${manifest.version ?? "missing"}; expected ${version}`,
++              );
++            return { directory, loader: NodeModule.createRequire(manifestPath) };
++          }
++        }
++        const parent = path.dirname(directory);
++        if (parent === directory) break;
++        directory = parent;
++      }
++      return yield* failure(`could not identify staged package ${name}`);
++    });
++    const sdk = yield* resolvePackage(
++      NodeModule.createRequire(path.join(root, "package.json")),
++      "@github/copilot-sdk",
++      COPILOT_PAYLOAD_VERSIONS.sdk,
++    );
++    const runtime = yield* resolvePackage(
++      sdk.loader,
++      "@github/copilot",
++      COPILOT_PAYLOAD_VERSIONS.runtime,
++    );
++    const koffi = yield* resolvePackage(sdk.loader, "koffi", COPILOT_PAYLOAD_VERSIONS.koffi);
++    yield* resolvePackage(sdk.loader, "vscode-jsonrpc", COPILOT_PAYLOAD_VERSIONS.jsonrpc);
++    yield* resolvePackage(sdk.loader, "zod", COPILOT_PAYLOAD_VERSIONS.zod);
++    yield* resolvePackage(runtime.loader, "detect-libc", COPILOT_PAYLOAD_VERSIONS.detectLibc);
++    return { fs, path, root, contained, realInside, resolvePackage, failure, sdk, runtime, koffi };
++  },
++);
++
++/**
++ * Prune only a reviewed SDK-server payload in an isolated production stage.
++ * Validate every target before deleting anything; never prune a package store
++ * reached outside the stage through Node resolution or a symlink.
++ */
++export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayload")(
++  function* (input: {
++    readonly stageDir: string;
++    readonly platform: BuildPlatform;
++    readonly arch: BuildArch;
++    readonly dependencies: Readonly<Record<string, string>>;
++    readonly overrides: Readonly<Record<string, string>>;
++  }) {
++    const closure = yield* resolveCopilotDependencyClosure(input);
++    if (closure === null) return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> };
++    const { fs, path, root, contained, realInside, resolvePackage, failure, runtime, koffi } =
++      closure;
++    if (input.arch === "universal" && input.platform !== "mac") {
++      return yield* failure("universal Copilot payloads are supported only on macOS");
++    }
++    const layouts = (input.arch === "universal" ? (["arm64", "x64"] as const) : [input.arch]).map(
++      (arch) => targetLayout(input.platform, arch),
++    );
++    const removals = new Set<string>();
++    const removedNativeFiles: string[] = [];
++    const isNative = (file: string) =>
++      NATIVE_FILE.test(file) || ["copilot", "rg", "tgrep"].includes(path.basename(file));
++    const nativeFiles = Effect.fn("copilotPayload.nativeFiles")(function* (packageRoot: string) {
++      const pending = [packageRoot];
++      const files: string[] = [];
++      while (pending.length > 0) {
++        const directory = pending.pop()!;
++        for (const name of yield* fs.readDirectory(directory)) {
++          const file = path.join(directory, name);
++          const real = yield* realInside(file);
++          if (real !== file) return yield* failure(`unexpected symlink inside payload: ${file}`);
++          const info = yield* fs.stat(real);
++          if (info.type === "Directory") pending.push(real);
++          else if (info.type === "File" && isNative(real))
++            files.push(path.relative(packageRoot, real).split(path.sep).join("/"));
++          else if (info.type !== "File")
++            return yield* failure(`unexpected file type in payload: ${file}`);
++        }
++      }
++      return files;
++    });
++    const requireFile = Effect.fn("copilotPayload.requireFile")(function* (file: string) {
++      const real = yield* realInside(file);
++      if ((yield* fs.stat(real)).type !== "File")
++        return yield* failure(`required payload is not a file: ${file}`);
++    });
++    for (const layout of layouts) {
++      const platform = yield* resolvePackage(
++        runtime.loader,
++        `@github/copilot-${layout.target}`,
++        COPILOT_PAYLOAD_VERSIONS.runtime,
++      );
++      const actual = yield* nativeFiles(platform.directory);
++      const missing = layout.required.filter((file) => !actual.includes(file));
++      const unexpected = actual.filter(
++        (file) => !layout.required.includes(file) && !layout.removed.includes(file),
++      );
++      const candidates = actual.filter((file) => layout.removed.includes(file));
++      if (
++        missing.length > 0 ||
++        unexpected.length > 0 ||
++        (candidates.length !== 0 && candidates.length !== layout.removed.length)
++      ) {
++        return yield* failure(
++          `unreviewed ${layout.target} layout; missing [${missing.join(", ")}], unexpected [${unexpected.join(", ")}], removable ${candidates.length}/${layout.removed.length}`,
++        );
++      }
++      for (const file of [
++        "sdk/index.js",
++        "clipboard/index.js",
++        "clipboard/node_modules/@teddyzhu/clipboard/index.js",
++      ]) {
++        yield* requireFile(path.join(platform.directory, file));
++      }
++      for (const file of candidates) {
++        removedNativeFiles.push(
++          path.relative(root, path.join(platform.directory, file)).split(path.sep).join("/"),
++        );
++        if (file.startsWith("clipboard/")) removals.add(path.join(platform.directory, file));
++      }
++      for (const directory of INTERACTIVE_DIRECTORIES) {
++        const candidate = path.join(platform.directory, directory);
++        if (yield* fs.exists(candidate)) removals.add(candidate);
++      }
++      if (layout.foreignSearchTarget) {
++        for (const tool of ["ripgrep", "tgrep"]) {
++          const candidate = path.join(platform.directory, tool, "bin", layout.foreignSearchTarget);
++          if (yield* fs.exists(candidate)) removals.add(candidate);
++        }
++      }
++      const binding = yield* resolvePackage(
++        koffi.loader,
++        `@koromix/koffi-${layout.target}`,
++        COPILOT_PAYLOAD_VERSIONS.koffi,
++      );
++      yield* requireFile(path.join(binding.directory, `${layout.os}_${layout.arch}`, "koffi.node"));
++      const bindingFiles = yield* nativeFiles(binding.directory);
++      const allowedBindings = new Set([
++        `${layout.os}_${layout.arch}/koffi.node`,
++        ...(layout.os === "linux" ? [`musl_${layout.arch}/koffi.node`] : []),
++      ]);
++      if (bindingFiles.some((file) => !allowedBindings.has(file)))
++        return yield* failure(`unreviewed Koffi layout for ${layout.target}`);
++      if (layout.os === "linux" && bindingFiles.includes(`musl_${layout.arch}/koffi.node`)) {
++        removals.add(path.join(binding.directory, `musl_${layout.arch}`));
++        removedNativeFiles.push(
++          path
++            .relative(root, path.join(binding.directory, `musl_${layout.arch}`, "koffi.node"))
++            .split(path.sep)
++            .join("/"),
++        );
++      }
++    }
++    // The selected artifacts are single-platform (or two macOS architectures), not
++    // the old combined Windows/Linux server tree. Reject accidental platform leaks.
++    for (const os of ["darwin", "win32", "linux", "linuxmusl"]) {
++      for (const arch of ["arm64", "x64"]) {
++        if (layouts.some((layout) => layout.target === `${os}-${arch}`)) continue;
++        const packages = [
++          { name: `@github/copilot-${os}-${arch}`, loader: runtime.loader },
++          ...(os === "linuxmusl"
++            ? []
++            : [{ name: `@koromix/koffi-${os}-${arch}`, loader: koffi.loader }]),
++        ];
++        for (const pkg of packages) {
++          const resolved = yield* Effect.try({
++            try: () => {
++              try {
++                return resolvePackageEntry(pkg.loader, pkg.name);
++              } catch (cause) {
++                if (cause instanceof Error && "code" in cause && cause.code === "MODULE_NOT_FOUND")
++                  return null;
++                throw cause;
++              }
++            },
++            catch: (cause) => failure("cannot inspect foreign platform packages", cause),
++          });
++          if (resolved !== null && contained(resolved)) {
++            return yield* failure(`unexpected installed native package ${pkg.name}`);
++          }
++        }
++      }
++    }
++    for (const file of removals) {
++      const real = yield* realInside(file);
++      if (real !== file) return yield* failure(`pruning path changed before removal: ${file}`);
++      yield* fs.remove(real, { recursive: true });
++    }
++    removedNativeFiles.sort();
++    yield* Effect.log("Pruned reviewed Copilot SDK-server payload").pipe(
++      Effect.annotateLogs({
++        platform: input.platform,
++        arch: input.arch,
++        removedNativeFiles: removedNativeFiles.length,
++        closureVersions: COPILOT_PAYLOAD_VERSIONS,
++      }),
++    );
++    return { pruned: true, removedNativeFiles };
++  },
++);
+diff --git a/scripts/lib/fork-preview.test.ts b/scripts/lib/fork-preview.test.ts
+new file mode 100644
+index 000000000..9649fda8a
+--- /dev/null
++++ b/scripts/lib/fork-preview.test.ts
+@@ -0,0 +1,109 @@
++// @effect-diagnostics nodeBuiltinImport:off - exercises the synchronous pre-Effect Electron bootstrap against an owned filesystem fixture.
++import { describe, expect, it } from "vite-plus/test";
++import * as NodeFS from "node:fs";
++import * as NodeOS from "node:os";
++import * as NodePath from "node:path";
++import * as NodeVM from "node:vm";
++import { forkPreviewBuildConfig, FORK_PREVIEW_APP_ID } from "./fork-preview.ts";
++
++const bootstrap = NodeFS.readFileSync(
++  new URL("../fork-preview-bootstrap.cjs", import.meta.url),
++  "utf8",
++);
++function runBootstrap(
++  options: {
++    root?: string;
++    existingHome?: string;
++    primary?: boolean;
++    inheritedPreview?: boolean;
++    cacheFailure?: boolean;
++  } = {},
++) {
++  const home = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-fork-bootstrap-"));
++  const env: Record<string, string> = {};
++  if (options.root)
++    env.T3CODE_FORK_PREVIEW_HOME =
++      options.root === "live" ? NodePath.join(home, ".t3") : options.root;
++  if (options.existingHome)
++    env.T3CODE_HOME =
++      options.existingHome === "preview"
++        ? NodePath.join(home, ".t3-fork-preview")
++        : options.existingHome;
++  if (options.inheritedPreview) env.T3CODE_DESKTOP_ISOLATED_PREVIEW = "true";
++  let loaded = false;
++  let quit = false;
++  let profile = "";
++  let compileCache = "";
++  try {
++    NodeVM.runInNewContext(bootstrap, {
++      process: { env },
++      require: (name: string) => {
++        if (name === "node:fs") return NodeFS;
++        if (name === "node:os") return { homedir: () => home };
++        if (name === "node:path") return NodePath;
++        if (name === "node:module")
++          return {
++            constants: { compileCacheStatus: { FAILED: 0 } },
++            enableCompileCache: (directory: string) => {
++              compileCache = directory;
++              return { status: options.cacheFailure ? 0 : 1, directory };
++            },
++          };
++        if (name === "electron")
++          return {
++            app: {
++              setPath: (_key: string, value: string) => {
++                profile = value;
++              },
++              requestSingleInstanceLock: () => options.primary !== false,
++              quit: () => {
++                quit = true;
++              },
++            },
++          };
++        if (name === "./apps/desktop/dist-electron/boot.cjs") {
++          expect(profile).toBe(NodePath.join(env.T3CODE_HOME!, "electron"));
++          expect(env.T3CODE_DISABLE_AUTO_UPDATE).toBe("true");
++          expect(compileCache).toBe(NodePath.join(env.T3CODE_HOME!, "compile-cache"));
++          loaded = true;
++          return {};
++        }
++        throw new Error(`Unexpected module ${name}`);
++      },
++    });
++    return { home, profile, env, loaded, quit };
++  } finally {
++    NodeFS.rmSync(home, { recursive: true });
++  }
++}
++
++describe("fork preview packaging isolation", () => {
++  it("removes update feeds and stock protocol claims without mutating ordinary configuration", () => {
++    const original = {
++      appId: "com.t3tools.t3code",
++      publish: [{ provider: "github" }],
++      protocols: [{ schemes: ["t3code"] }],
++      mac: { protocols: [{ schemes: ["t3code"] }], icon: "icon.icns" },
++    };
++    const result = forkPreviewBuildConfig(original);
++    expect(result.appId).toBe(FORK_PREVIEW_APP_ID);
++    expect(result.publish).toBeNull();
++    expect(result).not.toHaveProperty("protocols");
++    expect(result.mac).toEqual({ protocols: [], icon: "icon.icns" });
++    expect(original.publish).toHaveLength(1);
++    expect(original.mac.protocols).toHaveLength(1);
++  });
++  it("sets isolated server and Electron homes before booting the app", () => {
++    const result = runBootstrap();
++    expect(result.env.T3CODE_HOME).toBe(NodePath.join(result.home, ".t3-fork-preview"));
++    expect(result.profile).not.toContain(NodePath.join("Application Support", "t3code"));
++    expect(result.loaded).toBe(true);
++    expect(result.quit).toBe(false);
++  });
++  it("refuses the live profile and prevents a secondary process from booting another backend", () => {
++    expect(() => runBootstrap({ root: "live" })).toThrow("ordinary T3 profile");
++    expect(runBootstrap({ primary: false })).toMatchObject({ loaded: false, quit: true });
++    expect(runBootstrap({ inheritedPreview: true, existingHome: "preview" }).loaded).toBe(true);
++    expect(() => runBootstrap({ cacheFailure: true })).toThrow("isolated compile cache");
++  });
++});
+diff --git a/scripts/lib/fork-preview.ts b/scripts/lib/fork-preview.ts
+new file mode 100644
+index 000000000..61fa24b25
+--- /dev/null
++++ b/scripts/lib/fork-preview.ts
+@@ -0,0 +1,20 @@
++export const FORK_PREVIEW_APP_ID = "com.tesseracode.t3code.preview";
++export const FORK_PREVIEW_PRODUCT_NAME = "T3 Code Fork Preview";
++
++/** Installer identity and update metadata are isolated before electron-builder sees the stage. */
++export function forkPreviewBuildConfig(config: Record<string, unknown>): Record<string, unknown> {
++  const { publish: _publish, protocols: _protocols, ...rest } = config;
++  return {
++    ...rest,
++    publish: null,
++    appId: FORK_PREVIEW_APP_ID,
++    productName: FORK_PREVIEW_PRODUCT_NAME,
++    artifactName: "T3-Code-Fork-Preview-${version}-${arch}.${ext}",
++    ...(typeof config.mac === "object" && config.mac !== null
++      ? { mac: { ...config.mac, protocols: [] } }
++      : {}),
++    ...(typeof config.dmg === "object" && config.dmg !== null
++      ? { dmg: { ...config.dmg, title: FORK_PREVIEW_PRODUCT_NAME } }
++      : {}),
++  };
++}
+diff --git a/scripts/lib/runtime-external-dependencies.test.ts b/scripts/lib/runtime-external-dependencies.test.ts
+new file mode 100644
+index 000000000..a89681d20
+--- /dev/null
++++ b/scripts/lib/runtime-external-dependencies.test.ts
+@@ -0,0 +1,73 @@
++import * as NodeServices from "@effect/platform-node/NodeServices";
++import { assert, it } from "@effect/vitest";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import {
++  collectCliRuntimeExternalDependencies,
++  RuntimeExternalDependencyError,
++} from "./runtime-external-dependencies.ts";
++
++const fixture = Effect.fn("test.runtimeOwners")(function* (conflict = false, missing = false) {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-runtime-owners-" });
++  yield* fs.writeFileString(
++    path.join(root, "pnpm-workspace.yaml"),
++    'packages: ["apps/*", "packages/*"]\ncatalog:\n  node-pty: 1.2.0-beta.15\n',
++  );
++  for (const [directory, manifest] of Object.entries({
++    "apps/server": { name: "t3", dependencies: { "@test/provider": "workspace:*" } },
++    "packages/provider": {
++      name: "@test/provider",
++      dependencies: {
++        "@test/helper": "workspace:*",
++        "node-pty": "catalog:",
++        effect: "4.0.5",
++      },
++    },
++    "packages/helper": {
++      name: "@test/helper",
++      dependencies: {
++        "@test/provider": "workspace:*",
++        ...(missing ? { "@test/missing": "workspace:*" } : {}),
++        ...(conflict ? { "node-pty": "different" } : { "playwright-core": "1.58.2" }),
++      },
++    },
++    "packages/unreachable": { name: "@test/unreachable", dependencies: { "node-pty": "wrong" } },
++  })) {
++    yield* fs.makeDirectory(path.join(root, directory), { recursive: true });
++    yield* fs.writeFileString(path.join(root, directory, "package.json"), JSON.stringify(manifest));
++  }
++  return root;
++});
++
++it.layer(NodeServices.layer)("workspace-owned runtime externals", (it) => {
++  it.effect(
++    "stages the reachable owner closure, resolving catalogs and cycles without unrelated packages",
++    () =>
++      Effect.gen(function* () {
++        const root = yield* fixture();
++        assert.deepStrictEqual(yield* collectCliRuntimeExternalDependencies(root), {
++          "node-pty": "1.2.0-beta.15",
++          "playwright-core": "1.58.2",
++        });
++      }),
++  );
++  it.effect.each([
++    [true, false],
++    [false, true],
++  ] as const)(
++    "refuses incompatible flattened owners or missing workspace edges (%s, %s)",
++    ([conflict, missing]) =>
++      Effect.gen(function* () {
++        const root = yield* fixture(conflict, missing);
++        const error = yield* collectCliRuntimeExternalDependencies(root).pipe(Effect.flip);
++        assert.instanceOf(error, RuntimeExternalDependencyError);
++        assert.include(
++          error.detail,
++          conflict ? "Cannot flatten node-pty" : "missing workspace owner",
++        );
++      }),
++  );
++});
+diff --git a/scripts/lib/runtime-external-dependencies.ts b/scripts/lib/runtime-external-dependencies.ts
+new file mode 100644
+index 000000000..d95cf25b1
+--- /dev/null
++++ b/scripts/lib/runtime-external-dependencies.ts
+@@ -0,0 +1,94 @@
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodeFS from "node:fs";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import * as Schema from "effect/Schema";
++import { fromYaml } from "@t3tools/shared/schemaYaml";
++import { selectCliRuntimeExternalDependencies } from "./cli-external-packages.ts";
++import { resolveCatalogDependencies } from "./resolve-catalog.ts";
++
++const Workspace = Schema.Struct({
++  packages: Schema.Array(Schema.String),
++  catalog: Schema.optional(Schema.Record(Schema.String, Schema.String)),
++});
++const Manifest = Schema.Struct({
++  name: Schema.String,
++  dependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
++  optionalDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
++});
++const decodeManifest = Schema.decodeEffect(Schema.fromJsonString(Manifest));
++
++export class RuntimeExternalDependencyError extends Schema.TaggedError<RuntimeExternalDependencyError>()(
++  "RuntimeExternalDependencyError",
++  { detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
++) {}
++
++/** Follow workspace owners because provider dependencies no longer live in the server manifest. */
++export const collectCliRuntimeExternalDependencies = Effect.fn(
++  "collectCliRuntimeExternalDependencies",
++)(function* (repoRoot: string) {
++  const fs = yield* FileSystem.FileSystem;
++  const path = yield* Path.Path;
++  const workspace = yield* Schema.decodeEffect(fromYaml(Workspace))(
++    yield* fs.readFileString(path.join(repoRoot, "pnpm-workspace.yaml")),
++  );
++  const manifestPaths = yield* Effect.try({
++    try: () =>
++      NodeFS.globSync(
++        workspace.packages.map((pattern) => `${pattern}/package.json`),
++        { cwd: repoRoot },
++      ),
++    catch: (cause) =>
++      new RuntimeExternalDependencyError({
++        detail: "Could not enumerate workspace owners.",
++        cause,
++      }),
++  });
++  const owners = new Map<string, { manifest: typeof Manifest.Type; file: string }>();
++  for (const file of manifestPaths.sort()) {
++    const manifest = yield* decodeManifest(yield* fs.readFileString(path.join(repoRoot, file)));
++    if (owners.has(manifest.name)) {
++      return yield* new RuntimeExternalDependencyError({
++        detail: `Duplicate workspace owner ${manifest.name}.`,
++      });
++    }
++    owners.set(manifest.name, { manifest, file });
++  }
++  const serverFile = "apps/server/package.json";
++  const server = yield* decodeManifest(yield* fs.readFileString(path.join(repoRoot, serverFile)));
++  const queue = [{ manifest: server, file: serverFile }];
++  const visited = new Set<string>();
++  const dependencies: Record<string, string> = {};
++  const selectedOwners = new Map<string, string>();
++  for (const owner of queue) {
++    if (visited.has(owner.manifest.name)) continue;
++    visited.add(owner.manifest.name);
++    const declared = {
++      ...owner.manifest.dependencies,
++      ...owner.manifest.optionalDependencies,
++    };
++    for (const [name, spec] of Object.entries(declared)) {
++      if (!spec.startsWith("workspace:")) continue;
++      const child = owners.get(name);
++      if (!child) {
++        return yield* new RuntimeExternalDependencyError({
++          detail: `${owner.file} requires missing workspace owner ${name}.`,
++        });
++      }
++      queue.push(child);
++    }
++    const resolved = resolveCatalogDependencies(declared, workspace.catalog ?? {}, owner.file);
++    for (const [name, version] of Object.entries(selectCliRuntimeExternalDependencies(resolved))) {
++      if (version.startsWith("workspace:")) continue;
++      if (dependencies[name] !== undefined && dependencies[name] !== version) {
++        return yield* new RuntimeExternalDependencyError({
++          detail: `Cannot flatten ${name}: ${selectedOwners.get(name)} requires ${dependencies[name]}, but ${owner.file} requires ${version}.`,
++        });
++      }
++      dependencies[name] = version;
++      selectedOwners.set(name, owner.file);
++    }
++  }
++  return dependencies;
++});

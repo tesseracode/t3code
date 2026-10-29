@@ -1,0 +1,2212 @@
+diff --git a/apps/server/package.json b/apps/server/package.json
+index bc6ec2f04..79627043c 100644
+--- a/apps/server/package.json
++++ b/apps/server/package.json
+@@ -39,6 +39,7 @@
+   },
+   "devDependencies": {
+     "@effect/vitest": "catalog:",
++    "@t3tools/client-runtime": "workspace:*",
+     "@t3tools/contracts": "workspace:*",
+     "@t3tools/shared": "workspace:*",
+     "@t3tools/ssh": "workspace:*",
+diff --git a/apps/server/src/auth/RpcAuthorization.test.ts b/apps/server/src/auth/RpcAuthorization.test.ts
+index 726223957..df2ab3d8b 100644
+--- a/apps/server/src/auth/RpcAuthorization.test.ts
++++ b/apps/server/src/auth/RpcAuthorization.test.ts
+@@ -11,6 +11,9 @@ import { describe, expect, it } from "@effect/vitest";
+ import { RPC_REQUIRED_SCOPES, requiredScopeForRpcMethod } from "./RpcAuthorization.ts";
+ 
+ describe("RPC authorization scopes", () => {
++  it("requires orchestration read access for attention synchronization", () => {
++    expect(requiredScopeForRpcMethod(WS_METHODS.attentionSubscribe)).toBe(AuthOrchestrationReadScope);
++  });
+   it("declares exactly one scope for every RPC in the server group", () => {
+     expect(new Set(Object.keys(RPC_REQUIRED_SCOPES))).toEqual(new Set(WsRpcGroup.requests.keys()));
+   });
+diff --git a/apps/server/src/auth/RpcAuthorization.ts b/apps/server/src/auth/RpcAuthorization.ts
+index 36371713a..f08bd2845 100644
+--- a/apps/server/src/auth/RpcAuthorization.ts
++++ b/apps/server/src/auth/RpcAuthorization.ts
+@@ -21,6 +21,7 @@ type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
+  * runtime failure.
+  */
+ export const RPC_REQUIRED_SCOPES = {
++  [WS_METHODS.attentionSubscribe]: AuthOrchestrationReadScope,
+   [ORCHESTRATION_WS_METHODS.dispatchCommand]: AuthOrchestrationOperateScope,
+   [ORCHESTRATION_WS_METHODS.getWorkflowScript]: AuthOrchestrationReadScope,
+   [ORCHESTRATION_WS_METHODS.getTurnDiff]: AuthOrchestrationReadScope,
+diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
+index 9c2576724..51150a45b 100644
+--- a/apps/server/src/environment/ServerEnvironment.ts
++++ b/apps/server/src/environment/ServerEnvironment.ts
+@@ -213,6 +213,7 @@ export const make = Effect.gen(function* () {
+     },
+     serverVersion: packageJson.version,
+     capabilities: {
++      attentionSync: true,
+       repositoryIdentity: true,
+       connectionProbe: true,
+       attachmentUploads: true,
+diff --git a/apps/server/src/orchestration/AttentionSync.test.ts b/apps/server/src/orchestration/AttentionSync.test.ts
+new file mode 100644
+index 000000000..93558351d
+--- /dev/null
++++ b/apps/server/src/orchestration/AttentionSync.test.ts
+@@ -0,0 +1,462 @@
++import {
++  CommandId,
++  EventId,
++  EnvironmentId,
++  ProjectId,
++  ProviderInstanceId,
++  ThreadId,
++  TurnId,
++  EnvironmentAuthorizationError,
++  AuthOrchestrationReadScope,
++  type AttentionSubscribeInput,
++  type AttentionStreamMessage,
++  AttentionEntity,
++  AttentionDeliveryCursor,
++} from "@t3tools/contracts";
++import {
++  emptyAttentionSync,
++  reduceAttentionStream,
++  attentionSyncFailed,
++} from "@t3tools/client-runtime/attention-sync";
++import * as HashMap from "effect/HashMap";
++import * as Effect from "effect/Effect";
++import * as Layer from "effect/Layer";
++import * as Stream from "effect/Stream";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++import * as TestClock from "effect/testing/TestClock";
++import * as PubSub from "effect/PubSub";
++import * as Fiber from "effect/Fiber";
++import * as Deferred from "effect/Deferred";
++import * as Schema from "effect/Schema";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import * as NodeServices from "@effect/platform-node/NodeServices";
++import { assert, describe, it } from "@effect/vitest";
++import {
++  SqlitePersistenceMemory,
++  makeSqlitePersistenceLive,
++} from "../persistence/Layers/Sqlite.ts";
++import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
++import { OrchestrationLayerLive } from "./runtimeLayer.ts";
++import { ServerConfig } from "../config.ts";
++import { OrchestrationEngineService } from "./Services/OrchestrationEngine.ts";
++import { ProjectionThreadAttentionCurrentRepository } from "../persistence/Services/ProjectionThreadAttentionCurrent.ts";
++import { OrchestrationProjectionPipeline } from "./Services/ProjectionPipeline.ts";
++import { makeAttentionStream, ATTENTION_BOOTSTRAP_MS } from "./AttentionSync.ts";
++const decodeEntity = Schema.decodeUnknownEffect(Schema.fromJsonString(AttentionEntity));
++
++const layer = (dbPath?: string) =>
++  OrchestrationLayerLive.pipe(
++    Layer.provideMerge(RepositoryIdentityResolver.layer),
++    Layer.provideMerge(dbPath ? makeSqlitePersistenceLive(dbPath) : SqlitePersistenceMemory),
++    Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-attention-sync-" })),
++    Layer.provideMerge(NodeServices.layer),
++  );
++const setup = Effect.gen(function* () {
++  const engine = yield* OrchestrationEngineService;
++  const sql = yield* SqlClient.SqlClient;
++  const attention = yield* ProjectionThreadAttentionCurrentRepository;
++  const pipeline = yield* OrchestrationProjectionPipeline;
++  let id = 0;
++  let allowed = true;
++  const authorization = yield* PubSub.unbounded<void>();
++  const options = {
++    environmentId: EnvironmentId.make("env"),
++    scopeBinding: "session:orchestration:read",
++    secret: new Uint8Array(32).fill(7),
++    authorize: Effect.suspend(() =>
++      allowed
++        ? Effect.void
++        : Effect.fail(
++            new EnvironmentAuthorizationError({
++              requiredScope: AuthOrchestrationReadScope,
++              message: "Session revoked.",
++            }),
++          ),
++    ),
++    authorizationChanges: Stream.fromPubSub(authorization),
++  };
++  const now = "2026-09-28T00:00:00.000Z";
++  const command = () => CommandId.make(`sync-command-${++id}`);
++  const project = ProjectId.make("project");
++  yield* engine.dispatch({
++    type: "project.create",
++    commandId: command(),
++    projectId: project,
++    title: "Project",
++    workspaceRoot: "/tmp/attention-fixture",
++    defaultModelSelection: null,
++    createdAt: now,
++  });
++  const thread = (name: string) =>
++    engine.dispatch({
++      type: "thread.create",
++      commandId: command(),
++      threadId: ThreadId.make(name),
++      projectId: project,
++      title: name,
++      modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5-mini" },
++      runtimeMode: "approval-required",
++      interactionMode: "default",
++      branch: null,
++      worktreePath: null,
++      createdAt: now,
++    });
++  const activity = (threadId: string, kind: string, requestId: string) =>
++    engine.dispatch({
++      type: "thread.activity.append",
++      commandId: command(),
++      threadId: ThreadId.make(threadId),
++      createdAt: now,
++      activity: {
++        id: EventId.make(`sync-activity-${id}`),
++        kind,
++        turnId: TurnId.make("turn"),
++        tone: "info",
++        summary: "private",
++        payload: { requestId, detail: "private command" },
++        createdAt: now,
++      },
++    });
++  const connect = Effect.fn("test.connectAttention")(function* (
++    input: AttentionSubscribeInput = {},
++  ) {
++    const pull = yield* Stream.toPull(makeAttentionStream(input, options));
++    const next = () =>
++      pull.pipe(
++        Effect.map((frames) => {
++          assert.lengthOf(frames, 1);
++          return frames[0]!;
++        }),
++      );
++    return { next };
++  });
++  const revoke = Effect.gen(function* () {
++    allowed = false;
++    yield* PubSub.publish(authorization, undefined);
++  });
++  return {
++    engine,
++    sql,
++    attention,
++    pipeline,
++    options,
++    thread,
++    activity,
++    command,
++    connect,
++    revoke,
++    now,
++  };
++});
++
++describe("attention snapshot/live continuity", () => {
++  it.effect("rotates delivery generation across a real disk-backed server restart", () =>
++    Effect.gen(function* () {
++      const fs = yield* FileSystem.FileSystem;
++      const path = yield* Path.Path;
++      const directory = yield* fs.makeTempDirectoryScoped({
++        prefix: "t3-attention-delivery-restart-",
++      });
++      const db = path.join(directory, "state.sqlite");
++      const cursor = yield* Effect.gen(function* () {
++        const f = yield* setup;
++        yield* f.thread("thread");
++        const stream = yield* f.connect();
++        let cache = emptyAttentionSync();
++        while (cache.status !== "live") cache = reduceAttentionStream(cache, yield* stream.next());
++        return cache.cursor!;
++      }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer(db))));
++      yield* Effect.gen(function* () {
++        const f = yield* setup;
++        const stream = yield* f.connect({ cursor });
++        assert.deepEqual(yield* stream.next(), {
++          type: "reset-required",
++          reason: "generation-changed",
++        });
++        const fresh = yield* f.connect();
++        let cache = emptyAttentionSync();
++        while (cache.status !== "live") cache = reduceAttentionStream(cache, yield* fresh.next());
++        assert.equal(HashMap.size(cache.entries), 1);
++      }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer(db))));
++    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
++  );
++  it.effect(
++    "synchronizes more than 100 items and summaries across mutable pages, removals and recreation",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* setup;
++        for (let i = 0; i < 105; i++) {
++          yield* f.thread(`thread-${i}`);
++          yield* f.activity(`thread-${i}`, "approval.requested", "request");
++        }
++        const stream = yield* f.connect({ pageSize: 17 });
++        let cache = emptyAttentionSync();
++        const frames: AttentionStreamMessage[] = [];
++        const read = Effect.gen(function* () {
++          const frame = yield* stream.next();
++          frames.push(frame);
++          cache = reduceAttentionStream(cache, frame);
++          assert.notEqual(cache.status, "reset-required");
++          assert.lengthOf(cache.notificationCandidates, 0);
++          return frame;
++        });
++        assert.equal((yield* read).type, "begin");
++        assert.equal((yield* read).type, "page");
++        yield* f.activity("thread-0", "approval.resolved", "request");
++        yield* f.engine.dispatch({
++          type: "thread.delete",
++          commandId: f.command(),
++          threadId: ThreadId.make("thread-1"),
++        });
++        yield* f.thread("thread-1");
++        yield* f.activity("thread-1", "user-input.requested", "new");
++        yield* f.thread("000-insert-before-keyset");
++        yield* f.activity("000-insert-before-keyset", "approval.requested", "new");
++        let beforeFence = false;
++        while (true) {
++          const frame = yield* read;
++          if (frame.type === "sync-complete") break;
++          if (frame.type === "page" && frame.entries.length < 17 && !beforeFence) {
++            beforeFence = true;
++            yield* f.activity("thread-3", "user-input.requested", "between-page-and-fence");
++          }
++          assert.equal(HashMap.size(cache.entries), 0);
++          assert.isBelow(frames.length, 100);
++        }
++        assert.isTrue(beforeFence);
++        const expected = yield* f.sql<{
++          readonly entity_key: string;
++          readonly data_json: string;
++          readonly version: number;
++        }>`
++        SELECT entity_key, data_json, version FROM attention_delivery_rows WHERE status != 'resolved' ORDER BY entity_key
++      `;
++        const decoded = yield* Effect.forEach(expected, (row) =>
++          decodeEntity(row.data_json).pipe(
++            Effect.map((entity) => ({
++              key: row.entity_key,
++              version: row.version,
++              entity,
++            })),
++          ),
++        );
++        assert.deepEqual(
++          [...HashMap.values(cache.entries)].sort((a, b) => a.key.localeCompare(b.key)),
++          decoded,
++        );
++        assert.isAbove(HashMap.size(cache.entries), 200);
++        yield* f.activity("thread-2", "approval.resolved", "request");
++        const live = yield* stream.next();
++        assert.equal(live.type, "delta");
++        cache = reduceAttentionStream(cache, live);
++        assert.equal(cache.status, "live");
++        assert.isAbove(cache.notificationCandidates.length, 0);
++      }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer()))),
++  );
++
++  it.effect(
++    "resumes only a complete replay interval and rejects altered scope or malformed cursors",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* setup;
++        yield* f.thread("thread");
++        const stream = yield* f.connect();
++        let cache = emptyAttentionSync();
++        while (cache.status !== "live") cache = reduceAttentionStream(cache, yield* stream.next());
++        const cursor = cache.cursor!;
++        yield* f.activity("thread", "approval.requested", "request");
++        const resumed = yield* f.connect({ cursor });
++        cache = attentionSyncFailed(cache, "disconnected");
++        while (cache.status !== "live") {
++          cache = reduceAttentionStream(cache, yield* resumed.next());
++          assert.lengthOf(cache.notificationCandidates, 0);
++        }
++        assert.equal(HashMap.size(cache.entries), 2);
++        const changed = yield* f.connect({ cursor, filter: { includeResolved: true } });
++        const failure = yield* changed.next().pipe(Effect.result);
++        assert.equal(failure._tag, "Failure");
++        const badScope = yield* Stream.runHead(
++          makeAttentionStream(
++            { cursor },
++            { ...f.options, environmentId: EnvironmentId.make("other") },
++          ),
++        ).pipe(Effect.result);
++        assert.equal(badScope._tag, "Failure");
++        const malformed = yield* f.connect({
++          cursor: AttentionDeliveryCursor.make("invalid.token"),
++        });
++        assert.equal((yield* malformed.next().pipe(Effect.result))._tag, "Failure");
++        yield* f.sql`DELETE FROM attention_delivery_changes`;
++        yield* f.sql`UPDATE attention_delivery_state SET floor = head`;
++        const expired = yield* f.connect({ cursor });
++        assert.deepEqual(yield* expired.next(), {
++          type: "reset-required",
++          reason: "replay-unavailable",
++        });
++      }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer()))),
++  );
++
++  it.effect("resets on rebuild and bootstrap expiry instead of claiming an incomplete fence", () =>
++    Effect.gen(function* () {
++      const f = yield* setup;
++      yield* f.thread("thread");
++      const stream = yield* f.connect({ pageSize: 1 });
++      yield* stream.next();
++      yield* f.attention.reset;
++      yield* f.pipeline.bootstrap;
++      assert.deepEqual(yield* stream.next(), {
++        type: "reset-required",
++        reason: "generation-changed",
++      });
++      const expired = yield* f.connect();
++      yield* expired.next();
++      yield* TestClock.adjust(ATTENTION_BOOTSTRAP_MS + 1);
++      assert.deepEqual(yield* expired.next(), {
++        type: "reset-required",
++        reason: "bootstrap-expired",
++      });
++    }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer()))),
++  );
++
++  it.effect("emits empty filtered deltas and surfaces revoked authority while idle", () =>
++    Effect.gen(function* () {
++      const f = yield* setup;
++      yield* f.thread("thread");
++      const stream = yield* f.connect({
++        filter: { threadIds: [ThreadId.make("not-this-thread")] },
++      });
++      let cache = emptyAttentionSync();
++      while (cache.status !== "live") cache = reduceAttentionStream(cache, yield* stream.next());
++      assert.equal(HashMap.size(cache.entries), 0);
++      yield* f.activity("thread", "approval.requested", "request");
++      const change = yield* stream.next();
++      assert.equal(change.type, "delta");
++      if (change.type === "delta") assert.deepEqual(change.changes, []);
++      const waiting = yield* stream.next().pipe(Effect.forkScoped);
++      yield* f.revoke;
++      assert.equal((yield* Fiber.join(waiting).pipe(Effect.result))._tag, "Failure");
++      assert.equal(attentionSyncFailed(cache, "unauthorized").status, "reset-required");
++    }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer()))),
++  );
++
++  it.effect(
++    "registers before a committed watermark and never reads an in-flight rolled-back projection",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* setup;
++        yield* f.thread("thread");
++        const registered = yield* Deferred.make<void>();
++        const proceed = yield* Deferred.make<void>();
++        const pull = yield* Stream.toPull(
++          makeAttentionStream({}, f.options).pipe(
++            Stream.provideService(OrchestrationEngineService, {
++              ...f.engine,
++              subscribeDomainEvents: f.engine.subscribeDomainEvents.pipe(
++                Effect.tap(() =>
++                  Deferred.succeed(registered, undefined).pipe(
++                    Effect.andThen(Deferred.await(proceed)),
++                  ),
++                ),
++              ),
++            }),
++          ),
++        );
++        const first = yield* pull.pipe(Effect.forkScoped);
++        yield* Deferred.await(registered);
++        yield* f.activity("thread", "approval.requested", "during-registration");
++        yield* Deferred.succeed(proceed, undefined);
++        let cache = reduceAttentionStream(emptyAttentionSync(), (yield* Fiber.join(first))[0]!);
++        const written = yield* Deferred.make<void>();
++        const rollback = yield* Deferred.make<void>();
++        const transaction = yield* f.sql
++          .withTransaction(
++            Effect.gen(function* () {
++              yield* f.sql`UPDATE projection_thread_attention_current SET reason_code = 'response_failed', revision = revision + 1`;
++              yield* Deferred.succeed(written, undefined);
++              yield* Deferred.await(rollback);
++              return yield* Effect.fail("intentional-rollback");
++            }),
++          )
++          .pipe(Effect.result, Effect.forkScoped);
++        yield* Deferred.await(written);
++        const page = yield* pull.pipe(Effect.forkScoped);
++        yield* Deferred.succeed(rollback, undefined);
++        assert.equal((yield* Fiber.join(transaction))._tag, "Failure");
++        cache = reduceAttentionStream(cache, (yield* Fiber.join(page))[0]!);
++        while (cache.status !== "live") cache = reduceAttentionStream(cache, (yield* pull)[0]!);
++        assert.equal(HashMap.size(cache.entries), 2);
++        const item = [...HashMap.values(cache.entries)].find(
++          (entry) => entry.entity?.type === "item",
++        );
++        assert.equal(
++          item?.entity?.type === "item" ? item.entity.value.reasonCode : null,
++          "approval_requested",
++        );
++      }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer()))),
++  );
++
++  it.effect("resets a slow consumer on retention overflow and rejects oversized UTF-8 rows", () =>
++    Effect.gen(function* () {
++      const f = yield* setup;
++      yield* f.thread("thread");
++      const slow = yield* f.connect({ pageSize: 1 });
++      yield* slow.next();
++      yield* f.sql`
++        WITH RECURSIVE changes(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM changes WHERE n < 1100)
++        INSERT INTO attention_delivery_changes (entity_key,bytes,oversized)
++        SELECT 'summary:retention-fixture', 9000, 0 FROM changes
++      `;
++      const usage = yield* f.sql<{ readonly n: number; readonly bytes: number }>`
++        SELECT COUNT(*) AS n, SUM(bytes) AS bytes FROM attention_delivery_changes
++      `;
++      assert.isAtMost(usage[0]!.n, 1000);
++      assert.isAtMost(usage[0]!.bytes, 8 * 1024 * 1024);
++      assert.deepEqual(yield* slow.next(), {
++        type: "reset-required",
++        reason: "replay-unavailable",
++      });
++      yield* f.activity("thread", "approval.requested", "é".repeat(40000));
++      const oversized = yield* f.connect();
++      yield* oversized.next();
++      assert.deepEqual(yield* oversized.next(), {
++        type: "reset-required",
++        reason: "message-too-large",
++      });
++    }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer()))),
++  );
++
++  it.effect(
++    "enforces page-token separation, detects journal holes and waits for a new bootstrap during rebuild",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* setup;
++        yield* f.thread("thread");
++        const stream = yield* f.connect();
++        const begin = yield* stream.next();
++        assert.equal(begin.type, "begin");
++        const page = yield* stream.next();
++        assert.equal(page.type, "page");
++        if (page.type === "page") {
++          const wrongToken = yield* f.connect({
++            cursor: AttentionDeliveryCursor.make(page.pageToken),
++          });
++          assert.equal((yield* wrongToken.next().pipe(Effect.result))._tag, "Failure");
++        }
++        while ((yield* stream.next()).type !== "sync-complete") {}
++        yield* f.activity("thread", "approval.requested", "one");
++        yield* f.sql`DELETE FROM attention_delivery_changes WHERE sequence =
++        (SELECT MIN(sequence) FROM attention_delivery_changes WHERE sequence > 1)`;
++        assert.deepEqual(yield* stream.next(), {
++          type: "reset-required",
++          reason: "replay-unavailable",
++        });
++        yield* f.attention.reset;
++        const rebuilding = yield* f.connect();
++        assert.deepEqual(yield* rebuilding.next(), {
++          type: "reset-required",
++          reason: "rebuilding",
++        });
++      }).pipe(Effect.scoped, Effect.provide(Layer.fresh(layer()))),
++  );
++});
+diff --git a/apps/server/src/orchestration/AttentionSync.ts b/apps/server/src/orchestration/AttentionSync.ts
+new file mode 100644
+index 000000000..cc02cf5f2
+--- /dev/null
++++ b/apps/server/src/orchestration/AttentionSync.ts
+@@ -0,0 +1,438 @@
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodeCrypto from "node:crypto";
++import {
++  AttentionDeliveryCursor,
++  AttentionPageToken,
++  AttentionEntity,
++  AttentionStreamMessage,
++  AttentionSyncError,
++  type AttentionSubscribeInput,
++  type AttentionFilter,
++  type AttentionChange,
++  type AttentionResetReason,
++  type EnvironmentId,
++  type EnvironmentAuthorizationError,
++  NonNegativeInt,
++} from "@t3tools/contracts";
++import * as Effect from "effect/Effect";
++import * as Clock from "effect/Clock";
++import * as Schema from "effect/Schema";
++import * as Queue from "effect/Queue";
++import * as Stream from "effect/Stream";
++import * as Option from "effect/Option";
++import * as Scope from "effect/Scope";
++import * as Exit from "effect/Exit";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++import { OrchestrationEngineService } from "./Services/OrchestrationEngine.ts";
++import { ProjectionThreadAttentionCurrentRepository } from "../persistence/Services/ProjectionThreadAttentionCurrent.ts";
++import { makeLiveStreamBudget } from "./LiveStreamBudget.ts";
++import { affectsCurrentAttention } from "../persistence/Layers/ProjectionThreadAttentionCurrent.ts";
++
++export const ATTENTION_MESSAGE_BYTES = 64 * 1024;
++export const ATTENTION_BOOTSTRAP_MS = 30_000;
++const tokenSchema = Schema.Struct({
++  kind: Schema.Literals(["cursor", "page"]),
++  generation: Schema.String,
++  binding: Schema.String,
++  position: NonNegativeInt,
++  expiresAt: NonNegativeInt,
++});
++const encodeToken = Schema.encodeSync(Schema.fromJsonString(tokenSchema));
++const decodeToken = Schema.decodeUnknownOption(Schema.fromJsonString(tokenSchema));
++const decodeEntity = Schema.decodeUnknownEffect(Schema.fromJsonString(AttentionEntity));
++const encodeFrame = Schema.encodeSync(Schema.fromJsonString(AttentionStreamMessage));
++const encodeFilter = Schema.encodeSync(
++  Schema.fromJsonString(
++    Schema.Struct({
++      environmentId: Schema.String,
++      scope: Schema.String,
++      projects: Schema.Array(Schema.String),
++      threads: Schema.Array(Schema.String),
++      resolved: Schema.Boolean,
++    }),
++  ),
++);
++
++export function attentionFilterBinding(
++  environmentId: EnvironmentId,
++  scope: string,
++  filter: AttentionFilter,
++) {
++  return NodeCrypto.createHash("sha256")
++    .update(
++      encodeFilter({
++        environmentId,
++        scope,
++        projects: [...new Set(filter.projectIds)].sort(),
++        threads: [...new Set(filter.threadIds)].sort(),
++        resolved: filter.includeResolved === true,
++      }),
++    )
++    .digest("hex");
++}
++interface DeliveryState {
++  readonly generation: string;
++  readonly head: number;
++  readonly floor: number;
++  readonly ready: number;
++}
++interface StoredRow {
++  readonly entity_key: string;
++  readonly version: number;
++  readonly data_json: string | null;
++  readonly oversized: number;
++  readonly project_id: string | null;
++  readonly thread_id: string | null;
++  readonly status: string | null;
++  readonly before_project?: string | null;
++  readonly before_thread?: string | null;
++  readonly before_status?: string | null;
++}
++
++/** One subscription owns bootstrap, replay and live mode. Domain events are only post-commit wakeups. */
++export const makeAttentionStream = (
++  input: AttentionSubscribeInput,
++  options: {
++    readonly environmentId: EnvironmentId;
++    readonly scopeBinding: string;
++    readonly secret: Uint8Array;
++    readonly authorize: Effect.Effect<void, EnvironmentAuthorizationError | AttentionSyncError>;
++    readonly authorizationChanges: Stream.Stream<unknown>;
++    readonly expiresAtMs?: number;
++  },
++) =>
++  Stream.unwrap(
++    Effect.gen(function* () {
++      const sql = yield* SqlClient.SqlClient;
++      const engine = yield* OrchestrationEngineService;
++      const attention = yield* ProjectionThreadAttentionCurrentRepository;
++      const filter = input.filter ?? {};
++      const pageSize = input.pageSize ?? 50;
++      const binding = attentionFilterBinding(options.environmentId, options.scopeBinding, filter);
++      const sign = (payload: typeof tokenSchema.Type) => {
++        const body = Buffer.from(encodeToken(payload)).toString("base64url");
++        return `${body}.${NodeCrypto.createHmac("sha256", options.secret).update(body).digest("base64url")}`;
++      };
++      const parse = (cursor: AttentionDeliveryCursor) => {
++        const parts = cursor.split(".");
++        if (parts.length !== 2) return Option.none<typeof tokenSchema.Type>();
++        const body = parts[0]!,
++          signature = Buffer.from(parts[1]!, "base64url");
++        const expected = NodeCrypto.createHmac("sha256", options.secret).update(body).digest();
++        if (
++          signature.length !== expected.length ||
++          !NodeCrypto.timingSafeEqual(signature, expected)
++        )
++          return Option.none<typeof tokenSchema.Type>();
++        return decodeToken(Buffer.from(body, "base64url").toString("utf8"));
++      };
++      const wake = yield* Queue.sliding<void>(1);
++      yield* Effect.addFinalizer(() => Queue.shutdown(wake));
++      const watches = yield* Scope.fork(yield* Effect.scope);
++      const domain = yield* engine.subscribeDomainEvents.pipe(Scope.provide(watches));
++      const resets = yield* attention.subscribeResets.pipe(Scope.provide(watches));
++      yield* Stream.mergeAll(
++        [
++          domain.pipe(
++            Stream.filter(affectsCurrentAttention),
++            Stream.map(() => undefined),
++          ),
++          resets,
++          options.authorizationChanges.pipe(Stream.map(() => undefined)),
++        ],
++        { concurrency: "unbounded" },
++      ).pipe(
++        Stream.runForEach(() => Queue.offer(wake, undefined)),
++        Effect.forkIn(watches),
++      );
++      const state = () =>
++        sql<DeliveryState>`SELECT generation, head, floor, ready FROM attention_delivery_state WHERE id=1`.pipe(
++          Effect.flatMap((rows) =>
++            rows[0]
++              ? Effect.succeed(rows[0])
++              : Effect.fail(
++                  new AttentionSyncError({
++                    reason: "unavailable",
++                    message: "Attention delivery state is unavailable.",
++                  }),
++                ),
++          ),
++        );
++      // NodeSqliteClient serializes this short transaction with the projection writer.
++      yield* options.authorize;
++      const initial = yield* sql
++        .withTransaction(options.authorize.pipe(Effect.andThen(state())))
++        .pipe(
++          Effect.catchTag("SqlError", () =>
++            Effect.fail(
++              new AttentionSyncError({
++                reason: "unavailable",
++                message: "Could not capture attention watermark.",
++              }),
++            ),
++          ),
++        );
++      const started = yield* Clock.currentTimeMillis;
++      let position = initial.head;
++      const generation = initial.generation;
++      let pendingReset: AttentionResetReason | undefined = initial.ready ? undefined : "rebuilding";
++      if (input.cursor !== undefined) {
++        const token = parse(input.cursor);
++        if (Option.isNone(token) || token.value.kind !== "cursor")
++          return yield* new AttentionSyncError({
++            reason: "invalid-cursor",
++            message: "Malformed attention delivery cursor.",
++          });
++        if (token.value.binding !== binding)
++          return yield* new AttentionSyncError({
++            reason: "cursor-scope-mismatch",
++            message:
++              "Attention cursor belongs to another environment, filter or authorized session.",
++          });
++        if (token.value.generation !== generation) pendingReset = "generation-changed";
++        else if (
++          token.value.expiresAt < started ||
++          token.value.position < initial.floor ||
++          token.value.position > initial.head
++        )
++          pendingReset = "replay-unavailable";
++        else position = token.value.position;
++      }
++      const cursorAt = (value: number) =>
++        AttentionDeliveryCursor.make(
++          sign({
++            kind: "cursor",
++            generation,
++            binding,
++            position: value,
++            expiresAt: started + 24 * 60 * 60 * 1000,
++          }),
++        );
++      let cursor = input.cursor && !pendingReset ? input.cursor : cursorAt(position);
++      let phase: "begin" | "pages" | "fence" | "replay" | "live" | "ended" = "begin";
++      let afterKey = "";
++      let pageIndex = 0;
++      let previousPageToken: AttentionPageToken | null = null;
++      let fence = initial.head;
++      yield* Effect.sleep(ATTENTION_BOOTSTRAP_MS).pipe(
++        Effect.andThen(
++          Effect.suspend(() =>
++            phase === "live" || phase === "ended"
++              ? Effect.void
++              : Effect.gen(function* () {
++                  pendingReset = "bootstrap-expired";
++                  yield* Scope.close(watches, Exit.void);
++                  yield* Queue.offer(wake, undefined);
++                }),
++          ),
++        ),
++        Effect.forkScoped,
++      );
++      if (options.expiresAtMs !== undefined)
++        yield* Effect.sleep(Math.max(0, options.expiresAtMs - started)).pipe(
++          Effect.andThen(Queue.offer(wake, undefined)),
++          Effect.forkScoped,
++        );
++      const matches = (
++        project: string | null | undefined,
++        thread: string | null | undefined,
++        status: string | null | undefined,
++      ) =>
++        project != null &&
++        thread != null &&
++        (!filter.projectIds?.length || filter.projectIds.some((id) => id === project)) &&
++        (!filter.threadIds?.length || filter.threadIds.some((id) => id === thread)) &&
++        (filter.includeResolved === true || status !== "resolved");
++      const reset = (reason: AttentionResetReason): AttentionStreamMessage => {
++        phase = "ended";
++        return { type: "reset-required", reason };
++      };
++      const checkpoint = () => ({
++        environmentId: options.environmentId,
++        generation,
++        cursor,
++        position,
++      });
++      const next = Effect.fn("AttentionSync.next")(function* (): Effect.fn.Return<
++        AttentionStreamMessage | undefined,
++        AttentionSyncError | EnvironmentAuthorizationError
++      > {
++        if (phase === "ended") return undefined;
++        yield* options.authorize;
++        if (pendingReset) return reset(pendingReset);
++        while (true) {
++          const now = yield* Clock.currentTimeMillis;
++          if (phase !== "live" && now - started >= ATTENTION_BOOTSTRAP_MS)
++            return reset("bootstrap-expired");
++          const result = yield* sql
++            .withTransaction(
++              Effect.gen(function* () {
++                yield* options.authorize;
++                const current = yield* state();
++                if (current.generation !== generation)
++                  return { reset: "generation-changed" as const };
++                if (!current.ready) return { reset: "rebuilding" as const };
++                if (position < current.floor || position > current.head)
++                  return { reset: "replay-unavailable" as const };
++                if (phase === "begin") return { current };
++                if (phase === "pages") {
++                  const rows = yield* sql<StoredRow>`
++            SELECT CASE WHEN bytes > ${ATTENTION_MESSAGE_BYTES} THEN '' ELSE entity_key END AS entity_key,
++              version, CASE WHEN bytes > ${ATTENTION_MESSAGE_BYTES} THEN NULL ELSE data_json END AS data_json,
++              CASE WHEN bytes > ${ATTENTION_MESSAGE_BYTES} THEN 1 ELSE 0 END AS oversized,
++              CASE WHEN bytes > ${ATTENTION_MESSAGE_BYTES} THEN NULL ELSE project_id END AS project_id,
++              CASE WHEN bytes > ${ATTENTION_MESSAGE_BYTES} THEN NULL ELSE thread_id END AS thread_id, status
++            FROM attention_delivery_rows WHERE entity_key > ${afterKey}
++              ${filter.projectIds?.length ? sql`AND ${sql.in("project_id", filter.projectIds)}` : sql``}
++              ${filter.threadIds?.length ? sql`AND ${sql.in("thread_id", filter.threadIds)}` : sql``}
++              ${filter.includeResolved ? sql`` : sql`AND status != 'resolved'`}
++            ORDER BY entity_key LIMIT ${pageSize}
++          `;
++                  return { rows, current };
++                }
++                if (phase === "fence") return { current };
++                const through = phase === "replay" ? fence : current.head;
++                const rows = yield* sql<StoredRow>`
++          SELECT CASE WHEN oversized THEN '' ELSE entity_key END AS entity_key,
++            sequence AS version, data_json, oversized,
++            CASE WHEN oversized THEN NULL ELSE project_id END AS project_id,
++            CASE WHEN oversized THEN NULL ELSE thread_id END AS thread_id, status,
++            CASE WHEN oversized THEN NULL ELSE before_project END AS before_project,
++            CASE WHEN oversized THEN NULL ELSE before_thread END AS before_thread, before_status
++          FROM attention_delivery_changes WHERE sequence > ${position} AND sequence <= ${through}
++          ORDER BY sequence LIMIT ${pageSize}
++        `;
++                return { rows, current, through };
++              }),
++            )
++            .pipe(
++              Effect.catchTag("SqlError", () =>
++                Effect.fail(
++                  new AttentionSyncError({
++                    reason: "unavailable",
++                    message: "Could not read attention delivery state.",
++                  }),
++                ),
++              ),
++            );
++          if ("reset" in result) return reset(result.reset);
++          if (phase === "begin") {
++            phase = input.cursor === undefined ? "pages" : "fence";
++            return {
++              ...checkpoint(),
++              type: "begin",
++              mode: input.cursor === undefined ? "snapshot" : "resume",
++            };
++          }
++          if (phase === "fence") {
++            fence = result.current.head;
++            phase = "replay";
++            continue;
++          }
++          if (!("rows" in result))
++            return yield* new AttentionSyncError({
++              reason: "unavailable",
++              message: "Invalid attention stream phase.",
++            });
++          const changes: AttentionChange[] = [];
++          let bytes = 4096;
++          const beforeCursor = cursor;
++          let consumed = 0;
++          for (const row of result.rows) {
++            if (phase !== "pages" && row.version !== position + 1)
++              return reset("replay-unavailable");
++            if (row.oversized) return reset("message-too-large");
++            const entity =
++              row.data_json === null
++                ? null
++                : yield* decodeEntity(row.data_json).pipe(
++                    Effect.mapError(
++                      () =>
++                        new AttentionSyncError({
++                          reason: "unavailable",
++                          message: "Invalid projected attention record.",
++                        }),
++                    ),
++                  );
++            const include = matches(row.project_id, row.thread_id, row.status);
++            const exited = matches(row.before_project, row.before_thread, row.before_status);
++            const change = {
++              key: row.entity_key,
++              version: row.version,
++              entity: include ? entity : null,
++            };
++            const size =
++              Buffer.byteLength(row.data_json ?? "") + Buffer.byteLength(row.entity_key) + 256;
++            if (bytes + size > ATTENTION_MESSAGE_BYTES && consumed > 0) break;
++            if (bytes + size > ATTENTION_MESSAGE_BYTES) return reset("message-too-large");
++            bytes += size;
++            if (phase === "pages" || include || exited) changes.push(change);
++            consumed++;
++            if (phase === "pages") afterKey = row.entity_key;
++            else position = row.version;
++          }
++          if (phase === "pages") {
++            const pageToken = AttentionPageToken.make(
++              sign({
++                kind: "page",
++                generation,
++                binding,
++                position: ++pageIndex,
++                expiresAt: started + ATTENTION_BOOTSTRAP_MS,
++              }),
++            );
++            const message: AttentionStreamMessage = {
++              ...checkpoint(),
++              type: "page",
++              pageToken,
++              previousPageToken,
++              entries: changes,
++            };
++            previousPageToken = pageToken;
++            if (consumed === result.rows.length && result.rows.length < pageSize) phase = "fence";
++            return message;
++          }
++          if (consumed > 0) {
++            cursor = cursorAt(position);
++            return {
++              ...checkpoint(),
++              type: "delta",
++              after: beforeCursor,
++              notificationEligible: phase === "live",
++              changes,
++            };
++          }
++          if ("through" in result && position < result.through) return reset("replay-unavailable");
++          if (phase === "replay") {
++            if (position !== fence) return reset("replay-unavailable");
++            position = fence;
++            cursor = cursorAt(position);
++            phase = "live";
++            return { ...checkpoint(), type: "sync-complete" };
++          }
++          yield* Queue.take(wake).pipe(Effect.orDie);
++          yield* options.authorize;
++        }
++      });
++      const budget = yield* makeLiveStreamBudget();
++      const frames = Stream.unfold(undefined, () =>
++        next().pipe(
++          Effect.flatMap((message) => {
++            if (message === undefined) return Effect.succeed(undefined);
++            const bounded =
++              Buffer.byteLength(encodeFrame(message)) <= ATTENTION_MESSAGE_BYTES
++                ? message
++                : reset("message-too-large");
++            return budget.retain(bounded).pipe(Effect.map((value) => [value, undefined] as const));
++          }),
++        ),
++      );
++      return budget
++        .deliver(frames)
++        .pipe(
++          Stream.catchTag("OrchestrationGetSnapshotError", () =>
++            Stream.make(reset("backpressure")),
++          ),
++        );
++    }),
++  );
+diff --git a/apps/server/src/orchestration/Layers/ProjectionPipeline.ts b/apps/server/src/orchestration/Layers/ProjectionPipeline.ts
+index 1cf0a629b..fafc88cd3 100644
+--- a/apps/server/src/orchestration/Layers/ProjectionPipeline.ts
++++ b/apps/server/src/orchestration/Layers/ProjectionPipeline.ts
+@@ -2135,6 +2135,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
+     });
+ 
+     const bootstrap: OrchestrationProjectionPipelineShape["bootstrap"] = Effect.gen(function* () {
++      yield* currentAttention.beginRebuild;
+       const cleanupProjector = "projection.attachment-cleanup";
+       const states = yield* projectionStateRepository.listAll();
+       const byProjector = new Map(states.map((state) => [state.projector, state]));
+@@ -2151,6 +2152,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
+         updatedAt: cleanupState?.updatedAt ?? "1970-01-01T00:00:00.000Z",
+       });
+       yield* Effect.forEach(projectors, bootstrapProjector, { concurrency: 1, discard: true });
++      yield* currentAttention.finishRebuild;
+ 
+       // Cleanup has its own cursor so retries never have to replay committed text.
+       // All message and activity references are current before any files are removed.
+diff --git a/apps/server/src/persistence/ForkMigrations.test.ts b/apps/server/src/persistence/ForkMigrations.test.ts
+index 31314c0ef..c0c141017 100644
+--- a/apps/server/src/persistence/ForkMigrations.test.ts
++++ b/apps/server/src/persistence/ForkMigrations.test.ts
+@@ -11,6 +11,7 @@ import { migrationManifest, runMigrations } from "./Migrations.ts";
+ import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.ts";
+ import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
+ import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
++import { ATTENTION_DELIVERY_TRIGGERS } from "./ForkMigrations/048_AttentionDelivery.ts";
+ 
+ const attentionName = "ProjectionThreadAttentionAudit";
+ const twsName = "TwsBindings";
+@@ -135,6 +136,7 @@ it.effect("fresh installs keep upstream and fork histories in separate namespace
+         { migration_id: 45, name: twsName },
+         { migration_id: 46, name: "ProjectionThreadAttentionCurrent" },
+         { migration_id: 47, name: "ProjectionThreadAwareness" },
++        { migration_id: 48, name: "AttentionDelivery" },
+       ],
+     );
+     assert.deepEqual(yield* runMigrations(), []);
+@@ -152,7 +154,7 @@ it.effect("upstream-only databases add fork state without rerunning upstream mig
+       original,
+     );
+ 
+-    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 4);
++    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 5);
+   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+ );
+ 
+@@ -244,6 +246,57 @@ it.effect("upgrades ATT-01 atomically and resets only its derived rows and repla
+   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+ );
+ 
++it.effect(
++  "backfills delivery from ATT-02 projections atomically without resetting domain state",
++  () =>
++    Effect.gen(function* () {
++      const sql = yield* SqlClient.SqlClient;
++      yield* runMigrations();
++      for (const trigger of ATTENTION_DELIVERY_TRIGGERS)
++        yield* sql.unsafe(`DROP TRIGGER ${trigger.name}`);
++      for (const table of [
++        "attention_delivery_changes",
++        "attention_delivery_rows",
++        "attention_delivery_state",
++      ])
++        yield* sql.unsafe(`DROP TABLE ${table}`);
++      yield* sql`DELETE FROM t3code_fork_migrations WHERE migration_id = 48`;
++      yield* sql`INSERT INTO projection_thread_attention_current
++      (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code, revision,
++       source_event_id, source_sequence, opened_at, updated_at, resolved_at)
++      VALUES (${"c".repeat(64)}, 'project', 'thread', 'turn', 'request', 'approval', 'open',
++        'approval_requested', 1, 'source', 12, '2026-09-28T00:00:00Z', '2026-09-28T00:00:00Z', NULL)`;
++      const domain = yield* sql`SELECT * FROM projection_thread_attention_current`;
++      const ledger = yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`;
++      yield* sql`CREATE TRIGGER reject_delivery BEFORE INSERT ON t3code_fork_migrations
++      WHEN NEW.migration_id = 48 BEGIN SELECT RAISE(ABORT, 'blocked delivery upgrade'); END`;
++      assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
++      assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_current`, domain);
++      assert.deepEqual(
++        yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`,
++        ledger,
++      );
++      assert.deepEqual(
++        yield* sql`SELECT name FROM sqlite_master WHERE name = 'attention_delivery_rows'`,
++        [],
++      );
++      yield* sql`DROP TRIGGER reject_delivery`;
++      yield* runMigrations();
++      const delivery = yield* sql<{ readonly entity_key: string; readonly version: number }>`
++      SELECT entity_key, version FROM attention_delivery_rows`;
++      assert.deepEqual(delivery, [{ entity_key: `item:${"c".repeat(64)}`, version: 0 }]);
++      assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_current`, domain);
++      assert.deepEqual(yield* sql`SELECT * FROM attention_delivery_changes`, []);
++      yield* runMigrations();
++      assert.deepEqual(
++        yield* sql`SELECT entity_key, version FROM attention_delivery_rows`,
++        delivery,
++      );
++      yield* sql`DROP TRIGGER delivery_projection_thread_attention_current_update`;
++      assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
++    }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
++);
++
+ it.effect("does not reinterpret new fork migration IDs as historical upstream collisions", () =>
+   Effect.gen(function* () {
+     const sql = yield* SqlClient.SqlClient;
+diff --git a/apps/server/src/persistence/ForkMigrations.ts b/apps/server/src/persistence/ForkMigrations.ts
+index 5720c50cb..5be45e733 100644
+--- a/apps/server/src/persistence/ForkMigrations.ts
++++ b/apps/server/src/persistence/ForkMigrations.ts
+@@ -6,6 +6,9 @@ import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.
+ import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
+ import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
+ import ThreadAwareness from "./ForkMigrations/047_ProjectionThreadAwareness.ts";
++import AttentionDelivery, {
++  ATTENTION_DELIVERY_TRIGGERS,
++} from "./ForkMigrations/048_AttentionDelivery.ts";
+ import Upstream0044 from "./Migrations/044_ClearAutomaticProjectModelDefaults.ts";
+ import Upstream0045 from "./Migrations/045_ProjectionProjectsAutoPull.ts";
+ 
+@@ -15,6 +18,7 @@ const forkEntries = [
+   [45, "TwsBindings", TwsBindings],
+   [46, "ProjectionThreadAttentionCurrent", CurrentAttention],
+   [47, "ProjectionThreadAwareness", ThreadAwareness],
++  [48, "AttentionDelivery", AttentionDelivery],
+ ] as const;
+ const run = Migrator.make({});
+ 
+@@ -43,6 +47,54 @@ const locatorColumns = [
+ ];
+ const lifecycleColumns = ["first_seen_at", "last_seen_at", "retired_at"];
+ const tables: ReadonlyArray<TableShape> = [
++  {
++    name: "attention_delivery_state",
++    migration: 48,
++    columns: ["id", "generation", "head", "floor", "ready"],
++    nullable: ["id"],
++    primaryKey: ["id"],
++    integerColumns: ["id", "head", "floor", "ready"],
++    indexes: [],
++  },
++  {
++    name: "attention_delivery_rows",
++    migration: 48,
++    columns: ["entity_key", "project_id", "thread_id", "status", "data_json", "version", "bytes"],
++    nullable: [],
++    primaryKey: ["entity_key"],
++    integerColumns: ["version", "bytes"],
++    indexes: ["idx_attention_delivery_scope"],
++  },
++  {
++    name: "attention_delivery_changes",
++    migration: 48,
++    columns: [
++      "sequence",
++      "entity_key",
++      "before_project",
++      "before_thread",
++      "before_status",
++      "project_id",
++      "thread_id",
++      "status",
++      "data_json",
++      "bytes",
++      "oversized",
++    ],
++    nullable: [
++      "sequence",
++      "before_project",
++      "before_thread",
++      "before_status",
++      "project_id",
++      "thread_id",
++      "status",
++      "data_json",
++    ],
++    primaryKey: ["sequence"],
++    integerColumns: ["sequence", "bytes", "oversized"],
++    indexes: [],
++  },
+   {
+     name: "projection_thread_attention_lifecycle",
+     migration: 47,
+@@ -263,6 +315,24 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
+   applied: ReadonlySet<number>,
+ ) {
+   const sql = yield* SqlClient.SqlClient;
++  if (applied.has(48)) {
++    const triggers = yield* sql<{ readonly name: string; readonly tbl_name: string }>`
++      SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger'
++        AND ${sql.in(
++          "name",
++          ATTENTION_DELIVERY_TRIGGERS.map((trigger) => trigger.name),
++        )}
++    `;
++    if (
++      ATTENTION_DELIVERY_TRIGGERS.some(
++        (expected) =>
++          !triggers.some(
++            (actual) => actual.name === expected.name && actual.tbl_name === expected.table,
++          ),
++      )
++    )
++      return yield* badState("attention delivery triggers are missing or mismatched");
++  }
+   for (const table of tables) {
+     const indexes =
+       table.name === "projection_thread_attention_current" && applied.has(47)
+diff --git a/apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts b/apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts
+new file mode 100644
+index 000000000..f11fc6d68
+--- /dev/null
++++ b/apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts
+@@ -0,0 +1,143 @@
++import * as Effect from "effect/Effect";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++
++const requestFields = {
++  attentionId: "attention_id",
++  projectId: "project_id",
++  threadId: "thread_id",
++  turnId: "turn_id",
++  requestId: "request_id",
++  kind: "kind",
++  status: "status",
++  reasonCode: "reason_code",
++  revision: "revision",
++  sourceEventId: "source_event_id",
++  sourceSequence: "source_sequence",
++  openedAt: "opened_at",
++  updatedAt: "updated_at",
++  resolvedAt: "resolved_at",
++};
++const summaryFields = {
++  threadId: "thread_id",
++  projectId: "project_id",
++  turnId: "reported_turn_id",
++  phase: "phase",
++  approvalCount: "approval_count",
++  inputCount: "input_count",
++  failureCount: "failure_count",
++  disconnectCount: "disconnect_count",
++  revision: "revision",
++  sourceEventId: "source_event_id",
++  sourceSequence: "source_sequence",
++  updatedAt: "updated_at",
++};
++const sources = [
++  {
++    table: "projection_thread_attention_current",
++    type: "item",
++    id: "attention_id",
++    fields: requestFields,
++  },
++  {
++    table: "projection_thread_attention_lifecycle",
++    type: "item",
++    id: "attention_id",
++    fields: requestFields,
++  },
++  { table: "projection_thread_awareness", type: "summary", id: "thread_id", fields: summaryFields },
++] as const;
++export const ATTENTION_DELIVERY_TRIGGERS = [
++  { name: "attention_delivery_retention", table: "attention_delivery_changes" },
++  ...sources.flatMap((source) =>
++    ["insert", "update", "delete"].map((action) => ({
++      name: `delivery_${source.table}_${action}`,
++      table: source.table,
++    })),
++  ),
++];
++
++export default Effect.gen(function* () {
++  const sql = yield* SqlClient.SqlClient;
++  yield* sql`CREATE TABLE attention_delivery_state (
++    id INTEGER PRIMARY KEY CHECK (id = 1), generation TEXT NOT NULL, head INTEGER NOT NULL, floor INTEGER NOT NULL,
++    ready INTEGER NOT NULL CHECK (ready IN (0,1))
++  )`;
++  yield* sql`INSERT INTO attention_delivery_state VALUES (1, lower(hex(randomblob(16))), 0, 0, 0)`;
++  yield* sql`CREATE TABLE attention_delivery_rows (
++    entity_key TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, thread_id TEXT NOT NULL,
++    status TEXT NOT NULL, data_json TEXT NOT NULL, version INTEGER NOT NULL, bytes INTEGER NOT NULL
++  )`;
++  yield* sql`CREATE INDEX idx_attention_delivery_scope ON attention_delivery_rows(project_id, thread_id, entity_key)`;
++  yield* sql`CREATE TABLE attention_delivery_changes (
++    sequence INTEGER PRIMARY KEY AUTOINCREMENT, entity_key TEXT NOT NULL,
++    before_project TEXT, before_thread TEXT, before_status TEXT,
++    project_id TEXT, thread_id TEXT, status TEXT, data_json TEXT, bytes INTEGER NOT NULL, oversized INTEGER NOT NULL
++  )`;
++  // This is a bounded derived journal, not another authoritative event history.
++  yield* sql.unsafe(`CREATE TRIGGER attention_delivery_retention AFTER INSERT ON attention_delivery_changes BEGIN
++    UPDATE attention_delivery_state SET head = NEW.sequence WHERE id = 1;
++    DELETE FROM attention_delivery_changes WHERE sequence <= NEW.sequence - 1000;
++    DELETE FROM attention_delivery_changes WHERE sequence IN (
++      SELECT sequence FROM (
++        SELECT sequence, SUM(bytes) OVER (ORDER BY sequence DESC) AS retained_bytes
++        FROM attention_delivery_changes
++      ) WHERE retained_bytes > 8388608
++    );
++    UPDATE attention_delivery_state SET floor = COALESCE((SELECT MIN(sequence) - 1 FROM attention_delivery_changes), head) WHERE id = 1;
++  END`);
++  for (const source of sources) {
++    const json = (prefix: string) => {
++      const pairs = Object.entries(source.fields).map(
++        ([key, column]) =>
++          `'${key}', ${source.table.endsWith("lifecycle") && key === "requestId" ? "NULL" : `${prefix}.${column}`}`,
++      );
++      if (source.type === "summary")
++        pairs.push(
++          `'countsOverflowed', json(CASE ${prefix}.counts_overflowed WHEN 1 THEN 'true' ELSE 'false' END)`,
++        );
++      if (source.table.endsWith("lifecycle"))
++        pairs.push(
++          `'title', CASE ${prefix}.kind WHEN 'failure' THEN 'Agent failed' ELSE 'Provider disconnected' END`,
++        );
++      return `json_object('type', '${source.type}', 'value', json_object(${pairs.join(", ")}))`;
++    };
++    const status = (prefix: string) =>
++      source.type === "summary" ? "'summary'" : `${prefix}.status`;
++    const key = (prefix: string) => `'${source.type}:' || ${prefix}.${source.id}`;
++    const rowJson = json("source");
++    yield* sql.unsafe(`INSERT INTO attention_delivery_rows
++      SELECT ${key("source")}, source.project_id, source.thread_id, ${status("source")},
++        ${rowJson}, 0, length(CAST(${rowJson} AS BLOB)) FROM ${source.table} source`);
++    for (const action of ["INSERT", "UPDATE", "DELETE"] as const) {
++      const before =
++        action === "INSERT"
++          ? ["NULL", "NULL", "NULL"]
++          : ["OLD.project_id", "OLD.thread_id", status("OLD")];
++      const value = action === "DELETE" ? "NULL" : json("NEW");
++      const after =
++        action === "DELETE"
++          ? ["NULL", "NULL", "NULL"]
++          : ["NEW.project_id", "NEW.thread_id", status("NEW")];
++      const entityKey = key(action === "DELETE" ? "OLD" : "NEW");
++      const size = `COALESCE(length(CAST(${value} AS BLOB)), 0) + length(CAST(${entityKey} AS BLOB))
++        + ${[...before, ...after].map((field) => `COALESCE(length(CAST(${field} AS BLOB)),0)`).join(" + ")} + 1024`;
++      const condition = action === "UPDATE" ? "WHEN NEW.revision != OLD.revision" : "";
++      yield* sql.unsafe(`CREATE TRIGGER delivery_${source.table}_${action.toLowerCase()}
++        AFTER ${action} ON ${source.table} ${condition} BEGIN
++        INSERT INTO attention_delivery_changes
++          (entity_key,before_project,before_thread,before_status,project_id,thread_id,status,data_json,bytes,oversized)
++        VALUES (${entityKey},${before.join(",")},${after.join(",")},
++          CASE WHEN ${size} > 65536 THEN NULL ELSE ${value} END, ${size}, CASE WHEN ${size} > 65536 THEN 1 ELSE 0 END);
++        ${
++          action === "DELETE"
++            ? `DELETE FROM attention_delivery_rows WHERE entity_key = ${entityKey};`
++            : `INSERT INTO attention_delivery_rows VALUES (
++              ${entityKey}, NEW.project_id, NEW.thread_id, ${status("NEW")}, ${value},
++              (SELECT head FROM attention_delivery_state WHERE id=1), ${size})
++             ON CONFLICT(entity_key) DO UPDATE SET project_id=excluded.project_id,thread_id=excluded.thread_id,
++               status=excluded.status,data_json=excluded.data_json,version=excluded.version,bytes=excluded.bytes;`
++        }
++      END`);
++    }
++  }
++});
+diff --git a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
+index 639889e31..6d1b77151 100644
+--- a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
++++ b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
+@@ -16,6 +16,8 @@ import {
+ } from "@t3tools/contracts";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
++import * as PubSub from "effect/PubSub";
++import * as Stream from "effect/Stream";
+ import * as Option from "effect/Option";
+ import * as Schema from "effect/Schema";
+ import * as SqlClient from "effect/unstable/sql/SqlClient";
+@@ -44,6 +46,21 @@ const ActivityKind = Schema.Literals([
+   "provider.user-input.respond.failed",
+ ]);
+ const isActivityKind = Schema.is(ActivityKind);
++/** Keep transport wakeups aligned with the projector; ordinary content deltas do no attention work. */
++export function affectsCurrentAttention(event: OrchestrationEvent): boolean {
++  if (event.metadata.historyImport === true && event.type !== "thread.created") return false;
++  if (event.type === "thread.activity-appended") return isActivityKind(event.payload.activity.kind);
++  if (event.type === "thread.session-set") return event.payload.lifecycle !== undefined;
++  return [
++    "thread.created",
++    "thread.deleted",
++    "project.deleted",
++    "thread.reverted",
++    "thread.turn-start-requested",
++    "thread.session-stop-requested",
++    "thread.turn-interrupt-requested",
++  ].includes(event.type);
++}
+ const requestIdentity = Schema.decodeUnknownOption(
+   Schema.Struct({
+     requestId: Schema.optional(ApprovalRequestId),
+@@ -61,6 +78,7 @@ const encodeLifecycleIdentity = Schema.encodeEffect(
+ 
+ const make = Effect.gen(function* () {
+   const sql = yield* SqlClient.SqlClient;
++  const resets = yield* PubSub.sliding<void>(1);
+   const context = SqlSchema.findOneOption({
+     Request: ThreadId,
+     Result: Schema.Struct({
+@@ -469,24 +487,7 @@ const make = Effect.gen(function* () {
+   const project = Effect.fn("ProjectionThreadAttentionCurrent.project")(function* (
+     event: OrchestrationEvent,
+   ) {
+-    if (event.metadata.historyImport === true && event.type !== "thread.created") return;
+-    if (event.type === "thread.session-set" && event.payload.lifecycle === undefined) return;
+-    if (event.type === "thread.activity-appended" && !isActivityKind(event.payload.activity.kind))
+-      return;
+-    if (
+-      event.type !== "thread.activity-appended" &&
+-      ![
+-        "thread.created",
+-        "thread.deleted",
+-        "project.deleted",
+-        "thread.reverted",
+-        "thread.session-set",
+-        "thread.turn-start-requested",
+-        "thread.session-stop-requested",
+-        "thread.turn-interrupt-requested",
+-      ].includes(event.type)
+-    )
+-      return;
++    if (!affectsCurrentAttention(event)) return;
+     const cursor = yield* sql<{ readonly sequence: number }>`
+       SELECT last_applied_sequence AS sequence FROM projection_state WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}
+     `;
+@@ -553,6 +554,23 @@ const make = Effect.gen(function* () {
+       ? toPersistenceDecodeError(operation)(cause)
+       : toPersistenceSqlError(operation)(cause);
+   return ProjectionThreadAttentionCurrentRepository.of({
++    subscribeResets: PubSub.subscribe(resets).pipe(Effect.map(Stream.fromSubscription)),
++    beginRebuild: sql
++      .withTransaction(
++        Effect.gen(function* () {
++          yield* sql`UPDATE attention_delivery_state SET generation = lower(hex(randomblob(16))), ready = 0, floor = head WHERE id = 1`;
++          yield* sql`DELETE FROM attention_delivery_changes`;
++        }),
++      )
++      .pipe(
++        Effect.tap(() => PubSub.publish(resets, undefined)),
++        Effect.mapError(mapError("CurrentAttention.beginRebuild")),
++      ),
++    finishRebuild: sql`UPDATE attention_delivery_state SET ready = 1 WHERE id = 1`.pipe(
++      Effect.asVoid,
++      Effect.tap(() => PubSub.publish(resets, undefined)),
++      Effect.mapError(mapError("CurrentAttention.finishRebuild")),
++    ),
+     project: (event) => project(event).pipe(Effect.mapError(mapError("CurrentAttention.project"))),
+     listByThreadId: (input) => list(input).pipe(Effect.mapError(mapError("CurrentAttention.list"))),
+     getSummary: (threadId) =>
+@@ -570,8 +588,12 @@ const make = Effect.gen(function* () {
+           yield* sql`DELETE FROM projection_thread_attention_observations`;
+           yield* sql`DELETE FROM projection_thread_awareness`;
+           yield* sql`DELETE FROM projection_state WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}`;
++          yield* sql`DELETE FROM attention_delivery_rows`;
++          yield* sql`DELETE FROM attention_delivery_changes`;
++          yield* sql`UPDATE attention_delivery_state SET generation = lower(hex(randomblob(16))), floor = head, ready = 0 WHERE id = 1`;
+         }),
+       )
++      .pipe(Effect.tap(() => PubSub.publish(resets, undefined)))
+       .pipe(Effect.mapError(mapError("CurrentAttention.reset"))),
+   });
+ });
+diff --git a/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts
+index bfa2525b0..83fe7a37d 100644
+--- a/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts
++++ b/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts
+@@ -9,6 +9,8 @@ import {
+ import * as Context from "effect/Context";
+ import type * as Effect from "effect/Effect";
+ import type * as Option from "effect/Option";
++import type * as Scope from "effect/Scope";
++import type * as Stream from "effect/Stream";
+ import * as Schema from "effect/Schema";
+ import type { ProjectionRepositoryError } from "../Errors.ts";
+ 
+@@ -32,6 +34,9 @@ export class ProjectionThreadAttentionCurrentRepository extends Context.Service<
+     ) => Effect.Effect<Option.Option<ThreadAwarenessSummary>, ProjectionRepositoryError>;
+     /** Clears only this projection and its cursor; pipeline bootstrap replays the durable event store. */
+     readonly reset: Effect.Effect<void, ProjectionRepositoryError>;
++    readonly subscribeResets: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>;
++    readonly beginRebuild: Effect.Effect<void, ProjectionRepositoryError>;
++    readonly finishRebuild: Effect.Effect<void, ProjectionRepositoryError>;
+   }
+ >()(
+   "t3/persistence/Services/ProjectionThreadAttentionCurrent/ProjectionThreadAttentionCurrentRepository",
+diff --git a/apps/server/src/server.test.ts b/apps/server/src/server.test.ts
+index e24be9df8..e20bfef53 100644
+--- a/apps/server/src/server.test.ts
++++ b/apps/server/src/server.test.ts
+@@ -122,6 +122,7 @@ import * as Keybindings from "./keybindings.ts";
+ import * as ExternalLauncher from "./process/externalLauncher.ts";
+ import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
+ import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
++import { ProjectionThreadAttentionCurrentRepositoryLive } from "./persistence/Layers/ProjectionThreadAttentionCurrent.ts";
+ import {
+   OrchestrationListenerCallbackError,
+   OrchestrationThreadSettleBlockedError,
+@@ -982,6 +983,7 @@ const buildAppUnderTest = (options?: {
+               }),
+             dispatch: () => Effect.succeed({ sequence: 0 }),
+             streamDomainEvents: Stream.empty,
++            subscribeDomainEvents: Effect.succeed(Stream.never),
+             latestSequence: Effect.succeed(0),
+             ...options?.layers?.orchestrationEngine,
+           }),
+@@ -1057,7 +1059,9 @@ const buildAppUnderTest = (options?: {
+     );
+ 
+     const appLayer = servedRoutesLayer.pipe(
+-      Layer.provide(resourceTelemetryLayer),
++      Layer.provide(
++        Layer.mergeAll(ProjectionThreadAttentionCurrentRepositoryLive, resourceTelemetryLayer),
++      ),
+       Layer.provide(UsageService.layerTest),
+       Layer.provide(
+         Layer.mock(AnalyticsService.AnalyticsService)({
+@@ -2966,6 +2970,23 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
+     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+   );
+ 
++  it.effect("exposes bounded attention synchronization through authenticated environment RPC", () =>
++    Effect.gen(function* () {
++      yield* buildAppUnderTest();
++      const wsUrl = yield* getWsServerUrl("/ws");
++      const first = yield* Effect.scoped(
++        withWsRpcClient(wsUrl, (client) =>
++          client[WS_METHODS.attentionSubscribe]({ pageSize: 1 }).pipe(Stream.runHead),
++        ),
++      );
++      assert.isTrue(Option.isSome(first));
++      if (Option.isSome(first)) {
++        // The test server's mocked engine does not bootstrap projections.
++        assert.deepEqual(first.value, { type: "reset-required", reason: "rebuilding" });
++      }
++    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
++  );
++
+   it.effect(
+     "reports relay client status and streams installation progress over environment RPC",
+     () =>
+@@ -4191,7 +4212,18 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
+       assert.equal(wsTicketResponse.status, 200);
+       const wsUrl = `${yield* getWsServerUrl("/ws", { authenticated: false })}?wsTicket=${encodeURIComponent(wsTicketBody.ticket)}`;
+       const rpcError = yield* Effect.flip(
+-        Effect.scoped(withWsRpcClient(wsUrl, (client) => client[WS_METHODS.serverGetConfig]({}))),
++        Effect.scoped(
++          withWsRpcClient(wsUrl, (client) =>
++            Effect.gen(function* () {
++              const denied = yield* client[WS_METHODS.attentionSubscribe]({}).pipe(
++                Stream.runHead,
++                Effect.flip,
++              );
++              assert.equal(denied._tag, "EnvironmentAuthorizationError");
++              return yield* client[WS_METHODS.serverGetConfig]({});
++            }),
++          ),
++        ),
+       );
+       assert.equal(rpcError._tag, "EnvironmentAuthorizationError");
+       if (rpcError._tag === "EnvironmentAuthorizationError") {
+diff --git a/apps/server/src/ws.ts b/apps/server/src/ws.ts
+index 707df7780..3ac8d7348 100644
+--- a/apps/server/src/ws.ts
++++ b/apps/server/src/ws.ts
+@@ -1,3 +1,7 @@
++import { AttentionSyncError, AuthOrchestrationReadScope } from "@t3tools/contracts";
++import { makeAttentionStream } from "./orchestration/AttentionSync.ts";
++import { ServerSecretStore } from "./auth/ServerSecretStore.ts";
++import { AuthSessionRepository } from "./persistence/AuthSessions.ts";
+ import {
+   sameUsageLimitCommandCoverage,
+   withUsageLimitsCommands,
+@@ -500,6 +504,8 @@ const makeWsRpcLayer = (
+   WsRpcGroup.toLayer(
+     Effect.gen(function* () {
+       const currentSessionId = currentSession.sessionId;
++      const attentionSecrets = yield* ServerSecretStore;
++      const attentionAuthSessions = yield* AuthSessionRepository;
+       const crypto = yield* Crypto.Crypto;
+       const sql = yield* SqlClient.SqlClient;
+       const projectionSnapshotQuery = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
+@@ -2285,6 +2291,61 @@ const makeWsRpcLayer = (
+             }),
+             { "rpc.aggregate": "orchestration" },
+           ),
++        [WS_METHODS.attentionSubscribe]: (input) =>
++          observeRpcStream(
++            WS_METHODS.attentionSubscribe,
++            Stream.unwrap(
++              Effect.gen(function* () {
++                const secret = yield* attentionSecrets
++                  .getOrCreateRandom("attention-cursors", 32)
++                  .pipe(
++                    Effect.mapError(
++                      () =>
++                        new AttentionSyncError({
++                          reason: "unavailable",
++                          message: "Attention cursor signing is unavailable.",
++                        }),
++                    ),
++                  );
++                const environmentId = yield* serverEnvironment.getEnvironmentId;
++                const scopes = [...currentSession.scopes].sort().join(",");
++                const authorize = Effect.gen(function* () {
++                  const active = yield* attentionAuthSessions
++                    .getById({ sessionId: currentSessionId })
++                    .pipe(
++                      Effect.mapError(
++                        () =>
++                          new AttentionSyncError({
++                            reason: "unavailable",
++                            message: "Could not verify attention authorization.",
++                          }),
++                      ),
++                    );
++                  const now = yield* DateTime.now;
++                  if (
++                    Option.isNone(active) ||
++                    active.value.revokedAt !== null ||
++                    DateTime.toEpochMillis(active.value.expiresAt) <= DateTime.toEpochMillis(now) ||
++                    [...active.value.scopes].sort().join(",") !== scopes ||
++                    !active.value.scopes.includes(AuthOrchestrationReadScope)
++                  ) {
++                    return yield* authorizationError(AuthOrchestrationReadScope);
++                  }
++                });
++                return makeAttentionStream(input, {
++                  environmentId,
++                  scopeBinding: `${currentSessionId}:${scopes}`,
++                  secret,
++                  authorize,
++                  authorizationChanges: sessions.streamChanges,
++                  ...(currentSession.expiresAt
++                    ? { expiresAtMs: DateTime.toEpochMillis(currentSession.expiresAt) }
++                    : {}),
++                });
++              }),
++            ),
++            { "rpc.aggregate": "attention" },
++          ),
+         [WS_METHODS.serverProbe]: (_input) =>
+           observeRpcEffect(WS_METHODS.serverProbe, Effect.succeed({}), {
+             "rpc.aggregate": "server",
+diff --git a/docs/internals/overview.md b/docs/internals/overview.md
+index ac0f70b8b..53293f41c 100644
+--- a/docs/internals/overview.md
++++ b/docs/internals/overview.md
+@@ -144,6 +144,58 @@ transaction. Replay emits no notification; future delivery must publish only
+ after commit with its own delivery cursor. Ordinary streaming events do no
+ attention lookup beyond the existing batched cursor write.
+ 
++### Attention synchronization
++
++Servers advertising `capabilities.attentionSync` expose `attention.subscribe`
++under `orchestration:read`. One owned RPC stream emits `begin`, keyset `page`
++messages, catch-up `delta`s, `sync-complete`, and live `delta`s. The page tokens
++chain pages within that subscription; they are not resumable delivery cursors.
++The shared reducer lives at `@t3tools/client-runtime/attention-sync`.
++
++Delivery cursors are signed and bound to environment, authenticated session
++and scopes, canonical project/thread filters, and delivery generation. They
++expire after 24 hours and are usable only while their complete interval remains
++available. Malformed or wrong-scope tokens fail explicitly. Revocation and
++expiry produce authorization failure; clients must clear inaccessible state.
++Filters are selection within an environment-wide authorized read scope, not
++an independent authorization mechanism.
++
++Fork migration 48 adds a rebuildable delivery view and a compact change journal.
++SQL triggers capture material item/summary changes and removals inside the
++same projection transaction. They are derived caches, not another authoritative
++event log. The journal retains at most 1000 changes and 8 MiB; ordinary content
++deltas neither populate it nor cause delivery queries. Missing capture triggers
++make startup fail rather than silently serving stale state.
++
++Subscribe to post-commit domain/reset signals before capturing watermark W in
++a short SQL transaction serialized with projection writes. Pages scan the
++mutable delivery view by immutable entity key. They are not frozen at W.
++After the last page, capture F through the same committed transaction boundary
++and replay every compact change in (W,F], including filtered-out watermark
++advances. Only then emit `sync-complete(F)`. The journal is written synchronously
++with projections, so there is no asynchronous attention-publication backlog
++to race at the fence. Live delivery continues strictly above F.
++
++The client stages pages and replay, compares transport versions (including
++removal tombstones), and exposes the cache atomically at F. A later incarnation
++can supersede a tombstone even when its domain revision restarts at 1. Only live
++frames above a completed fence are notification candidates; this protocol
++does not deliver notifications or aggregate environments.
++
++Default pages contain 50 rows, maximum 100 combined items/summaries, with a
++64 KiB encoded-message bound. Total dataset size is not capped by a page.
++Bootstrap/replay expires after 30 seconds; the existing live-stream ACK budget
++also bounds delivery. Slow consumers, missing replay intervals, oversized
++rows, restart/rebuild generations and incomplete rebuilds produce explicit
++reset/backpressure, never a truncated success. A single bounded wake signal
++replaces queued raw thread events, and no database transaction spans an RPC ACK.
++Consumers own normal reconnect backoff; persistent inability to synchronize
++must be surfaced rather than retried in a tight loop.
++
++Startup/bootstrap rotates the delivery generation and gates delivery until
++replay completes. Reset clears only derived attention/delivery state and its
++cursor; the event history and audit remain authoritative and unchanged.
++
+ ## Turn completion and checkpoints
+ 
+ A turn ending and its follow-up work settling are separate milestones. The
+diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json
+index b4a3d5da1..41598ced4 100644
+--- a/packages/client-runtime/package.json
++++ b/packages/client-runtime/package.json
+@@ -3,6 +3,10 @@
+   "private": true,
+   "type": "module",
+   "exports": {
++    "./attention-sync": {
++      "types": "./src/attentionSync.ts",
++      "default": "./src/attentionSync.ts"
++    },
+     "./load-balancing": {
+       "types": "./src/load-balancing.ts",
+       "default": "./src/load-balancing.ts"
+diff --git a/packages/client-runtime/src/attentionSync.test.ts b/packages/client-runtime/src/attentionSync.test.ts
+new file mode 100644
+index 000000000..4e61a0e02
+--- /dev/null
++++ b/packages/client-runtime/src/attentionSync.test.ts
+@@ -0,0 +1,143 @@
++import { describe, expect, it } from "vite-plus/test";
++import {
++  AttentionDeliveryCursor,
++  AttentionPageToken,
++  AttentionId,
++  EnvironmentId,
++  ProjectId,
++  ThreadId,
++  ApprovalRequestId,
++  EventId,
++  type AttentionChange,
++} from "@t3tools/contracts";
++import * as HashMap from "effect/HashMap";
++import * as Option from "effect/Option";
++import { emptyAttentionSync, reduceAttentionStream, attentionSyncFailed } from "./attentionSync.ts";
++const c = (n: number) => AttentionDeliveryCursor.make(`cursor-${n}`);
++const checkpoint = (position: number) => ({
++  environmentId: EnvironmentId.make("env"),
++  generation: "generation",
++  position,
++  cursor: c(position),
++});
++const entry = (version: number): AttentionChange => ({
++  key: `item:${"a".repeat(64)}`,
++  version,
++  entity: {
++    type: "item",
++    value: {
++      attentionId: AttentionId.make("a".repeat(64)),
++      threadId: ThreadId.make("thread"),
++      projectId: ProjectId.make("project"),
++      turnId: null,
++      requestId: ApprovalRequestId.make("request"),
++      kind: "approval",
++      status: "open",
++      reasonCode: "approval_requested",
++      revision: 1,
++      sourceEventId: EventId.make("event"),
++      sourceSequence: 1,
++      openedAt: "2026-09-28T00:00:00Z",
++      updatedAt: "2026-09-28T00:00:00Z",
++      resolvedAt: null,
++    },
++  },
++});
++describe("attention protocol reducer", () => {
++  it("stages mutable pages and overlapping tombstones by delivery revision until the fence", () => {
++    let state = reduceAttentionStream(emptyAttentionSync(), {
++      ...checkpoint(0),
++      type: "begin",
++      mode: "snapshot",
++    });
++    state = reduceAttentionStream(state, {
++      ...checkpoint(0),
++      type: "page",
++      pageToken: AttentionPageToken.make("page-1"),
++      previousPageToken: null,
++      entries: [entry(3)],
++    });
++    expect(HashMap.size(state.entries)).toBe(0);
++    state = reduceAttentionStream(state, {
++      ...checkpoint(2),
++      type: "delta",
++      after: c(0),
++      notificationEligible: false,
++      changes: [{ ...entry(2), entity: null }],
++    });
++    expect(Option.getOrThrow(HashMap.get(state.staging, entry(3).key)).entity).not.toBeNull();
++    state = reduceAttentionStream(state, {
++      ...checkpoint(3),
++      type: "delta",
++      after: c(2),
++      notificationEligible: false,
++      changes: [entry(3)],
++    });
++    state = reduceAttentionStream(state, { ...checkpoint(3), type: "sync-complete" });
++    expect(state.status).toBe("live");
++    expect(HashMap.size(state.entries)).toBe(1);
++    expect(state.notificationCandidates).toEqual([]);
++    const removed = {
++      ...checkpoint(4),
++      type: "delta" as const,
++      after: c(3),
++      notificationEligible: true,
++      changes: [{ ...entry(4), entity: null }],
++    };
++    state = reduceAttentionStream(state, removed);
++    expect(HashMap.size(state.entries)).toBe(0);
++    expect(reduceAttentionStream(state, removed).entries).toBe(state.entries);
++    expect(reduceAttentionStream(state, removed).notificationCandidates).toEqual([]);
++    state = reduceAttentionStream(state, {
++      ...checkpoint(5),
++      type: "delta",
++      after: c(4),
++      notificationEligible: true,
++      changes: [entry(5)],
++    });
++    expect(HashMap.size(state.entries)).toBe(1);
++    expect(state.notificationCandidates).toHaveLength(1);
++  });
++  it("clears inaccessible state and rejects page-chain and delta gaps", () => {
++    const begin = reduceAttentionStream(emptyAttentionSync(), {
++      ...checkpoint(0),
++      type: "begin",
++      mode: "snapshot",
++    });
++    expect(
++      reduceAttentionStream(begin, {
++        ...checkpoint(0),
++        type: "page",
++        pageToken: AttentionPageToken.make("page-2"),
++        previousPageToken: AttentionPageToken.make("missing"),
++        entries: [],
++      }).reason,
++    ).toBe("invalid-page-chain");
++    expect(
++      reduceAttentionStream(begin, {
++        ...checkpoint(2),
++        type: "delta",
++        after: c(1),
++        notificationEligible: false,
++        changes: [],
++      }).reason,
++    ).toBe("noncontiguous-delta");
++    expect(attentionSyncFailed(begin, "unauthorized").cursor).toBeNull();
++    expect(attentionSyncFailed(begin, "disconnected").cursor).toBeNull();
++    expect(attentionSyncFailed(begin, "disconnected").reason).toBe("interrupted-sync");
++    expect(
++      reduceAttentionStream(begin, {
++        ...checkpoint(0),
++        environmentId: EnvironmentId.make("other"),
++        type: "sync-complete",
++      }).status,
++    ).toBe("reset-required");
++    expect(
++      reduceAttentionStream(emptyAttentionSync(), {
++        ...checkpoint(0),
++        type: "begin",
++        mode: "resume",
++      }).status,
++    ).toBe("reset-required");
++  });
++});
+diff --git a/packages/client-runtime/src/attentionSync.ts b/packages/client-runtime/src/attentionSync.ts
+new file mode 100644
+index 000000000..4246313fc
+--- /dev/null
++++ b/packages/client-runtime/src/attentionSync.ts
+@@ -0,0 +1,175 @@
++import type {
++  AttentionChange,
++  AttentionDeliveryCursor,
++  AttentionPageToken,
++  AttentionStreamMessage,
++  EnvironmentId,
++} from "@t3tools/contracts";
++import * as HashMap from "effect/HashMap";
++import * as Option from "effect/Option";
++
++export interface AttentionSyncState {
++  readonly status: "empty" | "syncing" | "live" | "stale" | "reset-required";
++  readonly environmentId: EnvironmentId | null;
++  readonly generation: string | null;
++  readonly cursor: AttentionDeliveryCursor | null;
++  readonly position: number;
++  readonly pageToken: AttentionPageToken | null;
++  readonly stagedMaxVersion: number;
++  readonly entries: HashMap.HashMap<string, AttentionChange>;
++  readonly staging: HashMap.HashMap<string, AttentionChange>;
++  readonly reason: string | null;
++  readonly notificationCandidates: ReadonlyArray<AttentionChange>;
++}
++export const emptyAttentionSync = (): AttentionSyncState => ({
++  status: "empty",
++  environmentId: null,
++  generation: null,
++  cursor: null,
++  position: 0,
++  pageToken: null,
++  entries: HashMap.empty(),
++  staging: HashMap.empty(),
++  reason: null,
++  notificationCandidates: [],
++  stagedMaxVersion: 0,
++});
++export function attentionSyncFailed(
++  state: AttentionSyncState,
++  reason: "unauthorized" | "disconnected",
++): AttentionSyncState {
++  if (reason === "disconnected" && state.status === "syncing") {
++    return { ...emptyAttentionSync(), status: "reset-required", reason: "interrupted-sync" };
++  }
++  return reason === "unauthorized"
++    ? { ...emptyAttentionSync(), status: "reset-required", reason }
++    : { ...state, status: "stale", staging: HashMap.empty(), notificationCandidates: [], reason };
++}
++const invalid = (reason: string): AttentionSyncState => ({
++  ...emptyAttentionSync(),
++  status: "reset-required",
++  reason,
++});
++function applyChanges(
++  rows: HashMap.HashMap<string, AttentionChange>,
++  changes: ReadonlyArray<AttentionChange>,
++) {
++  let next = rows;
++  const accepted: AttentionChange[] = [];
++  for (const change of changes) {
++    if (change.entity !== null) {
++      const expected =
++        change.entity.type === "item"
++          ? `item:${change.entity.value.attentionId}`
++          : `summary:${change.entity.value.threadId}`;
++      if (change.key !== expected) return null;
++    }
++    const previous = HashMap.get(next, change.key);
++    if (Option.isSome(previous) && previous.value.version >= change.version) continue;
++    next = HashMap.set(next, change.key, change);
++    accepted.push(change);
++  }
++  return { rows: next, accepted };
++}
++/** Pages/replayed changes remain invisible until their complete fence is delivered. */
++export function reduceAttentionStream(
++  state: AttentionSyncState,
++  message: AttentionStreamMessage,
++): AttentionSyncState {
++  if (message.type === "reset-required") return invalid(message.reason);
++  if (message.type === "begin") {
++    if (
++      message.mode === "resume" &&
++      ((state.status !== "stale" && state.status !== "live") ||
++        state.cursor !== message.cursor ||
++        state.environmentId !== message.environmentId ||
++        state.generation !== message.generation ||
++        state.position !== message.position)
++    )
++      return invalid("resume-without-matching-cache");
++    return {
++      ...emptyAttentionSync(),
++      status: "syncing",
++      environmentId: message.environmentId,
++      generation: message.generation,
++      cursor: message.cursor,
++      position: message.position,
++      stagedMaxVersion: message.position,
++      staging: message.mode === "resume" ? state.entries : HashMap.empty(),
++      entries: message.mode === "resume" ? state.entries : HashMap.empty(),
++    };
++  }
++  if (state.status !== "syncing" && state.status !== "live") return invalid("message-before-begin");
++  if (message.environmentId !== state.environmentId || message.generation !== state.generation)
++    return invalid("scope-changed");
++  if (message.type === "page") {
++    if (
++      state.status !== "syncing" ||
++      message.cursor !== state.cursor ||
++      message.position !== state.position ||
++      message.previousPageToken !== state.pageToken ||
++      message.pageToken === state.pageToken
++    )
++      return invalid("invalid-page-chain");
++    const result = applyChanges(state.staging, message.entries);
++    if (!result) return invalid("invalid-entity-key");
++    return {
++      ...state,
++      staging: result.rows,
++      pageToken: message.pageToken,
++      notificationCandidates: [],
++      stagedMaxVersion: Math.max(
++        state.stagedMaxVersion,
++        ...message.entries.map((entry) => entry.version),
++      ),
++    };
++  }
++  if (message.type === "delta") {
++    if (message.cursor === state.cursor && message.position === state.position)
++      return { ...state, notificationCandidates: [] };
++    if (
++      message.after !== state.cursor ||
++      message.position <= state.position ||
++      message.changes.some((row) => row.version > message.position || row.version <= state.position)
++    )
++      return invalid("noncontiguous-delta");
++    const result = applyChanges(
++      state.status === "syncing" ? state.staging : state.entries,
++      message.changes,
++    );
++    if (!result) return invalid("invalid-entity-key");
++    const common = {
++      ...state,
++      cursor: message.cursor,
++      position: message.position,
++      notificationCandidates: [],
++    };
++    if (state.status === "syncing")
++      return {
++        ...common,
++        staging: result.rows,
++        stagedMaxVersion: Math.max(state.stagedMaxVersion, message.position),
++      };
++    return {
++      ...common,
++      entries: HashMap.filter(result.rows, (row) => row.entity !== null),
++      notificationCandidates: message.notificationEligible ? result.accepted : [],
++    };
++  }
++  if (
++    state.status !== "syncing" ||
++    message.position !== state.position ||
++    message.position < state.stagedMaxVersion
++  )
++    return invalid("invalid-fence");
++  return {
++    ...state,
++    status: "live",
++    entries: HashMap.filter(state.staging, (row) => row.entity !== null),
++    staging: HashMap.empty(),
++    cursor: message.cursor,
++    position: message.position,
++    notificationCandidates: [],
++    reason: null,
++  };
++}
+diff --git a/packages/contracts/src/attentionSync.test.ts b/packages/contracts/src/attentionSync.test.ts
+new file mode 100644
+index 000000000..72a52cd85
+--- /dev/null
++++ b/packages/contracts/src/attentionSync.test.ts
+@@ -0,0 +1,21 @@
++import { describe, expect, it } from "vite-plus/test";
++import * as Schema from "effect/Schema";
++import { AttentionSubscribeInput, AttentionStreamMessage } from "./attentionSync.ts";
++const decodeInput = Schema.decodeUnknownSync(AttentionSubscribeInput);
++const decodeMessage = Schema.decodeUnknownSync(AttentionStreamMessage);
++describe("attention synchronization contracts", () => {
++  it("bounds pages and filter fan-out without imposing a dataset limit", () => {
++    expect(decodeInput({ pageSize: 100, filter: { threadIds: ["thread"] } }).pageSize).toBe(100);
++    for (const value of [0, 101, 1.5]) expect(() => decodeInput({ pageSize: value })).toThrow();
++    expect(() => decodeInput({ filter: { projectIds: Array(33).fill("project") } })).toThrow();
++    expect(() => decodeInput({ cursor: "" })).toThrow();
++    expect(() => decodeInput({ cursor: "a".repeat(4097) })).toThrow();
++  });
++  it("requires an explicit fence and reset reason", () => {
++    expect(decodeMessage({ type: "reset-required", reason: "rebuilding" }).type).toBe(
++      "reset-required",
++    );
++    expect(() => decodeMessage({ type: "sync-complete", position: 1 })).toThrow();
++    expect(() => decodeMessage({ type: "reset-required", reason: "unknown" })).toThrow();
++  });
++});
+diff --git a/packages/contracts/src/attentionSync.ts b/packages/contracts/src/attentionSync.ts
+new file mode 100644
+index 000000000..128e84686
+--- /dev/null
++++ b/packages/contracts/src/attentionSync.ts
+@@ -0,0 +1,88 @@
++import * as Schema from "effect/Schema";
++import {
++  EnvironmentId,
++  NonNegativeInt,
++  PositiveInt,
++  ProjectId,
++  ThreadId,
++  TrimmedNonEmptyString,
++} from "./baseSchemas.ts";
++import { ThreadAttentionItem, ThreadAwarenessSummary } from "./attention.ts";
++
++const OpaqueToken = Schema.String.check(
++  Schema.isMaxLength(4096),
++  Schema.isPattern(/^[A-Za-z0-9_.-]+$/),
++);
++export const AttentionDeliveryCursor = OpaqueToken.pipe(Schema.brand("AttentionDeliveryCursor"));
++export type AttentionDeliveryCursor = typeof AttentionDeliveryCursor.Type;
++export const AttentionPageToken = OpaqueToken.pipe(Schema.brand("AttentionPageToken"));
++export type AttentionPageToken = typeof AttentionPageToken.Type;
++export const AttentionFilter = Schema.Struct({
++  projectIds: Schema.optional(Schema.Array(ProjectId).check(Schema.isMaxLength(32))),
++  threadIds: Schema.optional(Schema.Array(ThreadId).check(Schema.isMaxLength(32))),
++  includeResolved: Schema.optional(Schema.Boolean),
++});
++export type AttentionFilter = typeof AttentionFilter.Type;
++export const AttentionSubscribeInput = Schema.Struct({
++  filter: Schema.optional(AttentionFilter),
++  cursor: Schema.optional(AttentionDeliveryCursor),
++  pageSize: Schema.optional(PositiveInt.check(Schema.isLessThanOrEqualTo(100))),
++});
++export type AttentionSubscribeInput = typeof AttentionSubscribeInput.Type;
++export const AttentionEntity = Schema.Union([
++  Schema.Struct({ type: Schema.Literal("item"), value: ThreadAttentionItem }),
++  Schema.Struct({ type: Schema.Literal("summary"), value: ThreadAwarenessSummary }),
++]);
++export type AttentionEntity = typeof AttentionEntity.Type;
++export const AttentionChange = Schema.Struct({
++  key: TrimmedNonEmptyString,
++  version: NonNegativeInt,
++  entity: Schema.NullOr(AttentionEntity),
++});
++export type AttentionChange = typeof AttentionChange.Type;
++const checkpoint = {
++  environmentId: EnvironmentId,
++  generation: TrimmedNonEmptyString,
++  cursor: AttentionDeliveryCursor,
++  position: NonNegativeInt,
++};
++export const AttentionResetReason = Schema.Literals([
++  "generation-changed",
++  "replay-unavailable",
++  "bootstrap-expired",
++  "message-too-large",
++  "backpressure",
++  "rebuilding",
++]);
++export type AttentionResetReason = typeof AttentionResetReason.Type;
++export const AttentionStreamMessage = Schema.Union([
++  Schema.Struct({
++    ...checkpoint,
++    type: Schema.Literal("begin"),
++    mode: Schema.Literals(["snapshot", "resume"]),
++  }),
++  Schema.Struct({
++    ...checkpoint,
++    type: Schema.Literal("page"),
++    pageToken: AttentionPageToken,
++    previousPageToken: Schema.NullOr(AttentionPageToken),
++    entries: Schema.Array(AttentionChange).check(Schema.isMaxLength(100)),
++  }),
++  Schema.Struct({
++    ...checkpoint,
++    type: Schema.Literal("delta"),
++    after: AttentionDeliveryCursor,
++    notificationEligible: Schema.Boolean,
++    changes: Schema.Array(AttentionChange).check(Schema.isMaxLength(100)),
++  }),
++  Schema.Struct({ ...checkpoint, type: Schema.Literal("sync-complete") }),
++  Schema.Struct({ type: Schema.Literal("reset-required"), reason: AttentionResetReason }),
++]);
++export type AttentionStreamMessage = typeof AttentionStreamMessage.Type;
++export class AttentionSyncError extends Schema.TaggedError<AttentionSyncError>()(
++  "AttentionSyncError",
++  {
++    reason: Schema.Literals(["invalid-cursor", "cursor-scope-mismatch", "unavailable"]),
++    message: Schema.String,
++  },
++) {}
+diff --git a/packages/contracts/src/environment.ts b/packages/contracts/src/environment.ts
+index 18fcb6e2c..7f77b5b7b 100644
+--- a/packages/contracts/src/environment.ts
++++ b/packages/contracts/src/environment.ts
+@@ -76,6 +76,8 @@ export const ServerSelfUpdateCapability = Schema.Literals([
+ export type ServerSelfUpdateCapability = typeof ServerSelfUpdateCapability.Type;
+ 
+ export const ExecutionEnvironmentCapabilities = Schema.Struct({
++  /** Owned, paginated attention bootstrap/replay/live stream protocol v1. */
++  attentionSync: Schema.optionalKey(Schema.Boolean),
+   repositoryIdentity: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+   connectionProbe: Schema.optionalKey(Schema.Boolean),
+   /** Missing on older servers, which still accept inline image attachments. */
+diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts
+index d53c6a62f..c18e9baa4 100644
+--- a/packages/contracts/src/index.ts
++++ b/packages/contracts/src/index.ts
+@@ -31,6 +31,7 @@ export * from "./workItem.ts";
+ export * from "./twsBindings.ts";
+ export * from "./orchestration.ts";
+ export * from "./attention.ts";
++export * from "./attentionSync.ts";
+ export * from "./t3ProjectFile.ts";
+ export * from "./editor.ts";
+ export * from "./project.ts";
+diff --git a/packages/contracts/src/rpc.ts b/packages/contracts/src/rpc.ts
+index 9096dd6e2..31db0f0d5 100644
+--- a/packages/contracts/src/rpc.ts
++++ b/packages/contracts/src/rpc.ts
+@@ -1,6 +1,11 @@
+ import * as Schema from "effect/Schema";
+ import * as Rpc from "effect/unstable/rpc/Rpc";
+ import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
++import {
++  AttentionSubscribeInput,
++  AttentionStreamMessage,
++  AttentionSyncError,
++} from "./attentionSync.ts";
+ import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+ import {
+   ProviderAuthCancelInput,
+@@ -270,6 +275,7 @@ import {
+ import { VcsError } from "./vcs.ts";
+ 
+ export const WS_METHODS = {
++  attentionSubscribe: "attention.subscribe",
+   // Project registry methods
+   projectsList: "projects.list",
+   projectsAdd: "projects.add",
+@@ -1358,6 +1364,12 @@ const WsSubscribeResourceTelemetryRpc = Rpc.make(WS_METHODS.subscribeResourceTel
+ });
+ 
+ export const WsRpcGroup = RpcGroup.make(
++  Rpc.make(WS_METHODS.attentionSubscribe, {
++    payload: AttentionSubscribeInput,
++    success: AttentionStreamMessage,
++    error: Schema.Union([AttentionSyncError, EnvironmentAuthorizationError]),
++    stream: true,
++  }),
+   WsServerProbeRpc,
+   WsServerGetConfigRpc,
+   WsServerRefreshProvidersRpc,
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 33eba38e1..b8ce0a425 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -542,6 +542,9 @@ importers:
+       '@effect/vitest':
+         specifier: 4.0.0-rc.112
+         version: 4.0.0-rc.112(patch_hash=a16b1e870d8c29e4a98b17cc4c638a4ff471753d8ca3487f78a22b759caf951b)(effect@4.0.0-rc.112(patch_hash=8bef799f35729cf3465eb428196f617b434a7c9f658d56acb2874d74b21b98b2))
++      '@t3tools/client-runtime':
++        specifier: workspace:*
++        version: link:../../packages/client-runtime
+       '@t3tools/contracts':
+         specifier: workspace:*
+         version: link:../../packages/contracts

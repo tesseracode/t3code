@@ -1,0 +1,1489 @@
+diff --git a/apps/web/src/components/CommandPalette.tsx b/apps/web/src/components/CommandPalette.tsx
+index b2af0f031..4f6b7f076 100644
+--- a/apps/web/src/components/CommandPalette.tsx
++++ b/apps/web/src/components/CommandPalette.tsx
+@@ -99,6 +99,7 @@ import {
+   resolveProjectPathForDispatch,
+ } from "../lib/projectPaths";
+ import { onOpenCommandPalette } from "../commandPaletteBus";
++import { openSessionSearch } from "../sessionSearchBus";
+ import { isPreviewFocused } from "../lib/previewFocus";
+ import { isTerminalFocused } from "../lib/terminalFocus";
+ import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
+@@ -1610,6 +1611,20 @@ function OpenCommandPaletteDialog(props: {
+     });
+   }
+ 
++  if (activeThread !== null || activeDraftThread !== null) {
++    actionItems.push({
++      kind: "action",
++      value: "action:search-current-thread",
++      searchTerms: ["search current thread", "find in conversation", "chat messages"],
++      title: "Search current thread",
++      icon: <TextSearchIcon className={ITEM_ICON_CLASS} />,
++      shortcutCommand: "chat.search",
++      run: async () => {
++        openSessionSearch();
++      },
++    });
++  }
++
+   actionItems.push({
+     kind: "action",
+     value: "action:open-file-picker",
+diff --git a/apps/web/src/components/chat/MessagesTimeline.logic.test.ts b/apps/web/src/components/chat/MessagesTimeline.logic.test.ts
+index d9bfdae04..1801725b7 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.logic.test.ts
++++ b/apps/web/src/components/chat/MessagesTimeline.logic.test.ts
+@@ -4,11 +4,195 @@ import {
+   computeStableMessagesTimelineRows,
+   computeMessageDurationStart,
+   deriveMessagesTimelineRows,
++  findMessagesTimelineRowIndex,
++  messagesTimelineRowContainsEntry,
+   normalizeCompactToolLabel,
+   resolveAssistantMessageCopyState,
+   shouldPreserveAssistantLineBreaks,
+ } from "./MessagesTimeline.logic";
+ 
++const SEARCH_REVEAL_BASE_INPUT = {
++  isWorking: false,
++  activeTurnStartedAt: null,
++  turnDiffSummaryByAssistantMessageId: new Map(),
++  revertTurnCountByUserMessageId: new Map(),
++};
++
++describe("search result reveal", () => {
++  it("expands only the settled turn containing the active result", () => {
++    const timelineEntries = [
++      {
++        id: "user-1",
++        kind: "message" as const,
++        createdAt: "2026-01-01T00:00:00Z",
++        message: {
++          id: "user-1" as never,
++          role: "user" as const,
++          text: "First request",
++          turnId: null,
++          createdAt: "2026-01-01T00:00:00Z",
++          updatedAt: "2026-01-01T00:00:00Z",
++          streaming: false,
++        },
++      },
++      {
++        id: "assistant-one",
++        kind: "message" as const,
++        createdAt: "2026-01-01T00:00:01Z",
++        message: {
++          id: "assistant-one" as never,
++          role: "assistant" as const,
++          text: "Hidden first result",
++          turnId: "turn-1" as never,
++          createdAt: "2026-01-01T00:00:01Z",
++          updatedAt: "2026-01-01T00:00:02Z",
++          streaming: false,
++        },
++      },
++      {
++        id: "assistant-one-final",
++        kind: "message" as const,
++        createdAt: "2026-01-01T00:00:03Z",
++        message: {
++          id: "assistant-one-final" as never,
++          role: "assistant" as const,
++          text: "First final",
++          turnId: "turn-1" as never,
++          createdAt: "2026-01-01T00:00:03Z",
++          updatedAt: "2026-01-01T00:00:04Z",
++          streaming: false,
++        },
++      },
++      {
++        id: "user-2",
++        kind: "message" as const,
++        createdAt: "2026-01-01T00:00:05Z",
++        message: {
++          id: "user-2" as never,
++          role: "user" as const,
++          text: "Second request",
++          turnId: null,
++          createdAt: "2026-01-01T00:00:05Z",
++          updatedAt: "2026-01-01T00:00:05Z",
++          streaming: false,
++        },
++      },
++      {
++        id: "assistant-two",
++        kind: "message" as const,
++        createdAt: "2026-01-01T00:00:06Z",
++        message: {
++          id: "assistant-two" as never,
++          role: "assistant" as const,
++          text: "Hidden second result",
++          turnId: "turn-2" as never,
++          createdAt: "2026-01-01T00:00:06Z",
++          updatedAt: "2026-01-01T00:00:07Z",
++          streaming: false,
++        },
++      },
++      {
++        id: "assistant-two-final",
++        kind: "message" as const,
++        createdAt: "2026-01-01T00:00:08Z",
++        message: {
++          id: "assistant-two-final" as never,
++          role: "assistant" as const,
++          text: "Second final",
++          turnId: "turn-2" as never,
++          createdAt: "2026-01-01T00:00:08Z",
++          updatedAt: "2026-01-01T00:00:09Z",
++          streaming: false,
++        },
++      },
++    ];
++
++    const rows = deriveMessagesTimelineRows({
++      ...SEARCH_REVEAL_BASE_INPUT,
++      timelineEntries,
++      revealedEntryId: "assistant-one",
++    });
++
++    expect(
++      rows
++        .filter((row) => row.kind === "turn-fold")
++        .map((row) => ({ turnId: row.turnId, expanded: row.expanded })),
++    ).toEqual([
++      { turnId: "turn-1", expanded: true },
++      { turnId: "turn-2", expanded: false },
++    ]);
++    expect(rows[findMessagesTimelineRowIndex(rows, "assistant-one")]?.id).toBe("assistant-one");
++    expect(
++      messagesTimelineRowContainsEntry(
++        rows[findMessagesTimelineRowIndex(rows, "assistant-one")]!,
++        "assistant-one",
++      ),
++    ).toBe(true);
++    expect(findMessagesTimelineRowIndex(rows, "assistant-two")).toBe(-1);
++  });
++
++  it("expands only the work group containing the active result", () => {
++    const work = (id: string, createdAt: string) => ({
++      id,
++      kind: "work" as const,
++      createdAt,
++      entry: {
++        id,
++        createdAt,
++        label: `Activity ${id}`,
++        tone: "tool" as const,
++      },
++    });
++    const separator = {
++      id: "user-separator",
++      kind: "message" as const,
++      createdAt: "2026-01-01T00:00:03Z",
++      message: {
++        id: "user-separator" as never,
++        role: "user" as const,
++        text: "Separate groups",
++        turnId: null,
++        createdAt: "2026-01-01T00:00:03Z",
++        updatedAt: "2026-01-01T00:00:03Z",
++        streaming: false,
++      },
++    };
++    const rows = deriveMessagesTimelineRows({
++      ...SEARCH_REVEAL_BASE_INPUT,
++      timelineEntries: [
++        work("work-1", "2026-01-01T00:00:01Z"),
++        work("work-2", "2026-01-01T00:00:02Z"),
++        separator,
++        work("work-3", "2026-01-01T00:00:04Z"),
++        work("work-4", "2026-01-01T00:00:05Z"),
++      ],
++      revealedEntryId: "work-2",
++    });
++
++    expect(rows.map((row) => row.id)).toEqual([
++      "work-toggle:work-1",
++      "work-1",
++      "work-2",
++      "user-separator",
++      "work-toggle:work-3",
++    ]);
++    expect(rows.find((row) => row.id === "work-toggle:work-1")).toMatchObject({
++      expanded: true,
++    });
++    expect(rows.find((row) => row.id === "work-toggle:work-3")).toMatchObject({
++      expanded: false,
++    });
++    expect(rows[findMessagesTimelineRowIndex(rows, "work-2")]?.id).toBe("work-2");
++    expect(messagesTimelineRowContainsEntry(rows[0]!, "work-2")).toBe(false);
++    expect(
++      messagesTimelineRowContainsEntry(
++        rows[findMessagesTimelineRowIndex(rows, "work-2")]!,
++        "work-2",
++      ),
++    ).toBe(true);
++  });
++});
++
+ describe("shouldPreserveAssistantLineBreaks", () => {
+   it("preserves Claude insight formatting without changing regular markdown", () => {
+     expect(
+diff --git a/apps/web/src/components/chat/MessagesTimeline.logic.ts b/apps/web/src/components/chat/MessagesTimeline.logic.ts
+index c787446f7..23bea5410 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.logic.ts
++++ b/apps/web/src/components/chat/MessagesTimeline.logic.ts
+@@ -1,17 +1,18 @@
+ import * as Equal from "effect/Equal";
+ import { renderCodexDirectivesForCopy } from "@t3tools/client-runtime/codex-markdown-directives";
+ import {
++  normalizeCompactToolLabel,
+   omitSupersededLifecycleMarkers,
+   summarizeToolGroup,
+   toolGroupSummaryKind,
+   type ToolGroupSummaryKind,
+ } from "@t3tools/client-runtime/work-log/presentation";
+ export {
+-  normalizeCompactToolLabel,
+   summarizeToolGroup,
+   toolGroupAction,
+   workLogEntryIsLocalCodeSearch,
+ } from "@t3tools/client-runtime/work-log/presentation";
++export { normalizeCompactToolLabel };
+ import {
+   formatDuration,
+   workEntryDisplayIndicatesToolFailure,
+@@ -21,6 +22,7 @@ import {
+   type WorkLogEntry,
+ } from "../../session-logic";
+ import { type ChatMessage, type ProposedPlan, type TurnDiffSummary } from "../../types";
++import { formatWorkspaceRelativePath } from "../../filePathDisplay";
+ import { type MessageId, type OrchestrationLatestTurn, type TurnId } from "@t3tools/contracts";
+ 
+ export const TIMELINE_MINIMAP_ITEM_SPACING = 8;
+@@ -41,6 +43,30 @@ export function workEntryIsVisibleInGroup(
+   );
+ }
+ 
++function capitalizePhrase(value: string): string {
++  const trimmed = value.trim();
++  if (trimmed.length === 0) {
++    return value;
++  }
++  return `${trimmed.charAt(0).toUpperCase()}${trimmed.slice(1)}`;
++}
++
++export function workEntryDisplayText(
++  entry: Pick<WorkLogEntry, "changedFiles" | "command" | "detail" | "label" | "toolTitle">,
++  workspaceRoot: string | undefined,
++): string {
++  if (entry.command) return entry.command;
++  if (entry.detail) return entry.detail;
++  const [firstPath] = entry.changedFiles ?? [];
++  if (firstPath) {
++    const displayPath = formatWorkspaceRelativePath(firstPath, workspaceRoot);
++    return (entry.changedFiles?.length ?? 0) === 1
++      ? displayPath
++      : `${displayPath} +${(entry.changedFiles?.length ?? 1) - 1} more`;
++  }
++  return capitalizePhrase(normalizeCompactToolLabel(entry.toolTitle ?? entry.label));
++}
++
+ export interface TimelineEndState {
+   readonly isAtEnd?: boolean;
+   readonly contentLength?: number;
+@@ -525,6 +551,7 @@ export function deriveMessagesTimelineRows(input: {
+   runningTurnId?: TurnId | null;
+   expandedTurnIds?: ReadonlySet<TurnId>;
+   expandedWorkGroupIds?: ReadonlySet<string>;
++  revealedEntryId?: string | null;
+   isWorking: boolean;
+   activeTurnStartedAt: string | null;
+   turnDiffSummaryByAssistantMessageId: ReadonlyMap<MessageId, TurnDiffSummary>;
+@@ -545,9 +572,13 @@ export function deriveMessagesTimelineRows(input: {
+     latestTurn: input.latestTurn ?? null,
+     unsettledTurnId,
+   });
++  const revealedEntryId = input.revealedEntryId ?? null;
++  const turnFoldIsExpanded = (fold: TurnFold) =>
++    input.expandedTurnIds?.has(fold.turnId) === true ||
++    (revealedEntryId !== null && fold.hiddenEntryIds.has(revealedEntryId));
+   const collapsedEntryIds = new Set<string>();
+   for (const fold of foldsByAnchorEntryId.values()) {
+-    if (!input.expandedTurnIds?.has(fold.turnId)) {
++    if (!turnFoldIsExpanded(fold)) {
+       for (const entryId of fold.hiddenEntryIds) {
+         collapsedEntryIds.add(entryId);
+       }
+@@ -611,7 +642,10 @@ export function deriveMessagesTimelineRows(input: {
+             entry: displayedToolEntry.entry,
+             groupedEntries: visibleActiveToolEntries.map((entry) => entry.entry),
+             groupId,
+-            expanded: input.expandedWorkGroupIds?.has(groupId) ?? false,
++            expanded:
++              input.expandedWorkGroupIds?.has(groupId) === true ||
++              (revealedEntryId !== null &&
++                visibleActiveToolEntries.some((entry) => entry.id === revealedEntryId)),
+             active: latestRunningToolEntry !== undefined,
+           };
+         })()
+@@ -666,7 +700,7 @@ export function deriveMessagesTimelineRows(input: {
+         createdAt: anchoredTurnFold.createdAt,
+         turnId: anchoredTurnFold.turnId,
+         label: anchoredTurnFold.label,
+-        expanded: input.expandedTurnIds?.has(anchoredTurnFold.turnId) ?? false,
++        expanded: turnFoldIsExpanded(anchoredTurnFold),
+       });
+     }
+ 
+@@ -718,7 +752,10 @@ export function deriveMessagesTimelineRows(input: {
+         const activeInProgressToolEntries = visibleGroupedEntries.filter(workEntryIsInActiveRun);
+         if (activeInProgressToolEntries.length > 0) {
+           const groupId = workGroupId(timelineEntry.id, timelineEntry.entry);
+-          const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
++          const expanded =
++            input.expandedWorkGroupIds?.has(groupId) === true ||
++            (revealedEntryId !== null &&
++              visibleGroupedEntries.some((entry) => entry.id === revealedEntryId));
+           const latestActiveToolEntry = activeInProgressToolEntries.at(-1)!;
+           nextRows.push({
+             kind: "work-live",
+@@ -745,7 +782,10 @@ export function deriveMessagesTimelineRows(input: {
+           }
+         } else {
+           const groupId = workGroupId(timelineEntry.id, timelineEntry.entry);
+-          const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
++          const expanded =
++            input.expandedWorkGroupIds?.has(groupId) === true ||
++            (revealedEntryId !== null &&
++              visibleGroupedEntries.some((entry) => entry.id === revealedEntryId));
+           const summaryKind = toolGroupSummaryKind(visibleGroupedEntries);
+           const latestToolEntry = visibleGroupedEntries.findLast(workLogEntryIsToolLike);
+           nextRows.push({
+@@ -843,6 +883,39 @@ export function deriveMessagesTimelineRows(input: {
+   return nextRows;
+ }
+ 
++export function messagesTimelineRowContainsEntry(
++  row: MessagesTimelineRow,
++  entryId: string,
++): boolean {
++  switch (row.kind) {
++    case "message":
++    case "proposed-plan":
++      return row.id === entryId;
++    case "work":
++      return row.groupedEntries.some((entry) => entry.id === entryId);
++    case "work-live":
++      return !row.expanded && row.groupedEntries.some((entry) => entry.id === entryId);
++    case "work-toggle":
++    case "turn-fold":
++    case "working":
++    case "thinking":
++      return false;
++  }
++}
++
++export function findMessagesTimelineRowIndex(
++  rows: ReadonlyArray<MessagesTimelineRow>,
++  entryId: string,
++): number {
++  const directIndex = rows.findIndex((row) => messagesTimelineRowContainsEntry(row, entryId));
++  if (directIndex >= 0) {
++    return directIndex;
++  }
++  return rows.findIndex(
++    (row) => row.kind === "work-live" && row.groupedEntries.some((entry) => entry.id === entryId),
++  );
++}
++
+ export function computeStableMessagesTimelineRows(
+   rows: MessagesTimelineRow[],
+   previous: StableMessagesTimelineRowsState,
+diff --git a/apps/web/src/components/chat/MessagesTimeline.tsx b/apps/web/src/components/chat/MessagesTimeline.tsx
+index dbe8507ae..0c95066e2 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.tsx
++++ b/apps/web/src/components/chat/MessagesTimeline.tsx
+@@ -33,6 +33,7 @@ import {
+   useEffect,
+   useLayoutEffect,
+   useMemo,
++  useReducer,
+   useRef,
+   useState,
+   type KeyboardEvent,
+@@ -96,7 +97,8 @@ import { MessageCopyButton } from "./MessageCopyButton";
+ import {
+   computeStableMessagesTimelineRows,
+   deriveMessagesTimelineRows,
+-  normalizeCompactToolLabel,
++  findMessagesTimelineRowIndex,
++  messagesTimelineRowContainsEntry,
+   resolveAssistantMessageCopyState,
+   resolveTimelineIsAtEnd,
+   resolveTimelineMinimapHasPersistentGutter,
+@@ -107,12 +109,22 @@ import {
+   resolveTimelineMinimapTopPercent,
+   shouldPreserveAssistantLineBreaks,
+   toolGroupAction,
++  workEntryDisplayText,
+   workEntryIsVisibleInGroup,
+   type StableMessagesTimelineRowsState,
+   type MessagesTimelineRow,
+   TIMELINE_MINIMAP_MIN_ITEMS,
+   type TimelineLatestTurn,
+ } from "./MessagesTimeline.logic";
++import {
++  deriveSessionSearchMatches,
++  INITIAL_SESSION_SEARCH_STATE,
++  navigateSessionSearchMatch,
++  reduceSessionSearchState,
++  resolveSessionSearchMatchIndex,
++} from "./sessionSearch";
++import { SessionSearchBar } from "./SessionSearchBar";
++import { onOpenSessionSearch } from "../../sessionSearchBus";
+ import { TerminalContextInlineChip } from "./TerminalContextInlineChip";
+ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+ import {
+@@ -172,6 +184,7 @@ interface TimelineRowSharedState {
+   onToggleWorkGroup: (groupId: string, anchorKey: string) => void;
+   agentPanelModel: AgentPanelModel;
+   onOpenAgents: () => void;
++  activeSearchEntryId: string | null;
+ }
+ 
+ interface TimelineRowActivityState {
+@@ -313,6 +326,58 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+   topFadeEnabled = false,
+   loadEarlier = null,
+ }: MessagesTimelineProps) {
++  const [sessionSearchState, dispatchSessionSearch] = useReducer(
++    reduceSessionSearchState,
++    INITIAL_SESSION_SEARCH_STATE,
++  );
++  const previousRouteThreadKeyRef = useRef(routeThreadKey);
++  useEffect(() => {
++    if (previousRouteThreadKeyRef.current === routeThreadKey) {
++      return;
++    }
++    previousRouteThreadKeyRef.current = routeThreadKey;
++    dispatchSessionSearch({ type: "thread-changed" });
++  }, [routeThreadKey]);
++  useEffect(
++    () =>
++      onOpenSessionSearch(() => {
++        dispatchSessionSearch({ type: "open" });
++      }),
++    [],
++  );
++  const closeSessionSearch = useCallback(() => {
++    dispatchSessionSearch({ type: "close" });
++  }, []);
++  const sessionSearchMatches = useMemo(
++    () =>
++      sessionSearchState.open
++        ? deriveSessionSearchMatches(timelineEntries, sessionSearchState.query, {
++            workspaceRoot,
++          })
++        : [],
++    [sessionSearchState.open, sessionSearchState.query, timelineEntries, workspaceRoot],
++  );
++  const activeSessionSearchMatchIndex = resolveSessionSearchMatchIndex(
++    sessionSearchMatches,
++    sessionSearchState.activeMatchKey,
++  );
++  const activeSearchMatch =
++    activeSessionSearchMatchIndex < 0
++      ? null
++      : (sessionSearchMatches[activeSessionSearchMatchIndex] ?? null);
++  const navigateSessionSearch = useCallback(
++    (direction: "next" | "previous") => {
++      const match = navigateSessionSearchMatch(
++        sessionSearchMatches,
++        sessionSearchState.activeMatchKey,
++        direction,
++      );
++      if (match) {
++        dispatchSessionSearch({ type: "select-match", matchKey: match.key });
++      }
++    },
++    [sessionSearchMatches, sessionSearchState.activeMatchKey],
++  );
+   const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<TurnId>>(new Set());
+   const [expandedWorkGroupIds, setExpandedWorkGroupIds] = useState<ReadonlySet<string>>(new Set());
+   const [disclosureToggleSettling, setDisclosureToggleSettling] = useState(false);
+@@ -444,6 +509,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+         runningTurnId,
+         expandedTurnIds,
+         expandedWorkGroupIds,
++        revealedEntryId: activeSearchMatch?.entryId ?? null,
+         isWorking,
+         activeTurnStartedAt,
+         turnDiffSummaryByAssistantMessageId,
+@@ -455,6 +521,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+       runningTurnId,
+       expandedTurnIds,
+       expandedWorkGroupIds,
++      activeSearchMatch?.entryId,
+       isWorking,
+       activeTurnStartedAt,
+       turnDiffSummaryByAssistantMessageId,
+@@ -462,6 +529,13 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+     ],
+   );
+   const rows = useStableRows(rawRows);
++  const activeSearchRowIndex = useMemo(
++    () =>
++      activeSearchMatch === null
++        ? -1
++        : findMessagesTimelineRowIndex(rows, activeSearchMatch.entryId),
++    [activeSearchMatch, rows],
++  );
+   const minimapItems = useMemo(() => deriveTimelineMinimapItems(rows), [rows]);
+   const [timelineViewportElement, setTimelineViewportElement] = useState<HTMLDivElement | null>(
+     null,
+@@ -521,6 +595,21 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+     return () => cancelAnimationFrame(frame);
+   }, [handleScroll, rows.length]);
+ 
++  useEffect(() => {
++    if (activeSearchMatch === null || activeSearchRowIndex < 0) {
++      return;
++    }
++    onManualNavigation();
++    const frame = requestAnimationFrame(() => {
++      void listRef.current?.scrollToIndex({
++        index: activeSearchRowIndex,
++        animated: false,
++        viewOffset: 64,
++      });
++    });
++    return () => cancelAnimationFrame(frame);
++  }, [activeSearchMatch?.key, activeSearchRowIndex, listRef, onManualNavigation]);
++
+   useEffect(() => {
+     if (!timelineViewportElement) {
+       return;
+@@ -566,6 +655,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+       onToggleWorkGroup,
+       agentPanelModel,
+       onOpenAgents,
++      activeSearchEntryId: activeSearchMatch?.entryId ?? null,
+     }),
+     [
+       timestampFormat,
+@@ -585,6 +675,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+       onToggleWorkGroup,
+       agentPanelModel,
+       onOpenAgents,
++      activeSearchMatch?.entryId,
+     ],
+   );
+   const activityState = useMemo<TimelineRowActivityState>(
+@@ -608,7 +699,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+     [],
+   );
+ 
+-  if (rows.length === 0 && !isWorking) {
++  if (rows.length === 0 && !isWorking && !sessionSearchState.open) {
+     if (hideEmptyPlaceholder) {
+       return null;
+     }
+@@ -623,6 +714,23 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+     <TimelineRowCtx value={sharedState}>
+       <TimelineRowActivityCtx value={activityState}>
+         <div ref={setTimelineViewportElement} className="relative h-full min-h-0">
++          {sessionSearchState.open ? (
++            <SessionSearchBar
++              query={sessionSearchState.query}
++              onQueryChange={(query) => {
++                dispatchSessionSearch({ type: "query-changed", query });
++              }}
++              matchCount={sessionSearchMatches.length}
++              currentMatchIndex={activeSessionSearchMatchIndex}
++              focusRequestId={sessionSearchState.focusRequestId}
++              onNext={() => navigateSessionSearch("next")}
++              onPrevious={() => navigateSessionSearch("previous")}
++              onClose={closeSessionSearch}
++              hasUnloadedHistory={loadEarlier !== null}
++              loadingEarlierHistory={loadEarlier?.loading ?? false}
++              onLoadEarlierHistory={loadEarlier?.onLoadEarlier}
++            />
++          ) : null}
+           <LegendList<MessagesTimelineRow>
+             ref={listRef}
+             data={rows}
+@@ -634,7 +742,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
+             {...(anchoredEndSpace ? { anchoredEndSpace } : {})}
+             contentInsetEndAdjustment={contentInsetEndAdjustment}
+             maintainScrollAtEnd={
+-              anchoredEndSpace || !liveFollowEnabled || disclosureToggleSettling
++              anchoredEndSpace ||
++              !liveFollowEnabled ||
++              disclosureToggleSettling ||
++              activeSearchMatch !== null
+                 ? false
+                 : TIMELINE_MAINTAIN_SCROLL_AT_END
+             }
+@@ -969,10 +1080,13 @@ type TimelineWorkEntry = Extract<MessagesTimelineRow, { kind: "work" }>["grouped
+ type TimelineRow = MessagesTimelineRow;
+ 
+ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: TimelineRow }) {
++  const { activeSearchEntryId } = use(TimelineRowCtx);
+   const isExpandedToolGroupEntry = row.kind === "work" && row.isExpandedToolGroupEntry;
+   const isLastExpandedToolGroupEntry = row.kind === "work" && row.isLastExpandedToolGroupEntry;
+   const isExpandedToolGroupHeader =
+     (row.kind === "work-toggle" && row.expanded) || (row.kind === "work-live" && row.expanded);
++  const isActiveSearchRow =
++    activeSearchEntryId !== null && messagesTimelineRowContainsEntry(row, activeSearchEntryId);
+ 
+   return (
+     <div
+@@ -996,7 +1110,11 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
+                 ? "pb-2"
+                 : "pb-4",
+         row.kind === "message" && row.message.role === "assistant" ? "group/assistant" : null,
++        isActiveSearchRow &&
++          "rounded-md bg-warning/8 ring-2 ring-warning/50 ring-offset-2 ring-offset-background",
+       )}
++      aria-current={isActiveSearchRow ? "true" : undefined}
++      data-session-search-active={isActiveSearchRow ? "true" : undefined}
+       data-timeline-row-id={row.id}
+       data-timeline-row-kind={row.kind}
+       data-message-id={row.kind === "message" ? row.message.id : undefined}
+@@ -1184,6 +1302,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message"
+           terminalContexts={terminalContexts}
+           skills={ctx.skills}
+           markdownCwd={ctx.markdownCwd}
++          forceExpanded={ctx.activeSearchEntryId === row.id}
+         />
+       </div>
+       <div className="flex w-full max-w-[80%] items-center justify-end pe-1 text-xs tabular-nums opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover:opacity-100">
+@@ -1327,6 +1446,7 @@ function ProposedPlanTimelineRow({
+         threadRef={ctx.threadRef ?? undefined}
+         cwd={ctx.markdownCwd}
+         workspaceRoot={ctx.workspaceRoot}
++        forceExpanded={ctx.activeSearchEntryId === row.id}
+       />
+     </div>
+   );
+@@ -1784,12 +1904,14 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
+   terminalContexts: ParsedTerminalContextEntry[];
+   skills: ReadonlyArray<Pick<ServerProviderSkill, "name" | "displayName">>;
+   markdownCwd: string | undefined;
++  forceExpanded?: boolean;
+   footer?: ReactNode;
+ }) {
+   const [expanded, setExpanded] = useState(false);
+   const hasVisibleBody = props.text.trim().length > 0 || props.terminalContexts.length > 0;
+   const canCollapse = hasVisibleBody && shouldCollapseUserMessage(props.text);
+-  const isCollapsed = canCollapse && !expanded;
++  const isExpanded = expanded || props.forceExpanded === true;
++  const isCollapsed = canCollapse && !isExpanded;
+ 
+   return (
+     <div>
+@@ -1825,17 +1947,17 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
+           )}
+           data-user-message-footer="true"
+         >
+-          {canCollapse ? (
++          {canCollapse && !props.forceExpanded ? (
+             <Button
+               type="button"
+               size="xs"
+               variant="ghost"
+-              aria-expanded={expanded}
++              aria-expanded={isExpanded}
+               data-scroll-anchor-ignore
+               onClick={() => setExpanded((value) => !value)}
+               className="-ml-1 h-6 rounded-md px-1.5 text-secondary-label text-xs hover:bg-muted/55 hover:text-message-foreground"
+             >
+-              {expanded ? "Show less" : "Show full message"}
++              {isExpanded ? "Show less" : "Show full message"}
+             </Button>
+           ) : null}
+           {props.footer ? (
+@@ -2195,21 +2317,6 @@ function workToneIcon(tone: TimelineWorkEntry["tone"]): {
+   };
+ }
+ 
+-function workEntryPreview(
+-  workEntry: Pick<TimelineWorkEntry, "detail" | "command" | "changedFiles">,
+-  workspaceRoot: string | undefined,
+-) {
+-  if (workEntry.command) return workEntry.command;
+-  if (workEntry.detail) return workEntry.detail;
+-  if ((workEntry.changedFiles?.length ?? 0) === 0) return null;
+-  const [firstPath] = workEntry.changedFiles ?? [];
+-  if (!firstPath) return null;
+-  const displayPath = formatWorkspaceRelativePath(firstPath, workspaceRoot);
+-  return workEntry.changedFiles!.length === 1
+-    ? displayPath
+-    : `${displayPath} +${workEntry.changedFiles!.length - 1} more`;
+-}
+-
+ function workEntryRawCommand(
+   workEntry: Pick<TimelineWorkEntry, "command" | "rawCommand">,
+ ): string | null {
+@@ -2237,7 +2344,7 @@ function liveWorkEntryLabel(
+     return `${verb} command`;
+   }
+ 
+-  return workEntryPreview(workEntry, workspaceRoot) ?? toolWorkEntryHeading(workEntry);
++  return workEntryDisplayText(workEntry, workspaceRoot);
+ }
+ 
+ function buildToolCallExpandedBody(
+@@ -2298,21 +2405,6 @@ function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconName {
+   return workToneIcon(workEntry.tone).iconName;
+ }
+ 
+-function capitalizePhrase(value: string): string {
+-  const trimmed = value.trim();
+-  if (trimmed.length === 0) {
+-    return value;
+-  }
+-  return `${trimmed.charAt(0).toUpperCase()}${trimmed.slice(1)}`;
+-}
+-
+-function toolWorkEntryHeading(workEntry: TimelineWorkEntry): string {
+-  if (!workEntry.toolTitle) {
+-    return capitalizePhrase(normalizeCompactToolLabel(workEntry.label));
+-  }
+-  return capitalizePhrase(normalizeCompactToolLabel(workEntry.toolTitle));
+-}
+-
+ const stopRowToggle = (e: { stopPropagation: () => void }) => e.stopPropagation();
+ 
+ /**
+@@ -2441,7 +2533,7 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
+   const showFailedIndicator = workEntryDisplayIndicatesToolFailure(workEntry);
+   const entryIconName =
+     showWarningIndicator || showFailedIndicator ? "circle-alert" : workEntryIconName(workEntry);
+-  const displayText = workEntryPreview(workEntry, workspaceRoot) ?? toolWorkEntryHeading(workEntry);
++  const displayText = workEntryDisplayText(workEntry, workspaceRoot);
+   const expandedBody = buildToolCallExpandedBody(workEntry, workspaceRoot);
+   const viewedImagePath = workEntryViewedImagePath(workEntry);
+   const viewedImage =
+diff --git a/apps/web/src/components/chat/ProposedPlanCard.tsx b/apps/web/src/components/chat/ProposedPlanCard.tsx
+index 9746857a8..a4a69231a 100644
+--- a/apps/web/src/components/chat/ProposedPlanCard.tsx
++++ b/apps/web/src/components/chat/ProposedPlanCard.tsx
+@@ -39,12 +39,14 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
+   threadRef,
+   cwd,
+   workspaceRoot,
++  forceExpanded = false,
+ }: {
+   planMarkdown: string;
+   environmentId: EnvironmentId;
+   threadRef?: ScopedThreadRef | undefined;
+   cwd: string | undefined;
+   workspaceRoot: string | undefined;
++  forceExpanded?: boolean;
+ }) {
+   const [expanded, setExpanded] = useState(false);
+   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+@@ -69,6 +71,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
+   const title = proposedPlanTitle(planMarkdown) ?? "Proposed plan";
+   const lineCount = planMarkdown.split("\n").length;
+   const canCollapse = planMarkdown.length > 900 || lineCount > 20;
++  const isExpanded = expanded || forceExpanded;
+   const displayedPlanMarkdown = stripDisplayedPlanMarkdown(planMarkdown);
+   const collapsedPreview = canCollapse
+     ? buildCollapsedProposedPlanPreviewMarkdown(planMarkdown, { maxLines: 10 })
+@@ -170,8 +173,8 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
+         </Menu>
+       </div>
+       <div className="mt-4">
+-        <div className={cn("relative", canCollapse && !expanded && "max-h-104 overflow-hidden")}>
+-          {canCollapse && !expanded ? (
++        <div className={cn("relative", canCollapse && !isExpanded && "max-h-104 overflow-hidden")}>
++          {canCollapse && !isExpanded ? (
+             <ChatMarkdown
+               text={collapsedPreview ?? ""}
+               cwd={cwd}
+@@ -186,11 +189,11 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
+               isStreaming={false}
+             />
+           )}
+-          {canCollapse && !expanded ? (
++          {canCollapse && !isExpanded ? (
+             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-card/95 via-card/80 to-transparent" />
+           ) : null}
+         </div>
+-        {canCollapse ? (
++        {canCollapse && !forceExpanded ? (
+           <div className="mt-4 flex justify-center">
+             <Button
+               size="sm"
+@@ -198,7 +201,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
+               data-scroll-anchor-ignore
+               onClick={() => setExpanded((value) => !value)}
+             >
+-              {expanded ? "Collapse plan" : "Expand plan"}
++              {isExpanded ? "Collapse plan" : "Expand plan"}
+             </Button>
+           </div>
+         ) : null}
+diff --git a/apps/web/src/components/chat/SessionSearchBar.tsx b/apps/web/src/components/chat/SessionSearchBar.tsx
+new file mode 100644
+index 000000000..7f62113cd
+--- /dev/null
++++ b/apps/web/src/components/chat/SessionSearchBar.tsx
+@@ -0,0 +1,137 @@
++import { ChevronDownIcon, ChevronUpIcon, XIcon } from "lucide-react";
++import { memo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
++
++import { SESSION_SEARCH_MAX_QUERY_LENGTH } from "./sessionSearch";
++
++export interface SessionSearchBarProps {
++  readonly query: string;
++  readonly onQueryChange: (query: string) => void;
++  readonly matchCount: number;
++  readonly currentMatchIndex: number;
++  readonly focusRequestId: number;
++  readonly onNext: () => void;
++  readonly onPrevious: () => void;
++  readonly onClose: () => void;
++  readonly hasUnloadedHistory: boolean;
++  readonly loadingEarlierHistory: boolean;
++  readonly onLoadEarlierHistory?: (() => void) | undefined;
++}
++
++export const SessionSearchBar = memo(function SessionSearchBar(props: SessionSearchBarProps) {
++  const inputRef = useRef<HTMLInputElement>(null);
++  const restoreFocusRef = useRef<HTMLElement | null>(null);
++
++  useLayoutEffect(() => {
++    restoreFocusRef.current =
++      document.activeElement instanceof HTMLElement ? document.activeElement : null;
++    inputRef.current?.focus({ preventScroll: true });
++    inputRef.current?.select();
++    return () => {
++      const restoreTarget = restoreFocusRef.current;
++      if (restoreTarget?.isConnected) {
++        restoreTarget.focus({ preventScroll: true });
++      }
++    };
++  }, []);
++
++  useEffect(() => {
++    inputRef.current?.focus({ preventScroll: true });
++    inputRef.current?.select();
++  }, [props.focusRequestId]);
++
++  const handleKeyDown = useCallback(
++    (event: React.KeyboardEvent<HTMLInputElement>) => {
++      if (event.key === "Escape") {
++        event.preventDefault();
++        event.stopPropagation();
++        props.onClose();
++      } else if (event.key === "Enter" && event.shiftKey) {
++        event.preventDefault();
++        event.stopPropagation();
++        props.onPrevious();
++      } else if (event.key === "Enter") {
++        event.preventDefault();
++        event.stopPropagation();
++        props.onNext();
++      }
++    },
++    [props],
++  );
++
++  const hasQuery = props.query.trim().length > 0;
++  const resultLabel =
++    hasQuery && props.matchCount > 0
++      ? `${props.currentMatchIndex + 1} of ${props.matchCount}`
++      : hasQuery
++        ? "No matches"
++        : "Type to search";
++
++  return (
++    <div
++      role="search"
++      aria-label="Search current thread"
++      className="absolute top-2 right-3 left-3 z-40 flex max-w-full flex-wrap items-center justify-end gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-lg sm:left-auto"
++    >
++      <input
++        ref={inputRef}
++        type="search"
++        className="h-6 min-w-36 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50 sm:w-52 sm:flex-none"
++        placeholder="Search loaded turns..."
++        value={props.query}
++        maxLength={SESSION_SEARCH_MAX_QUERY_LENGTH}
++        onChange={(event) => props.onQueryChange(event.target.value)}
++        onKeyDown={handleKeyDown}
++        aria-label="Search in thread"
++      />
++      <span
++        role="status"
++        aria-live="polite"
++        className="shrink-0 text-xs text-muted-foreground/70 tabular-nums"
++      >
++        {resultLabel}
++      </span>
++      {props.hasUnloadedHistory && props.onLoadEarlierHistory ? (
++        <button
++          type="button"
++          className="h-6 shrink-0 rounded px-1.5 text-xs text-muted-foreground/70 transition-colors hover:bg-accent/40 hover:text-foreground disabled:cursor-default disabled:opacity-50"
++          onClick={props.onLoadEarlierHistory}
++          disabled={props.loadingEarlierHistory}
++          aria-label="Load earlier turns to include them in search"
++        >
++          {props.loadingEarlierHistory ? "Loading…" : "Load earlier"}
++        </button>
++      ) : null}
++      <button
++        type="button"
++        className="flex size-6 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-accent/40 hover:text-foreground disabled:opacity-30"
++        onClick={props.onPrevious}
++        disabled={props.matchCount === 0}
++        aria-label="Previous match"
++      >
++        <ChevronUpIcon className="size-3.5" />
++      </button>
++      <button
++        type="button"
++        className="flex size-6 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-accent/40 hover:text-foreground disabled:opacity-30"
++        onClick={props.onNext}
++        disabled={props.matchCount === 0}
++        aria-label="Next match"
++      >
++        <ChevronDownIcon className="size-3.5" />
++      </button>
++      <button
++        type="button"
++        className="flex size-6 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-accent/40 hover:text-foreground"
++        onClick={props.onClose}
++        aria-label="Close search"
++      >
++        <XIcon className="size-3.5" />
++      </button>
++      {props.hasUnloadedHistory ? (
++        <span className="w-full text-right text-[10px] leading-none text-muted-foreground/60">
++          Results include loaded turns only
++        </span>
++      ) : null}
++    </div>
++  );
++});
+diff --git a/apps/web/src/components/chat/sessionSearch.test.ts b/apps/web/src/components/chat/sessionSearch.test.ts
+new file mode 100644
+index 000000000..0c65a36da
+--- /dev/null
++++ b/apps/web/src/components/chat/sessionSearch.test.ts
+@@ -0,0 +1,165 @@
++import { MessageId } from "@t3tools/contracts";
++import { describe, expect, it } from "vite-plus/test";
++
++import type { TimelineEntry } from "../../session-logic";
++import {
++  deriveSessionSearchMatches,
++  INITIAL_SESSION_SEARCH_STATE,
++  navigateSessionSearchMatch,
++  reduceSessionSearchState,
++  resolveSessionSearchMatchIndex,
++} from "./sessionSearch";
++
++const CREATED_AT = "2026-09-02T00:00:00.000Z";
++
++function messageEntry(id: string, role: "user" | "assistant", text: string): TimelineEntry {
++  return {
++    id,
++    kind: "message",
++    createdAt: CREATED_AT,
++    message: {
++      id: MessageId.make(id),
++      role,
++      text,
++      turnId: null,
++      streaming: false,
++      createdAt: CREATED_AT,
++      updatedAt: CREATED_AT,
++    },
++  };
++}
++
++const ENTRIES: ReadonlyArray<TimelineEntry> = [
++  messageEntry("user-1", "user", "Needle from the user"),
++  messageEntry("assistant-1", "assistant", "Needle from the assistant"),
++  {
++    id: "plan-1",
++    kind: "proposed-plan",
++    createdAt: CREATED_AT,
++    proposedPlan: {
++      id: "plan-1",
++      turnId: null,
++      planMarkdown: "# Needle plan",
++      implementedAt: null,
++      implementationThreadId: null,
++      createdAt: CREATED_AT,
++      updatedAt: CREATED_AT,
++    },
++  },
++  {
++    id: "work-1",
++    kind: "work",
++    createdAt: CREATED_AT,
++    entry: {
++      id: "work-1",
++      createdAt: CREATED_AT,
++      label: "Ran command",
++      command: "rg Needle apps/web",
++      detail: "Hidden expanded output",
++      tone: "tool",
++    },
++  },
++];
++
++describe("deriveSessionSearchMatches", () => {
++  it("searches user, assistant, proposed-plan, and visible activity text", () => {
++    expect(deriveSessionSearchMatches(ENTRIES, "needle").map((match) => match.kind)).toEqual([
++      "user",
++      "assistant",
++      "proposed-plan",
++      "activity",
++    ]);
++  });
++
++  it("normalizes Unicode compatibility forms and case", () => {
++    const entries = [messageEntry("unicode", "assistant", "CAFÉ cafe\u0301 Ｃａｆé")];
++    expect(deriveSessionSearchMatches(entries, "café")).toHaveLength(3);
++  });
++
++  it("returns every non-overlapping occurrence in deterministic order", () => {
++    const matches = deriveSessionSearchMatches(
++      [messageEntry("multiple", "user", "alpha ALPHAalpha")],
++      "alpha",
++    );
++    expect(
++      matches.map(({ entryId, occurrence, normalizedIndex }) => ({
++        entryId,
++        occurrence,
++        normalizedIndex,
++      })),
++    ).toEqual([
++      { entryId: "multiple", occurrence: 0, normalizedIndex: 0 },
++      { entryId: "multiple", occurrence: 1, normalizedIndex: 6 },
++      { entryId: "multiple", occurrence: 2, normalizedIndex: 11 },
++    ]);
++  });
++
++  it("does not search work detail hidden behind a different visible command", () => {
++    expect(deriveSessionSearchMatches(ENTRIES, "hidden expanded output")).toEqual([]);
++    expect(deriveSessionSearchMatches(ENTRIES, "rg needle")).toHaveLength(1);
++  });
++
++  it("returns no matches for blank or missing queries", () => {
++    expect(deriveSessionSearchMatches(ENTRIES, "   ")).toEqual([]);
++    expect(deriveSessionSearchMatches(ENTRIES, "absent")).toEqual([]);
++  });
++});
++
++describe("session search navigation", () => {
++  const matches = deriveSessionSearchMatches(
++    [messageEntry("multiple", "user", "alpha alpha alpha")],
++    "alpha",
++  );
++
++  it("wraps next and previous navigation", () => {
++    expect(navigateSessionSearchMatch(matches, matches[2]!.key, "next")?.key).toBe(matches[0]!.key);
++    expect(navigateSessionSearchMatch(matches, matches[0]!.key, "previous")?.key).toBe(
++      matches[2]!.key,
++    );
++  });
++
++  it("uses the first match when the active key is missing and preserves stable keys", () => {
++    expect(resolveSessionSearchMatchIndex(matches, null)).toBe(0);
++    expect(resolveSessionSearchMatchIndex(matches, "missing")).toBe(0);
++    expect(resolveSessionSearchMatchIndex(matches, matches[1]!.key)).toBe(1);
++    expect(navigateSessionSearchMatch([], null, "next")).toBeNull();
++  });
++});
++
++describe("reduceSessionSearchState", () => {
++  it("resets selection on query changes and clears on close", () => {
++    const opened = reduceSessionSearchState(INITIAL_SESSION_SEARCH_STATE, { type: "open" });
++    const queried = reduceSessionSearchState(opened, {
++      type: "query-changed",
++      query: "needle",
++    });
++    const selected = reduceSessionSearchState(queried, {
++      type: "select-match",
++      matchKey: "match-2",
++    });
++    expect(selected).toMatchObject({
++      open: true,
++      query: "needle",
++      activeMatchKey: "match-2",
++    });
++    expect(
++      reduceSessionSearchState(selected, { type: "query-changed", query: "other" }),
++    ).toMatchObject({ query: "other", activeMatchKey: null });
++    expect(reduceSessionSearchState(selected, { type: "close" })).toMatchObject({
++      open: false,
++      query: "",
++      activeMatchKey: null,
++    });
++  });
++
++  it("clears search state on thread switches and re-focuses an already open search", () => {
++    const opened = reduceSessionSearchState(INITIAL_SESSION_SEARCH_STATE, { type: "open" });
++    const reopened = reduceSessionSearchState(opened, { type: "open" });
++    expect(reopened.focusRequestId).toBe(opened.focusRequestId + 1);
++    expect(reduceSessionSearchState(reopened, { type: "thread-changed" })).toMatchObject({
++      open: false,
++      query: "",
++      activeMatchKey: null,
++    });
++  });
++});
+diff --git a/apps/web/src/components/chat/sessionSearch.ts b/apps/web/src/components/chat/sessionSearch.ts
+new file mode 100644
+index 000000000..d7e8dc890
+--- /dev/null
++++ b/apps/web/src/components/chat/sessionSearch.ts
+@@ -0,0 +1,174 @@
++import { omitSupersededLifecycleMarkers } from "@t3tools/client-runtime/work-log/presentation";
++
++import type { TimelineEntry } from "../../session-logic";
++import { workEntryDisplayText, workEntryIsVisibleInGroup } from "./MessagesTimeline.logic";
++
++export const SESSION_SEARCH_MAX_QUERY_LENGTH = 200;
++
++export type SessionSearchMatchKind = "user" | "assistant" | "proposed-plan" | "activity";
++
++export interface SessionSearchMatch {
++  readonly key: string;
++  readonly entryId: string;
++  readonly kind: SessionSearchMatchKind;
++  readonly occurrence: number;
++  readonly normalizedIndex: number;
++}
++
++export interface SessionSearchState {
++  readonly open: boolean;
++  readonly query: string;
++  readonly activeMatchKey: string | null;
++  readonly focusRequestId: number;
++}
++
++export type SessionSearchAction =
++  | { readonly type: "open" }
++  | { readonly type: "close" }
++  | { readonly type: "thread-changed" }
++  | { readonly type: "query-changed"; readonly query: string }
++  | { readonly type: "select-match"; readonly matchKey: string };
++
++export const INITIAL_SESSION_SEARCH_STATE: SessionSearchState = {
++  open: false,
++  query: "",
++  activeMatchKey: null,
++  focusRequestId: 0,
++};
++
++export function reduceSessionSearchState(
++  state: SessionSearchState,
++  action: SessionSearchAction,
++): SessionSearchState {
++  switch (action.type) {
++    case "open":
++      return {
++        ...state,
++        open: true,
++        focusRequestId: state.focusRequestId + 1,
++      };
++    case "query-changed":
++      return {
++        ...state,
++        query: action.query.slice(0, SESSION_SEARCH_MAX_QUERY_LENGTH),
++        activeMatchKey: null,
++      };
++    case "select-match":
++      return {
++        ...state,
++        activeMatchKey: action.matchKey,
++      };
++    case "close":
++    case "thread-changed":
++      return {
++        ...INITIAL_SESSION_SEARCH_STATE,
++        focusRequestId: state.focusRequestId,
++      };
++  }
++}
++
++export function normalizeSessionSearchText(value: string): string {
++  return value.normalize("NFKC").toLowerCase();
++}
++
++function searchableWorkEntryIds(entries: ReadonlyArray<TimelineEntry>): ReadonlySet<string> {
++  const visibleEntries = entries.flatMap((entry) =>
++    entry.kind === "work" &&
++    entry.entry.agentSpawn === undefined &&
++    workEntryIsVisibleInGroup(entry.entry, true)
++      ? [entry]
++      : [],
++  );
++  return new Set(
++    omitSupersededLifecycleMarkers(visibleEntries, (entry) => entry.entry).map((entry) => entry.id),
++  );
++}
++
++function searchableEntryText(
++  entry: TimelineEntry,
++  searchableWorkIds: ReadonlySet<string>,
++  workspaceRoot: string | undefined,
++): { readonly kind: SessionSearchMatchKind; readonly text: string } | null {
++  switch (entry.kind) {
++    case "message":
++      if (entry.message.role !== "user" && entry.message.role !== "assistant") {
++        return null;
++      }
++      return { kind: entry.message.role, text: entry.message.text };
++    case "proposed-plan":
++      return { kind: "proposed-plan", text: entry.proposedPlan.planMarkdown };
++    case "work":
++      return searchableWorkIds.has(entry.id)
++        ? {
++            kind: "activity",
++            text: workEntryDisplayText(entry.entry, workspaceRoot),
++          }
++        : null;
++  }
++}
++
++export function deriveSessionSearchMatches(
++  entries: ReadonlyArray<TimelineEntry>,
++  rawQuery: string,
++  options?: { readonly workspaceRoot?: string | undefined },
++): SessionSearchMatch[] {
++  const query = normalizeSessionSearchText(rawQuery.trim());
++  if (query.length === 0) {
++    return [];
++  }
++
++  const searchableWorkIds = searchableWorkEntryIds(entries);
++  const matches: SessionSearchMatch[] = [];
++  for (const entry of entries) {
++    const searchable = searchableEntryText(entry, searchableWorkIds, options?.workspaceRoot);
++    if (searchable === null) {
++      continue;
++    }
++    const text = normalizeSessionSearchText(searchable.text);
++    let occurrence = 0;
++    let searchFrom = 0;
++    while (searchFrom <= text.length - query.length) {
++      const index = text.indexOf(query, searchFrom);
++      if (index < 0) {
++        break;
++      }
++      matches.push({
++        key: JSON.stringify([entry.id, searchable.kind, occurrence, index]),
++        entryId: entry.id,
++        kind: searchable.kind,
++        occurrence,
++        normalizedIndex: index,
++      });
++      occurrence += 1;
++      searchFrom = index + query.length;
++    }
++  }
++  return matches;
++}
++
++export function resolveSessionSearchMatchIndex(
++  matches: ReadonlyArray<SessionSearchMatch>,
++  activeMatchKey: string | null,
++): number {
++  if (matches.length === 0) {
++    return -1;
++  }
++  if (activeMatchKey === null) {
++    return 0;
++  }
++  const index = matches.findIndex((match) => match.key === activeMatchKey);
++  return index < 0 ? 0 : index;
++}
++
++export function navigateSessionSearchMatch(
++  matches: ReadonlyArray<SessionSearchMatch>,
++  activeMatchKey: string | null,
++  direction: "next" | "previous",
++): SessionSearchMatch | null {
++  const currentIndex = resolveSessionSearchMatchIndex(matches, activeMatchKey);
++  if (currentIndex < 0) {
++    return null;
++  }
++  const delta = direction === "next" ? 1 : -1;
++  return matches[(currentIndex + delta + matches.length) % matches.length] ?? null;
++}
+diff --git a/apps/web/src/components/settings/KeybindingsSettings.logic.test.ts b/apps/web/src/components/settings/KeybindingsSettings.logic.test.ts
+index 90eaaef99..d41df7996 100644
+--- a/apps/web/src/components/settings/KeybindingsSettings.logic.test.ts
++++ b/apps/web/src/components/settings/KeybindingsSettings.logic.test.ts
+@@ -122,6 +122,7 @@ describe("KeybindingsSettings.logic", () => {
+ 
+   it("formats static and project script command labels", () => {
+     expect(commandLabel("commandPalette.toggle")).toBe("Command Palette: Toggle");
++    expect(commandLabel("chat.search")).toBe("Chat: Search");
+     expect(commandLabel("themeEditor.toggle")).toBe("Theme Editor: Toggle");
+     expect(commandLabel("script.setup-db.run")).toBe("Run Script: Setup Db");
+   });
+diff --git a/apps/web/src/keybindings.test.ts b/apps/web/src/keybindings.test.ts
+index 0f3fa825e..5622e8b81 100644
+--- a/apps/web/src/keybindings.test.ts
++++ b/apps/web/src/keybindings.test.ts
+@@ -128,6 +128,14 @@ const DEFAULT_BINDINGS = compile([
+     command: "projectSearch.toggle",
+     whenAst: whenNot(whenIdentifier("terminalFocus")),
+   },
++  {
++    shortcut: modShortcut("f"),
++    command: "chat.search",
++    whenAst: whenAnd(
++      whenNot(whenIdentifier("terminalFocus")),
++      whenNot(whenIdentifier("previewFocus")),
++    ),
++  },
+   {
+     shortcut: modShortcut("t", { altKey: true, shiftKey: true }),
+     command: "themeEditor.toggle",
+@@ -406,6 +414,7 @@ describe("shortcutLabelForCommand", () => {
+       shortcutLabelForCommand(DEFAULT_BINDINGS, "projectSearch.toggle", "MacIntel"),
+       "⇧⌘F",
+     );
++    assert.strictEqual(shortcutLabelForCommand(DEFAULT_BINDINGS, "chat.search", "MacIntel"), "⌘F");
+     assert.strictEqual(
+       shortcutLabelForCommand(DEFAULT_BINDINGS, "modelPicker.toggle", "Linux"),
+       "Ctrl+Shift+M",
+@@ -608,6 +617,37 @@ describe("chat/editor shortcuts", () => {
+     );
+   });
+ 
++  it("matches chat.search outside terminal and preview focus", () => {
++    assert.strictEqual(
++      resolveShortcutCommand(event({ key: "f", metaKey: true }), DEFAULT_BINDINGS, {
++        platform: "MacIntel",
++        context: { terminalFocus: false, previewFocus: false },
++      }),
++      "chat.search",
++    );
++    assert.strictEqual(
++      resolveShortcutCommand(event({ key: "f", ctrlKey: true }), DEFAULT_BINDINGS, {
++        platform: "Linux",
++        context: { terminalFocus: false, previewFocus: false },
++      }),
++      "chat.search",
++    );
++    assert.notStrictEqual(
++      resolveShortcutCommand(event({ key: "f", metaKey: true }), DEFAULT_BINDINGS, {
++        platform: "MacIntel",
++        context: { terminalFocus: true, previewFocus: false },
++      }),
++      "chat.search",
++    );
++    assert.notStrictEqual(
++      resolveShortcutCommand(event({ key: "f", metaKey: true }), DEFAULT_BINDINGS, {
++        platform: "MacIntel",
++        context: { terminalFocus: false, previewFocus: true },
++      }),
++      "chat.search",
++    );
++  });
++
+   it("matches filePicker.toggle shortcut outside terminal focus", () => {
+     assert.strictEqual(
+       resolveShortcutCommand(event({ key: "p", metaKey: true }), DEFAULT_BINDINGS, {
+diff --git a/apps/web/src/routes/_chat.tsx b/apps/web/src/routes/_chat.tsx
+index e084e22c2..040678a0b 100644
+--- a/apps/web/src/routes/_chat.tsx
++++ b/apps/web/src/routes/_chat.tsx
+@@ -15,6 +15,7 @@ import { startNewThreadFromContext } from "../lib/chatThreadActions";
+ import { isPreviewFocused } from "../lib/previewFocus";
+ import { isTerminalFocused } from "../lib/terminalFocus";
+ import { resolveShortcutCommand } from "../keybindings";
++import { openSessionSearch } from "../sessionSearchBus";
+ import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
+ import { isPreviewSupportedInRuntime } from "../previewStateStore";
+ import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
+@@ -77,6 +78,16 @@ function ChatRouteGlobalShortcuts() {
+         return;
+       }
+ 
++      if (command === "chat.search") {
++        if (activeThread === null && activeDraftThread === null) {
++          return;
++        }
++        event.preventDefault();
++        event.stopPropagation();
++        openSessionSearch();
++        return;
++      }
++
+       if (command === "chat.newLocal") {
+         event.preventDefault();
+         event.stopPropagation();
+diff --git a/apps/web/src/sessionSearchBus.ts b/apps/web/src/sessionSearchBus.ts
+new file mode 100644
+index 000000000..5c7210f6d
+--- /dev/null
++++ b/apps/web/src/sessionSearchBus.ts
+@@ -0,0 +1,10 @@
++const SESSION_SEARCH_OPEN_EVENT = "t3code:open-session-search";
++
++export function openSessionSearch(): void {
++  window.dispatchEvent(new Event(SESSION_SEARCH_OPEN_EVENT));
++}
++
++export function onOpenSessionSearch(listener: () => void): () => void {
++  window.addEventListener(SESSION_SEARCH_OPEN_EVENT, listener);
++  return () => window.removeEventListener(SESSION_SEARCH_OPEN_EVENT, listener);
++}
+diff --git a/packages/contracts/src/keybindings.test.ts b/packages/contracts/src/keybindings.test.ts
+index 411cff23c..f41290a08 100644
+--- a/packages/contracts/src/keybindings.test.ts
++++ b/packages/contracts/src/keybindings.test.ts
+@@ -78,6 +78,13 @@ it.effect("parses keybinding rules", () =>
+     });
+     assert.strictEqual(parsedProjectSearch.command, "projectSearch.toggle");
+ 
++    const parsedChatSearch = yield* decode(KeybindingRule, {
++      key: "mod+f",
++      command: "chat.search",
++      when: "!terminalFocus && !previewFocus",
++    });
++    assert.strictEqual(parsedChatSearch.command, "chat.search");
++
+     const parsedThemeEditor = yield* decode(KeybindingRule, {
+       key: "mod+alt+shift+t",
+       command: "themeEditor.toggle",
+diff --git a/packages/contracts/src/keybindings.ts b/packages/contracts/src/keybindings.ts
+index fe3549d07..0bb34287b 100644
+--- a/packages/contracts/src/keybindings.ts
++++ b/packages/contracts/src/keybindings.ts
+@@ -71,6 +71,7 @@ export const STATIC_KEYBINDING_COMMANDS = [
+   "projectSearch.toggle",
+   "themeEditor.toggle",
+   "composer.stash",
++  "chat.search",
+   "chat.new",
+   "chat.newLocal",
+   "editor.openFavorite",
+diff --git a/packages/shared/src/keybindings.ts b/packages/shared/src/keybindings.ts
+index 939e88b7f..b5808bc2b 100644
+--- a/packages/shared/src/keybindings.ts
++++ b/packages/shared/src/keybindings.ts
+@@ -39,6 +39,7 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
+   { key: "mod+shift+f", command: "projectSearch.toggle", when: "!terminalFocus" },
+   { key: "mod+alt+shift+t", command: "themeEditor.toggle" },
+   { key: "mod+s", command: "composer.stash", when: "!terminalFocus" },
++  { key: "mod+f", command: "chat.search", when: "!terminalFocus && !previewFocus" },
+   { key: "mod+n", command: "chat.new", when: "!terminalFocus" },
+   { key: "mod+shift+o", command: "chat.new", when: "!terminalFocus" },
+   { key: "mod+shift+n", command: "chat.newLocal", when: "!terminalFocus" },

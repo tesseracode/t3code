@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "feature": "attention-inbox",
+  "current_generation": 3,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_785d8fb88382",
+      "kind": "record",
+      "patch_sha256": "9684fd0ef5df647fffc4b630878bf7d932936eb93ac51d063e244957f605dae6",
+      "git_patch_id": "cddf20599af118833a06ad63cd1d03811b7dd4bd",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "0c80e147c09f82d60c2fb5a22d677e6206bf340630825964e2250b0a7cdd67b6",
+      "canonical_patch": "",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "c87189e978856b8fd6043f42e296d2cf312cb6cc",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "apps/web/src/components/AppSidebarLayout.tsx",
+          "apps/web/src/components/CommandPalette.tsx",
+          "apps/web/src/components/attention/AttentionInbox.tsx",
+          "apps/web/src/components/attention/AttentionSidebarItem.tsx",
+          "apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+          "apps/web/src/components/attention/attentionInbox.logic.test.ts",
+          "apps/web/src/components/attention/attentionInbox.logic.ts",
+          "apps/web/src/components/attention/useOpenAttentionInbox.ts",
+          "apps/web/src/components/sidebar/SidebarChrome.tsx",
+          "apps/web/src/routeTree.gen.ts",
+          "apps/web/src/routes/_chat.attention.tsx",
+          "docs/internals/overview.md",
+          "docs/user/attention.md",
+          "docs/user/keybindings.md",
+          "docs/user/thread-sidebar.md",
+          "packages/contracts/src/keybindings.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/web/src/components/AppSidebarLayout.tsx",
+        "apps/web/src/components/CommandPalette.tsx",
+        "apps/web/src/components/attention/AttentionInbox.tsx",
+        "apps/web/src/components/attention/AttentionSidebarItem.tsx",
+        "apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+        "apps/web/src/components/attention/attentionInbox.logic.test.ts",
+        "apps/web/src/components/attention/attentionInbox.logic.ts",
+        "apps/web/src/components/attention/useOpenAttentionInbox.ts",
+        "apps/web/src/components/sidebar/SidebarChrome.tsx",
+        "apps/web/src/routeTree.gen.ts",
+        "apps/web/src/routes/_chat.attention.tsx",
+        "docs/internals/overview.md",
+        "docs/user/attention.md",
+        "docs/user/keybindings.md",
+        "docs/user/thread-sidebar.md",
+        "packages/contracts/src/keybindings.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "phase1-foundation",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 12,
+          "parent_patch_sha256": "845c515c5e81918d414539e99a233b95c29dbe9c8cc4c50dd95a684e3ac6d605",
+          "parent_recipe_sha256": "3217c85018b5b9d2b8f4955640b6e958053ad96de71dea36a158471f89e3cc19"
+        },
+        {
+          "slug": "session-search",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 9,
+          "parent_patch_sha256": "38333be0dcb886cdac0f24e44ce4756611fe1e4ab82c584820a5554f5f9eae01",
+          "parent_recipe_sha256": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_63dfd050830e",
+      "kind": "amend-refresh",
+      "patch_sha256": "0ad2a6a7ad06a0433944e059afc477186202e62a0fdd7e42d5f51a14fbe1e761",
+      "git_patch_id": "9c822f034ab093578ae12575bae2c9ec18c521a0",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "f67d90d901f6edf6c8549e4fa45c3c182b500eb12697ef39ef5f28987ecdd3cf",
+      "canonical_patch": "",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "baf051d9690fc377e641cbbe82cfbd25b12049b6",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "docs/internals/overview.md",
+          "docs/user/keybindings.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/internals/overview.md",
+        "docs/user/keybindings.md"
+      ],
+      "dependencies": [
+        {
+          "slug": "phase1-foundation",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 12,
+          "parent_patch_sha256": "845c515c5e81918d414539e99a233b95c29dbe9c8cc4c50dd95a684e3ac6d605",
+          "parent_recipe_sha256": "3217c85018b5b9d2b8f4955640b6e958053ad96de71dea36a158471f89e3cc19"
+        },
+        {
+          "slug": "session-search",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 9,
+          "parent_patch_sha256": "38333be0dcb886cdac0f24e44ce4756611fe1e4ab82c584820a5554f5f9eae01",
+          "parent_recipe_sha256": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 3,
+      "generation_id": "pg_8403c1aaf482",
+      "kind": "amend-refresh",
+      "patch_sha256": "c817b3b2150735f0f64410a695df2b926d525b3df3c70f450366d4115c7d034a",
+      "git_patch_id": "282d8f402bf8279edef01034525638cae7d4853d",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "2055d20b7900d8710d727bd7947a49c93f555ad9ee61cbf797058cddf7d548db",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/003-record.patch",
+      "base_commit": "c87189e978856b8fd6043f42e296d2cf312cb6cc",
+      "upper": {
+        "kind": "commit",
+        "ref": "HEAD",
+        "commit": "76ef157f4a18b4288665b98f4e43c4c9afa175df"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          "apps/web/src/components/AppSidebarLayout.tsx",
+          "apps/web/src/components/CommandPalette.tsx",
+          "apps/web/src/components/attention/AttentionInbox.tsx",
+          "apps/web/src/components/attention/AttentionSidebarItem.tsx",
+          "apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+          "apps/web/src/components/attention/attentionInbox.logic.test.ts",
+          "apps/web/src/components/attention/attentionInbox.logic.ts",
+          "apps/web/src/components/attention/useOpenAttentionInbox.ts",
+          "apps/web/src/components/sidebar/SidebarChrome.tsx",
+          "apps/web/src/routeTree.gen.ts",
+          "apps/web/src/routes/_chat.attention.tsx",
+          "docs/internals/overview.md",
+          "docs/user/attention.md",
+          "docs/user/keybindings.md",
+          "docs/user/thread-sidebar.md",
+          "packages/contracts/src/keybindings.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/web/src/components/AppSidebarLayout.tsx",
+        "apps/web/src/components/CommandPalette.tsx",
+        "apps/web/src/components/attention/AttentionInbox.tsx",
+        "apps/web/src/components/attention/AttentionSidebarItem.tsx",
+        "apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+        "apps/web/src/components/attention/attentionInbox.logic.test.ts",
+        "apps/web/src/components/attention/attentionInbox.logic.ts",
+        "apps/web/src/components/attention/useOpenAttentionInbox.ts",
+        "apps/web/src/components/sidebar/SidebarChrome.tsx",
+        "apps/web/src/routeTree.gen.ts",
+        "apps/web/src/routes/_chat.attention.tsx",
+        "docs/internals/overview.md",
+        "docs/user/attention.md",
+        "docs/user/keybindings.md",
+        "docs/user/thread-sidebar.md",
+        "packages/contracts/src/keybindings.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "phase1-foundation",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 12,
+          "parent_patch_sha256": "845c515c5e81918d414539e99a233b95c29dbe9c8cc4c50dd95a684e3ac6d605",
+          "parent_recipe_sha256": "3217c85018b5b9d2b8f4955640b6e958053ad96de71dea36a158471f89e3cc19"
+        },
+        {
+          "slug": "session-search",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 9,
+          "parent_patch_sha256": "38333be0dcb886cdac0f24e44ce4756611fe1e4ab82c584820a5554f5f9eae01",
+          "parent_recipe_sha256": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

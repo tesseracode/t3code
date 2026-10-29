@@ -1,0 +1,22 @@
+{
+  "id": "tpatch-local-capture-ignore",
+  "slug": "tpatch-local-capture-ignore",
+  "title": "Record the already-shipped .tpatch/local/ ignore rule so a clean same-base replay includes the local-only private capture exclusion. This is historical intent adoption, not a new product behavior.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-29T07:20:20Z",
+  "updated_at": "2026-10-29T08:41:16Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-29T08:41:52Z",
+  "apply": {
+    "completed_at": "2026-10-29T08:41:16Z",
+    "base_commit": "2cad5d72dc615996325bc1204d3e034e094795b7",
+    "has_patch": true
+  },
+  "reconcile": {
+    "attempted_at": "2026-10-29T08:39:17Z",
+    "upstream_ref": "v0.1.3",
+    "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
+    "outcome": "blocked"
+  }
+}

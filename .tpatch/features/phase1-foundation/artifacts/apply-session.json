@@ -1,0 +1,8 @@
+{
+  "slug": "phase1-foundation",
+  "completed_at": "2026-10-29T09:16:09Z",
+  "base_commit": "81c2157c19b6984d2d76365bf243d1ae90f61548",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "tpatch test — command: PATH=/Users/jdbencardinop/.nvm/versions/node/v26.12.1/bin:$PATH node_modules/.bin/vp test run apps/server/src/orchestration-v2/FoundationProjection.test.ts apps/server/src/persistence/ForkMigrations.test.ts packages/contracts/src/attention.test.ts packages/client-runtime/src/state/attentionNotifications.test.ts"
+}

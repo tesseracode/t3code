@@ -1,0 +1,1114 @@
+diff --git a/apps/server/src/orchestration/Layers/CurrentRequestAttention.test.ts b/apps/server/src/orchestration/Layers/CurrentRequestAttention.test.ts
+new file mode 100644
+index 000000000..3d93f5b92
+--- /dev/null
++++ b/apps/server/src/orchestration/Layers/CurrentRequestAttention.test.ts
+@@ -0,0 +1,409 @@
++import {
++  ApprovalRequestId,
++  CommandId,
++  EventId,
++  type OrchestrationEvent,
++  ProjectId,
++  ProviderInstanceId,
++  ThreadId,
++  TurnId,
++} from "@t3tools/contracts";
++import * as NodeServices from "@effect/platform-node/NodeServices";
++import { assert, describe, it } from "@effect/vitest";
++import * as Effect from "effect/Effect";
++import * as FileSystem from "effect/FileSystem";
++import * as Path from "effect/Path";
++import * as Layer from "effect/Layer";
++import * as Option from "effect/Option";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++import { OrchestrationEventStoreLive } from "../../persistence/Layers/OrchestrationEventStore.ts";
++import {
++  makeSqlitePersistenceLive,
++  SqlitePersistenceMemory,
++} from "../../persistence/Layers/Sqlite.ts";
++import { OrchestrationEventStore } from "../../persistence/Services/OrchestrationEventStore.ts";
++import { ProjectionStateRepository } from "../../persistence/Services/ProjectionState.ts";
++import {
++  CURRENT_ATTENTION_PROJECTOR,
++  ProjectionThreadAttentionCurrentRepository,
++} from "../../persistence/Services/ProjectionThreadAttentionCurrent.ts";
++import { OrchestrationProjectionPipeline } from "../Services/ProjectionPipeline.ts";
++import { OrchestrationProjectionPipelineLive } from "./ProjectionPipeline.ts";
++import { ServerConfig } from "../../config.ts";
++
++const makeLayer = (dbPath?: string) =>
++  OrchestrationProjectionPipelineLive.pipe(
++    Layer.provideMerge(OrchestrationEventStoreLive),
++    Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-current-attention-" })),
++    Layer.provideMerge(dbPath ? makeSqlitePersistenceLive(dbPath) : SqlitePersistenceMemory),
++    Layer.provideMerge(NodeServices.layer),
++  );
++const fixture = Effect.gen(function* () {
++  const store = yield* OrchestrationEventStore;
++  const pipeline = yield* OrchestrationProjectionPipeline;
++  const attention = yield* ProjectionThreadAttentionCurrentRepository;
++  const projectionState = yield* ProjectionStateRepository;
++  const sql = yield* SqlClient.SqlClient;
++  let nextId = 0;
++  const base = (threadId: ThreadId) => ({
++    eventId: EventId.make(`attention-event-${++nextId}`),
++    aggregateKind: "thread" as const,
++    aggregateId: threadId,
++    occurredAt: "2026-09-27T00:00:00.000Z",
++    commandId: CommandId.make(`attention-command-${nextId}`),
++    causationEventId: null,
++    correlationId: null,
++    metadata: {},
++  });
++  const append = Effect.fn("test.appendCurrentAttention")(function* (
++    event: Omit<OrchestrationEvent, "sequence">,
++    project = true,
++  ) {
++    const stored = yield* store.append(event);
++    if (project) yield* pipeline.projectEvent(stored);
++    return stored;
++  });
++  const thread = Effect.fn("test.createAttentionThread")(function* (
++    threadId = ThreadId.make("thread"),
++    projectId = ProjectId.make("project"),
++  ) {
++    return yield* append({
++      ...base(threadId),
++      type: "thread.created",
++      payload: {
++        threadId,
++        projectId,
++        title: "Thread",
++        modelSelection: {
++          instanceId: ProviderInstanceId.make("githubCopilot"),
++          model: "gpt-5-mini",
++        },
++        runtimeMode: "approval-required",
++        interactionMode: "default",
++        branch: null,
++        worktreePath: null,
++        createdAt: "2026-09-27T00:00:00.000Z",
++        updatedAt: "2026-09-27T00:00:00.000Z",
++      },
++    });
++  });
++  const activity = Effect.fn("test.attentionActivity")(function* (
++    kind: string,
++    requestId = "request",
++    options: {
++      threadId?: ThreadId;
++      turnId?: TurnId | null;
++      historyImport?: boolean;
++      project?: boolean;
++    } = {},
++  ) {
++    const threadId = options.threadId ?? ThreadId.make("thread");
++    const event = base(threadId);
++    return yield* append(
++      {
++        ...event,
++        type: "thread.activity-appended",
++        metadata: options.historyImport ? { historyImport: true } : {},
++        payload: {
++          threadId,
++          activity: {
++            id: event.eventId,
++            kind,
++            tone: "info",
++            summary: "private original summary",
++            payload: {
++              requestId,
++              detail: "private command/error",
++              questions: ["private question"],
++            },
++            turnId: options.turnId === undefined ? TurnId.make("turn") : options.turnId,
++            createdAt: event.occurredAt,
++          },
++        },
++      },
++      options.project ?? true,
++    );
++  });
++  const list = (threadId = ThreadId.make("thread")) =>
++    attention.listByThreadId({ threadId, limit: 100 });
++  return { sql, store, pipeline, attention, projectionState, append, thread, activity, list, base };
++});
++
++describe("current request attention", () => {
++  it.effect("isolates multiple kinds, threads and turns; revisions change only materially", () =>
++    Effect.gen(function* () {
++      const f = yield* fixture;
++      const threadId = ThreadId.make("thread");
++      yield* f.thread();
++      const first = yield* f.activity("approval.requested");
++      yield* f.pipeline.projectEvent(first);
++      yield* f.activity("approval.requested");
++      const [opened] = yield* f.list();
++      assert.equal(opened?.revision, 1);
++      assert.equal(opened?.sourceEventId, first.eventId);
++      assert.notMatch(Object.values(opened!).join(" "), /private/);
++      yield* f.activity("user-input.requested");
++      yield* f.activity("approval.requested", "other");
++      yield* f.thread(ThreadId.make("another"), ProjectId.make("other-project"));
++      yield* f.activity("approval.requested", "request", { threadId: ThreadId.make("another") });
++      yield* f.activity("approval.resolved", "request", { turnId: TurnId.make("wrong-turn") });
++      yield* f.append({
++        ...f.base(threadId),
++        type: "thread.approval-response-requested",
++        payload: {
++          threadId,
++          requestId: ApprovalRequestId.make("request"),
++          decision: "accept",
++          createdAt: first.occurredAt,
++        },
++      });
++      assert.equal((yield* f.list()).filter((row) => row.status === "open").length, 3);
++      yield* f.activity("provider.approval.respond.failed");
++      const failed = (yield* f.list()).find((row) => row.attentionId === opened?.attentionId)!;
++      assert.equal(failed.status, "open");
++      assert.equal(failed.reasonCode, "response_failed");
++      assert.equal(failed.revision, 2);
++      yield* f.activity("provider.approval.respond.failed");
++      assert.deepEqual(
++        (yield* f.list()).find((row) => row.attentionId === opened?.attentionId),
++        failed,
++      );
++      const resolvedEvent = yield* f.activity("approval.resolved");
++      yield* f.activity("provider.approval.respond.failed");
++      yield* f.activity("approval.requested");
++      const resolved = (yield* f.list()).find((row) => row.attentionId === opened?.attentionId)!;
++      assert.equal(resolved.status, "resolved");
++      assert.equal(resolved.revision, 3);
++      assert.equal(resolved.sourceEventId, resolvedEvent.eventId);
++      assert.equal((yield* f.list(ThreadId.make("another")))[0]?.status, "open");
++      yield* f.activity("approval.requested", "request", { turnId: TurnId.make("next-turn") });
++      yield* f.activity("approval.resolved", "request");
++      assert.equal((yield* f.list()).find((row) => row.turnId === "next-turn")?.status, "open");
++      yield* f.activity("user-input.resolved");
++      assert.equal((yield* f.list()).find((row) => row.kind === "user_input")?.status, "resolved");
++      yield* f.activity("approval.resolved", "unknown");
++      assert.lengthOf(yield* f.list(), 4);
++    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect(
++    "resolves every open request on revert, deletes incarnations, and rebuilds without phantom imports",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* fixture;
++        const threadId = ThreadId.make("thread");
++        yield* f.thread();
++        yield* f.activity("approval.requested", "imported", { historyImport: true });
++        assert.deepEqual(yield* f.list(), []);
++        yield* f.activity("approval.requested", "one");
++        yield* f.activity("user-input.requested", "two");
++        const revert = yield* f.append({
++          ...f.base(threadId),
++          type: "thread.reverted",
++          payload: { threadId, turnCount: 0 },
++        });
++        const rows = yield* f.list();
++        assert.lengthOf(rows, 2);
++        assert.isTrue(
++          rows.every(
++            (row) =>
++              row.status === "resolved" &&
++              row.reasonCode === "thread_reverted" &&
++              row.revision === 2 &&
++              row.sourceEventId === revert.eventId,
++          ),
++        );
++        const audit =
++          yield* f.sql`SELECT * FROM projection_thread_attention_audit ORDER BY sequence`;
++        yield* f.attention.reset;
++        yield* f.pipeline.bootstrap;
++        assert.deepEqual(yield* f.list(), rows);
++        assert.deepEqual(
++          yield* f.sql`SELECT * FROM projection_thread_attention_audit ORDER BY sequence`,
++          audit,
++        );
++        const deleted = yield* f.append({
++          ...f.base(threadId),
++          type: "thread.deleted",
++          payload: { threadId, deletedAt: "2026-09-27T00:00:00.000Z" },
++        });
++        assert.deepEqual(yield* f.list(), []);
++        yield* f.activity("approval.requested", "late");
++        assert.deepEqual(yield* f.list(), []);
++        yield* f.pipeline.projectEvent(revert);
++        const cursor = yield* f.projectionState.getByProjector({
++          projector: CURRENT_ATTENTION_PROJECTOR,
++        });
++        assert.isTrue(Option.isSome(cursor) && cursor.value.lastAppliedSequence > deleted.sequence);
++        yield* f.thread();
++        yield* f.activity("approval.requested", "one");
++        const recreated = yield* f.list();
++        assert.lengthOf(recreated, 1);
++        assert.isFalse(rows.some((row) => row.attentionId === recreated[0]?.attentionId));
++        yield* f.attention.reset;
++        yield* f.pipeline.bootstrap;
++        assert.deepEqual(yield* f.list(), recreated);
++      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect("rolls back rows and cursor together, retries, and purges a deleted project", () =>
++    Effect.gen(function* () {
++      const f = yield* fixture;
++      yield* f.thread();
++      const cursorBefore = yield* f.projectionState.getByProjector({
++        projector: CURRENT_ATTENTION_PROJECTOR,
++      });
++      const event = yield* f.activity("approval.requested", "retry", { project: false });
++      yield* f.sql`CREATE TRIGGER fail_attention_cursor BEFORE UPDATE ON projection_state
++        WHEN NEW.projector = 'projection.thread-attention-current'
++        BEGIN SELECT RAISE(ABORT, 'test rollback'); END`;
++      const failed = yield* f.pipeline.projectEvent(event).pipe(Effect.result);
++      assert.equal(failed._tag, "Failure");
++      assert.deepEqual(yield* f.list(), []);
++      assert.deepEqual(
++        yield* f.projectionState.getByProjector({ projector: CURRENT_ATTENTION_PROJECTOR }),
++        cursorBefore,
++      );
++      yield* f.sql`DROP TRIGGER fail_attention_cursor`;
++      yield* f.pipeline.projectEvent(event);
++      assert.equal((yield* f.list())[0]?.revision, 1);
++      yield* f.thread(ThreadId.make("second"));
++      yield* f.activity("user-input.requested", "two", { threadId: ThreadId.make("second") });
++      const projectId = ProjectId.make("project");
++      yield* f.append({
++        ...f.base(ThreadId.make("thread")),
++        aggregateKind: "project",
++        aggregateId: projectId,
++        type: "project.deleted",
++        payload: { projectId, deletedAt: event.occurredAt },
++      });
++      assert.deepEqual(yield* f.list(), []);
++      assert.deepEqual(yield* f.list(ThreadId.make("second")), []);
++      yield* f.attention.reset;
++      yield* f.pipeline.bootstrap;
++      assert.deepEqual(yield* f.list(), []);
++      assert.deepEqual(yield* f.list(ThreadId.make("second")), []);
++    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect("does not guess an unscoped reply across reused request IDs and bounds queries", () =>
++    Effect.gen(function* () {
++      const f = yield* fixture;
++      yield* f.thread();
++      yield* f.activity("approval.requested");
++      yield* f.activity("approval.requested", "request", { turnId: TurnId.make("second") });
++      yield* f.activity("approval.resolved", "request", { turnId: null });
++      assert.isTrue((yield* f.list()).every((row) => row.status === "open"));
++      yield* f.activity("approval.resolved");
++      yield* f.activity("approval.resolved", "request", { turnId: null });
++      assert.equal((yield* f.list()).find((row) => row.turnId === "second")?.status, "open");
++      const firstPage = yield* f.attention.listByThreadId({
++        threadId: ThreadId.make("thread"),
++        limit: 1,
++      });
++      const nextPage = yield* f.attention.listByThreadId({
++        threadId: ThreadId.make("thread"),
++        limit: 1,
++        afterAttentionId: firstPage[0]!.attentionId,
++      });
++      assert.equal(firstPage.length + nextPage.length, 2);
++      assert.notEqual(firstPage[0]?.attentionId, nextPage[0]?.attentionId);
++      assert.equal(
++        (yield* f.attention
++          .listByThreadId({ threadId: ThreadId.make("thread"), limit: 101 })
++          .pipe(Effect.result))._tag,
++        "Failure",
++      );
++    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect(
++    "uses legacy metadata identity and ignores imported resolutions and raw failure text",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* fixture;
++        const threadId = ThreadId.make("thread");
++        yield* f.thread();
++        const base = f.base(threadId);
++        yield* f.append({
++          ...base,
++          type: "thread.activity-appended",
++          metadata: { requestId: ApprovalRequestId.make("legacy") },
++          payload: {
++            threadId,
++            activity: {
++              id: base.eventId,
++              kind: "user-input.requested",
++              tone: "info",
++              summary: "private question",
++              payload: {},
++              turnId: null,
++              createdAt: base.occurredAt,
++            },
++          },
++        });
++        yield* f.activity("user-input.resolved", "legacy", { turnId: null, historyImport: true });
++        assert.equal((yield* f.list())[0]?.status, "open");
++        yield* f.activity("provider.user-input.respond.failed", "legacy", { turnId: null });
++        const failed = (yield* f.list())[0]!;
++        assert.equal(failed.reasonCode, "response_failed");
++        assert.equal(failed.revision, 2);
++        assert.notMatch(Object.values(failed).join(" "), /private/);
++        yield* f.activity("user-input.resolved", "legacy", { turnId: null });
++        yield* f.activity("provider.user-input.respond.failed", "legacy", { turnId: null });
++        assert.equal((yield* f.list())[0]?.revision, 3);
++        assert.equal((yield* f.list())[0]?.status, "resolved");
++        const invalid = yield* f.activity("approval.requested", "", { project: false });
++        yield* f.sql.withTransaction(f.attention.project(invalid));
++        assert.lengthOf(yield* f.list(), 1);
++      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect(
++    "reopens disk state, applies its missed tail once and rebuilds the same revisions",
++    () =>
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const path = yield* Path.Path;
++        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-attention-restart-" });
++        const dbPath = path.join(directory, "state.sqlite");
++        const saved = yield* Effect.gen(function* () {
++          const f = yield* fixture;
++          yield* f.thread();
++          yield* f.activity("approval.requested");
++          yield* f.activity("user-input.requested", "input");
++          const missed = yield* f.activity("provider.user-input.respond.failed", "input", {
++            project: false,
++          });
++          return { rows: yield* f.list(), missed };
++        }).pipe(Effect.provide(Layer.fresh(makeLayer(dbPath))));
++        yield* Effect.gen(function* () {
++          const attention = yield* ProjectionThreadAttentionCurrentRepository;
++          const pipeline = yield* OrchestrationProjectionPipeline;
++          const projectionState = yield* ProjectionStateRepository;
++          const list = () =>
++            attention.listByThreadId({ threadId: ThreadId.make("thread"), limit: 100 });
++          assert.deepEqual(yield* list(), saved.rows);
++          yield* pipeline.bootstrap;
++          const caughtUp = yield* list();
++          assert.equal(caughtUp.find((row) => row.kind === "approval")?.revision, 1);
++          assert.equal(caughtUp.find((row) => row.kind === "user_input")?.revision, 2);
++          assert.equal(
++            caughtUp.find((row) => row.kind === "user_input")?.reasonCode,
++            "response_failed",
++          );
++          yield* pipeline.projectEvent(saved.missed);
++          assert.deepEqual(yield* list(), caughtUp);
++          yield* attention.reset;
++          yield* pipeline.bootstrap;
++          assert.deepEqual(yield* list(), caughtUp);
++          const cursor = yield* projectionState.getByProjector({
++            projector: CURRENT_ATTENTION_PROJECTOR,
++          });
++          assert.isTrue(
++            Option.isSome(cursor) && cursor.value.lastAppliedSequence === saved.missed.sequence,
++          );
++        }).pipe(Effect.provide(Layer.fresh(makeLayer(dbPath))));
++      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
++  );
++});
+diff --git a/apps/server/src/orchestration/Layers/ProjectionPipeline.ts b/apps/server/src/orchestration/Layers/ProjectionPipeline.ts
+index ed85738a4..1cf0a629b 100644
+--- a/apps/server/src/orchestration/Layers/ProjectionPipeline.ts
++++ b/apps/server/src/orchestration/Layers/ProjectionPipeline.ts
+@@ -21,6 +21,11 @@ import {
+ } from "@t3tools/shared/threadPullRequests";
+ 
+ import { toPersistenceSqlError, type ProjectionRepositoryError } from "../../persistence/Errors.ts";
++import {
++  CURRENT_ATTENTION_PROJECTOR,
++  ProjectionThreadAttentionCurrentRepository,
++} from "../../persistence/Services/ProjectionThreadAttentionCurrent.ts";
++import { ProjectionThreadAttentionCurrentRepositoryLive } from "../../persistence/Layers/ProjectionThreadAttentionCurrent.ts";
+ import { OrchestrationEventStore } from "../../persistence/Services/OrchestrationEventStore.ts";
+ import { ProjectionPendingApprovalRepository } from "../../persistence/Services/ProjectionPendingApprovals.ts";
+ import { ProjectionProjectRepository } from "../../persistence/Services/ProjectionProjects.ts";
+@@ -70,6 +75,7 @@ import {
+ } from "../../attachmentStore.ts";
+ 
+ export const ORCHESTRATION_PROJECTOR_NAMES = {
++  threadAttentionCurrent: CURRENT_ATTENTION_PROJECTOR,
+   projects: "projection.projects",
+   threads: "projection.threads",
+   threadMessages: "projection.thread-messages",
+@@ -479,6 +485,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
+     const sql = yield* SqlClient.SqlClient;
+     const eventStore = yield* OrchestrationEventStore;
+     const projectionStateRepository = yield* ProjectionStateRepository;
++    const currentAttention = yield* ProjectionThreadAttentionCurrentRepository;
+     const projectionProjectRepository = yield* ProjectionProjectRepository;
+     const projectionThreadRepository = yield* ProjectionThreadRepository;
+     const projectionThreadMessageRepository = yield* ProjectionThreadMessageRepository;
+@@ -1941,6 +1948,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
+     });
+ 
+     const projectors: ReadonlyArray<ProjectorDefinition> = [
++      { name: CURRENT_ATTENTION_PROJECTOR, apply: (event) => currentAttention.project(event) },
+       {
+         name: ORCHESTRATION_PROJECTOR_NAMES.projects,
+         apply: applyProjectsProjection,
+@@ -2215,4 +2223,5 @@ export const OrchestrationProjectionPipelineLive = Layer.effect(
+   Layer.provideMerge(ProjectionTurnRepositoryLive),
+   Layer.provideMerge(ProjectionPendingApprovalRepositoryLive),
+   Layer.provideMerge(ProjectionStateRepositoryLive),
++  Layer.provideMerge(ProjectionThreadAttentionCurrentRepositoryLive),
+ );
+diff --git a/apps/server/src/persistence/ForkMigrations.test.ts b/apps/server/src/persistence/ForkMigrations.test.ts
+index cec735963..219cc3683 100644
+--- a/apps/server/src/persistence/ForkMigrations.test.ts
++++ b/apps/server/src/persistence/ForkMigrations.test.ts
+@@ -132,6 +132,7 @@ it.effect("fresh installs keep upstream and fork histories in separate namespace
+       [
+         { migration_id: 44, name: attentionName },
+         { migration_id: 45, name: twsName },
++        { migration_id: 46, name: "ProjectionThreadAttentionCurrent" },
+       ],
+     );
+     assert.deepEqual(yield* runMigrations(), []);
+@@ -148,7 +149,49 @@ it.effect("upstream-only databases add fork state without rerunning upstream mig
+       yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`,
+       original,
+     );
+-    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 2);
++
++    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 3);
++  }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
++);
++
++it.effect(
++  "upgrades the established fork ledger additively without changing the audit or its cursor",
++  () =>
++    Effect.gen(function* () {
++      const sql = yield* SqlClient.SqlClient;
++      yield* runMigrations({ toMigrationInclusive: 52 });
++      yield* AttentionAudit;
++      yield* TwsBindings;
++      yield* sql`INSERT INTO t3code_fork_migrations (migration_id, name, created_at)
++        VALUES (44, ${attentionName}, ${originalTimestamp}), (45, ${twsName}, ${originalTimestamp})`;
++      yield* sql`INSERT INTO projection_thread_attention_audit
++        (event_id, thread_id, kind, sequence, occurred_at)
++        VALUES ('audit', 'thread', 'approval.requested', 3, '2026-09-27T00:00:00Z')`;
++      yield* sql`INSERT INTO projection_state (projector, last_applied_sequence, updated_at)
++        VALUES ('projection.thread-attention-audit', 3, '2026-09-27T00:00:00Z')`;
++      const before = yield* snapshotPreservedRows;
++      const upstream = yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`;
++      yield* runMigrations();
++      assert.deepEqual(yield* snapshotPreservedRows, before);
++      assert.deepEqual(
++        yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`,
++        upstream,
++      );
++      assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_current`, []);
++      assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_context`, []);
++      assert.deepEqual(yield* runMigrations(), []);
++    }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
++);
++
++it.effect("does not reinterpret new fork migration IDs as historical upstream collisions", () =>
++  Effect.gen(function* () {
++    const sql = yield* SqlClient.SqlClient;
++    yield* runMigrations({ toMigrationInclusive: 52 });
++    yield* sql`UPDATE effect_sql_migrations SET name = 'ProjectionThreadAttentionCurrent' WHERE migration_id = 46`;
++    const before = yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`;
++    assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
++    assert.deepEqual(yield* sql`SELECT * FROM effect_sql_migrations ORDER BY migration_id`, before);
++    assert.deepEqual(yield* sql`SELECT * FROM t3code_fork_migrations`, []);
+   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+ );
+ 
+@@ -165,7 +208,7 @@ it.effect(
+       yield* runMigrations();
+       assert.deepEqual(yield* snapshotPreservedRows, saved);
+       assert.deepEqual(
+-        yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`,
++        yield* sql`SELECT * FROM t3code_fork_migrations WHERE migration_id <= 45 ORDER BY migration_id`,
+         provenance,
+       );
+       yield* assertUpstreamState;
+diff --git a/apps/server/src/persistence/ForkMigrations.ts b/apps/server/src/persistence/ForkMigrations.ts
+index 7bd3b8e30..19697f49d 100644
+--- a/apps/server/src/persistence/ForkMigrations.ts
++++ b/apps/server/src/persistence/ForkMigrations.ts
+@@ -4,6 +4,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
+ 
+ import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.ts";
+ import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
++import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
+ import Upstream0044 from "./Migrations/044_ClearAutomaticProjectModelDefaults.ts";
+ import Upstream0045 from "./Migrations/045_ProjectionProjectsAutoPull.ts";
+ 
+@@ -11,6 +12,7 @@ const FORK_MIGRATIONS_TABLE = "t3code_fork_migrations";
+ const forkEntries = [
+   [44, "ProjectionThreadAttentionAudit", AttentionAudit],
+   [45, "TwsBindings", TwsBindings],
++  [46, "ProjectionThreadAttentionCurrent", CurrentAttention],
+ ] as const;
+ const run = Migrator.make({});
+ 
+@@ -39,6 +41,44 @@ const locatorColumns = [
+ ];
+ const lifecycleColumns = ["first_seen_at", "last_seen_at", "retired_at"];
+ const tables: ReadonlyArray<TableShape> = [
++  {
++    name: "projection_thread_attention_context",
++    migration: 46,
++    columns: ["thread_id", "project_id", "incarnation_event_id", "is_deleted"],
++    nullable: [],
++    primaryKey: ["thread_id"],
++    integerColumns: ["is_deleted"],
++    indexes: ["idx_attention_context_project"],
++  },
++  {
++    name: "projection_thread_attention_current",
++    migration: 46,
++    columns: [
++      "attention_id",
++      "project_id",
++      "thread_id",
++      "turn_id",
++      "request_id",
++      "kind",
++      "status",
++      "reason_code",
++      "revision",
++      "source_event_id",
++      "source_sequence",
++      "opened_at",
++      "updated_at",
++      "resolved_at",
++    ],
++    nullable: ["turn_id", "resolved_at"],
++    primaryKey: ["attention_id"],
++    integerColumns: ["revision", "source_sequence"],
++    indexes: [
++      "idx_attention_current_thread",
++      "idx_attention_current_request",
++      "idx_attention_current_sequence",
++      "idx_attention_current_project",
++    ],
++  },
+   {
+     name: "projection_thread_attention_audit",
+     migration: 44,
+@@ -276,8 +316,10 @@ export const bridgeLegacyForkMigrations = Effect.fn("bridgeLegacyForkMigrations"
+     ledger.length === 0
+       ? []
+       : yield* sql<MigrationRow>`SELECT migration_id, name, created_at FROM effect_sql_migrations ORDER BY migration_id`;
+-  const legacy = sharedHistory.filter((row) =>
+-    forkEntries.some(([id, name]) => row.migration_id === id && row.name === name),
++  const legacy = sharedHistory.filter(
++    (row) =>
++      (row.migration_id === 44 || row.migration_id === 45) &&
++      forkEntries.some(([id, name]) => row.migration_id === id && row.name === name),
+   );
+   if (
+     toMigrationInclusive !== undefined &&
+diff --git a/apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts
+new file mode 100644
+index 000000000..a43dad1c9
+--- /dev/null
++++ b/apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts
+@@ -0,0 +1,45 @@
++import * as Effect from "effect/Effect";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++
++export default Effect.gen(function* () {
++  const sql = yield* SqlClient.SqlClient;
++  yield* sql`
++    CREATE TABLE projection_thread_attention_context (
++      thread_id TEXT PRIMARY KEY NOT NULL,
++      project_id TEXT NOT NULL,
++      incarnation_event_id TEXT NOT NULL,
++      is_deleted INTEGER NOT NULL CHECK (is_deleted IN (0, 1))
++    )
++  `;
++  yield* sql`CREATE INDEX idx_attention_context_project
++    ON projection_thread_attention_context(project_id)`;
++  yield* sql`
++    CREATE TABLE projection_thread_attention_current (
++      attention_id TEXT PRIMARY KEY NOT NULL,
++      project_id TEXT NOT NULL,
++      thread_id TEXT NOT NULL,
++      turn_id TEXT,
++      request_id TEXT NOT NULL,
++      kind TEXT NOT NULL CHECK (kind IN ('approval', 'user_input')),
++      status TEXT NOT NULL CHECK (status IN ('open', 'resolved')),
++      reason_code TEXT NOT NULL CHECK (reason_code IN (
++        'approval_requested', 'user_input_requested', 'response_failed', 'request_resolved', 'thread_reverted'
++      )),
++      revision INTEGER NOT NULL CHECK (revision > 0),
++      source_event_id TEXT NOT NULL,
++      source_sequence INTEGER NOT NULL,
++      opened_at TEXT NOT NULL,
++      updated_at TEXT NOT NULL,
++      resolved_at TEXT,
++      CHECK ((status = 'open' AND resolved_at IS NULL) OR (status = 'resolved' AND resolved_at IS NOT NULL))
++    )
++  `;
++  yield* sql`CREATE INDEX idx_attention_current_thread
++    ON projection_thread_attention_current(thread_id, attention_id)`;
++  yield* sql`CREATE INDEX idx_attention_current_request
++    ON projection_thread_attention_current(thread_id, kind, request_id, status, turn_id)`;
++  yield* sql`CREATE INDEX idx_attention_current_sequence
++    ON projection_thread_attention_current(source_sequence, attention_id)`;
++  yield* sql`CREATE INDEX idx_attention_current_project
++    ON projection_thread_attention_current(project_id)`;
++});
+diff --git a/apps/server/src/persistence/Layers/ProjectionState.ts b/apps/server/src/persistence/Layers/ProjectionState.ts
+index a6fb7f3be..7857afb80 100644
+--- a/apps/server/src/persistence/Layers/ProjectionState.ts
++++ b/apps/server/src/persistence/Layers/ProjectionState.ts
+@@ -59,6 +59,7 @@ const makeProjectionStateRepository = Effect.gen(function* () {
+             DO UPDATE SET
+               last_applied_sequence = excluded.last_applied_sequence,
+               updated_at = excluded.updated_at
++            WHERE excluded.last_applied_sequence >= projection_state.last_applied_sequence
+           `,
+   });
+ 
+diff --git a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
+new file mode 100644
+index 000000000..8a1b5bb2e
+--- /dev/null
++++ b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
+@@ -0,0 +1,236 @@
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodeCrypto from "node:crypto";
++import {
++  ApprovalRequestId,
++  EventId,
++  type OrchestrationEvent,
++  ProjectId,
++  RequestAttentionKind,
++  RequestAttentionItem,
++  ThreadId,
++  TurnId,
++} from "@t3tools/contracts";
++import * as Effect from "effect/Effect";
++import * as Layer from "effect/Layer";
++import * as Option from "effect/Option";
++import * as Schema from "effect/Schema";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++import * as SqlSchema from "effect/unstable/sql/SqlSchema";
++import { toPersistenceDecodeError, toPersistenceSqlError } from "../Errors.ts";
++import {
++  CURRENT_ATTENTION_PROJECTOR,
++  ListCurrentAttentionInput,
++  ProjectionThreadAttentionCurrentRepository,
++} from "../Services/ProjectionThreadAttentionCurrent.ts";
++
++const activityTransitions = {
++  "approval.requested": { kind: "approval", action: "open" },
++  "approval.resolved": { kind: "approval", action: "resolve" },
++  "provider.approval.respond.failed": { kind: "approval", action: "fail" },
++  "user-input.requested": { kind: "user_input", action: "open" },
++  "user-input.resolved": { kind: "user_input", action: "resolve" },
++  "provider.user-input.respond.failed": { kind: "user_input", action: "fail" },
++} as const;
++const ActivityKind = Schema.Literals([
++  "approval.requested",
++  "approval.resolved",
++  "provider.approval.respond.failed",
++  "user-input.requested",
++  "user-input.resolved",
++  "provider.user-input.respond.failed",
++]);
++const isActivityKind = Schema.is(ActivityKind);
++const requestIdentity = Schema.decodeUnknownOption(
++  Schema.Struct({
++    requestId: Schema.optional(ApprovalRequestId),
++  }),
++);
++const encodeIdentity = Schema.encodeEffect(
++  Schema.fromJsonString(
++    Schema.Tuple([EventId, RequestAttentionKind, ApprovalRequestId, Schema.NullOr(TurnId)]),
++  ),
++);
++
++const make = Effect.gen(function* () {
++  const sql = yield* SqlClient.SqlClient;
++  const context = SqlSchema.findOneOption({
++    Request: ThreadId,
++    Result: Schema.Struct({
++      projectId: ProjectId,
++      incarnationEventId: EventId,
++      isDeleted: Schema.Literals([0, 1]),
++    }),
++    execute: (threadId) => sql`
++      SELECT project_id AS "projectId", incarnation_event_id AS "incarnationEventId",
++        is_deleted AS "isDeleted"
++      FROM projection_thread_attention_context WHERE thread_id = ${threadId}
++    `,
++  });
++  const list = SqlSchema.findAll({
++    Request: ListCurrentAttentionInput,
++    Result: RequestAttentionItem,
++    execute: ({ threadId, limit, afterAttentionId }) => sql`
++      SELECT attention_id AS "attentionId", project_id AS "projectId", thread_id AS "threadId",
++        turn_id AS "turnId", request_id AS "requestId", kind, status, reason_code AS "reasonCode",
++        revision, source_event_id AS "sourceEventId", source_sequence AS "sourceSequence",
++        opened_at AS "openedAt", updated_at AS "updatedAt", resolved_at AS "resolvedAt"
++      FROM projection_thread_attention_current
++      WHERE thread_id = ${threadId} AND attention_id > ${afterAttentionId ?? ""}
++      ORDER BY attention_id ASC LIMIT ${limit}
++    `,
++  });
++  const project = Effect.fn("ProjectionThreadAttentionCurrent.project")(function* (
++    event: OrchestrationEvent,
++  ) {
++    if (event.type === "thread.activity-appended") {
++      if (event.metadata.historyImport === true || !isActivityKind(event.payload.activity.kind))
++        return;
++    } else if (
++      !["thread.created", "thread.deleted", "thread.reverted", "project.deleted"].includes(
++        event.type,
++      )
++    ) {
++      return;
++    }
++    const cursor = yield* sql<{ readonly sequence: number }>`
++      SELECT last_applied_sequence AS sequence FROM projection_state
++      WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}
++    `;
++    if ((cursor[0]?.sequence ?? 0) >= event.sequence) return;
++    switch (event.type) {
++      case "thread.created":
++        yield* sql`DELETE FROM projection_thread_attention_current WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`
++          INSERT INTO projection_thread_attention_context (thread_id, project_id, incarnation_event_id, is_deleted)
++          VALUES (${event.payload.threadId}, ${event.payload.projectId}, ${event.eventId}, 0)
++          ON CONFLICT (thread_id) DO UPDATE SET project_id = excluded.project_id,
++            incarnation_event_id = excluded.incarnation_event_id, is_deleted = 0
++        `;
++        return;
++      case "thread.deleted":
++        yield* sql`DELETE FROM projection_thread_attention_current WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`UPDATE projection_thread_attention_context SET is_deleted = 1 WHERE thread_id = ${event.payload.threadId}`;
++        return;
++      case "project.deleted":
++        yield* sql`DELETE FROM projection_thread_attention_current WHERE project_id = ${event.payload.projectId}`;
++        yield* sql`UPDATE projection_thread_attention_context SET is_deleted = 1 WHERE project_id = ${event.payload.projectId}`;
++        return;
++      case "thread.reverted":
++        yield* sql`
++          UPDATE projection_thread_attention_current SET status = 'resolved', reason_code = 'thread_reverted',
++            revision = revision + 1, source_event_id = ${event.eventId}, source_sequence = ${event.sequence},
++            updated_at = ${event.occurredAt}, resolved_at = ${event.occurredAt}
++          WHERE thread_id = ${event.payload.threadId} AND status = 'open'
++        `;
++        return;
++      case "thread.activity-appended": {
++        if (!isActivityKind(event.payload.activity.kind)) return;
++        const transition = activityTransitions[event.payload.activity.kind];
++        const decoded = requestIdentity(event.payload.activity.payload);
++        const requestId =
++          (Option.isSome(decoded) ? decoded.value.requestId : undefined) ??
++          event.metadata.requestId;
++        if (requestId === undefined) {
++          yield* Effect.logWarning(
++            "Ignored current attention event without a valid request identity",
++            {
++              eventId: event.eventId,
++              sequence: event.sequence,
++              kind: event.payload.activity.kind,
++            },
++          );
++          return;
++        }
++        const thread = yield* context(event.payload.threadId);
++        if (Option.isNone(thread)) {
++          yield* Effect.logWarning("Ignored current attention event without a thread incarnation", {
++            eventId: event.eventId,
++            sequence: event.sequence,
++          });
++          return;
++        }
++        if (thread.value.isDeleted === 1) return;
++        const turnId = event.payload.activity.turnId;
++        if (transition.action === "open") {
++          const identity = yield* encodeIdentity([
++            thread.value.incarnationEventId,
++            transition.kind,
++            requestId,
++            turnId,
++          ]);
++          const attentionId = NodeCrypto.createHash("sha256").update(identity).digest("hex");
++          yield* sql`
++            INSERT INTO projection_thread_attention_current
++              (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code,
++               revision, source_event_id, source_sequence, opened_at, updated_at, resolved_at)
++            VALUES (${attentionId}, ${thread.value.projectId}, ${event.payload.threadId}, ${turnId},
++              ${requestId}, ${transition.kind}, 'open',
++              ${transition.kind === "approval" ? "approval_requested" : "user_input_requested"},
++              1, ${event.eventId}, ${event.sequence}, ${event.occurredAt}, ${event.occurredAt}, NULL)
++            ON CONFLICT (attention_id) DO NOTHING
++          `;
++          return;
++        }
++        const candidates = yield* sql<{
++          readonly attention_id: string;
++          readonly reason_code: string;
++          readonly status: string;
++        }>`
++          SELECT attention_id, reason_code, status FROM projection_thread_attention_current
++          WHERE thread_id = ${event.payload.threadId} AND kind = ${transition.kind}
++            AND request_id = ${requestId}
++            AND (${turnId} IS NULL OR turn_id = ${turnId})
++          LIMIT 2
++        `;
++        if (candidates.length > 1) {
++          yield* Effect.logWarning(
++            "Ignored ambiguous current attention reply without matching turn identity",
++            {
++              eventId: event.eventId,
++              sequence: event.sequence,
++            },
++          );
++          return;
++        }
++        const candidate = candidates[0];
++        if (
++          !candidate ||
++          candidate.status !== "open" ||
++          (transition.action === "fail" && candidate.reason_code === "response_failed")
++        )
++          return;
++        const resolved = transition.action === "resolve";
++        yield* sql`
++          UPDATE projection_thread_attention_current SET status = ${resolved ? "resolved" : "open"},
++            reason_code = ${resolved ? "request_resolved" : "response_failed"}, revision = revision + 1,
++            source_event_id = ${event.eventId}, source_sequence = ${event.sequence},
++            updated_at = ${event.occurredAt}, resolved_at = ${resolved ? event.occurredAt : null}
++          WHERE attention_id = ${candidate.attention_id}
++        `;
++        return;
++      }
++    }
++  });
++  const mapError = (operation: string) => (cause: unknown) =>
++    Schema.isSchemaError(cause)
++      ? toPersistenceDecodeError(operation)(cause)
++      : toPersistenceSqlError(operation)(cause);
++  return ProjectionThreadAttentionCurrentRepository.of({
++    project: (event) => project(event).pipe(Effect.mapError(mapError("CurrentAttention.project"))),
++    listByThreadId: (input) => list(input).pipe(Effect.mapError(mapError("CurrentAttention.list"))),
++    reset: sql
++      .withTransaction(
++        Effect.gen(function* () {
++          yield* sql`DELETE FROM projection_thread_attention_current`;
++          yield* sql`DELETE FROM projection_thread_attention_context`;
++          yield* sql`DELETE FROM projection_state WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}`;
++        }),
++      )
++      .pipe(Effect.mapError(mapError("CurrentAttention.reset"))),
++  });
++});
++
++export const ProjectionThreadAttentionCurrentRepositoryLive = Layer.effect(
++  ProjectionThreadAttentionCurrentRepository,
++  make,
++);
+diff --git a/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts
+new file mode 100644
+index 000000000..c67a4afeb
+--- /dev/null
++++ b/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts
+@@ -0,0 +1,33 @@
++import {
++  AttentionId,
++  type OrchestrationEvent,
++  PositiveInt,
++  type RequestAttentionItem,
++  ThreadId,
++} from "@t3tools/contracts";
++import * as Context from "effect/Context";
++import type * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
++import type { ProjectionRepositoryError } from "../Errors.ts";
++
++export const CURRENT_ATTENTION_PROJECTOR = "projection.thread-attention-current";
++export const ListCurrentAttentionInput = Schema.Struct({
++  threadId: ThreadId,
++  limit: PositiveInt.check(Schema.isLessThanOrEqualTo(100)),
++  afterAttentionId: Schema.optional(AttentionId),
++});
++
++export class ProjectionThreadAttentionCurrentRepository extends Context.Service<
++  ProjectionThreadAttentionCurrentRepository,
++  {
++    /** Called inside the pipeline's transaction, which also advances this projector's cursor. */
++    readonly project: (event: OrchestrationEvent) => Effect.Effect<void, ProjectionRepositoryError>;
++    readonly listByThreadId: (
++      input: typeof ListCurrentAttentionInput.Type,
++    ) => Effect.Effect<ReadonlyArray<RequestAttentionItem>, ProjectionRepositoryError>;
++    /** Clears only this projection and its cursor; pipeline bootstrap replays the durable event store. */
++    readonly reset: Effect.Effect<void, ProjectionRepositoryError>;
++  }
++>()(
++  "t3/persistence/Services/ProjectionThreadAttentionCurrent/ProjectionThreadAttentionCurrentRepository",
++) {}
+diff --git a/docs/internals/overview.md b/docs/internals/overview.md
+index 54d2b5775..10cfdd278 100644
+--- a/docs/internals/overview.md
++++ b/docs/internals/overview.md
+@@ -88,6 +88,28 @@ Keep this upgrade path when reconciling future releases; never remove old
+ records just to satisfy a newer manifest. Explicit migration bounds used by
+ tests build upstream-only fixtures; normal startup also runs fork migrations.
+ 
++### Current request attention
++
++Current approval/input attention is separate from the compact audit. Rebuild
++it from persisted orchestration events, not audit rows or the latest thread
++shell: independent projector cursors can be at different points during
++bootstrap. Its thread context tracks project ownership and creation
++incarnations so replay never consults another projection's future state.
++
++Sending a response is intent, not resolution. Canonical resolution closes
++the matching request; response failure leaves it open with a bounded reason.
++Resolved identities stay closed. Turn-scoped identities distinguish reused
++request IDs; an unscoped reply is ignored with a warning when history makes
++its target ambiguous. Revert resolves remaining requests; deletion removes
++current rows, recreation starts a new incarnation, and imported history never
++creates actionable requests. Completion, failure and disconnect awareness
++are separate follow-up work.
++
++Rows and the internal projection cursor share the existing event/receipt
++transaction. Replay emits no notification; future delivery must publish only
++after commit with its own delivery cursor. Ordinary streaming events do no
++attention lookup beyond the existing batched cursor write.
++
+ ## Turn completion and checkpoints
+ 
+ A turn ending and its follow-up work settling are separate milestones. The
+diff --git a/packages/contracts/src/attention.test.ts b/packages/contracts/src/attention.test.ts
+new file mode 100644
+index 000000000..cebcaaa2a
+--- /dev/null
++++ b/packages/contracts/src/attention.test.ts
+@@ -0,0 +1,53 @@
++import { describe, expect, it } from "vite-plus/test";
++import * as Schema from "effect/Schema";
++import { AttentionId, RequestAttentionItem } from "./attention.ts";
++const decodeItem = Schema.decodeUnknownSync(RequestAttentionItem);
++const decodeId = Schema.decodeUnknownSync(AttentionId);
++
++const row = {
++  attentionId: "a".repeat(64),
++  projectId: "project",
++  threadId: "thread",
++  turnId: null,
++  requestId: "request",
++  kind: "approval",
++  revision: 1,
++  sourceEventId: "event",
++  sourceSequence: 1,
++  openedAt: "2026-09-27T00:00:00Z",
++  updatedAt: "2026-09-27T00:00:00Z",
++  status: "open",
++  reasonCode: "approval_requested",
++  resolvedAt: null,
++};
++describe("current request attention contracts", () => {
++  it("accepts bounded request state without storing prompts, commands or raw failure details", () => {
++    const decoded = decodeItem({
++      ...row,
++      detail: "private command",
++    });
++    expect(decoded).toEqual(row);
++    expect(
++      decodeItem({
++        ...row,
++        status: "resolved",
++        reasonCode: "request_resolved",
++        resolvedAt: row.updatedAt,
++      }).status,
++    ).toBe("resolved");
++  });
++  it("rejects invalid identity, revision and lifecycle combinations", () => {
++    expect(() => decodeId("thread/request")).toThrow();
++    for (const change of [
++      { revision: 0 },
++      { revision: 1.5 },
++      { sourceSequence: -1 },
++      { requestId: "" },
++      { kind: "failure" },
++      { reasonCode: "raw-provider-error" },
++      { status: "resolved" },
++      { resolvedAt: row.updatedAt },
++    ])
++      expect(() => decodeItem({ ...row, ...change })).toThrow();
++  });
++});
+diff --git a/packages/contracts/src/attention.ts b/packages/contracts/src/attention.ts
+new file mode 100644
+index 000000000..056520d9e
+--- /dev/null
++++ b/packages/contracts/src/attention.ts
+@@ -0,0 +1,49 @@
++import * as Schema from "effect/Schema";
++import {
++  ApprovalRequestId,
++  EventId,
++  IsoDateTime,
++  NonNegativeInt,
++  PositiveInt,
++  ProjectId,
++  ThreadId,
++  TurnId,
++} from "./baseSchemas.ts";
++
++export const AttentionId = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/)).pipe(
++  Schema.brand("AttentionId"),
++);
++export type AttentionId = typeof AttentionId.Type;
++
++export const RequestAttentionKind = Schema.Literals(["approval", "user_input"]);
++export type RequestAttentionKind = typeof RequestAttentionKind.Type;
++
++const fields = {
++  attentionId: AttentionId,
++  projectId: ProjectId,
++  threadId: ThreadId,
++  turnId: Schema.NullOr(TurnId),
++  requestId: ApprovalRequestId,
++  kind: RequestAttentionKind,
++  revision: PositiveInt,
++  sourceEventId: EventId,
++  sourceSequence: NonNegativeInt,
++  openedAt: IsoDateTime,
++  updatedAt: IsoDateTime,
++};
++
++export const RequestAttentionItem = Schema.Union([
++  Schema.Struct({
++    ...fields,
++    status: Schema.Literal("open"),
++    reasonCode: Schema.Literals(["approval_requested", "user_input_requested", "response_failed"]),
++    resolvedAt: Schema.Null,
++  }),
++  Schema.Struct({
++    ...fields,
++    status: Schema.Literal("resolved"),
++    reasonCode: Schema.Literals(["request_resolved", "thread_reverted"]),
++    resolvedAt: IsoDateTime,
++  }),
++]);
++export type RequestAttentionItem = typeof RequestAttentionItem.Type;
+diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts
+index 937eb4770..d53c6a62f 100644
+--- a/packages/contracts/src/index.ts
++++ b/packages/contracts/src/index.ts
+@@ -30,6 +30,7 @@ export * from "./pullRequest.ts";
+ export * from "./workItem.ts";
+ export * from "./twsBindings.ts";
+ export * from "./orchestration.ts";
++export * from "./attention.ts";
+ export * from "./t3ProjectFile.ts";
+ export * from "./editor.ts";
+ export * from "./project.ts";

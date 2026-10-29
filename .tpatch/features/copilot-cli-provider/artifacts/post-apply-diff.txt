@@ -1,0 +1,4 @@
+ docs/internals/providers.md                        |   4 +
+ .../provider-copilot/src/server/adapter.test.ts    | 116 +++++++++++++++++++++
+ packages/provider-copilot/src/server/adapter.ts    |  81 ++++++++++----
+ 3 files changed, 178 insertions(+), 23 deletions(-)

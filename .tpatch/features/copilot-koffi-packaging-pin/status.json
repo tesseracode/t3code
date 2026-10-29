@@ -1,0 +1,29 @@
+{
+  "id": "copilot-koffi-packaging-pin",
+  "slug": "copilot-koffi-packaging-pin",
+  "title": "Pin the Copilot SDK 1.0.8 staging dependency on Koffi to the source-tested 3.1.6 resolution and fail desktop packaging when a Copilot-bearing stage resolves another Koffi version.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-09-11T16:37:15Z",
+  "updated_at": "2026-09-24T17:10:09Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-09-24T17:09:38Z",
+  "apply": {
+    "completed_at": "2026-09-24T17:06:48Z",
+    "base_commit": "47556adef3f46f5720869c423032ba0abba3c445",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-package-payload-pruning",
+      "kind": "soft"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-09-24T17:10:05Z",
+    "passed": true,
+    "recipe_hash_at_verify": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8",
+    "patch_hash_at_verify": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306"
+  }
+}

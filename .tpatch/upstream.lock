@@ -1,0 +1,8 @@
+# Upstream Lock
+# Stable v0.1.4 target, verified against upstream refs/tags/v0.1.4.
+# Pass --upstream-ref v0.1.4; branch records the remote tracking convention,
+# not permission to reconcile this candidate against moving main.
+remote: "upstream"
+branch: "main"
+commit: "783581d461dc72cdd8f78fc8abb4ad536dfc4547"
+url: "https://github.com/pingdotgg/t3code.git"

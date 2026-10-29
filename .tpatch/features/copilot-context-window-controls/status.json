@@ -1,0 +1,18 @@
+{
+  "id": "copilot-context-window-controls",
+  "slug": "copilot-context-window-controls",
+  "title": "Research Copilot effective context tiers, prompt budgets and automatic compaction thresholds versus the legacy context meter, using pinned/runtime-version evidence. Record possible explicit tier controls and accurate denominator/provenance UX; leave implementation unapproved and lifecycle requested.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-02T05:50:57Z",
+  "updated_at": "2026-10-02T05:50:57Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    }
+  ]
+}

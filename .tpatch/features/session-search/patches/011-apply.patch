@@ -1,0 +1,134 @@
+diff --git a/apps/web/src/components/chat/MessagesTimeline.test.tsx b/apps/web/src/components/chat/MessagesTimeline.test.tsx
+index 90373b79b..9c2ceb4ff 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.test.tsx
++++ b/apps/web/src/components/chat/MessagesTimeline.test.tsx
+@@ -2134,6 +2134,7 @@ describe("session search interactions", () => {
+     }
+     const previousFocus = new FocusElement();
+     const input = new FocusElement();
++    const nextButton = new FocusElement();
+     const testDocument = {
+       activeElement: previousFocus,
+       documentElement: { classList: { contains: () => false } },
+@@ -2143,7 +2144,10 @@ describe("session search interactions", () => {
+     input.focus.mockImplementation(() => {
+       testDocument.activeElement = input;
+     });
+-    const container = { contains: (node: unknown) => node === input };
++    nextButton.focus.mockImplementation(() => {
++      testDocument.activeElement = nextButton;
++    });
++    const container = { contains: (node: unknown) => node === input || node === nextButton };
+     class TestElement {
+       nodeType = 1;
+     }
+@@ -2181,6 +2185,7 @@ describe("session search interactions", () => {
+     return {
+       props,
+       input,
++      nextButton,
+       previousFocus,
+       scrollToIndex,
+       createNodeMock: (element: { type: unknown; props: unknown }) => {
+@@ -2199,6 +2204,64 @@ describe("session search interactions", () => {
+     };
+   }
+ 
++  it("dismisses and clears search from a focused navigation button without intercepting Enter", async () => {
++    const test = setup();
++    let renderer: ReactTestRenderer | undefined;
++    try {
++      await act(() => {
++        renderer = create(
++          <MessagesTimeline
++            {...test.props}
++            timelineEntries={[buildUserTimelineEntry(buildLongUserMessageText("needle needle"))]}
++          />,
++          { createNodeMock: test.createNodeMock },
++        );
++      });
++      act(() => {
++        openSessionSearch(test.props.routeThreadKey);
++      });
++      act(() =>
++        renderer!.root.findByProps({ "aria-label": "Search in thread" }).props.onChange({
++          target: { value: "needle" },
++        }),
++      );
++      act(() => {
++        test.nextButton.focus();
++        renderer!.root.findByProps({ "aria-label": "Next match" }).props.onClick();
++      });
++      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["2 of 2"]);
++      const event = {
++        key: "Enter",
++        keyCode: 13,
++        shiftKey: false,
++        nativeEvent: { isComposing: false },
++        preventDefault: vi.fn(),
++        stopPropagation: vi.fn(),
++      };
++      act(() => renderer!.root.findByProps({ role: "search" }).props.onKeyDown(event));
++      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["2 of 2"]);
++      expect(event.preventDefault).not.toHaveBeenCalled();
++      act(() =>
++        renderer!.root.findByProps({ role: "search" }).props.onKeyDown({
++          ...event,
++          key: "Escape",
++          keyCode: 27,
++        }),
++      );
++      await test.flush();
++      expect(renderer!.root.findAllByProps({ role: "search" })).toHaveLength(0);
++      expect(test.previousFocus.focus).toHaveBeenCalled();
++      act(() => {
++        openSessionSearch(test.props.routeThreadKey);
++      });
++      expect(renderer!.root.findByProps({ "aria-label": "Search in thread" }).props.value).toBe("");
++      expect(renderer!.root.findByProps({ role: "status" }).children).toEqual(["Type to search"]);
++    } finally {
++      act(() => renderer?.unmount());
++      vi.unstubAllGlobals();
++    }
++  });
++
+   it("opens the scoped search, reveals a collapsed user match, wraps, and loads history only on demand", async () => {
+     const test = setup();
+     const onLoadEarlier = vi.fn();
+diff --git a/apps/web/src/components/chat/SessionSearchBar.tsx b/apps/web/src/components/chat/SessionSearchBar.tsx
+index ffbcd4cfe..7cd06a910 100644
+--- a/apps/web/src/components/chat/SessionSearchBar.tsx
++++ b/apps/web/src/components/chat/SessionSearchBar.tsx
+@@ -46,7 +46,7 @@ export const SessionSearchBar = memo(function SessionSearchBar(props: SessionSea
+   }, [props.focusRequestId]);
+ 
+   const handleKeyDown = useCallback(
+-    (event: React.KeyboardEvent<HTMLInputElement>) => {
++    (event: React.KeyboardEvent<HTMLElement>) => {
+       handleSessionSearchKeyDown(event, {
+         close: props.onClose,
+         next: props.onNext,
+@@ -69,6 +69,9 @@ export const SessionSearchBar = memo(function SessionSearchBar(props: SessionSea
+       ref={containerRef}
+       role="search"
+       aria-label="Search current thread"
++      onKeyDown={(event) => {
++        if (event.key === "Escape") handleKeyDown(event);
++      }}
+       className="absolute top-2 right-3 left-3 z-40 flex max-w-full flex-wrap items-center justify-end gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-lg sm:left-auto"
+     >
+       <input
+diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md
+index fb495e41b..5c62b3d85 100644
+--- a/docs/user/keybindings.md
++++ b/docs/user/keybindings.md
+@@ -25,7 +25,8 @@ in Settings.
+ 
+ On web and desktop, use `Cmd+F` on macOS or `Ctrl+F` on Windows/Linux, or choose
+ **Search current thread** in the command palette. Enter and Shift+Enter move
+-between matches; Escape closes search. Terminal and preview focus keep their
++between matches in the search field; Escape closes search even when one of its
++buttons has focus. Terminal and preview focus keep their
+ own shortcuts. Customize the binding in **Settings → Keybindings**.
+ 
+ Results cover loaded messages, proposed plans and visible activity labels.
