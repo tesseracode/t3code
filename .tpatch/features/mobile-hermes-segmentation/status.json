@@ -2,18 +2,24 @@
   "id": "mobile-hermes-segmentation",
   "slug": "mobile-hermes-segmentation",
   "title": "Make native mobile startup compatible with Hermes while preserving Unicode grapheme validation.",
-  "state": "applied",
+  "state": "upstream_merged",
   "compatibility": "unknown",
   "requested_at": "2026-10-03T13:51:55Z",
-  "updated_at": "2026-10-03T13:58:42Z",
-  "last_command": "verify",
-  "notes": "landed at 2026-10-03T13:55:57Z",
+  "updated_at": "2026-10-29T08:49:10Z",
+  "last_command": "reconcile",
+  "notes": "Feature adopted by upstream — confirmed via human review revision rr_f36431f590eb",
   "apply": {
     "completed_at": "2026-10-03T14:12:42Z",
     "base_commit": "bc9eeb9a6f5e3fe2e6d58d9c1b14d5ed93d6c2be",
     "has_patch": true
   },
-  "reconcile": {},
+  "reconcile": {
+    "attempted_at": "2026-10-29T08:42:03Z",
+    "upstream_ref": "v0.1.3",
+    "upstream_commit": "de343914273eceb852a1d1d739cd1d38df7796ee",
+    "outcome": "upstreamed",
+    "review_verdict": "confirmed-upstreamed"
+  },
   "verify": {
     "verified_at": "2026-10-03T13:58:38Z",
     "passed": true,

@@ -3,6 +3,7 @@ import {
   type EventId,
   type ProjectId,
   type ProviderLifecycleEvidence,
+  type RunId,
   type ThreadId,
   type TurnId,
 } from "@t3tools/contracts";
@@ -21,8 +22,16 @@ export type AttentionEvidence = Common &
       }
     | { readonly type: "project.deleted"; readonly payload: { readonly projectId: ProjectId } }
     | {
-        readonly type: "thread.deleted" | "thread.reverted" | "run.starting";
+        readonly type: "thread.deleted" | "thread.reverted";
         readonly payload: { readonly threadId: ThreadId };
+      }
+    | {
+        readonly type: "run.starting";
+        readonly payload: {
+          readonly threadId: ThreadId;
+          readonly runId: RunId;
+          readonly providerKey: string;
+        };
       }
     | {
         readonly type: "request.changed";

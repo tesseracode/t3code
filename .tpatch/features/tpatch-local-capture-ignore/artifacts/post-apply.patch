@@ -1,12 +1,12 @@
 diff --git a/.gitignore b/.gitignore
-index 8482c5a29..81568b229 100644
+index b33f3469c..5f683a1d9 100644
 --- a/.gitignore
 +++ b/.gitignore
-@@ -27,6 +27,7 @@ squashfs-root/
- .vercel
- .gstack/
- .plans/
+@@ -16,6 +16,7 @@ build/
+ release/
+ release-mock/
+ .t3
 +.tpatch/local/
- dist-electron/
- .electron-runtime/
- .showcase/
+ .idea/
+ apps/web/.playwright
+ apps/web/playwright-report

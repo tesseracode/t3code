@@ -5,6 +5,7 @@ import {
   type OrchestrationV2DomainEvent,
   type OrchestrationThreadAttentionAuditKind,
   type ProviderLifecycleEvidence,
+  type RunId,
   type ThreadId,
   TurnId,
 } from "@t3tools/contracts";
@@ -59,7 +60,7 @@ const make = Effect.gen(function* () {
   const events = yield* ApplicationEvents.OrchestrationEventStore;
   interface NodeRow {
     readonly node_id: string;
-    readonly run_id: string | null;
+    readonly run_id: RunId | null;
     readonly is_root: number;
     readonly provider_thread_id: string | null;
     readonly provider_turn_id: string | null;
@@ -93,7 +94,7 @@ const make = Effect.gen(function* () {
     const project = (evidence: AttentionEvidence) => current.project(evidence);
     const lifecycle = (
       event: OrchestrationV2DomainEvent,
-      turnId: string | null,
+      runId: RunId,
       providerKey: string,
       transition: ProviderLifecycleEvidence["transition"],
       failureReason?: ProviderLifecycleEvidence["failureReason"],
@@ -107,11 +108,9 @@ const make = Effect.gen(function* () {
         payload: {
           threadId: event.threadId,
           lifecycle: {
-            providerEventId: EventId.make(
-              `${event.rawEventId ?? event.id}:${turnId ?? ""}:${transition}`,
-            ),
+            providerEventId: EventId.make(`${event.rawEventId ?? event.id}:${runId}:${transition}`),
             providerKey,
-            turnId: turnId === null ? null : TurnId.make(turnId),
+            turnId: TurnId.make(runId),
             transition,
             ...(failureReason === undefined ? {} : { failureReason }),
           },
@@ -183,7 +182,9 @@ const make = Effect.gen(function* () {
           if (request.responseCapability.type === "not_resumable") break;
           if (request.responseDelivery === "pending") break;
           const owner = yield* node(source.threadId, request.nodeId);
-          const turnId = request.providerTurnId ?? owner?.provider_turn_id ?? owner?.run_id ?? null;
+          const runId = owner?.run_id ?? null;
+          const sourceTurnId =
+            request.providerTurnId ?? owner?.provider_turn_id ?? owner?.run_id ?? null;
           const kind = request.kind === "user_input" ? "user-input" : "approval";
           const action =
             request.responseDelivery === "failed"
@@ -200,7 +201,7 @@ const make = Effect.gen(function* () {
               threadId: source.threadId,
               activity: {
                 kind: activity,
-                turnId: turnId === null ? null : TurnId.make(turnId),
+                turnId: runId === null ? null : TurnId.make(runId),
                 payload: {
                   requestId: ApprovalRequestId.make(request.id),
                   ...(request.responseCapability.type === "message"
@@ -213,7 +214,7 @@ const make = Effect.gen(function* () {
           yield* audit.upsert({
             ...common,
             threadId: source.threadId,
-            turnId: turnId === null ? null : TurnId.make(turnId),
+            turnId: sourceTurnId === null ? null : TurnId.make(sourceTurnId),
             requestId: ApprovalRequestId.make(request.id),
             kind: activity as OrchestrationThreadAttentionAuditKind,
           });
@@ -223,7 +224,7 @@ const make = Effect.gen(function* () {
           const turn = source.payload;
           const root = yield* node(source.threadId, turn.nodeId);
           const owner = yield* provider(source.threadId, turn.providerThreadId);
-          if (root?.is_root !== 1 || owner === undefined) break;
+          if (root?.is_root !== 1 || root.run_id === null || owner === undefined) break;
           yield* sql`UPDATE foundation_v2_nodes SET provider_turn_id = ${turn.id}, provider_thread_id = ${turn.providerThreadId}
             WHERE thread_id = ${source.threadId} AND node_id = ${turn.nodeId}`;
           const transition =
@@ -232,7 +233,7 @@ const make = Effect.gen(function* () {
               : turn.status === "cancelled"
                 ? "interrupted"
                 : turn.status;
-          yield* lifecycle(source, turn.id, owner.provider_key, transition);
+          yield* lifecycle(source, root.run_id, owner.provider_key, transition);
           break;
         }
         case "run.created":
@@ -242,7 +243,11 @@ const make = Effect.gen(function* () {
             yield* project({
               ...common,
               type: "run.starting",
-              payload: { threadId: source.threadId },
+              payload: {
+                threadId: source.threadId,
+                runId: run.id,
+                providerKey: run.providerInstanceId,
+              },
             });
           } else if (run.status === "rolled_back") {
             yield* project({
@@ -251,15 +256,14 @@ const make = Effect.gen(function* () {
               payload: { threadId: source.threadId },
             });
           } else if (["completed", "failed", "interrupted", "cancelled"].includes(run.status)) {
-            const root =
-              run.rootNodeId === null ? undefined : yield* node(source.threadId, run.rootNodeId);
             const terminal = yield* sql`SELECT 1 FROM projection_thread_attention_turns
               WHERE thread_id = ${source.threadId} AND provider_key = ${run.providerInstanceId}
-                AND turn_id = ${root?.provider_turn_id ?? run.id} AND phase IN ('failed', 'completed', 'interrupted')`;
+                AND turn_id = ${run.id} AND (
+                  phase IN ('completed', 'interrupted') OR (phase = 'failed' AND ${run.status} = 'failed'))`;
             if (terminal.length > 0) break;
             yield* lifecycle(
               source,
-              root?.provider_turn_id ?? run.id,
+              run.id,
               run.providerInstanceId,
               run.status === "failed"
                 ? "failed"
@@ -282,22 +286,18 @@ const make = Effect.gen(function* () {
           const sessionId =
             "id" in source.payload ? source.payload.id : source.payload.providerSessionId;
           const roots = yield* sql<{
-            readonly provider_turn_id: string;
+            readonly run_id: RunId;
             readonly provider_key: string;
           }>`
-            SELECT n.provider_turn_id, p.provider_key FROM foundation_v2_nodes n
+            SELECT n.run_id, p.provider_key FROM foundation_v2_nodes n
             JOIN foundation_v2_providers p ON p.thread_id = n.thread_id AND p.provider_thread_id = n.provider_thread_id
-            JOIN projection_thread_attention_turns t ON t.thread_id = n.thread_id AND t.turn_id = n.provider_turn_id AND t.provider_key = p.provider_key
-            WHERE n.thread_id = ${source.threadId} AND n.is_root = 1 AND p.provider_session_id = ${sessionId} AND t.phase = 'running'
+            JOIN projection_thread_attention_turns t ON t.thread_id = n.thread_id AND t.turn_id = n.run_id AND t.provider_key = p.provider_key
+            WHERE n.thread_id = ${source.threadId} AND n.is_root = 1 AND n.run_id IS NOT NULL
+              AND p.provider_session_id = ${sessionId} AND t.phase = 'running'
             LIMIT 2`;
           // Multiple active roots are insufficient attribution, not permission to guess.
           if (roots.length === 1)
-            yield* lifecycle(
-              source,
-              roots[0]!.provider_turn_id,
-              roots[0]!.provider_key,
-              "disconnected",
-            );
+            yield* lifecycle(source, roots[0]!.run_id, roots[0]!.provider_key, "disconnected");
           break;
         }
       }

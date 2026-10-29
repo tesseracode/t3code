@@ -1,25 +1,19 @@
 # Implementation Record: tpatch-local-capture-ignore
 
-**Recorded**: 2026-10-29T07:21:50Z
+**Recorded**: 2026-10-29T08:41:16Z
 **Files changed**: 1
-**Patch size**: 230 bytes
-**Capture mode**: working-tree-all
+**Patch size**: 234 bytes
+**Capture mode**: staged-index
 **Pathspecs**: .gitignore
-
-## Change Summary
-
-```
- .gitignore | 1 +
- 1 file changed, 1 insertion(+)
-```
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
+- **capture_mode**: `staged-index`
 - **pathspecs**: .gitignore
 - **claim_ids**: (none)
-- **base_commit**: `23e896ef9b1fa38d68443c2bf5ad330f19d9cacb`
+- **base_commit**: `2cad5d72dc615996325bc1204d3e034e094795b7`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 1 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 

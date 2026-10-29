@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "tpatch-local-capture-ignore",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "81c0c22129aecca59202a5c830456dc60e81f5e0",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "f72ed0f4e8beeabac3f1a76339be6bda3f0ebf4305a3ae170150f29a93bca8a7",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/001-record.patch",
       "base_commit": "719a76ca1dbf5490f1aa33ffb9966301e02be9a9",
       "upper": {
@@ -21,6 +21,40 @@
       },
       "capture": {
         "mode": "committed-range",
+        "pathspecs": [
+          ".gitignore"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".gitignore"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_9d01178f8c12",
+      "kind": "amend-refresh",
+      "patch_sha256": "caf0161dde80974a21be30d95a53cb861d1ed03963ffdccc9eb1416dfff4ac0e",
+      "git_patch_id": "3b65b3a5051d7e14edf2af4e1ce113db55746b5f",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "f72ed0f4e8beeabac3f1a76339be6bda3f0ebf4305a3ae170150f29a93bca8a7",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "2cad5d72dc615996325bc1204d3e034e094795b7",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
         "pathspecs": [
           ".gitignore"
         ],

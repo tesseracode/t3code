@@ -2,6 +2,7 @@ import { assert, it } from "@effect/vitest";
 import {
   EnvironmentId,
   EventId,
+  MessageId,
   NodeId,
   ProjectId,
   ProviderDriverKind,
@@ -10,13 +11,16 @@ import {
   ProviderThreadId,
   ProviderTurnId,
   RawEventId,
+  RunId,
   RuntimeRequestId,
   ThreadId,
+  TurnId,
   type OrchestrationV2AppThread,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2ExecutionNode,
   type OrchestrationV2RuntimeRequest,
   type OrchestrationV2ProviderThread,
+  type OrchestrationV2Run,
   type AttentionStreamMessage,
   type AttentionId,
 } from "@t3tools/contracts";
@@ -57,6 +61,7 @@ const instanceId = ProviderInstanceId.make("codex");
 const providerThreadId = ProviderThreadId.make("native-thread");
 const providerTurnId = ProviderTurnId.make("native-turn");
 const nodeId = NodeId.make("root");
+const runId = RunId.make("app-run");
 const time = DateTime.makeUnsafe("2026-10-28T00:00:00Z");
 const thread: OrchestrationV2AppThread = {
   id: threadId,
@@ -84,7 +89,7 @@ const thread: OrchestrationV2AppThread = {
 const root: OrchestrationV2ExecutionNode = {
   id: nodeId,
   threadId,
-  runId: null,
+  runId,
   parentNodeId: null,
   rootNodeId: nodeId,
   kind: "root_turn",
@@ -126,6 +131,23 @@ const request: OrchestrationV2RuntimeRequest = {
   createdAt: time,
   resolvedAt: null,
 };
+const run: OrchestrationV2Run = {
+  id: runId,
+  threadId,
+  ordinal: 1,
+  providerInstanceId: instanceId,
+  modelSelection: thread.modelSelection,
+  providerThreadId,
+  userMessageId: MessageId.make("user-message"),
+  rootNodeId: nodeId,
+  activeAttemptId: null,
+  status: "running",
+  requestedAt: time,
+  startedAt: time,
+  completedAt: null,
+  checkpointId: null,
+  contextHandoffId: null,
+};
 const harness = Effect.fn("foundationHarness")(function* () {
   const sink = yield* EventSink.EventSinkV2;
   const current = yield* Current;
@@ -165,6 +187,19 @@ const harness = Effect.fn("foundationHarness")(function* () {
         },
       ],
     });
+  const runLifecycle = (status: "completed" | "failed" | "interrupted") =>
+    sink.write({
+      events: [
+        {
+          id: EventId.make(`run-event-${++sequence}`),
+          type: "run.updated",
+          threadId,
+          runId,
+          occurredAt: time,
+          payload: { ...run, status, completedAt: time },
+        },
+      ],
+    });
   yield* sink.write({
     events: [
       {
@@ -181,6 +216,7 @@ const harness = Effect.fn("foundationHarness")(function* () {
         occurredAt: time,
         payload: providerThread,
       },
+      { id: EventId.make("run"), type: "run.created", threadId, occurredAt: time, payload: run },
       { id: EventId.make("node"), type: "node.updated", threadId, occurredAt: time, payload: root },
     ],
   });
@@ -191,10 +227,155 @@ const harness = Effect.fn("foundationHarness")(function* () {
     foundation,
     write,
     lifecycle,
+    runLifecycle,
     items: () => current.listByThreadId({ threadId, limit: 100 }),
     summary: current.getSummary(threadId).pipe(Effect.map(Option.getOrThrow)),
   };
 });
+
+it.effect.each([
+  { status: "failed", order: "provider-first" },
+  { status: "failed", order: "run-first" },
+  { status: "completed", order: "provider-first" },
+  { status: "completed", order: "run-first" },
+] as const)("uses one owning run identity for $status with $order evidence", ({ status, order }) =>
+  Effect.gen(function* () {
+    const h = yield* harness();
+    yield* h.lifecycle("running");
+    yield* h.write({ type: "runtime-request.updated", payload: request });
+    assert.equal((yield* h.items())[0]?.turnId, TurnId.make(runId));
+    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
+    const native = h.lifecycle(status);
+    const app = h.runLifecycle(status);
+    yield* order === "provider-first" ? native : app;
+    const first = yield* h.items();
+    const summary = yield* h.summary;
+    yield* order === "provider-first" ? app : native;
+    const final = yield* h.items();
+    assert.deepEqual(
+      final.map((item) => item.attentionId),
+      first.map((item) => item.attentionId),
+    );
+    assert.isTrue(final.every((item) => item.turnId === TurnId.make(runId)));
+    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
+    assert.equal((yield* h.summary).revision, summary.revision);
+    assert.equal((yield* h.summary).phase, status);
+    assert.equal(
+      final.filter((item) => item.kind === "failure").length,
+      status === "failed" ? 1 : 0,
+    );
+    const audit = yield* h.audit.listByThreadId({ threadId, limit: 100 });
+    assert.equal(audit[0]?.turnId, TurnId.make(providerTurnId));
+    const stored = yield* (yield* EventStore.EventStoreV2)
+      .read({ threadId, eventType: "provider-turn.updated" })
+      .pipe(Stream.runCollect);
+    for (const entry of stored) {
+      if (entry.event.type === "provider-turn.updated")
+        assert.equal(entry.event.payload.id, providerTurnId);
+    }
+  }).pipe(Effect.provide(layer)),
+);
+
+it.effect("attributes the starting summary before any native provider turn arrives", () =>
+  Effect.gen(function* () {
+    const h = yield* harness();
+    yield* h.sink.write({
+      events: [
+        {
+          id: EventId.make("starting-run"),
+          type: "run.updated",
+          threadId,
+          occurredAt: time,
+          payload: { ...run, status: "starting" },
+        },
+      ],
+    });
+    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
+    assert.equal((yield* h.summary).phase, "starting");
+  }).pipe(Effect.provide(layer)),
+);
+
+it.effect("uses canonical run completion to close the same root provider failure", () =>
+  Effect.gen(function* () {
+    const h = yield* harness();
+    yield* h.lifecycle("running");
+    yield* h.lifecycle("failed");
+    const failure = (yield* h.items())[0]!;
+    assert.equal(failure.turnId, TurnId.make(runId));
+    yield* h.runLifecycle("failed");
+    yield* h.runLifecycle("completed");
+    const resolved = (yield* h.items())[0]!;
+    assert.equal(resolved.attentionId, failure.attentionId);
+    assert.equal(resolved.reasonCode, "turn_completed");
+    assert.equal(resolved.turnId, TurnId.make(runId));
+    assert.equal((yield* h.summary).phase, "completed");
+  }).pipe(Effect.provide(layer)),
+);
+
+it.effect("does not substitute native turn identity when root run ownership is unknown", () =>
+  Effect.gen(function* () {
+    const h = yield* harness();
+    yield* h.sink.write({
+      events: [
+        {
+          id: EventId.make("unattributed-root"),
+          type: "node.updated",
+          threadId,
+          occurredAt: time,
+          payload: { ...root, runId: null },
+        },
+      ],
+    });
+    yield* h.lifecycle("failed");
+    assert.equal((yield* h.summary).failureCount, 0);
+    assert.equal((yield* h.summary).turnId, null);
+    yield* h.write({ type: "runtime-request.updated", payload: request });
+    assert.equal((yield* h.items())[0]?.turnId, null);
+    assert.equal(
+      (yield* h.audit.listByThreadId({ threadId, limit: 1 }))[0]?.turnId,
+      TurnId.make(providerTurnId),
+    );
+  }).pipe(Effect.provide(layer)),
+);
+
+it.effect("does not promote a child provider failure into its owning run's root attention", () =>
+  Effect.gen(function* () {
+    const h = yield* harness();
+    yield* h.lifecycle("running");
+    const child = NodeId.make("child");
+    yield* h.sink.write({
+      events: [
+        {
+          id: EventId.make("child-node"),
+          type: "node.updated",
+          threadId,
+          occurredAt: time,
+          payload: { ...root, id: child, parentNodeId: nodeId, kind: "subagent" },
+        },
+        {
+          id: EventId.make("child-failed"),
+          type: "provider-turn.updated",
+          threadId,
+          occurredAt: time,
+          payload: {
+            id: ProviderTurnId.make("child-turn"),
+            providerThreadId,
+            nodeId: child,
+            runAttemptId: null,
+            nativeTurnRef: null,
+            ordinal: 2,
+            status: "failed",
+            startedAt: time,
+            completedAt: time,
+          },
+        },
+      ],
+    });
+    assert.equal((yield* h.summary).failureCount, 0);
+    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
+    assert.equal((yield* h.summary).phase, "running");
+  }).pipe(Effect.provide(layer)),
+);
 
 it.effect(
   "projects native requests, intent, delivery failure, and confirmation without rewriting audit",

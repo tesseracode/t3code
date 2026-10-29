@@ -66,15 +66,16 @@ index 4a23878e4..5a84f6338 100644
    [ORCHESTRATION_V2_WS_METHODS.stopWorkflow]: "orchestration",
 diff --git a/apps/server/src/orchestration-v2/AttentionEvidence.ts b/apps/server/src/orchestration-v2/AttentionEvidence.ts
 new file mode 100644
-index 000000000..2f5f258ed
+index 000000000..f3fb62a86
 --- /dev/null
 +++ b/apps/server/src/orchestration-v2/AttentionEvidence.ts
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,57 @@
 +import {
 +  ApprovalRequestId,
 +  type EventId,
 +  type ProjectId,
 +  type ProviderLifecycleEvidence,
++  type RunId,
 +  type ThreadId,
 +  type TurnId,
 +} from "@t3tools/contracts";
@@ -93,8 +94,16 @@ index 000000000..2f5f258ed
 +      }
 +    | { readonly type: "project.deleted"; readonly payload: { readonly projectId: ProjectId } }
 +    | {
-+        readonly type: "thread.deleted" | "thread.reverted" | "run.starting";
++        readonly type: "thread.deleted" | "thread.reverted";
 +        readonly payload: { readonly threadId: ThreadId };
++      }
++    | {
++        readonly type: "run.starting";
++        readonly payload: {
++          readonly threadId: ThreadId;
++          readonly runId: RunId;
++          readonly providerKey: string;
++        };
 +      }
 +    | {
 +        readonly type: "request.changed";
@@ -765,14 +774,15 @@ index af8fa5a95..a796f8111 100644
  export const layerFromStores = layerBase;
 diff --git a/apps/server/src/orchestration-v2/FoundationProjection.test.ts b/apps/server/src/orchestration-v2/FoundationProjection.test.ts
 new file mode 100644
-index 000000000..d5b4026ca
+index 000000000..dfa241686
 --- /dev/null
 +++ b/apps/server/src/orchestration-v2/FoundationProjection.test.ts
-@@ -0,0 +1,446 @@
+@@ -0,0 +1,627 @@
 +import { assert, it } from "@effect/vitest";
 +import {
 +  EnvironmentId,
 +  EventId,
++  MessageId,
 +  NodeId,
 +  ProjectId,
 +  ProviderDriverKind,
@@ -781,13 +791,16 @@ index 000000000..d5b4026ca
 +  ProviderThreadId,
 +  ProviderTurnId,
 +  RawEventId,
++  RunId,
 +  RuntimeRequestId,
 +  ThreadId,
++  TurnId,
 +  type OrchestrationV2AppThread,
 +  type OrchestrationV2DomainEvent,
 +  type OrchestrationV2ExecutionNode,
 +  type OrchestrationV2RuntimeRequest,
 +  type OrchestrationV2ProviderThread,
++  type OrchestrationV2Run,
 +  type AttentionStreamMessage,
 +  type AttentionId,
 +} from "@t3tools/contracts";
@@ -828,6 +841,7 @@ index 000000000..d5b4026ca
 +const providerThreadId = ProviderThreadId.make("native-thread");
 +const providerTurnId = ProviderTurnId.make("native-turn");
 +const nodeId = NodeId.make("root");
++const runId = RunId.make("app-run");
 +const time = DateTime.makeUnsafe("2026-10-28T00:00:00Z");
 +const thread: OrchestrationV2AppThread = {
 +  id: threadId,
@@ -855,7 +869,7 @@ index 000000000..d5b4026ca
 +const root: OrchestrationV2ExecutionNode = {
 +  id: nodeId,
 +  threadId,
-+  runId: null,
++  runId,
 +  parentNodeId: null,
 +  rootNodeId: nodeId,
 +  kind: "root_turn",
@@ -897,6 +911,23 @@ index 000000000..d5b4026ca
 +  createdAt: time,
 +  resolvedAt: null,
 +};
++const run: OrchestrationV2Run = {
++  id: runId,
++  threadId,
++  ordinal: 1,
++  providerInstanceId: instanceId,
++  modelSelection: thread.modelSelection,
++  providerThreadId,
++  userMessageId: MessageId.make("user-message"),
++  rootNodeId: nodeId,
++  activeAttemptId: null,
++  status: "running",
++  requestedAt: time,
++  startedAt: time,
++  completedAt: null,
++  checkpointId: null,
++  contextHandoffId: null,
++};
 +const harness = Effect.fn("foundationHarness")(function* () {
 +  const sink = yield* EventSink.EventSinkV2;
 +  const current = yield* Current;
@@ -936,6 +967,19 @@ index 000000000..d5b4026ca
 +        },
 +      ],
 +    });
++  const runLifecycle = (status: "completed" | "failed" | "interrupted") =>
++    sink.write({
++      events: [
++        {
++          id: EventId.make(`run-event-${++sequence}`),
++          type: "run.updated",
++          threadId,
++          runId,
++          occurredAt: time,
++          payload: { ...run, status, completedAt: time },
++        },
++      ],
++    });
 +  yield* sink.write({
 +    events: [
 +      {
@@ -952,6 +996,7 @@ index 000000000..d5b4026ca
 +        occurredAt: time,
 +        payload: providerThread,
 +      },
++      { id: EventId.make("run"), type: "run.created", threadId, occurredAt: time, payload: run },
 +      { id: EventId.make("node"), type: "node.updated", threadId, occurredAt: time, payload: root },
 +    ],
 +  });
@@ -962,10 +1007,155 @@ index 000000000..d5b4026ca
 +    foundation,
 +    write,
 +    lifecycle,
++    runLifecycle,
 +    items: () => current.listByThreadId({ threadId, limit: 100 }),
 +    summary: current.getSummary(threadId).pipe(Effect.map(Option.getOrThrow)),
 +  };
 +});
++
++it.effect.each([
++  { status: "failed", order: "provider-first" },
++  { status: "failed", order: "run-first" },
++  { status: "completed", order: "provider-first" },
++  { status: "completed", order: "run-first" },
++] as const)("uses one owning run identity for $status with $order evidence", ({ status, order }) =>
++  Effect.gen(function* () {
++    const h = yield* harness();
++    yield* h.lifecycle("running");
++    yield* h.write({ type: "runtime-request.updated", payload: request });
++    assert.equal((yield* h.items())[0]?.turnId, TurnId.make(runId));
++    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
++    const native = h.lifecycle(status);
++    const app = h.runLifecycle(status);
++    yield* order === "provider-first" ? native : app;
++    const first = yield* h.items();
++    const summary = yield* h.summary;
++    yield* order === "provider-first" ? app : native;
++    const final = yield* h.items();
++    assert.deepEqual(
++      final.map((item) => item.attentionId),
++      first.map((item) => item.attentionId),
++    );
++    assert.isTrue(final.every((item) => item.turnId === TurnId.make(runId)));
++    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
++    assert.equal((yield* h.summary).revision, summary.revision);
++    assert.equal((yield* h.summary).phase, status);
++    assert.equal(
++      final.filter((item) => item.kind === "failure").length,
++      status === "failed" ? 1 : 0,
++    );
++    const audit = yield* h.audit.listByThreadId({ threadId, limit: 100 });
++    assert.equal(audit[0]?.turnId, TurnId.make(providerTurnId));
++    const stored = yield* (yield* EventStore.EventStoreV2)
++      .read({ threadId, eventType: "provider-turn.updated" })
++      .pipe(Stream.runCollect);
++    for (const entry of stored) {
++      if (entry.event.type === "provider-turn.updated")
++        assert.equal(entry.event.payload.id, providerTurnId);
++    }
++  }).pipe(Effect.provide(layer)),
++);
++
++it.effect("attributes the starting summary before any native provider turn arrives", () =>
++  Effect.gen(function* () {
++    const h = yield* harness();
++    yield* h.sink.write({
++      events: [
++        {
++          id: EventId.make("starting-run"),
++          type: "run.updated",
++          threadId,
++          occurredAt: time,
++          payload: { ...run, status: "starting" },
++        },
++      ],
++    });
++    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
++    assert.equal((yield* h.summary).phase, "starting");
++  }).pipe(Effect.provide(layer)),
++);
++
++it.effect("uses canonical run completion to close the same root provider failure", () =>
++  Effect.gen(function* () {
++    const h = yield* harness();
++    yield* h.lifecycle("running");
++    yield* h.lifecycle("failed");
++    const failure = (yield* h.items())[0]!;
++    assert.equal(failure.turnId, TurnId.make(runId));
++    yield* h.runLifecycle("failed");
++    yield* h.runLifecycle("completed");
++    const resolved = (yield* h.items())[0]!;
++    assert.equal(resolved.attentionId, failure.attentionId);
++    assert.equal(resolved.reasonCode, "turn_completed");
++    assert.equal(resolved.turnId, TurnId.make(runId));
++    assert.equal((yield* h.summary).phase, "completed");
++  }).pipe(Effect.provide(layer)),
++);
++
++it.effect("does not substitute native turn identity when root run ownership is unknown", () =>
++  Effect.gen(function* () {
++    const h = yield* harness();
++    yield* h.sink.write({
++      events: [
++        {
++          id: EventId.make("unattributed-root"),
++          type: "node.updated",
++          threadId,
++          occurredAt: time,
++          payload: { ...root, runId: null },
++        },
++      ],
++    });
++    yield* h.lifecycle("failed");
++    assert.equal((yield* h.summary).failureCount, 0);
++    assert.equal((yield* h.summary).turnId, null);
++    yield* h.write({ type: "runtime-request.updated", payload: request });
++    assert.equal((yield* h.items())[0]?.turnId, null);
++    assert.equal(
++      (yield* h.audit.listByThreadId({ threadId, limit: 1 }))[0]?.turnId,
++      TurnId.make(providerTurnId),
++    );
++  }).pipe(Effect.provide(layer)),
++);
++
++it.effect("does not promote a child provider failure into its owning run's root attention", () =>
++  Effect.gen(function* () {
++    const h = yield* harness();
++    yield* h.lifecycle("running");
++    const child = NodeId.make("child");
++    yield* h.sink.write({
++      events: [
++        {
++          id: EventId.make("child-node"),
++          type: "node.updated",
++          threadId,
++          occurredAt: time,
++          payload: { ...root, id: child, parentNodeId: nodeId, kind: "subagent" },
++        },
++        {
++          id: EventId.make("child-failed"),
++          type: "provider-turn.updated",
++          threadId,
++          occurredAt: time,
++          payload: {
++            id: ProviderTurnId.make("child-turn"),
++            providerThreadId,
++            nodeId: child,
++            runAttemptId: null,
++            nativeTurnRef: null,
++            ordinal: 2,
++            status: "failed",
++            startedAt: time,
++            completedAt: time,
++          },
++        },
++      ],
++    });
++    assert.equal((yield* h.summary).failureCount, 0);
++    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
++    assert.equal((yield* h.summary).phase, "running");
++  }).pipe(Effect.provide(layer)),
++);
 +
 +it.effect(
 +  "projects native requests, intent, delivery failure, and confirmation without rewriting audit",
@@ -1217,7 +1407,7 @@ index 000000000..d5b4026ca
 +);
 diff --git a/apps/server/src/orchestration-v2/FoundationProjection.ts b/apps/server/src/orchestration-v2/FoundationProjection.ts
 new file mode 100644
-index 000000000..bbe5a2b57
+index 000000000..768fa1ffa
 --- /dev/null
 +++ b/apps/server/src/orchestration-v2/FoundationProjection.ts
 @@ -0,0 +1,353 @@
@@ -1228,6 +1418,7 @@ index 000000000..bbe5a2b57
 +  type OrchestrationV2DomainEvent,
 +  type OrchestrationThreadAttentionAuditKind,
 +  type ProviderLifecycleEvidence,
++  type RunId,
 +  type ThreadId,
 +  TurnId,
 +} from "@t3tools/contracts";
@@ -1282,7 +1473,7 @@ index 000000000..bbe5a2b57
 +  const events = yield* ApplicationEvents.OrchestrationEventStore;
 +  interface NodeRow {
 +    readonly node_id: string;
-+    readonly run_id: string | null;
++    readonly run_id: RunId | null;
 +    readonly is_root: number;
 +    readonly provider_thread_id: string | null;
 +    readonly provider_turn_id: string | null;
@@ -1316,7 +1507,7 @@ index 000000000..bbe5a2b57
 +    const project = (evidence: AttentionEvidence) => current.project(evidence);
 +    const lifecycle = (
 +      event: OrchestrationV2DomainEvent,
-+      turnId: string | null,
++      runId: RunId,
 +      providerKey: string,
 +      transition: ProviderLifecycleEvidence["transition"],
 +      failureReason?: ProviderLifecycleEvidence["failureReason"],
@@ -1330,11 +1521,9 @@ index 000000000..bbe5a2b57
 +        payload: {
 +          threadId: event.threadId,
 +          lifecycle: {
-+            providerEventId: EventId.make(
-+              `${event.rawEventId ?? event.id}:${turnId ?? ""}:${transition}`,
-+            ),
++            providerEventId: EventId.make(`${event.rawEventId ?? event.id}:${runId}:${transition}`),
 +            providerKey,
-+            turnId: turnId === null ? null : TurnId.make(turnId),
++            turnId: TurnId.make(runId),
 +            transition,
 +            ...(failureReason === undefined ? {} : { failureReason }),
 +          },
@@ -1406,7 +1595,9 @@ index 000000000..bbe5a2b57
 +          if (request.responseCapability.type === "not_resumable") break;
 +          if (request.responseDelivery === "pending") break;
 +          const owner = yield* node(source.threadId, request.nodeId);
-+          const turnId = request.providerTurnId ?? owner?.provider_turn_id ?? owner?.run_id ?? null;
++          const runId = owner?.run_id ?? null;
++          const sourceTurnId =
++            request.providerTurnId ?? owner?.provider_turn_id ?? owner?.run_id ?? null;
 +          const kind = request.kind === "user_input" ? "user-input" : "approval";
 +          const action =
 +            request.responseDelivery === "failed"
@@ -1423,7 +1614,7 @@ index 000000000..bbe5a2b57
 +              threadId: source.threadId,
 +              activity: {
 +                kind: activity,
-+                turnId: turnId === null ? null : TurnId.make(turnId),
++                turnId: runId === null ? null : TurnId.make(runId),
 +                payload: {
 +                  requestId: ApprovalRequestId.make(request.id),
 +                  ...(request.responseCapability.type === "message"
@@ -1436,7 +1627,7 @@ index 000000000..bbe5a2b57
 +          yield* audit.upsert({
 +            ...common,
 +            threadId: source.threadId,
-+            turnId: turnId === null ? null : TurnId.make(turnId),
++            turnId: sourceTurnId === null ? null : TurnId.make(sourceTurnId),
 +            requestId: ApprovalRequestId.make(request.id),
 +            kind: activity as OrchestrationThreadAttentionAuditKind,
 +          });
@@ -1446,7 +1637,7 @@ index 000000000..bbe5a2b57
 +          const turn = source.payload;
 +          const root = yield* node(source.threadId, turn.nodeId);
 +          const owner = yield* provider(source.threadId, turn.providerThreadId);
-+          if (root?.is_root !== 1 || owner === undefined) break;
++          if (root?.is_root !== 1 || root.run_id === null || owner === undefined) break;
 +          yield* sql`UPDATE foundation_v2_nodes SET provider_turn_id = ${turn.id}, provider_thread_id = ${turn.providerThreadId}
 +            WHERE thread_id = ${source.threadId} AND node_id = ${turn.nodeId}`;
 +          const transition =
@@ -1455,7 +1646,7 @@ index 000000000..bbe5a2b57
 +              : turn.status === "cancelled"
 +                ? "interrupted"
 +                : turn.status;
-+          yield* lifecycle(source, turn.id, owner.provider_key, transition);
++          yield* lifecycle(source, root.run_id, owner.provider_key, transition);
 +          break;
 +        }
 +        case "run.created":
@@ -1465,7 +1656,11 @@ index 000000000..bbe5a2b57
 +            yield* project({
 +              ...common,
 +              type: "run.starting",
-+              payload: { threadId: source.threadId },
++              payload: {
++                threadId: source.threadId,
++                runId: run.id,
++                providerKey: run.providerInstanceId,
++              },
 +            });
 +          } else if (run.status === "rolled_back") {
 +            yield* project({
@@ -1474,15 +1669,14 @@ index 000000000..bbe5a2b57
 +              payload: { threadId: source.threadId },
 +            });
 +          } else if (["completed", "failed", "interrupted", "cancelled"].includes(run.status)) {
-+            const root =
-+              run.rootNodeId === null ? undefined : yield* node(source.threadId, run.rootNodeId);
 +            const terminal = yield* sql`SELECT 1 FROM projection_thread_attention_turns
 +              WHERE thread_id = ${source.threadId} AND provider_key = ${run.providerInstanceId}
-+                AND turn_id = ${root?.provider_turn_id ?? run.id} AND phase IN ('failed', 'completed', 'interrupted')`;
++                AND turn_id = ${run.id} AND (
++                  phase IN ('completed', 'interrupted') OR (phase = 'failed' AND ${run.status} = 'failed'))`;
 +            if (terminal.length > 0) break;
 +            yield* lifecycle(
 +              source,
-+              root?.provider_turn_id ?? run.id,
++              run.id,
 +              run.providerInstanceId,
 +              run.status === "failed"
 +                ? "failed"
@@ -1505,22 +1699,18 @@ index 000000000..bbe5a2b57
 +          const sessionId =
 +            "id" in source.payload ? source.payload.id : source.payload.providerSessionId;
 +          const roots = yield* sql<{
-+            readonly provider_turn_id: string;
++            readonly run_id: RunId;
 +            readonly provider_key: string;
 +          }>`
-+            SELECT n.provider_turn_id, p.provider_key FROM foundation_v2_nodes n
++            SELECT n.run_id, p.provider_key FROM foundation_v2_nodes n
 +            JOIN foundation_v2_providers p ON p.thread_id = n.thread_id AND p.provider_thread_id = n.provider_thread_id
-+            JOIN projection_thread_attention_turns t ON t.thread_id = n.thread_id AND t.turn_id = n.provider_turn_id AND t.provider_key = p.provider_key
-+            WHERE n.thread_id = ${source.threadId} AND n.is_root = 1 AND p.provider_session_id = ${sessionId} AND t.phase = 'running'
++            JOIN projection_thread_attention_turns t ON t.thread_id = n.thread_id AND t.turn_id = n.run_id AND t.provider_key = p.provider_key
++            WHERE n.thread_id = ${source.threadId} AND n.is_root = 1 AND n.run_id IS NOT NULL
++              AND p.provider_session_id = ${sessionId} AND t.phase = 'running'
 +            LIMIT 2`;
 +          // Multiple active roots are insufficient attribution, not permission to guess.
 +          if (roots.length === 1)
-+            yield* lifecycle(
-+              source,
-+              roots[0]!.provider_turn_id,
-+              roots[0]!.provider_key,
-+              "disconnected",
-+            );
++            yield* lifecycle(source, roots[0]!.run_id, roots[0]!.provider_key, "disconnected");
 +          break;
 +        }
 +      }
@@ -3467,10 +3657,10 @@ index 000000000..506dbd2f2
 +);
 diff --git a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
 new file mode 100644
-index 000000000..6d3e817f6
+index 000000000..f935099a2
 --- /dev/null
 +++ b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
-@@ -0,0 +1,588 @@
+@@ -0,0 +1,591 @@
 +// @effect-diagnostics nodeBuiltinImport:off
 +import * as NodeCrypto from "node:crypto";
 +import {
@@ -3988,7 +4178,10 @@ index 000000000..6d3e817f6
 +          WHERE thread_id = ${event.payload.threadId}`;
 +        break;
 +      case "run.starting":
-+        yield* sql`UPDATE projection_thread_awareness SET pending_start = 1, stop_requested = 0 WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`UPDATE projection_thread_awareness SET pending_start = 1, stop_requested = 0,
++          turn_id = ${event.payload.runId}, provider_key = ${event.payload.providerKey},
++          base_phase = NULL, lifecycle_observed_at = ${event.occurredAt}
++          WHERE thread_id = ${event.payload.threadId}`;
 +        break;
 +      case "lifecycle.observed":
 +        yield* applyLifecycle(event);
@@ -9990,10 +10183,10 @@ index 000000000..4107c2b73
 +export const twsEnvironment = createTwsEnvironmentAtoms(connectionAtomRuntime);
 diff --git a/docs/internals/foundation.md b/docs/internals/foundation.md
 new file mode 100644
-index 000000000..ad8c962c6
+index 000000000..0250290bb
 --- /dev/null
 +++ b/docs/internals/foundation.md
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,51 @@
 +# Environment-local foundation projections
 +
 +Foundation consumes committed V2 orchestration, not the retired V1 engine.
@@ -10004,7 +10197,14 @@ index 000000000..ad8c962c6
 +
 +The immutable compact audit is separate from mutable current requests and
 +lifecycle awareness. Request identities include the V2 creation event, request
-+kind, request ID and attributed turn. A response intent is not confirmation:
++kind, request ID and owning V2 run. The compatibility wire field `turnId` on
++current attention items, awareness summaries and their lifecycle evidence means
++the owning V2 `runId`, never a `providerTurnId`. Provider-turn events use their
++explicit root-node run ownership; requests without known node run ownership
++keep a null value, and unattributed root lifecycle events create no live item.
++The immutable audit and canonical source events retain their original
++source/native-turn identities; this mapping does not rewrite historical IDs.
++A response intent is not confirmation:
 +live responses record pending delivery, then a worker receipt confirms or
 +records a failed delivery. Canonical provider resolution and turn termination
 +also close matching callbacks. Message-mode questions survive turn completion.
@@ -12269,10 +12469,10 @@ index 000000000..383f1101d
 +});
 diff --git a/packages/contracts/src/attention.ts b/packages/contracts/src/attention.ts
 new file mode 100644
-index 000000000..f907255ca
+index 000000000..b6a003b1d
 --- /dev/null
 +++ b/packages/contracts/src/attention.ts
-@@ -0,0 +1,150 @@
+@@ -0,0 +1,153 @@
 +import * as Schema from "effect/Schema";
 +import {
 +  ApprovalRequestId,
@@ -12298,6 +12498,7 @@ index 000000000..f907255ca
 +  attentionId: AttentionId,
 +  projectId: ProjectId,
 +  threadId: ThreadId,
++  /** V2 compatibility field: the owning runId, or null when ownership is unknown. */
 +  turnId: Schema.NullOr(TurnId),
 +  requestId: ApprovalRequestId,
 +  kind: RequestAttentionKind,
@@ -12327,6 +12528,7 @@ index 000000000..f907255ca
 +export const ProviderLifecycleEvidence = Schema.Struct({
 +  providerEventId: EventId,
 +  providerKey: TrimmedNonEmptyString,
++  /** V2 current-attention evidence uses the owning runId, not a providerTurnId. */
 +  turnId: Schema.NullOr(TurnId),
 +  transition: Schema.Literals([
 +    "starting",
@@ -12386,6 +12588,7 @@ index 000000000..f907255ca
 +export const ThreadAwarenessSummary = Schema.Struct({
 +  threadId: ThreadId,
 +  projectId: ProjectId,
++  /** V2 compatibility field: the owning runId, or null when ownership is unknown. */
 +  turnId: Schema.NullOr(TurnId),
 +  phase: Schema.NullOr(ThreadAwarenessPhase),
 +  approvalCount: Count,

@@ -4,8 +4,8 @@
     {
       "type": "replace-in-file",
       "path": ".gitignore",
-      "search": ".plans/\ndist-electron/",
-      "replace": ".plans/\n.tpatch/local/\ndist-electron/"
+      "search": ".t3\n.idea/",
+      "replace": ".t3\n.tpatch/local/\n.idea/"
     }
   ]
 }
