@@ -1,41 +1,9 @@
-diff --git a/apps/mobile/package.json b/apps/mobile/package.json
-index bdb4c8ebf..9d384e074 100644
---- a/apps/mobile/package.json
-+++ b/apps/mobile/package.json
-@@ -74,6 +74,7 @@
-     "@t3tools/mobile-source-text": "file:./modules/t3-source-text",
-     "@t3tools/mobile-terminal-native": "file:./modules/t3-terminal",
-     "@t3tools/provider-acp-registry": "workspace:*",
-+    "@t3tools/provider-copilot": "workspace:*",
-     "@t3tools/provider-core": "workspace:*",
-     "@t3tools/provider-cursor": "workspace:*",
-     "@t3tools/provider-fx": "workspace:*",
-diff --git a/apps/mobile/src/lib/providerClients.ts b/apps/mobile/src/lib/providerClients.ts
-index 2a62b5fdc..32930d1d5 100644
---- a/apps/mobile/src/lib/providerClients.ts
-+++ b/apps/mobile/src/lib/providerClients.ts
-@@ -4,6 +4,7 @@ import { makeProviderClientRegistry } from "@t3tools/provider-core/client";
- import { cursorClient } from "@t3tools/provider-cursor/client";
- import { fxClient } from "@t3tools/provider-fx/client";
- import { grokClient } from "@t3tools/provider-grok/client";
-+import { copilotClient } from "@t3tools/provider-copilot/client";
- import { museClient } from "@t3tools/provider-muse/client";
- import { openCodeClient } from "@t3tools/provider-opencode/client";
- import { piClient } from "@t3tools/provider-pi/client";
-@@ -11,6 +12,7 @@ import { piClient } from "@t3tools/provider-pi/client";
- const providerClients = makeProviderClientRegistry([
-   cursorClient,
-   grokClient,
-+  copilotClient,
-   fxClient,
-   museClient,
-   openCodeClient,
 diff --git a/apps/server/package.json b/apps/server/package.json
-index f8e6671b3..021cde6f0 100644
+index 5abc76941..a9296dbf3 100644
 --- a/apps/server/package.json
 +++ b/apps/server/package.json
-@@ -43,6 +43,7 @@
-     "@opencode-ai/sdk": "^1.3.15",
+@@ -42,6 +42,7 @@
+     "@napi-rs/keyring": "^1.3.0",
      "@t3tools/provider-acp": "workspace:*",
      "@t3tools/provider-acp-registry": "workspace:*",
 +    "@t3tools/provider-copilot": "workspace:*",
@@ -137,7 +105,7 @@ index bd985cab2..3187067d5 100644
      Effect.gen(function* () {
        const serverConfig = yield* ServerConfig.ServerConfig;
 diff --git a/apps/server/src/serverSettings.ts b/apps/server/src/serverSettings.ts
-index 3131c84d8..9b5e23e09 100644
+index a1e0d34c7..d1ab492ce 100644
 --- a/apps/server/src/serverSettings.ts
 +++ b/apps/server/src/serverSettings.ts
 @@ -74,7 +74,12 @@ const textDecoder = new TextDecoder();
@@ -166,7 +134,7 @@ index 3131c84d8..9b5e23e09 100644
    for (const driver of HISTORY_RESTORED_DRIVERS) {
      if (!legacyEntries.has(driver)) legacyEntries.set(driver, {});
    }
-@@ -735,6 +745,9 @@ const make = Effect.gen(function* () {
+@@ -736,6 +746,9 @@ const make = Effect.gen(function* () {
              ),
            );
  
@@ -176,7 +144,7 @@ index 3131c84d8..9b5e23e09 100644
      const loaded = foldProviderInstanceEnabledFlags(
        legacyProviders === undefined
          ? settings
-@@ -773,6 +786,7 @@ const make = Effect.gen(function* () {
+@@ -774,6 +787,7 @@ const make = Effect.gen(function* () {
        : folded;
      if (
        migrated !== loaded ||
@@ -184,43 +152,11 @@ index 3131c84d8..9b5e23e09 100644
        (settingsFileTrusted && legacyProviders !== undefined) ||
        hasLegacySourceControl
      ) {
-diff --git a/apps/web/package.json b/apps/web/package.json
-index 5ae86a8a7..99ff20b97 100644
---- a/apps/web/package.json
-+++ b/apps/web/package.json
-@@ -35,6 +35,7 @@
-     "@t3tools/client-runtime": "workspace:*",
-     "@t3tools/contracts": "workspace:*",
-     "@t3tools/provider-acp-registry": "workspace:*",
-+    "@t3tools/provider-copilot": "workspace:*",
-     "@t3tools/provider-core": "workspace:*",
-     "@t3tools/provider-cursor": "workspace:*",
-     "@t3tools/provider-fx": "workspace:*",
-diff --git a/apps/web/src/components/settings/providerDriverMeta.ts b/apps/web/src/components/settings/providerDriverMeta.ts
-index 552fc0d28..7e28be9c8 100644
---- a/apps/web/src/components/settings/providerDriverMeta.ts
-+++ b/apps/web/src/components/settings/providerDriverMeta.ts
-@@ -9,6 +9,7 @@ import { makeProviderClientRegistry } from "@t3tools/provider-core/client";
- import { cursorClient } from "@t3tools/provider-cursor/client";
- import { fxClient } from "@t3tools/provider-fx/client";
- import { grokClient } from "@t3tools/provider-grok/client";
-+import { copilotClient } from "@t3tools/provider-copilot/client";
- import { museClient } from "@t3tools/provider-muse/client";
- import { openCodeClient } from "@t3tools/provider-opencode/client";
- import { piClient } from "@t3tools/provider-pi/client";
-@@ -28,6 +29,7 @@ export const providerClients = makeProviderClientRegistry([
-   },
-   cursorClient,
-   grokClient,
-+  copilotClient,
-   fxClient,
-   openCodeClient,
-   {
 diff --git a/docs/internals/providers.md b/docs/internals/providers.md
-index 4121a349d..25469266c 100644
+index 42f0a7010..3f9032879 100644
 --- a/docs/internals/providers.md
 +++ b/docs/internals/providers.md
-@@ -11,6 +11,37 @@ session or catalog state. For a new driver, start with [adding a provider](./add
+@@ -11,6 +11,39 @@ session or catalog state. For a new driver, start with [adding a provider](./add
  
  ## Process and account isolation
  
@@ -231,6 +167,8 @@ index 4121a349d..25469266c 100644
 +the instance's resolved Copilot home; T3 never rewrites native transcripts or
 +claims unsupported rollback/fork capabilities. Resume disables pending-work
 +continuation and refuses `alreadyInUse` without aborting the other owner.
++Forced native-session replacement is refused rather than reusing a conversation
++whose handoff context may be uncertain.
 +Legacy `copilot` settings migrate to this driver while existing instance IDs survive.
 +
 +Permissions use the native `permission.requested` ID and await
@@ -260,10 +198,10 @@ index 4121a349d..25469266c 100644
  directory must not share one T3 MCP entry.
 diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
 new file mode 100644
-index 000000000..a2fdbc7e3
+index 000000000..eca524ff4
 --- /dev/null
 +++ b/docs/user/providers-copilot.md
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,45 @@
 +# GitHub Copilot
 +
 +Enable **GitHub Copilot** in **Settings > Providers** on the environment running
@@ -285,6 +223,8 @@ index 000000000..a2fdbc7e3
 +instructions, and skills. The skill picker uses the current project's discovered
 +skills, not a combined list from unrelated projects. Disabled and agent-only
 +skills are not offered as user commands.
++Enabling or disabling skills during an active session is not exposed by this
++integration.
 +
 +## Conversations and permissions
 +
@@ -307,11 +247,43 @@ index 000000000..a2fdbc7e3
 +Automatic native compaction is shown in the thread. Explicit manual compaction,
 +native conversation rollback, and native forks are not exposed by this integration;
 +portable handoffs remain available.
+diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json
+index 66e79c749..0d38301b5 100644
+--- a/packages/client-runtime/package.json
++++ b/packages/client-runtime/package.json
+@@ -513,6 +513,7 @@
+     "@t3tools/contracts": "workspace:*",
+     "@t3tools/provider-acp-registry": "workspace:*",
+     "@t3tools/provider-core": "workspace:*",
++    "@t3tools/provider-copilot": "workspace:*",
+     "@t3tools/provider-cursor": "workspace:*",
+     "@t3tools/provider-fx": "workspace:*",
+     "@t3tools/provider-grok": "workspace:*",
+diff --git a/packages/client-runtime/src/providerClients.ts b/packages/client-runtime/src/providerClients.ts
+index 37cd15209..ad15c8c89 100644
+--- a/packages/client-runtime/src/providerClients.ts
++++ b/packages/client-runtime/src/providerClients.ts
+@@ -8,6 +8,7 @@ import {
+ import { acpRegistryClient } from "@t3tools/provider-acp-registry/client";
+ import { makeProviderClientRegistry } from "@t3tools/provider-core/client";
+ import { modelShortName } from "@t3tools/provider-core/modelShortName";
++import { copilotClient } from "@t3tools/provider-copilot/client";
+ import { cursorClient } from "@t3tools/provider-cursor/client";
+ import { fxClient } from "@t3tools/provider-fx/client";
+ import { grokClient } from "@t3tools/provider-grok/client";
+@@ -32,6 +33,7 @@ export const providerClients = makeProviderClientRegistry([
+   },
+   cursorClient,
+   grokClient,
++  copilotClient,
+   fxClient,
+   openCodeClient,
+   {
 diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts
-index 74acdb2a8..c7c847df3 100644
+index 438d8fa6e..013e4f3ee 100644
 --- a/packages/contracts/src/settings.ts
 +++ b/packages/contracts/src/settings.ts
-@@ -1280,7 +1280,7 @@ export const providerInstanceConfigEnabledFlag = (config: unknown): boolean | un
+@@ -1332,7 +1332,7 @@ export const providerInstanceConfigEnabledFlag = (config: unknown): boolean | un
  
  // Must match each driver's enabled decoding default.
  const DEFAULT_DISABLED_PROVIDER_DRIVERS: ReadonlySet<ProviderDriverKind> = new Set(
@@ -386,10 +358,10 @@ index 000000000..5dea54a3c
 +export { CopilotDriver, type CopilotDriverEnv } from "./server/driver.ts";
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
 new file mode 100644
-index 000000000..0a2d3b059
+index 000000000..13be8e74a
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
-@@ -0,0 +1,918 @@
+@@ -0,0 +1,940 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import type {
 +  CopilotSession,
@@ -953,6 +925,28 @@ index 000000000..0a2d3b059
 +    ),
 +  );
 +
++  it.effect("refuses forced replacement instead of reusing the existing native conversation", () =>
++    provide(
++      Effect.gen(function* () {
++        const fake = fakeSdk();
++        const { runtime, thread, drain } = yield* setup(fake, "native-copilot");
++        const replacement = yield* runtime
++          .ensureThread({
++            threadId,
++            existingProviderThread: { ...thread, nativeThreadRef: null },
++            modelSelection: selection,
++            runtimePolicy: policy,
++            forceNewNativeThread: true,
++          })
++          .pipe(Effect.exit);
++        assert.isTrue(Exit.isFailure(replacement));
++        assert.equal((yield* drain()).providerThread.nativeThreadRef?.nativeId, "native-copilot");
++        assert.equal(fake.disconnected, 0);
++        assert.equal(fake.sent.length, 0);
++      }),
++    ),
++  );
++
 +  it.effect(
 +    "waits for native send admission even when the root becomes idle before send resolves",
 +    () =>
@@ -1310,10 +1304,10 @@ index 000000000..0a2d3b059
 +});
 diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
 new file mode 100644
-index 000000000..87517fe9a
+index 000000000..9f05143ee
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/adapter.ts
-@@ -0,0 +1,1575 @@
+@@ -0,0 +1,1589 @@
 +import type {
 +  CopilotClient,
 +  CopilotClientOptions,
@@ -2453,6 +2447,12 @@ index 000000000..87517fe9a
 +      });
 +      const ensureThread: ProviderAdapter.ProviderAdapterV2SessionRuntime["ensureThread"] =
 +        Effect.fn("CopilotAdapter.ensureThread")(function* (ensure) {
++          if (ensure.forceNewNativeThread)
++            return yield* new ProviderAdapter.ProviderAdapterEnsureThreadError({
++              driver: COPILOT_DRIVER,
++              threadId: ensure.threadId,
++              cause: new Error("Native Copilot session replacement is unsupported."),
++            });
 +          if (ensure.modelSelection.instanceId !== input.instanceId)
 +            return yield* new ProviderAdapter.ProviderAdapterEnsureThreadError({
 +              driver: COPILOT_DRIVER,
@@ -2488,7 +2488,15 @@ index 000000000..87517fe9a
 +            enableConfigDiscovery: input.settings.enableConfigDiscovery,
 +            skipCustomInstructions: !input.settings.enableConfigDiscovery,
 +            ...(mcp
-+              ? { systemMessage: { mode: "append", content: t3OrchestrationSystemPrompt(true)! } }
++              ? {
++                  systemMessage: {
++                    mode: "append",
++                    content: t3OrchestrationSystemPrompt(
++                      true,
++                      mcp.capabilities?.has("device") === true,
++                    )!,
++                  },
++                }
 +              : {}),
 +            includeSubAgentStreamingEvents: false,
 +            ...(mcp
@@ -4310,10 +4318,10 @@ index 000000000..f9d61df25
 +  "include": ["src"]
 +}
 diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
-index 96751b010..1eb4bdff1 100644
+index f2eabadf0..139cb3295 100644
 --- a/pnpm-lock.yaml
 +++ b/pnpm-lock.yaml
-@@ -253,6 +253,11 @@ catalogs:
+@@ -265,6 +265,11 @@ catalogs:
        version: 11.0.5
  
  overrides:
@@ -4325,7 +4333,7 @@ index 96751b010..1eb4bdff1 100644
    react-native-image-viewing: 0.2.2
    mdast-util-math: 3.0.0
    micromark-extension-llm-math: 3.1.0
-@@ -582,6 +587,9 @@ importers:
+@@ -849,6 +854,9 @@ importers:
        '@t3tools/provider-acp-registry':
          specifier: workspace:*
          version: link:../../packages/provider-acp-registry
@@ -4335,27 +4343,17 @@ index 96751b010..1eb4bdff1 100644
        '@t3tools/provider-core':
          specifier: workspace:*
          version: link:../../packages/provider-core
-@@ -859,6 +867,9 @@ importers:
+@@ -1437,6 +1445,9 @@ importers:
        '@t3tools/provider-acp-registry':
          specifier: workspace:*
-         version: link:../../packages/provider-acp-registry
+         version: link:../provider-acp-registry
 +      '@t3tools/provider-copilot':
 +        specifier: workspace:*
-+        version: link:../../packages/provider-copilot
++        version: link:../provider-copilot
        '@t3tools/provider-core':
          specifier: workspace:*
-         version: link:../../packages/provider-core
-@@ -1064,6 +1075,9 @@ importers:
-       '@t3tools/provider-acp-registry':
-         specifier: workspace:*
-         version: link:../../packages/provider-acp-registry
-+      '@t3tools/provider-copilot':
-+        specifier: workspace:*
-+        version: link:../../packages/provider-copilot
-       '@t3tools/provider-core':
-         specifier: workspace:*
-         version: link:../../packages/provider-core
-@@ -1601,6 +1615,34 @@ importers:
+         version: link:../provider-core
+@@ -1618,6 +1629,34 @@ importers:
          specifier: 1.4.0
          version: 1.4.0(@astrojs/compiler-rs@0.5.1)(@tsc-rs/typescript@0.8.0)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(@tsc-rs/typescript@0.8.0))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.60.0)(terser@5.48.0)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
  
@@ -4390,9 +4388,9 @@ index 96751b010..1eb4bdff1 100644
    packages/provider-core:
      dependencies:
        '@t3tools/contracts':
-@@ -4323,6 +4365,66 @@ packages:
-   '@formkit/auto-animate@0.9.0':
-     resolution: {integrity: sha512-VhP4zEAacXS3dfTpJpJ88QdLqMTcabMg0jwpOSxZ/VzfQVfl3GkZSCZThhGC5uhq/TxPHPzW0dzr4H9Bb1OgKA==}
+@@ -4311,6 +4350,66 @@ packages:
+   '@fontsource-variable/inter@5.3.0':
+     resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
  
 +  '@github/copilot-darwin-arm64@1.0.75':
 +    resolution: {integrity: sha512-avt2ganQwtycGkqz9z8JpARoEz2Fzi02O+WitbB8I8iF3jfvEGpQ8k3z9oSCPAAO0rIMBeSl05xEUUV5RJwfRA==}
@@ -4457,7 +4455,7 @@ index 96751b010..1eb4bdff1 100644
    '@hono/node-server@1.19.17':
      resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
      engines: {node: '>=18.14.1'}
-@@ -4536,6 +4638,106 @@ packages:
+@@ -4682,6 +4781,106 @@ packages:
      resolution: {integrity: sha512-hloP58zRVCRSpgDxmqCWJNlizAlUgJFqG2ypq79DCvyv9tHjRYMDOcPFjzfl/A1/YxDvRCZz8wvZvmapQnKwFQ==}
      engines: {node: '>=12'}
  
@@ -4564,7 +4562,7 @@ index 96751b010..1eb4bdff1 100644
    '@legendapp/list@3.3.5':
      resolution: {integrity: sha512-XTsLYtpg41SVb5uLBYA+YcDSA3w0tgoPq/W8ZggQ2tx+3lrC/rf+ehTP9KYHea9oFaZIuePAgzACs5/auVMJlQ==}
      peerDependencies:
-@@ -9593,6 +9795,9 @@ packages:
+@@ -9593,6 +9792,9 @@ packages:
      engines: {node: ^20.19.0 || >=22.12.0}
      hasBin: true
  
@@ -4574,7 +4572,7 @@ index 96751b010..1eb4bdff1 100644
    lan-network@0.2.1:
      resolution: {integrity: sha512-ONPnazC96VKDntab9j9JKwIWhZ4ZUceB4A9Epu4Ssg0hYFmtHZSeQ+n15nIwTFmcBUKtExOer8WTJ4GF9MO64A==}
      hasBin: true
-@@ -12076,6 +12281,10 @@ packages:
+@@ -12028,6 +12230,10 @@ packages:
      resolution: {integrity: sha512-C+r0eKJUIfiDIfwJhria30+TYWPtuHJXHtI7J0YlOmKAo7ogxP20T0zxB7HZQIFhIyvoBPwWskjxrvAtfjyZfA==}
      engines: {node: '>=14.0.0'}
  
@@ -4585,7 +4583,7 @@ index 96751b010..1eb4bdff1 100644
    vscode-languageserver-protocol@3.17.5:
      resolution: {integrity: sha512-mb1bvRJN8SVznADSGWM9u/b07H7Ecg0I3OgXDuLdn307rl/J3A9YD6/eYOssqhecL27hK1IPZAsaqh00i/Jljg==}
  
-@@ -12329,6 +12538,9 @@ packages:
+@@ -12273,6 +12479,9 @@ packages:
    zod@3.25.76:
      resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
  
@@ -4595,9 +4593,9 @@ index 96751b010..1eb4bdff1 100644
    zod@4.5.4:
      resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
  
-@@ -14678,6 +14890,50 @@ snapshots:
+@@ -14423,6 +14632,50 @@ snapshots:
  
-   '@formkit/auto-animate@0.9.0': {}
+   '@fontsource-variable/inter@5.3.0': {}
  
 +  '@github/copilot-darwin-arm64@1.0.75':
 +    optional: true
@@ -4646,7 +4644,7 @@ index 96751b010..1eb4bdff1 100644
    '@hono/node-server@1.19.17(hono@4.13.7)':
      dependencies:
        hono: 4.13.7
-@@ -14840,6 +15096,66 @@ snapshots:
+@@ -14689,6 +14942,66 @@ snapshots:
      dependencies:
        jsbi: 4.3.2
  
@@ -4713,7 +4711,7 @@ index 96751b010..1eb4bdff1 100644
    '@legendapp/list@3.3.5(patch_hash=6cbdacd8c380d9a5afb9f73d4198dc2cc44be6ef28a955b1183c781469307896)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)':
      dependencies:
        react: 19.3.0
-@@ -19757,6 +20073,29 @@ snapshots:
+@@ -19433,6 +19746,29 @@ snapshots:
        yaml: 2.9.0
        zod: 4.6.5
  
@@ -4743,7 +4741,7 @@ index 96751b010..1eb4bdff1 100644
    lan-network@0.2.1: {}
  
    lazy-val@1.0.5: {}
-@@ -22844,6 +23183,8 @@ snapshots:
+@@ -22508,6 +22844,8 @@ snapshots:
  
    vscode-jsonrpc@8.2.0: {}
  
@@ -4752,7 +4750,7 @@ index 96751b010..1eb4bdff1 100644
    vscode-languageserver-protocol@3.17.5:
      dependencies:
        vscode-jsonrpc: 8.2.0
-@@ -23092,6 +23433,8 @@ snapshots:
+@@ -22747,6 +23085,8 @@ snapshots:
  
    zod@3.25.76: {}
  
@@ -4762,7 +4760,7 @@ index 96751b010..1eb4bdff1 100644
  
    zod@4.6.5: {}
 diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
-index f953a77de..dee9cf728 100644
+index a07ad2b00..fda1054c5 100644
 --- a/pnpm-workspace.yaml
 +++ b/pnpm-workspace.yaml
 @@ -18,6 +18,7 @@ allowBuilds:
@@ -4773,8 +4771,8 @@ index f953a77de..dee9cf728 100644
    msgpackr-extract: true
    msw: false
    node-pty: true
-@@ -226,6 +227,11 @@ minimumReleaseAgeExclude:
-   - "@pierre/theming@1.0.2"
+@@ -229,6 +230,11 @@ minimumReleaseAgeExclude:
+   - agent-device@0.21.32
  
  overrides:
 +  "@github/copilot-sdk@1.0.8>@github/copilot": 1.0.75

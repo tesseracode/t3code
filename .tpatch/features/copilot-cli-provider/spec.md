@@ -73,7 +73,7 @@
 14. Focused core tests cover client options, provider/model status, migration, create/resume/stop,
     permissions/user input/plans, critical runtime events, text generation, and workspace isolation.
     Packaging closure and real provider-turn continuity remain separate integration gates.
-15. On v0.1.3, the provider package uses shared identity stamping and maintenance resolution,
+15. On v0.1.3 and v0.1.4, the provider package uses shared identity stamping and maintenance resolution,
     accepts current structured custom model settings, and preserves linked-context
     title generation/refinement and upstream project-settings folding. Upstream V2 owns queueing,
     delegation, and portable handoffs; the native adapter does not introduce an orchestrator.
@@ -81,6 +81,10 @@
     file-backed ESM imports. Electron and standalone hosts resolve the native target
     executable without respawning T3; explicit runtime/connection overrides win.
     Missing SDK/runtime payloads produce typed initialization/status failures.
+17. On v0.1.4, register the client once through the shared client-runtime registry
+    used by web, desktop and mobile, and preserve capability-gated device
+    instructions. Forced native-session replacement returns a typed error rather
+    than silently reusing the old conversation.
 
 Full packaged Windows/Linux/WSL qualification, exact all-stage dependency closure
 and payload pruning remain integration gates on the dependent maintenance roots.
