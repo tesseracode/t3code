@@ -1,37 +1,27 @@
 {
   "feature": "fork-maintenance-check-scope",
-  "version": 1,
-  "description": "Auto-generated recipe from git diff HEAD..9ddc8ac87617a71a1c8f2f4f723c0cfe38228f57",
   "operations": [
     {
-      "id": "01",
       "type": "write-file",
       "path": "scripts/lib/ci-changes.test.ts",
       "preimage_hash": "",
-      "description": "Create ci-changes.test.ts",
       "content": "import { describe, expect, it } from \"vite-plus/test\";\nimport { decide } from \"../../.github/scripts/ci-changes.cjs\";\n\nconst packages = [\n  { name: \"@t3tools/web\", dir: \"apps/web\", hasTest: true, deps: [] },\n  { name: \"t3\", dir: \"apps/server\", hasTest: true, deps: [] },\n];\n\nconst metadata = [\n  \".tpatch/features/example/artifacts/post-apply.patch\",\n  \".tpatch/features/example/status.json\",\n  \".tpatch/tools/generate-recipe.cjs\",\n];\n\ndescribe(\"administrative patch evidence\", () => {\n  it(\"does not select application packages for metadata-only changes\", () => {\n    expect(decide(metadata, packages, false).affected).toEqual([]);\n  });\n\n  it(\"preserves product and dependent selection in a mixed change\", () => {\n    const source = [\"apps/web/src/example.ts\"];\n    expect(decide([...metadata, ...source], packages, false)).toEqual(\n      decide(source, packages, false),\n    );\n  });\n\n  it(\"keeps lookalike paths conservative\", () => {\n    expect(decide([\".tpatch-other/policy.json\"], packages, false).affected).toEqual(\n      packages.map((entry) => entry.name).sort(),\n    );\n  });\n});\n"
     },
     {
-      "id": "02",
       "type": "replace-in-file",
       "path": ".github/scripts/ci-changes.cjs",
-      "description": "Modify ci-changes.cjs",
       "search": "\nconst INERT = [\n  /^docs\\//,\n  /^\\.(agents|cursor|vscode|devcontainer|macroscope|repos)\\//,\n  /^[^/]+\\.md$/,\n  /^LICENSE$/,\n];",
       "replace": "\nconst INERT = [\n  /^docs\\//,\n  /^\\.(agents|cursor|vscode|devcontainer|macroscope|repos|tpatch)\\//,\n  /^[^/]+\\.md$/,\n  /^LICENSE$/,\n];"
     },
     {
-      "id": "03",
       "type": "replace-in-file",
       "path": "vite.config.ts",
-      "description": "Modify vite.config.ts",
       "search": "  fmt: {\n    ignorePatterns: [\n      \".repos/**\",\n      \"infra/task-cache/vendor/**\",\n      // Macroscope requires one glob per line; Markdown formatting corrupts it.\n      \".macroscope/ignore.md\",",
       "replace": "  fmt: {\n    ignorePatterns: [\n      \".repos/**\",\n      // Preserve hash-bound patch recipes and historical evidence.\n      \".tpatch/**\",\n      \"infra/task-cache/vendor/**\",\n      // Macroscope requires one glob per line; Markdown formatting corrupts it.\n      \".macroscope/ignore.md\","
     },
     {
-      "id": "04",
       "type": "replace-in-file",
       "path": "vite.config.ts",
-      "description": "Modify vite.config.ts",
       "search": "  },\n  lint: {\n    ignorePatterns: [\n      \".repos\",\n      \".repos/**\",\n      \"infra/task-cache/vendor/**\",",
       "replace": "  },\n  lint: {\n    ignorePatterns: [\n      \".tpatch/**\",\n      \".repos\",\n      \".repos/**\",\n      \"infra/task-cache/vendor/**\","
     }

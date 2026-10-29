@@ -21,3 +21,10 @@ session had already captured the new patch. The repository's recipe generator
 was therefore run against the real staged Git tree, with the genuine empty
 preimage for this new file. Recipe content was compared to the materialized file
 before recording and landing.
+
+The historical helper also emitted legacy `version`, `description` and operation
+`id` fields rejected by the current strict recipe schema. Those fields were
+removed from this current recipe without changing its source contents. Provenance
+is a manual attestation of the actual application base and corrected recipe
+hash, not a provider-generated artifact. The existing source range is re-recorded
+and re-attested; no historical source commit or generation manifest is rewritten.

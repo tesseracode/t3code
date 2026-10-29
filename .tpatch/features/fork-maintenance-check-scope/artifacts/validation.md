@@ -29,3 +29,9 @@ not byte-identical to the preserved canonical. The old canonical was therefore
 rematerialized first, then the correction was made before recording the complete
 still-uncommitted root. The final corrected source is the same source that passed
 the focused test, format and owning-package type checks.
+
+The historical generator emitted legacy recipe fields rejected by the current
+strict schema. They were removed from this current recipe; source contents and
+real preimages are unchanged. Recipe provenance manually attests the actual
+application base and corrected schema bytes, without claiming provider generation
+or rewriting historical generation manifests.
