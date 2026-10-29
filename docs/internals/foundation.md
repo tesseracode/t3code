@@ -8,7 +8,14 @@ do not perform attention SQL work.
 
 The immutable compact audit is separate from mutable current requests and
 lifecycle awareness. Request identities include the V2 creation event, request
-kind, request ID and attributed turn. A response intent is not confirmation:
+kind, request ID and owning V2 run. The compatibility wire field `turnId` on
+current attention items, awareness summaries and their lifecycle evidence means
+the owning V2 `runId`, never a `providerTurnId`. Provider-turn events use their
+explicit root-node run ownership; requests without known node run ownership
+keep a null value, and unattributed root lifecycle events create no live item.
+The immutable audit and canonical source events retain their original
+source/native-turn identities; this mapping does not rewrite historical IDs.
+A response intent is not confirmation:
 live responses record pending delivery, then a worker receipt confirms or
 records a failed delivery. Canonical provider resolution and turn termination
 also close matching callbacks. Message-mode questions survive turn completion.

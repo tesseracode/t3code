@@ -515,7 +515,10 @@ const make = Effect.gen(function* () {
           WHERE thread_id = ${event.payload.threadId}`;
         break;
       case "run.starting":
-        yield* sql`UPDATE projection_thread_awareness SET pending_start = 1, stop_requested = 0 WHERE thread_id = ${event.payload.threadId}`;
+        yield* sql`UPDATE projection_thread_awareness SET pending_start = 1, stop_requested = 0,
+          turn_id = ${event.payload.runId}, provider_key = ${event.payload.providerKey},
+          base_phase = NULL, lifecycle_observed_at = ${event.occurredAt}
+          WHERE thread_id = ${event.payload.threadId}`;
         break;
       case "lifecycle.observed":
         yield* applyLifecycle(event);

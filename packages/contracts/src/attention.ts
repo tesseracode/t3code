@@ -23,6 +23,7 @@ const fields = {
   attentionId: AttentionId,
   projectId: ProjectId,
   threadId: ThreadId,
+  /** V2 compatibility field: the owning runId, or null when ownership is unknown. */
   turnId: Schema.NullOr(TurnId),
   requestId: ApprovalRequestId,
   kind: RequestAttentionKind,
@@ -52,6 +53,7 @@ export type RequestAttentionItem = typeof RequestAttentionItem.Type;
 export const ProviderLifecycleEvidence = Schema.Struct({
   providerEventId: EventId,
   providerKey: TrimmedNonEmptyString,
+  /** V2 current-attention evidence uses the owning runId, not a providerTurnId. */
   turnId: Schema.NullOr(TurnId),
   transition: Schema.Literals([
     "starting",
@@ -111,6 +113,7 @@ const Count = NonNegativeInt.check(Schema.isLessThanOrEqualTo(ATTENTION_SUMMARY_
 export const ThreadAwarenessSummary = Schema.Struct({
   threadId: ThreadId,
   projectId: ProjectId,
+  /** V2 compatibility field: the owning runId, or null when ownership is unknown. */
   turnId: Schema.NullOr(TurnId),
   phase: Schema.NullOr(ThreadAwarenessPhase),
   approvalCount: Count,
