@@ -2,15 +2,15 @@
   "id": "phase1-foundation",
   "slug": "phase1-foundation",
   "title": "Consolidate the completed Phase 1 local-first foundation into one upstream-maintenance root. Capture the durable thread attention audit, read-only TWS v1.2.14 adapter, opaque environment-scoped TWS bindings, and GitHub Issue/Azure Boards contracts as one integrated patch on the verified Phase 0 base. Preserve granular child features as audit history but supersede them, and fold the five Copilot child records already provided by the verified Copilot root. Do not add UI, RPC, relay, push, TWS mutation, hosting provider implementations, or target-platform claims.",
-  "state": "blocked",
+  "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-03T10:11:24Z",
-  "updated_at": "2026-10-29T07:34:56Z",
-  "last_command": "reconcile",
-  "notes": "Reconciliation blocked — manual intervention needed",
+  "updated_at": "2026-10-29T08:15:07Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-10-29T08:14:14Z",
   "apply": {
-    "completed_at": "2026-10-01T15:02:05Z",
-    "base_commit": "e63a807291df4cbbf57673bfebb6963f3b79c54d",
+    "completed_at": "2026-10-29T08:10:00Z",
+    "base_commit": "81c2157c19b6984d2d76365bf243d1ae90f61548",
     "has_patch": true
   },
   "reconcile": {
@@ -18,9 +18,7 @@
     "upstream_ref": "v0.1.3",
     "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
     "outcome": "blocked",
-    "labels": [
-      "blocked-by-parent"
-    ]
+    "labels": ["blocked-by-parent"]
   },
   "depends_on": [
     {
@@ -69,10 +67,10 @@
     }
   ],
   "verify": {
-    "verified_at": "2026-10-03T13:58:29Z",
+    "verified_at": "2026-10-29T08:15:01Z",
     "passed": true,
-    "recipe_hash_at_verify": "ae7d0124443ab08e32855eaf7bf1602619396caa94a5f507114e02d03323301d",
-    "patch_hash_at_verify": "cb31a341adaebd840624b8d1d04d4b64f21bd74b949211ea74263d6a9c215db5",
+    "recipe_hash_at_verify": "e9cc5e65bbecf84a2062594ea57af7ab7616393561092e9f3e95c72c1f121cc4",
+    "patch_hash_at_verify": "91bda61328c15149793967a0b61fb88bc445af914282b637069870ee1d84f8b9",
     "parent_snapshot": {
       "copilot-cli-provider": "applied"
     }

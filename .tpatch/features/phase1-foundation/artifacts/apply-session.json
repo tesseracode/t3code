@@ -1,8 +1,8 @@
 {
   "slug": "phase1-foundation",
-  "completed_at": "2026-10-01T15:02:05Z",
-  "base_commit": "26b7eb894d1ce095c3469b9451ea9f0c4172c1ae",
+  "completed_at": "2026-10-29T08:10:00Z",
+  "base_commit": "81c2157c19b6984d2d76365bf243d1ae90f61548",
   "has_patch": true,
   "validation_status": "passed",
-  "validation_notes": "TWS-01 optional environment integration: 219 focused tests, two selected authenticated RPC gates, server/web/mobile/client-runtime/desktop types, targeted lint and web build pass. Approved isolated browser: disabled makes no fixture CLI calls, explicit opt-in/refresh/version rejection/disable/reload pass. No TWS mutation or live T3 writes."
+  "validation_notes": "tpatch test — command: PATH=/Users/jdbencardinop/.nvm/versions/node/v26.12.1/bin:$PATH node_modules/.bin/vp test run packages/contracts/src/attention.test.ts packages/contracts/src/attentionSync.test.ts packages/contracts/src/twsBindings.test.ts packages/contracts/src/twsContext.test.ts packages/contracts/src/workItem.test.ts packages/client-runtime/src/attentionSync.test.ts packages/client-runtime/src/state/attention.test.ts packages/client-runtime/src/state/attentionNotifications.test.ts apps/server/src/tws/TwsBindingMatch.test.ts apps/server/src/tws/TwsCliAdapter.test.ts apps/server/src/tws/TwsCliDecoder.test.ts apps/server/src/tws/TwsTopology.test.ts apps/server/src/tws/TwsContextService.test.ts apps/server/src/persistence/ForkMigrations.test.ts apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.test.ts apps/server/src/persistence/ForkMigrations/045_TwsBindings.test.ts apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts apps/server/src/persistence/Layers/TwsBindings.test.ts apps/server/src/persistence/Migrations.test.ts apps/server/src/persistence/reconcileV2PreviewMigration.test.ts apps/server/src/orchestration-v2/FoundationProjection.test.ts apps/server/src/orchestration-v2/EffectWorker.test.ts apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts apps/server/src/orchestration-v2/ProjectionRecovery.test.ts apps/server/src/orchestration-v2/ProjectionSettlement.test.ts apps/server/src/auth/RpcAuthorization.test.ts apps/server/src/ws.test.ts apps/server/src/serverRuntimeStartup.test.ts apps/server/src/serverRuntimeStartup.autoPull.test.ts"
 }

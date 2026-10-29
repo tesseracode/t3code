@@ -31,6 +31,8 @@ import { flushCompileCache } from "./compileCache.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as EffectWorker from "./orchestration-v2/EffectWorker.ts";
+import * as FoundationProjection from "./orchestration-v2/FoundationProjection.ts";
+import { TwsContextService } from "./tws/TwsContextService.ts";
 import * as LegacyV1ThreadImporter from "./orchestration-v2/legacy/LegacyV1ThreadImporter.ts";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as ProviderRuntimeRecovery from "./orchestration-v2/ProviderRuntimeRecoveryService.ts";
@@ -488,6 +490,7 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
   );
 
   const startup = Effect.gen(function* () {
+    yield* (yield* FoundationProjection.FoundationProjection).bootstrap;
     yield* Effect.logDebug("startup phase: starting keybindings runtime");
     yield* runStartupPhase(
       "keybindings.start",
@@ -518,6 +521,7 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
       ),
     );
 
+    yield* (yield* TwsContextService).start;
     const welcomeBase = yield* resolveWelcomeBase;
     const environment = yield* serverEnvironment.getDescriptor;
     const legacyMigrationThreadCount = yield* legacyV1ThreadImporter.pendingThreadCount;
