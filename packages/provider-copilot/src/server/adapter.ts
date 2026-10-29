@@ -6,7 +6,6 @@ import type {
   SessionEvent,
   MessageOptions,
   PermissionRequest,
-  PermissionRequestResult,
   ResumeSessionConfig,
   SkillsLoadedSkill,
 } from "@github/copilot-sdk";
@@ -74,6 +73,7 @@ export type SessionHandle = Pick<
     readonly plan: Pick<Rpc["plan"], "read">;
     readonly skills: Pick<Rpc["skills"], "list">;
     readonly tasks: Pick<Rpc["tasks"], "list" | "cancel">;
+    readonly permissions: Pick<Rpc["permissions"], "handlePendingPermissionRequest">;
   };
 };
 export type ClientHandle = Pick<CopilotClient, "start" | "stop" | "forceStop"> & {
@@ -114,6 +114,7 @@ interface ActiveTurn {
 }
 type PendingResponse = {
   readonly owner: ActiveTurn;
+  readonly nativePermissionId?: string;
   readonly request: OrchestrationV2RuntimeRequest;
   readonly item: OrchestrationV2TurnItem;
   readonly node: OrchestrationV2ExecutionNode;
@@ -126,7 +127,7 @@ type Ingress =
       readonly type: "request";
       readonly kind: "permission";
       readonly request: PermissionRequest;
-      readonly resolve: (result: PermissionRequestResult) => void;
+      readonly nativeRequestId: string;
     }
   | {
       readonly type: "request";
@@ -205,7 +206,8 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       const turns = new Map<string, OrchestrationV2ProviderTurn>();
       const messages = new Map<string, OrchestrationV2ConversationMessage>();
       const pending = new Map<RuntimeRequestId, PendingResponse>();
-      const requestHistory = new Map<RuntimeRequestId, OrchestrationV2RuntimeRequest>();
+      const confirmedPermissionReplies = new Map<RuntimeRequestId, string>();
+      const sdkOwnedPermissionRequests = new WeakSet<PermissionRequest>();
       const tasks = new Map<string, Task>();
       const subagents = new Map<string, OrchestrationV2Subagent>();
       const taskOwners = new Map<string, ActiveTurn>();
@@ -232,6 +234,27 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                   }),
               ),
             ),
+          ),
+        );
+      const decidePermission = (
+        requestId: string,
+        result: Parameters<Rpc["permissions"]["handlePendingPermissionRequest"]>[0]["result"],
+      ) =>
+        sdk("permission response", () =>
+          native!.rpc.permissions.handlePendingPermissionRequest({
+            requestId,
+            result,
+          }),
+        ).pipe(
+          Effect.flatMap((receipt) =>
+            receipt.success
+              ? Effect.void
+              : Effect.fail(
+                  new ProviderAdapter.ProviderAdapterProtocolError({
+                    driver: COPILOT_DRIVER,
+                    detail: "Copilot permission request was already resolved",
+                  }),
+                ),
           ),
         );
       const config = yield* Effect.try({
@@ -261,8 +284,6 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         const now = yield* DateTime.now;
         for (const entry of pending.values()) {
           entry.cancel();
-          const cancelled = { ...entry.request, status: "cancelled" as const, resolvedAt: now };
-          requestHistory.set(cancelled.id, cancelled);
           entry.owner.items.set(entry.request.id, {
             ...entry.item,
             status: "cancelled",
@@ -577,7 +598,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         reasoning: boolean,
       ) {
         const previous = turn.items.get(key);
-        const content = final ? text : (previous && "text" in previous ? previous.text : "") + text;
+        if (text.length === 0 && (!final || previous === undefined)) return;
+        const content =
+          final && text.length > 0
+            ? text
+            : (previous && "text" in previous ? previous.text : "") + text;
         const now = yield* DateTime.now;
         const base = {
           ...baseItem(turn, key, key),
@@ -634,6 +659,22 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             },
             open.threadId,
           );
+        if (event.type === "permission.requested") {
+          if (
+            !event.data.resolvedByHook &&
+            !sdkOwnedPermissionRequests.has(event.data.permissionRequest) &&
+            ![...pending.values()].some(
+              (entry) => entry.nativePermissionId === event.data.requestId,
+            )
+          )
+            yield* onRequest({
+              type: "request",
+              kind: "permission",
+              request: event.data.permissionRequest,
+              nativeRequestId: event.data.requestId,
+            }).pipe(Effect.catch((cause) => (active ? terminal(active, cause) : Effect.void)));
+          return;
+        }
         // Child events never advance or complete the root's user-turn lifecycle.
         if (event.agentId) {
           if (
@@ -911,8 +952,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       const onRequest = Effect.fnUntraced(function* (entry: Extract<Ingress, { type: "request" }>) {
         const turn = active;
         if (!turn || turn.finished || stopped) {
-          if (entry.kind === "permission") entry.resolve({ kind: "reject" });
-          else if (entry.kind === "input") entry.resolve({ answer: "", wasFreeform: true });
+          if (entry.kind === "permission") {
+            if (native && !stopped)
+              yield* decidePermission(entry.nativeRequestId, { kind: "user-not-available" });
+          } else if (entry.kind === "input") entry.resolve({ answer: "", wasFreeform: true });
           else entry.resolve({ approved: false });
           return;
         }
@@ -922,7 +965,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             (turn.input.runtimePolicy.runtimeMode === "auto-accept-edits" &&
               entry.request.kind === "write"))
         ) {
-          entry.resolve({ kind: "approve-once" });
+          yield* decidePermission(entry.nativeRequestId, { kind: "approve-once" });
           return;
         }
         const now = yield* DateTime.now;
@@ -940,7 +983,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
           id,
           nodeId,
           providerTurnId: turn.providerTurn.id,
-          nativeRequestRef: null,
+          nativeRequestRef: entry.kind === "permission" ? ref(entry.nativeRequestId) : null,
           kind: requestKind,
           status: "pending",
           responseCapability: { type: "live", providerSessionId: open.providerSessionId },
@@ -1014,13 +1057,12 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         if (entry.kind === "plan") yield* refreshPlan().pipe(Effect.ignore);
         pending.set(id, {
           owner: turn,
+          ...(entry.kind === "permission" ? { nativePermissionId: entry.nativeRequestId } : {}),
           request,
           item,
           node,
           resolve: (response) => {
-            if (entry.kind === "permission")
-              entry.resolve({ kind: response.decision === "accept" ? "approve-once" : "reject" });
-            else {
+            if (entry.kind !== "permission") {
               const answer = response.answers?.answer;
               const text =
                 typeof answer === "string"
@@ -1044,12 +1086,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             }
           },
           cancel: () => {
-            if (entry.kind === "permission") entry.resolve({ kind: "reject" });
-            else if (entry.kind === "input") entry.resolve({ answer: "", wasFreeform: true });
-            else entry.resolve({ approved: false });
+            if (entry.kind === "input") entry.resolve({ answer: "", wasFreeform: true });
+            else if (entry.kind === "plan") entry.resolve({ approved: false });
           },
         });
-        requestHistory.set(id, request);
         yield* emit({ type: "node.updated", driver: COPILOT_DRIVER, node });
         yield* emit({
           type: "runtime_request.updated",
@@ -1137,17 +1177,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                   },
                 }
               : {}),
-            onPermissionRequest: (request) =>
-              new Promise((resolve) => {
-                if (stopped) resolve({ kind: "reject" });
-                else
-                  Queue.offerUnsafe(inbox, {
-                    type: "request",
-                    kind: "permission",
-                    request,
-                    resolve,
-                  });
-              }),
+            // Handle native IDs and applied-decision receipts through the permission RPC.
+            onPermissionRequest: (request) => {
+              if (!active || active.finished || stopped) {
+                sdkOwnedPermissionRequests.add(request);
+                return { kind: "user-not-available" };
+              }
+              return { kind: "no-result" };
+            },
             onUserInputRequest: (request) =>
               new Promise((resolve) => {
                 if (stopped) resolve({ answer: "", wasFreeform: true });
@@ -1194,6 +1231,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                   (event.type !== "assistant.message" && event.type !== "user.message")
                 )
                   continue;
+                if (event.type === "assistant.message" && event.data.content.length === 0) continue;
                 const messageId = MessageId.make(`${open.providerSessionId}:history:${event.id}`);
                 messages.set(messageId, {
                   id: messageId,
@@ -1412,6 +1450,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         respondToRuntimeRequest: Effect.fn("CopilotAdapter.respondToRuntimeRequest")(
           function* (response) {
             const entry = pending.get(response.requestId);
+            const permissionReplyKey = `${response.decision ?? ""}\n${response.feedback ?? ""}`;
+            if (
+              !entry &&
+              confirmedPermissionReplies.get(response.requestId) === permissionReplyKey &&
+              response.answers === undefined
+            )
+              return;
             if (!entry)
               return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({
                 driver: COPILOT_DRIVER,
@@ -1424,7 +1469,8 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             if (
               entry.request.kind === "user_input"
                 ? !validAnswer
-                : !["accept", "decline", "cancel"].includes(response.decision ?? "")
+                : !["accept", "decline", "cancel"].includes(response.decision ?? "") ||
+                  response.answers !== undefined
             ) {
               return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({
                 driver: COPILOT_DRIVER,
@@ -1434,45 +1480,28 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                 ),
               });
             }
-            entry.resolve(response);
-            pending.delete(response.requestId);
             const now = yield* DateTime.now;
-            const resolved = {
-              ...entry.request,
-              status: "resolved" as const,
-              resolvedAt: now,
-              ...(response.decision ? { decision: response.decision } : {}),
-              ...(response.answers ? { answers: response.answers } : {}),
-            };
-            requestHistory.set(response.requestId, resolved);
+            if (entry.nativePermissionId) {
+              yield* decidePermission(
+                entry.nativePermissionId,
+                response.decision === "accept"
+                  ? { kind: "approve-once" }
+                  : {
+                      kind: "reject",
+                      ...(response.feedback ? { feedback: response.feedback } : {}),
+                    },
+              );
+              confirmedPermissionReplies.set(response.requestId, permissionReplyKey);
+            }
+            pending.delete(response.requestId);
             entry.owner.items.set(response.requestId, {
               ...entry.item,
               status: "completed",
               completedAt: now,
               updatedAt: now,
             });
-            yield* emit({
-              type: "runtime_request.updated",
-              driver: COPILOT_DRIVER,
-              threadId: open.threadId,
-              runtimeRequest: {
-                ...entry.request,
-                status: "resolved",
-                resolvedAt: now,
-                ...(response.decision ? { decision: response.decision } : {}),
-                ...(response.answers ? { answers: response.answers } : {}),
-              },
-            });
-            yield* emit({
-              type: "turn_item.updated",
-              driver: COPILOT_DRIVER,
-              turnItem: { ...entry.item, status: "completed", completedAt: now, updatedAt: now },
-            });
-            yield* emit({
-              type: "node.updated",
-              driver: COPILOT_DRIVER,
-              node: { ...entry.node, status: "completed", completedAt: now },
-            });
+            // The decider owns resolution and delivery state; callback handoff is the last operation.
+            if (!entry.nativePermissionId) entry.resolve(response);
           },
         ),
         readThreadSnapshot: Effect.fn("CopilotAdapter.readThreadSnapshot")(function* () {
@@ -1486,7 +1515,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             providerThread,
             providerTurns: [...turns.values()],
             messages: [...messages.values()],
-            runtimeRequests: [...requestHistory.values()],
+            runtimeRequests: [...pending.values()].map((entry) => entry.request),
           };
         }),
         rollbackThread: (rollback) =>

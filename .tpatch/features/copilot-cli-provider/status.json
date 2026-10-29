@@ -5,11 +5,11 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-04-17T09:58:12Z",
-  "updated_at": "2026-10-29T07:58:01Z",
-  "last_command": "verify",
-  "notes": "landed at 2026-10-29T07:58:45Z",
+  "updated_at": "2026-10-29T10:02:59Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-29T10:03:53Z",
   "apply": {
-    "completed_at": "2026-10-29T07:57:47Z",
+    "completed_at": "2026-10-29T10:02:19Z",
     "base_commit": "010dacb26afec7a34fb8a3010a2cd3396d5b4550",
     "has_patch": true
   },
@@ -20,9 +20,9 @@
     "outcome": "blocked"
   },
   "verify": {
-    "verified_at": "2026-10-29T07:57:55Z",
-    "passed": true,
-    "recipe_hash_at_verify": "cf4000ceeb9a924f0afea7762868cbcb7f81c77bdbc1f264327026b54c4efaa8",
-    "patch_hash_at_verify": "c2c91db4de2b0831a1a0595c7467f4183e0160ac9cd1828baa2531febb702bfa"
+    "verified_at": "2026-10-29T10:00:52Z",
+    "passed": false,
+    "recipe_hash_at_verify": "77a404801943da200418bd66b780cc418f746a8b74c1cc46cf221b633b40fd4c",
+    "patch_hash_at_verify": "70365367c3bd5d1bb3751d8d52f069228d932a1d9f6483f4f283d8d760724545"
   }
 }

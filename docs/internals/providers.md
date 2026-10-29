@@ -20,6 +20,15 @@ claims unsupported rollback/fork capabilities. Resume disables pending-work
 continuation and refuses `alreadyInUse` without aborting the other owner.
 Legacy `copilot` settings migrate to this driver while existing instance IDs survive.
 
+Permissions use the native `permission.requested` ID and await
+`permissions.handlePendingPermissionRequest().success`; false or failed RPCs stay
+unconfirmed. The SDK permission handler returns `no-result` for active turns so
+it cannot send a second decision. Identical retries reuse only a previously
+successful native receipt on that runtime. Startup/closed requests remain denied
+through the SDK handler. Questions and plan approval retain the SDK callback
+handoff boundary; that callback alone is not a native RPC acknowledgement.
+The adapter never re-emits app-owned reply resolution or delivery state.
+
 Only a root `session.idle` successfully terminates a user turn.
 `assistant.turn_end`, `assistant.idle`, and all child events are non-terminal.
 Task snapshots update V2 native subagents and pending background work separately;
