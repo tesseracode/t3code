@@ -1,2 +1,4 @@
- .gitignore | 1 +
- 1 file changed, 1 insertion(+)
+ .gitignore                                               | 1 +
+ .tpatch/FEATURES.md                                      | 2 +-
+ .tpatch/features/tpatch-local-capture-ignore/status.json | 8 ++++----
+ 3 files changed, 6 insertions(+), 5 deletions(-)

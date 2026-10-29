@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-10-29T07:20:53Z
+**Timestamp**: 2026-10-29T08:41:16Z
 
 ## Notes
 
-Seven-root exact replay has only this one-line non-tpatch difference.
+git check-ignore .tpatch/local/capture/verification.json passed; current upstream ignore rules preserved.
