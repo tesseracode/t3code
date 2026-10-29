@@ -241,3 +241,122 @@ session continuity, integrated provider tests, lint and client verification rema
 separate later gates. No local or network listening ports were started; there
 were **no port-binding failures**. The failures above are reconciliation and
 offline package-metadata failures, not networking tests.
+
+## Landed-tree readback
+
+Source landed through scoped `tpatch land --no-record` as
+**`65e0084abbe2af0e49d5b959752d348a52b9846f`**. The commit, locked tpatch trailer
+block and Co-authored-by trailer were read back with `git log`. The installed
+`land` automatically adds Co-authored-by; supplying it in the message as well
+produced a harmless duplicate in this source commit. No source was amended.
+
+After landing, every one of the 28 actual source paths from
+`git diff --name-only <seed> HEAD -- ':(exclude).tpatch'` was compared with this
+audit's list. Every committed blob SHA-256 and `git ls-tree HEAD` mode matched
+the table above. No expected or unexpected path was missing. Working tree was
+clean immediately after source landing. The following research was performed
+only after this readback; it does not change the pinned source implementation.
+
+## Official SDK release and API research
+
+**Checked 2026-10-29, 16:33:17–16:37:20 UTC** using GitHub's official API,
+versioned GitHub documentation/source and the official npm registry. Published
+SDK tarballs were inspected **in memory only**, without installing or executing
+their code; both SHA-512 digests matched npm metadata. No inference call was made.
+
+### Exact versions and publication times
+
+| Item | Result at research time | Official source |
+|---|---|---|
+| Latest stable GitHub SDK release | **v1.0.28**, published **2026-10-28T01:01:32Z** | https://github.com/github/copilot-sdk/releases/tag/v1.0.28 |
+| npm SDK `latest` | **1.0.28**, published **2026-10-28T00:58:28.214Z** | https://registry.npmjs.org/@github%2fcopilot-sdk |
+| npm SDK `prerelease` | **1.0.28-preview.0**, published **2026-10-27T22:55:10.001Z**, not stable | Same registry metadata |
+| npm SDK `unstable` | **1.0.25-unstable.40711449110.g5767f52**, published **2026-10-28T17:44:41.131Z**, not stable | Same registry metadata |
+| Maintained pinned SDK | **1.0.8**, npm publication **2026-07-22T23:15:02.747Z**; GitHub release **2026-07-22T23:17:03Z** | https://github.com/github/copilot-sdk/releases/tag/v1.0.8 |
+| npm native CLI `latest` | **1.0.105**, published **2026-10-28T00:44:26.688Z** | https://registry.npmjs.org/@github%2fcopilot |
+| Maintained pinned native CLI | **1.0.75**, published **2026-07-24T19:52:42.725Z** | Same CLI registry metadata |
+| SDK repository main, for disambiguation only | `e22b95e6ead5e1de7e9a68d3087b8d28dc5f364a`, **2026-10-28T17:51:00Z** | https://github.com/github/copilot-sdk/commit/e22b95e6ead5e1de7e9a68d3087b8d28dc5f364a |
+
+The v1.0.28 release notes say its SDK snapshot targets **Copilot CLI 1.0.105-1**.
+That snapshot/prerelease identifier must not be conflated with npm CLI stable
+`latest` **1.0.105**. Main is not used as evidence that unshipped APIs are stable.
+
+Published API evidence:
+
+- Pinned package: https://registry.npmjs.org/@github/copilot-sdk/-/copilot-sdk-1.0.8.tgz
+- Latest package: https://registry.npmjs.org/@github/copilot-sdk/-/copilot-sdk-1.0.28.tgz
+- Pinned generated RPC source: https://github.com/github/copilot-sdk/blob/v1.0.8/nodejs/src/generated/rpc.ts
+- Latest generated RPC source: https://github.com/github/copilot-sdk/blob/v1.0.28/nodejs/src/generated/rpc.ts
+- Pinned compatibility guide: https://github.com/github/copilot-sdk/blob/v1.0.8/docs/troubleshooting/compatibility.md
+- Latest compatibility guide: https://github.com/github/copilot-sdk/blob/v1.0.28/docs/troubleshooting/compatibility.md
+
+### Public supported versus public experimental versus CLI-only
+
+**Public supported high-level APIs** in both inspected packages include
+`CopilotClient.createSession`, `resumeSession`, `CopilotSession.send`,
+`sendAndWait`, event subscriptions, model selection, configuration for automatic
+compaction, `onPermissionRequest`, `onUserInputRequest` and
+`onExitPlanModeRequest`. These are official SDK APIs, not private conversation
+file manipulation. Source:
+https://github.com/github/copilot-sdk/blob/v1.0.8/nodejs/src/types.ts and
+https://github.com/github/copilot-sdk/blob/v1.0.28/nodejs/src/types.ts .
+
+The `client.rpc` / `session.rpc` accessors are public, but the inspected generated
+`history`, `sessions`, `mode`, `plan`, `permissions` and `skills` namespaces carry
+**`@experimental`**. Publicly reachable is not the same as stable. The native
+integration deliberately uses a pinned subset of these exposed APIs; no API below
+was silently enabled by this research.
+
+| Requested capability | Pinned 1.0.8 | Latest stable 1.0.28 | Maintained integration decision |
+|---|---|---|---|
+| Manual compaction | Public **experimental** `session.rpc.history.compact({customInstructions?})`; returns success, token/message reduction and optional summary/context usage. Cancellation helpers also exist. | Still **experimental**; request additionally accepts trigger `manual` / `model_switch` and token-limit attribution. | Automatic compaction events are mapped; explicit manual compaction remains unsupported by this integration. It is incorrect to say the pinned SDK has no compaction API. |
+| Native fork | Public **experimental** `client.rpc.sessions.fork({sessionId,toEventId?,name?})`, returning new session ID/name. The guide calls the server-scoped accessor `server.rpc`; in the Node client it is `client.rpc`. | Same exposed experimental fork API. | Native fork remains unimplemented/unqualified here. No transcript copying or prompt emulation. |
+| Conversation rollback | No high-level `rollback`; public **experimental** `session.rpc.history.truncate({eventId})` removes an event suffix and returns `eventsRemoved`. It is not a filesystem restore. | Adds experimental `history.listRewindPoints()`, `previewRewind({eventId})`, `rewind({eventId,mode})`, with `conversation` or `conversation-and-files`. | Current adapter truthfully rejects rollback. Latest rewind is not available in the pinned package and is not an authorized upgrade. |
+| Review guide / `textGeneration` | No exported operation or RPC namespace named `textGeneration` / `generateText`, nor a dedicated review-guide endpoint. Structured prompt/response is possible through supported session APIs. | Same absence of a dedicated review-guide/text-generation endpoint. `/review` is classified CLI-only in the official compatibility guide. | T3's structured title/branch/commit/PR runner is its own abstraction. It disables tools/config; requests needing read-only checkout investigation return the existing typed unsupported error. SDK availability does not establish a safe review-guide investigation implementation. |
+| Plan controls | Supported exit-plan callback and message `agentMode`; public **experimental** `rpc.mode.get/set` and `rpc.plan.read/update/delete` (plus SQL todos). | Same concepts, but `mode.set` now returns structured status, `modeApplied`, confirmation/model-switch warnings and continuation/defer information, rather than `void`. | Preserve pinned plan flow and callbacks. Do not copy a newer signature or assume an experimental mode-change return means success. |
+| Permission controls | Supported callback accepts native decisions and `no-result`. Public **experimental** pending-permission RPC resolves native request IDs and returns **`{success:boolean}`**; configure/pending/rules/setApproveAll/setAllowAll helpers exist. | Pending receipt still returns `{success:boolean}`; attribution/context fields expand, and experimental `permissions.setMode/getMode` (`manual`, `assisted`, `allow-all`) replace the old allow-all setter/getter shape. | Root uses real pending-permission acknowledgement and one-time UI choices only; unsupported persistent options are not advertised. Do not replace native acknowledgement with callback return or reuse newer APIs against CLI 1.0.75. |
+| Mid-session skill management | Public **experimental** `session.rpc.skills.enable/disable/reload` exists, alongside discovery/listing. | Still publicly exposed and experimental. | Missing T3 service/contract/transport capability is not an SDK absence; see the legacy coverage audit above. No unapproved management UI added. |
+
+Latest rewind has explicit unavailable and partial-failure outcomes:
+`session-busy`, `file-change-tracking-disabled`, `unsupported-remote-session`,
+`files-rolled-back`, `rollback-incomplete`, `truncation-failed`,
+`checkpoint-cleanup-failed`, `snapshot-prune-failed`. A future integration must
+not treat RPC completion as atomic rollback success. File tracking availability
+is exposed on the rewind-points result. This is a material semantic change from
+1.0.8's conversation-only truncation, not a reason to enable rollback today.
+
+The latest official context-clearing guide documents another **experimental**
+primitive, `session.rpc.history.clearContext({prompt})`. It requires an active
+tool call, a nonempty seed prompt and a local session; it is not a general
+replace-session or rollback operation:
+https://github.com/github/copilot-sdk/blob/v1.0.28/docs/features/context-management.md .
+
+CLI-only interactive `/review`, `/skills` and UI workflows are not proof of
+stable SDK methods. Conversely, the documented experimental compaction/fork/
+truncation operations are real published SDK surface, not invented internal
+methods. Composer `$` / `/` interpretation was not researched or changed.
+
+### Upgrade and validation boundary
+
+SDK **1.0.28** has a materially different runtime package layout:
+optional `@github/copilot-sdk-<platform>` **1.0.28** packages and exact dependencies
+Koffi **3.2.1**, JSON-RPC **8.2.1**, Zod **4.3.6**. Pinned **1.0.8** instead
+depends on `@github/copilot` and ranges overridden here to the reviewed CLI
+**1.0.75**, Koffi **3.3.1**, JSON-RPC **8.2.1**, Zod **4.4.3**.
+No pin, override, package payload policy or packaging root was changed for this
+research. Newer API/schema/runtime availability would need separate authorization,
+compatibility review and real qualification. Existing supported/unsupported
+integration capability flags remain unchanged.
+
+### Post-research source integrity
+
+Before landing this audit-only follow-up, the complete root was recorded again
+from the immutable seed to the committed source landing, scoped to the same 28
+recipe paths (`record --from <seed> --files <28 paths> --regenerate-recipe`).
+The CLI reported **no content change**, retained the 186,963-byte full canonical
+patch and skipped a new numbered snapshot. `tpatch verify copilot-cli-provider`
+passed again with **exact landing evidence at `65e0084`**, matching patch, recipe
+and base, and historical-anchor/current-index replay checks. Its raw-blocked
+reconcile warning remains visible. This follow-up changes feature metadata only;
+all source/test files and pinned dependencies remain byte-identical to the
+source landing. Behavioral tests and package typechecks remain unexecuted.
