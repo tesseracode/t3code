@@ -8,7 +8,7 @@
 | `copilot-cli-provider` | Expand the providers so that not only claude and codex are
  supported, but add the ability to use the copilot cli, as requested in
  this github issue from the upstream
- https://github.com/pingdotgg/t3code/issues/193 | applied | unknown |
+ https://github.com/pingdotgg/t3code/issues/193 | blocked | unknown |
 | `copilot-command-events` | Wire up Copilot SDK command and shell execution events. Map command.execute, command.completed, command.queued, shell_completed, and shell_detached_completed events in CopilotAdapter mapSessionEvent to surface as command execution timeline entries. These are currently dropped by the default case. | blocked | unknown |
 | `copilot-context-window-controls` | Research Copilot effective context tiers, prompt budgets and automatic compaction thresholds versus the legacy context meter, using pinned/runtime-version evidence. Record possible explicit tier controls and accurate denominator/provenance UX; leave implementation unapproved and lifecycle requested. | requested | unknown |
 | `copilot-cross-platform-build` | Add all Copilot SDK platform binaries as direct dependencies so cross-platform desktop builds include the correct native binary regardless of build host OS. Without this, building a Windows installer on macOS produces a package missing copilot.exe. | blocked | unknown |
