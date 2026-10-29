@@ -1,39 +1,42 @@
 # Reconciliation: session-search
 
 **Outcome**: blocked
-**Phase**: phase-4-blocked
-**Upstream Ref**: v0.1.3
-**Upstream Commit**: d2c440312e5f39d59827ed466838a623516454d6
-**Timestamp**: 2026-10-29T07:36:28Z
+**Phase**: phase-4-forward-apply-conflicts
+**Upstream Ref**: v0.1.4
+**Upstream Commit**: 783581d461dc72cdd8f78fc8abb4ad536dfc4547
+**Timestamp**: 2026-10-29T16:25:58Z
 
 ## Notes
 
-- Operation-level: 0 present, 5 applicable, 17 conflicts
-- Patch cannot be applied cleanly — manual intervention needed
-- git: Applied patch to 'apps/web/src/components/ChatView.tsx' with conflicts.
-Applied patch to 'apps/web/src/components/CommandPalette.logic.test.ts' with conflicts.
-Applied patch to 'apps/web/src/components/CommandPalette.logic.ts' with conflicts.
-Applied patch to 'apps/web/src/components/CommandPalette.tsx' with conflicts.
-Applied patch to 'apps/web/src/components/chat/MessagesTimeline.logic.test.ts' with conflicts.
-Applied patch to 'apps/web/src/components/chat/MessagesTimeline.logic.ts' with conflicts.
-error: apps/web/src/components/chat/MessagesTimeline.test.tsx: does not exist in index
-Applied patch to 'apps/web/src/components/chat/MessagesTimeline.tsx' with conflicts.
-Applied patch to 'apps/web/src/components/chat/ProposedPlanCard.tsx' with conflicts.
+- Operation-level: 0 present, 2 applicable, 20 conflicts
+- 3-way merge would leave conflict markers in 2 file(s) — manual resolution required (re-run with --resolve to attempt provider-assisted resolution)
+- git: Applied patch to 'apps/server/src/orchestration-v2/ThreadFind.test.ts' cleanly.
+Applied patch to 'apps/server/src/orchestration-v2/ThreadFind.ts' with conflicts.
+Applied patch to 'apps/web/src/components/chat/MessagesTimeline.browser.test.tsx' cleanly.
+Applied patch to 'apps/web/src/components/chat/MessagesTimeline.logic.ts' cleanly.
+Applied patch to 'apps/web/src/components/chat/MessagesTimeline.tsx' cleanly.
 Falling back to direct application...
-Falling back to direct application...
-Falling back to direct application...
-Applied patch to 'apps/web/src/components/chat/useAssistantCitationTarget.ts' with conflicts.
-Applied patch to 'apps/web/src/components/settings/KeybindingsSettings.logic.test.ts' with conflicts.
-Applied patch to 'apps/web/src/keybindings.test.ts' with conflicts.
-Applied patch to 'apps/web/src/routes/_chat.tsx' with conflicts.
+Applied patch to 'apps/web/src/components/chat/ThreadFindBar.tsx' cleanly.
+Applied patch to 'apps/web/src/components/chat/TimelineWorkEntryRow.tsx' cleanly.
+Applied patch to 'apps/web/src/components/chat/TimelineWorkGroupRows.tsx' with conflicts.
+Applied patch to 'apps/web/src/components/chat/threadFindHighlights.browser.test.tsx' cleanly.
+Applied patch to 'apps/web/src/components/chat/threadFindHighlights.ts' cleanly.
+Applied patch to 'apps/web/src/components/chat/threadFindPosition.ts' cleanly.
+Applied patch to 'apps/web/src/components/chat/timelineRowContext.ts' cleanly.
+Applied patch to 'apps/web/src/components/chat/useThreadFind.ts' cleanly.
+Applied patch to 'apps/web/src/components/chat/useThreadFindNavigation.ts' cleanly.
+Applied patch to 'apps/web/src/components/chat/useThreadFindPositionReader.ts' cleanly.
 Falling back to direct application...
 Applied patch to 'docs/user/keybindings.md' cleanly.
-Applied patch to 'docs/user/thread-sidebar.md' cleanly.
-Applied patch to 'packages/contracts/src/keybindings.test.ts' with conflicts.
-Applied patch to 'packages/contracts/src/keybindings.ts' cleanly.
-Applied patch to 'packages/shared/src/keybindings.ts' with conflicts.
+Applied patch to 'packages/contracts/src/orchestrationV2.ts' cleanly.
+Applied patch to 'packages/shared/src/threadFindText.ts' cleanly.
+Applied patch to 'packages/shared/src/threadSearch.test.ts' cleanly.
+Applied patch to 'packages/shared/src/threadSearch.ts' cleanly.
+U apps/server/src/orchestration-v2/ThreadFind.ts
+U apps/web/src/components/chat/TimelineWorkGroupRows.tsx
 
 ## Conflicts
 
-- Forward-apply failed — check for merge conflicts
+- apps/server/src/orchestration-v2/ThreadFind.ts
+- apps/web/src/components/chat/TimelineWorkGroupRows.tsx
 
