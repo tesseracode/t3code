@@ -1,0 +1,8 @@
+{
+  "slug": "fork-maintenance-check-scope",
+  "completed_at": "2026-10-29T17:30:59Z",
+  "base_commit": "a67761be595832d5145b64079eea1dc441f7f4dc",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Two classifier cases failed before; three pass after. Scoped real formatter/linter exclusions preserve archive bytes; product checks unchanged."
+}

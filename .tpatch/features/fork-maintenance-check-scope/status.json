@@ -1,0 +1,17 @@
+{
+  "id": "fork-maintenance-check-scope",
+  "slug": "fork-maintenance-check-scope",
+  "title": "Keep administrative .tpatch archives out of application formatting, lint and package-impact classification while preserving all product checks and exact replay verification.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-29T17:25:03Z",
+  "updated_at": "2026-10-29T17:30:59Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-29T17:31:03Z",
+  "apply": {
+    "completed_at": "2026-10-29T17:30:59Z",
+    "base_commit": "a67761be595832d5145b64079eea1dc441f7f4dc",
+    "has_patch": true
+  },
+  "reconcile": {}
+}

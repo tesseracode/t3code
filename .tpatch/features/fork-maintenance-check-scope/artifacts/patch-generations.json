@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "feature": "fork-maintenance-check-scope",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_cbad1846e7ed",
+      "kind": "record",
+      "patch_sha256": "5ab0fd9943b79e9a5337f28f39fd6f8030629f964d88f6108683c3347c694cdc",
+      "git_patch_id": "e565e517bce538251f24c88f4ec05ae2718cd52d",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "b0d35faa248db7155eae58594e216421aec47954f666337d3068bc95924b9a95",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "a67761be595832d5145b64079eea1dc441f7f4dc",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          ".github/scripts/ci-changes.cjs",
+          "scripts/lib/ci-changes.test.ts",
+          "vite.config.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/scripts/ci-changes.cjs",
+        "scripts/lib/ci-changes.test.ts",
+        "vite.config.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}
