@@ -1,6 +1,56 @@
 # Spec: session-search
 
-## Retained acceptance criteria on v0.0.42
+## Current acceptance criteria on v0.1.3
+
+The v0.1.3 implementation extends upstream's server-backed `chat.find`,
+`ThreadFindProvider`, `ThreadFindBar`, and existing incremental timeline.
+It does not replay the former parallel client-only search implementation.
+The historical criteria below remain an unedited intent reference, as do
+the recorded historical patches and blocked reconciliation evidence.
+
+1. Keep upstream's scoped `Cmd+F` / `Ctrl+F`, command-palette action,
+   keybinding settings, terminal/preview exclusions, thread/environment
+   ownership, retry, and cancellation behavior. `chat.find` is the upstream
+   equivalent of the historical `chat.search` entry point.
+2. Search rendered conversation text, proposed plans, and the source summaries
+   of activity rows: commands, reasoning, dynamic tool labels/read paths/search
+   terms, changed file names, task progress, questions/answers, approval prompts,
+   provider errors, and notices. The same shared summary is indexed and displayed
+   while finding, including the wire's bounded dynamic-input representation.
+   Ordinary activity presentation is unchanged outside find.
+3. Retain the old root's boundary: hidden expanded tool-output/inspector bodies,
+   diffs, image data, embedded HTML/MCP app bodies, setup-only entries, and
+   superseded lifecycle markers are not search documents. The historical
+   canonical matcher searched `workEntryDisplayLabel`, explicitly not its
+   hidden expanded output. Resource cards are not reported as invisible matches.
+4. Case-insensitive NFKC matching counts non-overlapping occurrences and preserves
+   original DOM offsets through compatibility expansion and combining sequences.
+   Keep upstream's deterministic next/previous wrap, bounded navigation cache,
+   live count, inline highlights, and thread-scoped query reset.
+5. Enter/Shift+Enter navigate from the input; Enter on a navigation button keeps
+   native activation. Escape closes from every focused find control, without
+   treating IME composition as a command. Reopening refocuses the existing input.
+6. Reveal the matching run/attempt, activity group and clipped source summary.
+   Resolve tool item IDs to their containing outer row and then the nested
+   virtualized member. Scroll and highlight that member, not the group header.
+   Keep unrelated groups folded and do not replace nested lists with unbounded DOM.
+7. Preserve upstream's live-follow suspension, history anchoring and citation
+   cancellation. Opening/requerying from activity uses the visible nested member
+   as its viewport anchor. Closing find restores ordinary activity presentation.
+8. Use upstream's server-backed full-thread search and automatic targeted history
+   loading rather than resurrecting the old loaded-window limitation and manual
+   pagination bar. This expands coverage; it does not claim hidden resource bodies.
+9. Focused service tests prove SQLite/memory agreement, mixed message/plan/activity
+   ordering, Unicode, wrap, folded-answer de-duplication, and hidden/resource bounds.
+   Real headless component tests prove nested activity materialization, visible
+   highlight/navigation, unchanged message highlights, folds, and keyboard controls.
+   The coordinator owns separate integrated browser/visual verification.
+10. Negotiate activity inclusion across the wire. Older clients must never receive
+    activity matches they cannot reveal; older servers must not cause newer clients
+    to highlight activity absent from their counts. Include the opt-in in scan cache
+    identity and preserve message/plan search without it.
+
+## Historical acceptance criteria on v0.0.42 (retained)
 
 1. `Cmd+F` / `Ctrl+F` dispatches `chat.search` in the chat surface. The default
    binding is disabled while the terminal or in-app preview owns focus.

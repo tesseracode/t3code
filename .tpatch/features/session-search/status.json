@@ -2,15 +2,15 @@
   "id": "session-search",
   "slug": "session-search",
   "title": "Add in-session search (Cmd/Ctrl+F) to find text within the current chat thread. Should search across all messages (user and assistant), tool outputs, and work log entries. Highlight matches and allow navigation between results. Similar to browser find-in-page but scoped to the thread content.",
-  "state": "blocked",
+  "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-05-12T02:47:48Z",
-  "updated_at": "2026-10-29T07:36:26Z",
-  "last_command": "reconcile",
-  "notes": "Reconciliation blocked — manual intervention needed",
+  "updated_at": "2026-10-29T08:02:56Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-10-29T08:03:48Z",
   "apply": {
-    "completed_at": "2026-09-25T04:13:09Z",
-    "base_commit": "0ac29bd2bd5251a3e50ab86e90b89cb3988447b9",
+    "completed_at": "2026-10-29T08:02:50Z",
+    "base_commit": "8cbf4544f7b94acc91a545a78a5e1fa74426aeb0",
     "has_patch": true
   },
   "reconcile": {
@@ -20,9 +20,9 @@
     "outcome": "blocked"
   },
   "verify": {
-    "verified_at": "2026-10-03T13:58:18Z",
+    "verified_at": "2026-10-29T08:02:50Z",
     "passed": true,
-    "recipe_hash_at_verify": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e",
-    "patch_hash_at_verify": "38333be0dcb886cdac0f24e44ce4756611fe1e4ab82c584820a5554f5f9eae01"
+    "recipe_hash_at_verify": "888114af033aa6326ae4e7dc51b9249b87a372d8bbc76a46609d77eb0602388f",
+    "patch_hash_at_verify": "563e59e1794fb07b4c4f77046ead67b9e8045df0d198c5be7fd220ff30ab4d32"
   }
 }

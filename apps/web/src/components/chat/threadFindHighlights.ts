@@ -1,4 +1,4 @@
-import { findThreadSearchOccurrences } from "@t3tools/shared/threadSearch";
+import { findThreadSearchRanges } from "@t3tools/shared/threadSearch";
 import { useEffect, useEffectEvent, useRef } from "react";
 import { THREAD_FIND_BLOCK_TAGS } from "@t3tools/shared/threadFindText";
 
@@ -22,7 +22,9 @@ export function collectThreadFindRanges(container: HTMLElement, query: string): 
 
   for (const scope of container.querySelectorAll(THREAD_FIND_TEXT_SELECTOR)) {
     if (scope.parentElement?.closest(THREAD_FIND_TEXT_SELECTOR)) continue;
-    const rowId = scope.closest("[data-timeline-row-id]")?.getAttribute("data-timeline-row-id");
+    const row = scope.closest("[data-thread-find-entry-id], [data-timeline-row-id]");
+    const rowId =
+      row?.getAttribute("data-thread-find-entry-id") ?? row?.getAttribute("data-timeline-row-id");
     if (!rowId) continue;
 
     let text = "";
@@ -30,16 +32,16 @@ export function collectThreadFindRanges(container: HTMLElement, query: string): 
     const flush = () => {
       let startIndex = 0;
       let endIndex = 0;
-      for (const offset of findThreadSearchOccurrences(text, query)) {
+      for (const { start: offset, end: matchEnd } of findThreadSearchRanges(text, query)) {
         while (startIndex < nodes.length && nodes[startIndex]!.end <= offset) startIndex++;
         if (endIndex < startIndex) endIndex = startIndex;
-        while (endIndex < nodes.length && nodes[endIndex]!.end < offset + query.length) endIndex++;
+        while (endIndex < nodes.length && nodes[endIndex]!.end < matchEnd) endIndex++;
         const start = nodes[startIndex];
         const end = nodes[endIndex];
         if (!start || !end) continue;
         const range = container.ownerDocument.createRange();
         range.setStart(start.node, offset - start.start);
-        range.setEnd(end.node, offset + query.length - end.start);
+        range.setEnd(end.node, matchEnd - end.start);
         const occurrence = occurrenceByRowId.get(rowId) ?? 0;
         ranges.push({ rowId, occurrence, range });
         occurrenceByRowId.set(rowId, occurrence + 1);
@@ -76,15 +78,14 @@ const FOLD_SELECTOR = "[hidden], [data-thread-find-fold]";
 
 function foldsHiding(range: Range, container: HTMLElement): Element[] {
   const folds: Element[] = [];
+  const rect = range.getBoundingClientRect();
   for (
     let fold = range.startContainer.parentElement?.closest(FOLD_SELECTOR);
     fold && container.contains(fold);
     fold = fold.parentElement?.closest(FOLD_SELECTOR)
   ) {
-    if (
-      fold.hasAttribute("hidden") ||
-      range.getBoundingClientRect().bottom > fold.getBoundingClientRect().bottom
-    )
+    const foldRect = fold.getBoundingClientRect();
+    if (fold.hasAttribute("hidden") || rect.bottom > foldRect.bottom || rect.right > foldRect.right)
       folds.push(fold);
   }
   return folds;
@@ -192,6 +193,7 @@ export function useThreadFindHighlights(input: {
         "data-timeline-row-id",
         "data-thread-find-text",
         "data-thread-find-ignore",
+        "data-thread-find-entry-id",
       ],
     });
     // Revealing the first match can synchronously mount or recycle list rows.

@@ -124,6 +124,17 @@ function revealThreadFindMatch(
     return;
   }
 
+  const groupScroller = range.startContainer.parentElement?.closest<HTMLElement>(
+    "[data-tool-group-scroll]",
+  );
+  if (groupScroller) {
+    const rect = range.getBoundingClientRect();
+    const viewport = groupScroller.getBoundingClientRect();
+    if (rect.top < viewport.top) groupScroller.scrollTop += rect.top - viewport.top - 8;
+    else if (rect.bottom > viewport.bottom)
+      groupScroller.scrollTop += rect.bottom - viewport.bottom + 8;
+  }
+
   const codeScroller = range.startContainer.parentElement?.closest("pre");
   if (codeScroller) {
     const rect = range.getBoundingClientRect();

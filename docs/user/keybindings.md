@@ -129,11 +129,20 @@ Combine keys with `!` for not, `&&` for and, `||` for or, and parentheses:
 
 ## Find in the current thread
 
-`chat.find` searches conversation messages and proposed plans in the active thread. Entering a
-query searches the entire thread, including older messages. Thread search requires server support;
+`chat.find` searches conversation messages, proposed plans, and activity summaries in the active
+thread. Activity includes command text, reasoning, file and web searches, changed file names,
+questions and answers, task progress, and notices. While finding, activity shows its searchable
+source summary; selecting clipped text reveals it. Hidden tool inspector output, diffs, images,
+embedded apps, and lifecycle cards are not searched.
+
+Entering a query searches the entire thread, including older messages, and loads the matching
+history when needed. Matching ignores case and Unicode compatibility differences. Only the
+matching turn and activity group open, and large tool groups stay virtualized.
+Thread search requires server support;
 update an older server to enable it. Select **Retry** if a search fails. It defaults to
 `mod+f` outside terminals and previews. Press **Enter** or **Shift+Enter** to move between matches,
 and **Escape** to close find.
+Servers without activity search support continue to search messages and proposed plans.
 
 ## Precedence
 

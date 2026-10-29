@@ -54,6 +54,8 @@ export interface TimelineRowSharedState {
   onAppFullscreenChange: (rowId: string, fullscreen: boolean) => void;
   onRunShellCommand: ((command: string) => void) | undefined;
   findActive: boolean;
+  findActivity: boolean;
+  activeFindEntryId: string | null;
   onImageExpand: (preview: ExpandedImagePreview) => void;
   displayThreadKey?: string;
   /** Unset where there is no diff to open, so the timeline shows no "Open diff" button. */
