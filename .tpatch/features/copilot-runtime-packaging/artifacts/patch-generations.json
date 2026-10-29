@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-runtime-packaging",
-  "current_generation": 11,
+  "current_generation": 13,
   "generations": [
     {
       "generation": 1,
@@ -968,7 +968,7 @@
       "git_patch_id": "1f66a05f9ff608d4dd5a8e04e162a23d1698de20",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "6cef7f421c064705ac884a52d4d993e95a8ddd539c59e02358417a4ebbafc197",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/011-record.patch",
       "base_commit": "75b2ad95056ea428008d551e2980f1ac389defaf",
       "upper": {
@@ -1017,6 +1017,204 @@
         "apps/desktop/src/app/DesktopClerk.ts",
         "apps/desktop/src/app/DesktopConfig.ts",
         "apps/desktop/src/app/DesktopEnvironment.ts",
+        "apps/desktop/src/app/DesktopUserData.test.ts",
+        "apps/desktop/src/app/DesktopUserData.ts",
+        "apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+        "apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+        "docs/operations/fork-native-preview.md",
+        "docs/operations/release.md",
+        "packages/shared/package.json",
+        "packages/shared/src/copilotRuntime.test.ts",
+        "packages/shared/src/copilotRuntime.ts",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/fork-preview-bootstrap.cjs",
+        "scripts/fork-preview-manifest.mjs",
+        "scripts/lib/cli-external-packages.test.ts",
+        "scripts/lib/cli-external-packages.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts",
+        "scripts/lib/fork-preview.test.ts",
+        "scripts/lib/fork-preview.ts",
+        "scripts/lib/runtime-external-dependencies.test.ts",
+        "scripts/lib/runtime-external-dependencies.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 21,
+          "parent_patch_sha256": "d2c6f42fbdf5c69f24b421c4aa741997224a1ef08a8af8fad2861d9a3c526eda",
+          "parent_recipe_sha256": "2087aed362ffc4abf2c983563ebfc8776530f09563c898fe3231198bcc352e40"
+        },
+        {
+          "slug": "copilot-koffi-packaging-pin",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 6,
+          "parent_patch_sha256": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306",
+          "parent_recipe_sha256": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8"
+        },
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        },
+        {
+          "slug": "wsl-runtime-executable-modes",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
+          "parent_recipe_sha256": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 12,
+      "generation_id": "pg_5d68870c0913",
+      "kind": "amend-refresh",
+      "patch_sha256": "3536761baabbd5db12f0b7b1cba24af896a897e5c8a9bcf836f8b0ae9f4080b2",
+      "git_patch_id": "ac9b0f1c596aaebdf19f14e0dce9d9823e081e4e",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "b8ff14da636c0226a7eca32d74c870a6dfc25b1896e46ee88b5584348bd0474c",
+      "canonical_patch": "",
+      "audit_patch": "",
+      "base_commit": "f69617f5964758e48b8dbdb65ab96c36a1533aa0",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts",
+          "apps/desktop/src/app/DesktopLegacyLocalStorage.ts",
+          "docs/operations/fork-native-preview.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts",
+        "apps/desktop/src/app/DesktopLegacyLocalStorage.ts",
+        "docs/operations/fork-native-preview.md"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 21,
+          "parent_patch_sha256": "d2c6f42fbdf5c69f24b421c4aa741997224a1ef08a8af8fad2861d9a3c526eda",
+          "parent_recipe_sha256": "2087aed362ffc4abf2c983563ebfc8776530f09563c898fe3231198bcc352e40"
+        },
+        {
+          "slug": "copilot-koffi-packaging-pin",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 6,
+          "parent_patch_sha256": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306",
+          "parent_recipe_sha256": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8"
+        },
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        },
+        {
+          "slug": "wsl-runtime-executable-modes",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
+          "parent_recipe_sha256": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 13,
+      "generation_id": "pg_516c49beacc0",
+      "kind": "amend-refresh",
+      "patch_sha256": "de85cac196b3adfd7f770f2f59193becad50dd40d071a2a54cd297a2113671e6",
+      "git_patch_id": "d4a609f7a8b32f9f099884e39bfcfe9bfa042494",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "5e66ae6b04925c451d487d4d8c823dfcdb18299734ac896a3f91281926206a2f",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/013-record.patch",
+      "base_commit": "75b2ad95056ea428008d551e2980f1ac389defaf",
+      "upper": {
+        "kind": "commit",
+        "ref": "fbb4c4db0d6d87cf88cd28b89e1131134fabc855",
+        "commit": "fbb4c4db0d6d87cf88cd28b89e1131134fabc855"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          ".github/workflows/fork-native-preview.yml",
+          "apps/desktop/src/app/DesktopClerk.test.ts",
+          "apps/desktop/src/app/DesktopClerk.ts",
+          "apps/desktop/src/app/DesktopConfig.ts",
+          "apps/desktop/src/app/DesktopEnvironment.ts",
+          "apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts",
+          "apps/desktop/src/app/DesktopLegacyLocalStorage.ts",
+          "apps/desktop/src/app/DesktopUserData.test.ts",
+          "apps/desktop/src/app/DesktopUserData.ts",
+          "apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+          "apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+          "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+          "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+          "docs/operations/fork-native-preview.md",
+          "docs/operations/release.md",
+          "packages/shared/package.json",
+          "packages/shared/src/copilotRuntime.test.ts",
+          "packages/shared/src/copilotRuntime.ts",
+          "scripts/build-cli-archive.ts",
+          "scripts/build-desktop-artifact.test.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/fork-preview-bootstrap.cjs",
+          "scripts/fork-preview-manifest.mjs",
+          "scripts/lib/cli-external-packages.test.ts",
+          "scripts/lib/cli-external-packages.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts",
+          "scripts/lib/fork-preview.test.ts",
+          "scripts/lib/fork-preview.ts",
+          "scripts/lib/runtime-external-dependencies.test.ts",
+          "scripts/lib/runtime-external-dependencies.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/workflows/fork-native-preview.yml",
+        "apps/desktop/src/app/DesktopClerk.test.ts",
+        "apps/desktop/src/app/DesktopClerk.ts",
+        "apps/desktop/src/app/DesktopConfig.ts",
+        "apps/desktop/src/app/DesktopEnvironment.ts",
+        "apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts",
+        "apps/desktop/src/app/DesktopLegacyLocalStorage.ts",
         "apps/desktop/src/app/DesktopUserData.test.ts",
         "apps/desktop/src/app/DesktopUserData.ts",
         "apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",

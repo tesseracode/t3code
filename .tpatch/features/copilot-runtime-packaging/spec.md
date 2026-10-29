@@ -30,6 +30,12 @@ with the real base/build commits and verified version-only transform; historical
 artifacts cannot qualify the new candidates. Mac native build/UI and receiving
 Windows/WSL/Ubuntu qualification remain separate, explicitly pending gates.
 
+Isolated previews must also skip the upstream V1 Local Storage importer before
+it probes markers or discovers stock profiles. Retain normal V1 migration and
+existing same-preview Chromium storage; do not delete prior data or replace OS
+cryptography. The complete maintained root includes its parent-authored CLI
+external boundaries and the corrected Windows CI `C:\t3\tmp` workspace separation.
+
 ## Exact dependency closure
 
 1. Require SDK 1.0.8, CLI and matching platform packages 1.0.75, Koffi and

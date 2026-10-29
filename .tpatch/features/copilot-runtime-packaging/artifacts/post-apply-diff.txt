@@ -1,2 +1,3 @@
- .github/workflows/fork-native-preview.yml | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ apps/desktop/src/app/DesktopLegacyLocalStorage.ts | 2 +-
+ docs/operations/fork-native-preview.md            | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)

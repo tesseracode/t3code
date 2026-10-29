@@ -17,6 +17,9 @@ known live-profile paths. For an owned test directory, set
 `T3CODE_FORK_PREVIEW_HOME` before launching. Do not set it to an existing install.
 The preview keeps a separate single-instance lock, disables automatic updates
 and does not register the stock T3 URL schemes.
+Preview startup does not import V1 local storage from stock profiles. Existing
+storage in the same preview profile is retained; updating a build does not clear
+previously imported data. Use a fresh owned preview home when qualifying isolation.
 
 Desktop cloud OAuth and native passkeys are intentionally unavailable in this
 isolated unsigned profile. Use local/direct connections. Do not use managed
