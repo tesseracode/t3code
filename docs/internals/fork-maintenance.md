@@ -1,0 +1,94 @@
+# Maintaining the T3 Code fork
+
+## Branch targets
+
+`main` is the fork integration branch, not an upstream mirror and not an
+automatic deployment trigger. There is no permanent `dev` branch. `upstream`
+remains the read-only upstream remote.
+
+- `tpatch/<slug>` starts from and targets `main`. A feature that depends on an
+  active reconciliation starts from and targets `reconcile/<upstream-tag>`;
+  record that dependency and target in its tracking issue.
+- `reconcile/<upstream-tag>` starts from an immutable, verified stable upstream
+  commit and composes the selected maintained roots. It targets `main` only
+  after review and all required qualification gates.
+- `release/<fork-version>` is temporary candidate qualification from a frozen
+  integration commit. Production releases use immutable fork-prefixed tags
+  (`fork-v<upstream-version>-<sequence>`), never upstream's tag names.
+- Existing `phase*`, `build`, `request`, `landing`, `replay`, `validation` and
+  `archive` branches remain historical evidence. Inventory semantic coverage
+  before adopting their changes; do not delete, rename or force-push them as
+  housekeeping.
+
+Request registration does not approve implementation. A clean review does not
+authorize main promotion, a PR, publication, signing, deployment, or a live
+upgrade. Those actions require explicit approval.
+
+## Reproducible source
+
+For every candidate, record the upstream commit, ordered root slugs and canonical
+patch hashes, integration commit, and declared build-only transforms.
+Replay from the exact base in a clean owned worktree and compare tracked paths,
+including file modes. A successful per-feature verify is not proof of complete
+combined-tree coverage.
+
+`post-apply.patch` is authoritative intent. Run status/next before lifecycle work,
+record before commit, and prefer scoped `tpatch land`. Do not replace a full root
+with an incremental fix. Capture gaps through the normal lifecycle; preserve
+failed attempts rather than fabricate manifests or rewrite their evidence.
+
+Administrative `.tpatch` history is not expected to be reproduced by product
+patches. All other tracked differences require a recorded root or an explicit
+bootstrap/build declaration. Dependency locks, preview isolation and packaging
+are source intent, not unexplained build exceptions. Generated signing profiles,
+machine credentials, caches and private captures never enter canonical patches.
+
+## Fix and reconciliation evidence
+
+Establish the actual frontend, backend, provider, OS and environment identity
+before reproducing a report. Use isolated T3 homes, provider storage and
+workspaces; never run a test server against a live or recovery database.
+
+For user-visible changes, preserve the observed failure and a before capture,
+then repeat the same scenario after the fix. Pair captures with the smallest
+meaningful behavioral assertions. Timing and lifecycle changes need a recording
+and relevant events/receipts, not a single screenshot. Pure layout changes do not
+need tests that merely assert markup.
+
+Check affected entry points, clients, reverse actions and connection modes.
+Unavailable Windows/WSL, Ubuntu, mobile, or remote checks stay blocked and get a
+receiving-host runbook; a local pass does not certify them. Reuse upstream fixes
+only after verifying their semantics against the report.
+
+An independent reviewer examines both code and evidence. Use OpenAI/MAI models
+unless the maintainer explicitly authorizes another model. Address actionable
+findings and repeat affected checks/review until no actionable findings remain.
+Missing evidence cannot be converted into a pass by a code-only review.
+Browser/device/provider execution needs explicit authorization for its scope;
+this policy does not grant unrestricted computer use.
+
+## Candidates, migration and releases
+
+Keep the working installation intact while preparing candidates. Inspect CI
+triggers before pushing; build-only candidate jobs must not publish packages,
+tags, releases or deployments. Record target-specific build attempts and honor
+the approved limit. Candidate artifacts carry exact source/version/checksum
+manifests; an unsigned build must never be described as signed or qualified on a
+platform that has not exercised it.
+
+Before a major migration, preserve recoverable data and identify shared settings,
+attachments, workspace files and provider-owned databases. A copied T3 database
+alone is not isolation. Native session continuation, imported transcript viewing
+and a fresh provider session with a handoff are different outcomes; document
+which the maintainer accepted. Never claim a disconnected or apparently idle
+external owner has released a session.
+
+Release only a qualified frozen candidate after explicit promotion approval.
+Update all clients and environments required by a protocol-version change.
+Keep a rollback plan that accounts for one-way migration and divergent writes;
+do not point an old server at newly migrated data. Never silently substitute a
+different provider protocol to make a migration appear complete.
+
+Active work and evidence belong in the owning GitHub issue. This document is
+policy, not a second implementation checklist or a record of current release
+status.
