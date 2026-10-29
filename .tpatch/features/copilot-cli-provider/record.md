@@ -1,6 +1,6 @@
 # Implementation Record: copilot-cli-provider
 
-**Recorded**: 2026-10-29T16:37:45Z
+**Recorded**: 2026-10-29T16:49:00Z
 **Files changed**: 28
 **Patch size**: 186963 bytes
 **Capture mode**: committed-range
