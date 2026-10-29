@@ -1,8 +1,8 @@
 # Implementation Record: fork-maintenance-policy
 
-**Recorded**: 2026-10-29T08:40:11Z
+**Recorded**: 2026-10-29T16:35:23Z
 **Files changed**: 1
-**Patch size**: 5512 bytes
+**Patch size**: 6649 bytes
 **Capture mode**: staged-index
 **Pathspecs**: docs/internals/fork-maintenance.md
 
@@ -11,7 +11,7 @@
 - **capture_mode**: `staged-index`
 - **pathspecs**: docs/internals/fork-maintenance.md
 - **claim_ids**: (none)
-- **base_commit**: `f595ef56ebb18ccb6a1ddacdd862b9de97e3fb5e`
+- **base_commit**: `16a55122c16fdd957ac7bba8e00aed970584d0f2`
 - **upper_commit**: `working-tree`
 - **dirty_state**: 1 staged paths, 0 unrelated unstaged paths
 

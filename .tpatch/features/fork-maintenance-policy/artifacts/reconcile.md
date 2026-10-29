@@ -2,9 +2,9 @@
 
 **Outcome**: reapplied
 **Phase**: phase-4-forward-apply-strict
-**Upstream Ref**: v0.1.3
-**Upstream Commit**: d2c440312e5f39d59827ed466838a623516454d6
-**Timestamp**: 2026-10-29T08:39:13Z
+**Upstream Ref**: v0.1.4
+**Upstream Commit**: 783581d461dc72cdd8f78fc8abb4ad536dfc4547
+**Timestamp**: 2026-10-29T16:32:52Z
 
 ## Notes
 

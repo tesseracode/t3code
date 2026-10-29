@@ -1,4 +1,6 @@
- .tpatch/FEATURES.md                                | 105 +++++++++++----------
- .../features/fork-maintenance-policy/status.json   |  15 ++-
- .../tpatch-local-capture-ignore/status.json        |  15 ++-
- 3 files changed, 73 insertions(+), 62 deletions(-)
+ .tpatch/FEATURES.md                                  |  2 +-
+ .../artifacts/reconcile-evidence.jsonl               |  2 ++
+ .../artifacts/reconcile-session.json                 | 20 ++++++++++----------
+ .../fork-maintenance-policy/artifacts/reconcile.md   |  6 +++---
+ .tpatch/features/fork-maintenance-policy/status.json | 14 +++++++-------
+ 5 files changed, 23 insertions(+), 21 deletions(-)

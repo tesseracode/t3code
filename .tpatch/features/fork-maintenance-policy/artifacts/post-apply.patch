@@ -1,9 +1,9 @@
 diff --git a/docs/internals/fork-maintenance.md b/docs/internals/fork-maintenance.md
 new file mode 100644
-index 000000000..83eb679b3
+index 000000000..0c4c3c774
 --- /dev/null
 +++ b/docs/internals/fork-maintenance.md
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,110 @@
 +# Maintaining the T3 Code fork
 +
 +## Branch targets
@@ -38,10 +38,26 @@ index 000000000..83eb679b3
 +including file modes. A successful per-feature verify is not proof of complete
 +combined-tree coverage.
 +
++Account for every previously shipped feature before composing: retain it, prove
++upstream coverage, or identify the maintained root that supersedes it. Requested
++features are not shipped features. Apply retained roots in dependency order,
++then read each touched file and check the intended change and upstream behavior
++before proceeding. A `reapplied` applicability verdict or zero exit status is not
++proof that source files changed. Record partial or blocked outcomes explicitly.
++
 +`post-apply.patch` is authoritative intent. Run status/next before lifecycle work,
 +record before commit, and prefer scoped `tpatch land`. Do not replace a full root
 +with an incremental fix. Capture gaps through the normal lifecycle; preserve
 +failed attempts rather than fabricate manifests or rewrite their evidence.
++
++The maintainer accepts the known historical-baseline verifier limitation tracked
++in [tesseracode/tesserapatch#26](https://github.com/tesseracode/tesserapatch/issues/26)
++when independent strict replay reproduces the candidate exactly. Retain an
++internal, version-specific record of the base and target commits, ordered roots
++and patch hashes, replay command/results, file-mode comparison, residual paths,
++and excluded administrative metadata or declared build transforms. Preserve the
++failed verifier results. This exception does not waive source inspection,
++behavioral validation, independent review, or receiving-platform qualification.
 +
 +Administrative `.tpatch` history is not expected to be reproduced by product
 +patches. All other tracked differences require a recorded root or an explicit

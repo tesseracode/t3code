@@ -1,8 +1,8 @@
 # Manual Validation
 
-**Status**: passed
-**Timestamp**: 2026-10-29T08:40:11Z
+**Status**: needs_review
+**Timestamp**: 2026-10-29T16:34:16Z
 
 ## Notes
 
-Approved policy content unchanged; exact one-file canonical application. Documentation-only, no product behavior changed.
+Complete documentation inspected; runtime validation is not applicable. Final reviewer and exact replay follow full integration.
