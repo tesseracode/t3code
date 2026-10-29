@@ -107,3 +107,21 @@ Pre-landing verification correctly refused stale evidence from the prior
 recipe changed. The actual hard-parent landing gate is satisfied; a new ordinary
 tpatch landing is needed to bind this full-root generation. Historical blocked
 reconcile evidence remains untouched.
+
+The full root was genuinely landed with `tpatch land --no-record` at
+`1cc830d637b6729c38e7acedee476db06e0c8015`. It has matching patch/recipe/base
+trailers and a satisfied hard-parent state gate. Post-landing `tpatch verify`
+still exited **2**: it recognizes this exact landing, but refuses parent replay
+because the canonical native-Copilot patch attested at
+`92e65ded1dd53ac16c888b7ff344edc64a61a6c6` is not present at the historical
+verification baseline. Parent metadata was not changed or bypassed; the failed
+verification record remains truthful. Log:
+`.t3/packaging-check/legacy-root-verify-after-land.log`.
+
+Separately, direct Git validation using an owned isolated index loaded from the
+real `75b2ad95056ea428008d551e2980f1ac389defaf` tree accepted the complete
+31-path canonical patch with `git apply --cached --check`; reverse-checking it
+against the current tree also passed. All 31 recipe preimages/current contents
+were checked, and all 28 unaffected existing product paths are byte-identical to
+the investigated source. This proves root coverage and forward applicability,
+not successful tpatch parent replay or native runtime qualification.
