@@ -248,17 +248,17 @@ index 000000000..eca524ff4
 +native conversation rollback, and native forks are not exposed by this integration;
 +portable handoffs remain available.
 diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json
-index 66e79c749..0d38301b5 100644
+index 66e79c749..33c52873f 100644
 --- a/packages/client-runtime/package.json
 +++ b/packages/client-runtime/package.json
-@@ -513,6 +513,7 @@
+@@ -512,6 +512,7 @@
+     "@pierre/diffs": "catalog:",
      "@t3tools/contracts": "workspace:*",
      "@t3tools/provider-acp-registry": "workspace:*",
-     "@t3tools/provider-core": "workspace:*",
 +    "@t3tools/provider-copilot": "workspace:*",
+     "@t3tools/provider-core": "workspace:*",
      "@t3tools/provider-cursor": "workspace:*",
      "@t3tools/provider-fx": "workspace:*",
-     "@t3tools/provider-grok": "workspace:*",
 diff --git a/packages/client-runtime/src/providerClients.ts b/packages/client-runtime/src/providerClients.ts
 index 37cd15209..ad15c8c89 100644
 --- a/packages/client-runtime/src/providerClients.ts

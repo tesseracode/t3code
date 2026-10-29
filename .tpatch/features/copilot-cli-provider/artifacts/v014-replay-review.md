@@ -417,3 +417,52 @@ and base, and historical-anchor/current-index replay checks. Its raw-blocked
 reconcile warning remains visible. This follow-up changes feature metadata only;
 all source/test files and pinned dependencies remain byte-identical to the
 source landing. Behavioral tests and package typechecks remain unexecuted.
+
+## Integrated-format follow-up
+
+The primary's first integrated `check:changed` found one native-owned formatting
+failure: the newly added dependency in `packages/client-runtime/package.json`
+needed to precede `provider-core`. Only that dependency ordering changed.
+Parsed manifest values are identical, all SDK/CLI/Koffi pins and lockfile bytes
+are unchanged, and the source root still contains exactly 28 paths.
+
+The primary checkout's absolute `node_modules/.bin/vp` formatted this one file
+from the owned worktree. Initial direct invocations could not load the owned
+checkout's Vite config without its dependencies; the primary `node_modules` was
+then linked locally for the formatter invocation and that owned link removed
+immediately afterward. No dependency install was performed.
+
+Both single-file commands passed:
+
+```
+vp fmt packages/client-runtime/package.json
+vp fmt --check packages/client-runtime/package.json
+```
+
+Before committing, Git index tree
+`abe2cb6ad8e1638c2d078fec500d264a61035245` captured the formatted file alongside
+the already landed complete source. A scoped
+`tpatch record --from <immutable-seed> --to <index-tree> --files <28 root paths>`
+captured the **full root**, not the HEAD-to-worktree formatting increment.
+The committed-range `--regenerate-recipe` invocation left the old recipe content
+unchanged; its single manifest-content ordering was therefore synchronized
+mechanically, preserving all 28 operations. No generation manifest was authored.
+Re-recording retained the complete patch but tpatch 0.16.0's patch-byte-only
+generation deduplication retained generation 24's earlier recipe hash. Replaying
+the record from the last complete canonical patch produced `040-record.patch`
+without a new generation. This tooling limitation is preserved as evidence, not
+repaired by fabricating generation metadata; the actual current recipe and the
+landing's locked recipe trailer use the corrected hash below.
+
+Current follow-up integrity values (the earlier table remains the exact original
+`65e0084` landing attestation):
+
+- Manifest SHA-256: `d04003390b90ffc21c921a4922fa88a46c69694330e440fa49fa00a66225c5f7`.
+- Complete canonical patch: **186,951 bytes / 28 files**.
+- Patch SHA-256: `b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86`.
+- Full recipe SHA-256: `ce4213531e74b01fc8b637cf2990fb53a928325a4b729392d0cc03736db07ea8`.
+
+The changed manifest was inspected after formatting; the recorded path set and
+every recipe file content were compared with the actual owned worktree. No
+behavioral test, provider turn, application or server was run for this follow-up.
+Integrated behavioral results belong to the primary's separate validation record.
