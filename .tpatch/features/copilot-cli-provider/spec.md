@@ -23,9 +23,14 @@
    events cannot complete it; explicit failure, abort and shutdown remain terminal.
    Follow-up sends are refused until completion, and independent task updates
    remain distinct. Issue #20 is maintained as a fixup of this complete root.
-6. Current T3 approval, user-input, and proposed-plan flows resolve the corresponding SDK
-   callbacks. Approval options never advertise unsupported persistence, and identical plans remain
-   valid in later turns. Unsupported rollback is a typed, explicit error.
+6. Current T3 permission answers use the native request ID and require the public SDK permission
+   RPC's applied-decision receipt. False, failed, foreign, or conflicting replies cannot report
+   successful delivery; identical retries reuse only an already successful receipt on that runtime.
+   The SDK's `no-result` permission handler prevents duplicate SDK-owned response RPCs.
+   User-input and proposed-plan flows retain SDK callback handoff, without claiming native RPC
+   acknowledgement. V2 owns answer resolution and delivery metadata; the adapter does not replace
+   it with stale snapshots. Approval options never advertise unsupported persistence, and identical
+   plans remain valid in later turns. Unsupported rollback is a typed, explicit error.
 7. Assistant, reasoning, tool, native tool-backed commands, hook, task/subagent,
    automatic compaction/truncation, skill, MCP, and context-usage events map to current
    `ProviderAdapterV2Event` contracts. Event processing is
@@ -33,6 +38,8 @@
    transcript, successful subagent completion retains its latest real response, usage accumulates
    every root model call per turn, compaction reaches V2 compaction items and context snapshots,
    and native task ownership remains attached to its originating run after the root becomes idle.
+   Tool-only empty assistant messages produce no empty timeline rows, including native transcript
+   import; real streamed whitespace remains intact.
    Explicit manual compaction, native rollback, and native forks are unsupported rather than
    simulated with conversation-file edits or a text prompt.
 8. Tool arguments/results and raw provenance are bounded and redact credential-shaped argument

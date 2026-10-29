@@ -1,8 +1,8 @@
 {
   "slug": "copilot-cli-provider",
-  "completed_at": "2026-10-29T07:57:47Z",
-  "base_commit": "010dacb26afec7a34fb8a3010a2cd3396d5b4550",
+  "completed_at": "2026-10-29T10:02:19Z",
+  "base_commit": "d62b429ab20cd97a8430aa9b1d638e22c42dbd7c",
   "has_patch": true,
   "validation_status": "passed",
-  "validation_notes": "tpatch test — command: node_modules/.bin/vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/textGeneration.test.ts packages/provider-copilot/src/server/driver.test.ts apps/server/src/serverSettings.test.ts -t 'Copilot|native Copilot'"
+  "validation_notes": "tpatch test — command: node_modules/.bin/vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/textGeneration.test.ts packages/provider-copilot/src/server/driver.test.ts"
 }

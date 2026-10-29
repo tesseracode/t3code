@@ -1,5 +1,5 @@
-# Test run — 2026-10-29T07:57:47Z
-# Command: node_modules/.bin/vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/textGeneration.test.ts packages/provider-copilot/src/server/driver.test.ts apps/server/src/serverSettings.test.ts -t 'Copilot|native Copilot'
+# Test run — 2026-10-29T10:02:19Z
+# Command: node_modules/.bin/vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/textGeneration.test.ts packages/provider-copilot/src/server/driver.test.ts
 # Directory: /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-copilot
 
 note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
@@ -7,8 +7,8 @@ note: You are running `vp test` as a Vite+ built-in command. If you meant to run
  RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-copilot
 
 
- Test Files  5 passed (5)
-      Tests  21 passed | 47 skipped (68)
-   Start at  00:57:43
-   Duration  4.22s (transform 69%, import 21%, setup 10%, tests 1%)
+ Test Files  4 passed (4)
+      Tests  22 passed (22)
+   Start at  03:02:10
+   Duration  9.10s (transform 70%, import 16%, setup 13%, tests 1%)
 
