@@ -27,6 +27,31 @@ const decodeServerSettingsPatch = Schema.decodeUnknownSync(ServerSettingsPatch);
 const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const decodeClaudeSettings = Schema.decodeUnknownSync(ClaudeSettings);
 
+describe("notification policy settings", () => {
+  it("round-trips opt-in categories, environment mutes and local quiet hours", () => {
+    const policy = {
+      notificationCategories: ["approval", "disconnect"],
+      notificationMutedEnvironments: ["environment-one"],
+      notificationQuietHours: { enabled: true, start: "22:30", end: "06:15" },
+    };
+    const settings = decodeClientSettings(policy);
+    expect(decodeClientSettings(encodeClientSettings(settings))).toMatchObject(policy);
+    expect(decodeClientSettingsPatch(policy)).toEqual(policy);
+    expect(decodeClientSettingsPatch({ diffColorScheme: "blue-orange" })).toEqual({
+      diffColorScheme: "blue-orange",
+    });
+    expect(decodeClientSettingsPatch({})).toEqual({});
+  });
+
+  it("rejects invalid quiet-hour values in both storage and patches", () => {
+    for (const start of ["24:00", "9:30", "", "12:60"]) {
+      const value = { notificationQuietHours: { enabled: true, start, end: "08:00" } };
+      expect(() => decodeClientSettings(value)).toThrow();
+      expect(() => decodeClientSettingsPatch(value)).toThrow();
+    }
+  });
+});
+
 describe("storage cleanup settings", () => {
   it("keeps cleanup disabled for existing installations", () => {
     expect(decodeServerSettings({}).worktreeCleanup).toBeNull();

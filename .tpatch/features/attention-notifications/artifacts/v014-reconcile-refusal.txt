@@ -1,0 +1,19 @@
+Command: tpatch reconcile attention-notifications --upstream-ref v0.1.4 --format json
+Working tree: clean, HEAD 4de99f4a5 (Foundation c36a114 landed and per-file audited), tpatch v0.16.0
+Exit: 1
+JSON stdout: empty
+Actual stderr:
+parent-generation-stale: reconcile refused for feature "attention-notifications" because 1 hard parent generation snapshot(s) are stale:
+  - phase1-foundation (snapshot parent_generation=24, current generation_id=pg_d4e3aa889560)
+Run `tpatch feature patch refresh <parent>` for the stale parent or `tpatch reconcile attention-notifications` to refresh the child dependency snapshot.
+error: parent-generation-stale: reconcile refused for feature "attention-notifications" because 1 hard parent generation snapshot(s) are stale:
+  - phase1-foundation (snapshot parent_generation=24, current generation_id=pg_d4e3aa889560)
+Run `tpatch feature patch refresh <parent>` for the stale parent or `tpatch reconcile attention-notifications` to refresh the child dependency snapshot.
+
+Supported recovery:
+tpatch apply attention-notifications --mode started --note 'Manual canonical child replay on actual landed Foundation v014 base; reconcile refused stale parent snapshot24 vs pg_d4e3aa889560. Preserve refusal without refreshing unchanged parent.'
+Exit: 0
+Output: Feature attention-notifications marked as implementing
+
+No parent metadata or generation manifest was manually rewritten.
+git apply --3way of authoritative canonical patch 93dc0cb5694033539a6cdd0019615ccbfc4d40518b96042d04b0271e78f18630 exited 1 with actual conflicts in AppSidebarLayout.tsx, ThreadNotificationCoordinator.badge.browser.test.ts, ThreadNotificationCoordinator.tsx, and threadNotifications.ts. Resolution preserves the v014 imperative coordinator, shared linked-subagent request/delegation subscriptions, existing disposable test helpers and new-only sidebar design, adding canonical scoped policy/eligibility and static payload/click/error behavior.

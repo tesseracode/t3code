@@ -61,6 +61,7 @@ import {
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
+  InboxIcon,
   MessageSquareDashedIcon,
   LinkIcon,
   MessageSquareIcon,
@@ -1492,6 +1493,18 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+
+  actionItems.push({
+    kind: "action",
+    value: "action:attention",
+    searchTerms: ["attention", "inbox", "approval", "input", "failure", "disconnect"],
+    title: "Open attention inbox",
+    icon: <InboxIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "attention.open",
+    run: async () => {
+      await navigate({ to: "/attention" });
+    },
+  });
 
   actionItems.push({
     kind: "action",
