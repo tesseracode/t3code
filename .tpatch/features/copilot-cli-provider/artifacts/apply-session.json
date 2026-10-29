@@ -1,8 +1,8 @@
 {
   "slug": "copilot-cli-provider",
-  "completed_at": "2026-10-29T10:29:51Z",
-  "base_commit": "3cfec6dd34a1ffef5a03ef814fd09ac92b34d539",
+  "completed_at": "2026-10-29T16:30:04Z",
+  "base_commit": "2a79a1b73b15bdd0aa093967855a8a92fd5799d9",
   "has_patch": true,
-  "validation_status": "passed",
-  "validation_notes": "tpatch test — command: node_modules/.bin/vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/textGeneration.test.ts packages/provider-copilot/src/server/driver.test.ts"
+  "validation_status": "needs_review",
+  "validation_notes": "Full source replay and per-file manual inspection; behavioral tests explicitly deferred until all maintained roots integrate. Required reconcile was blocked despite exit 0. v014 central registry, device instruction signature and safe forced-replacement refusal resolved manually."
 }

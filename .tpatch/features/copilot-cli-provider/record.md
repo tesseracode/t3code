@@ -1,20 +1,36 @@
 # Implementation Record: copilot-cli-provider
 
-**Recorded**: 2026-10-29T10:30:23Z
-**Files changed**: 30
-**Patch size**: 187327 bytes
-**Capture mode**: committed-range
-**Base commit**: 010dacb26afec7a34fb8a3010a2cd3396d5b4550
-**Upper bound**: HEAD
-**Pathspecs**: packages/provider-copilot/,apps/server/package.json,apps/server/src/provider/builtInDrivers.ts,apps/server/src/serverSettings.ts,apps/server/src/serverSettings.test.ts,apps/web/package.json,apps/web/src/components/settings/providerDriverMeta.ts,apps/mobile/package.json,apps/mobile/src/lib/providerClients.ts,packages/contracts/src/settings.ts,pnpm-workspace.yaml,pnpm-lock.yaml,docs/user/providers-copilot.md,docs/internals/providers.md
+**Recorded**: 2026-10-29T16:30:17Z
+**Files changed**: 28
+**Patch size**: 186963 bytes
+**Capture mode**: staged-index
+
+## Change Summary
+
+```
+ .../artifacts/apply-recipe.json                    |  179 +-
+ .../artifacts/apply-session.json                   |    8 +-
+ .../artifacts/manual-validation.md                 |    6 +-
+ .../artifacts/patch-generations.json               |   42 +-
+ .../artifacts/post-apply-diff.txt                  |   21 +-
+ .../artifacts/post-apply.patch                     | 4436 +-------------------
+ .../artifacts/reconcile-evidence.jsonl             |    5 +
+ .../artifacts/reconcile-session.json               |  265 +-
+ .../copilot-cli-provider/artifacts/reconcile.md    |   48 +-
+ .tpatch/features/copilot-cli-provider/record.md    |   42 +-
+ .tpatch/features/copilot-cli-provider/spec.md      |    6 +-
+ .tpatch/features/copilot-cli-provider/status.json  |   14 +-
+ 12 files changed, 339 insertions(+), 4733 deletions(-)
+```
 
 ## Capture Provenance
 
-- **capture_mode**: `committed-range`
-- **pathspecs**: packages/provider-copilot/, apps/server/package.json, apps/server/src/provider/builtInDrivers.ts, apps/server/src/serverSettings.ts, apps/server/src/serverSettings.test.ts, apps/web/package.json, apps/web/src/components/settings/providerDriverMeta.ts, apps/mobile/package.json, apps/mobile/src/lib/providerClients.ts, packages/contracts/src/settings.ts, pnpm-workspace.yaml, pnpm-lock.yaml, docs/user/providers-copilot.md, docs/internals/providers.md
+- **capture_mode**: `staged-index`
+- **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `010dacb26afec7a34fb8a3010a2cd3396d5b4550`
-- **upper_commit**: `HEAD`
+- **base_commit**: `2a79a1b73b15bdd0aa093967855a8a92fd5799d9`
+- **upper_commit**: `working-tree`
+- **dirty_state**: 28 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
@@ -24,5 +40,3 @@ To re-apply this feature to a clean checkout:
 # From the feature's artifacts directory:
 git apply .tpatch/features/copilot-cli-provider/artifacts/post-apply.patch
 ```
-
-_Patch was captured as a committed diff from `010dacb26afec7a34fb8a3010a2cd3396d5b4550` to `HEAD`._

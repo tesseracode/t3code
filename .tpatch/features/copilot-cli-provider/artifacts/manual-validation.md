@@ -1,8 +1,8 @@
 # Manual Validation
 
-**Status**: passed
-**Timestamp**: 2026-10-29T07:56:44Z
+**Status**: needs_review
+**Timestamp**: 2026-10-29T16:30:04Z
 
 ## Notes
 
-Native V2 core: 21 focused tests passed; provider/server/contracts/web/mobile types and precise-path lint passed on Node26.12.1. Isolated metadata-only SDK1.0.8 CLI1.0.75 skill discovery passed (4 skills, 3 project; no native sessions/provider turns). Packaging/license notices, native real-turn continuity and integrated visuals remain parent-owned qualification gates.
+Full source replay and per-file manual inspection; behavioral tests explicitly deferred until all maintained roots integrate. Required reconcile was blocked despite exit 0. v014 central registry, device instruction signature and safe forced-replacement refusal resolved manually.
