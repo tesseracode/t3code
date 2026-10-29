@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-cli-provider",
-  "current_generation": 15,
+  "current_generation": 16,
   "generations": [
     {
       "generation": 1,
@@ -866,7 +866,7 @@
       "git_patch_id": "d2184679136f2935a85f24e9a401da2e1c172386",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "282642299c8ef7784a95f43850e8aa9cee8b1b8023d9b16dcd87bb89ca88ed6d",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/030-fixup.patch",
       "base_commit": "8366d1db3119e8f5260d0a89584c49e5b4cbe53f",
       "upper": {
@@ -918,6 +918,82 @@
         "pnpm-workspace.yaml",
         "scripts/lib/cli-external-packages.test.ts",
         "scripts/lib/cli-external-packages.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 16,
+      "generation_id": "pg_7fc224fb4b1b",
+      "kind": "amend-refresh",
+      "patch_sha256": "c2c91db4de2b0831a1a0595c7467f4183e0160ac9cd1828baa2531febb702bfa",
+      "git_patch_id": "b4e96328b6fc94e6034142652d008d45cd7099b3",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "cf4000ceeb9a924f0afea7762868cbcb7f81c77bdbc1f264327026b54c4efaa8",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/031-record.patch",
+      "base_commit": "010dacb26afec7a34fb8a3010a2cd3396d5b4550",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/mobile/package.json",
+          "apps/mobile/src/lib/providerClients.ts",
+          "apps/server/package.json",
+          "apps/server/src/provider/builtInDrivers.ts",
+          "apps/server/src/serverSettings.test.ts",
+          "apps/server/src/serverSettings.ts",
+          "apps/web/package.json",
+          "apps/web/src/components/settings/providerDriverMeta.ts",
+          "docs/internals/providers.md",
+          "docs/user/providers-copilot.md",
+          "packages/contracts/src/settings.ts",
+          "packages/provider-copilot/",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/mobile/package.json",
+        "apps/mobile/src/lib/providerClients.ts",
+        "apps/server/package.json",
+        "apps/server/src/provider/builtInDrivers.ts",
+        "apps/server/src/serverSettings.test.ts",
+        "apps/server/src/serverSettings.ts",
+        "apps/web/package.json",
+        "apps/web/src/components/settings/providerDriverMeta.ts",
+        "docs/internals/providers.md",
+        "docs/user/providers-copilot.md",
+        "packages/contracts/src/settings.ts",
+        "packages/provider-copilot/package.json",
+        "packages/provider-copilot/src/client.ts",
+        "packages/provider-copilot/src/server.ts",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-copilot/src/server/capabilities.ts",
+        "packages/provider-copilot/src/server/client.ts",
+        "packages/provider-copilot/src/server/driver.test.ts",
+        "packages/provider-copilot/src/server/driver.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/status.ts",
+        "packages/provider-copilot/src/server/textGeneration.test.ts",
+        "packages/provider-copilot/src/server/textGeneration.ts",
+        "packages/provider-copilot/src/server/tools.ts",
+        "packages/provider-copilot/src/settings.ts",
+        "packages/provider-copilot/src/testing.ts",
+        "packages/provider-copilot/tsconfig.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml"
       ],
       "dependencies": [],
       "refs": {

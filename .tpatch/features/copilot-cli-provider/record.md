@@ -1,47 +1,35 @@
 # Implementation Record: copilot-cli-provider
 
-**Recorded**: 2026-10-02T07:21:46Z
-**Files changed**: 38
-**Patch size**: 317992 bytes
+**Recorded**: 2026-10-29T07:57:55Z
+**Files changed**: 30
+**Patch size**: 170142 bytes
 **Capture mode**: working-tree-all
+**Pathspecs**: packages/provider-copilot/,apps/server/package.json,apps/server/src/provider/builtInDrivers.ts,apps/server/src/serverSettings.ts,apps/server/src/serverSettings.test.ts,apps/web/package.json,apps/web/src/components/settings/providerDriverMeta.ts,apps/mobile/package.json,apps/mobile/src/lib/providerClients.ts,packages/contracts/src/settings.ts,pnpm-workspace.yaml,pnpm-lock.yaml,docs/user/providers-copilot.md,docs/internals/providers.md
 
 ## Change Summary
 
 ```
- README.md                                          |   7 +-
- apps/mobile/src/components/ProviderIcon.tsx        |  11 +
+ apps/mobile/package.json                           |   1 +
+ apps/mobile/src/lib/providerClients.ts             |   2 +
  apps/server/package.json                           |   1 +
- .../Layers/ProviderInstanceRegistryHydration.ts    |  26 +-
  apps/server/src/provider/builtInDrivers.ts         |   3 +
- apps/server/src/serverSettings.test.ts             |  27 ++
- apps/server/src/serverSettings.ts                  |  84 +++++-
- apps/server/src/textGeneration/TextGeneration.ts   |   9 +-
- apps/web/src/components/chat/providerIconUtils.ts  |   3 +
- .../settings/AddProviderInstanceDialog.tsx         |   7 +-
- .../settings/ProviderSettingsForm.test.ts          |  13 +
- .../components/settings/ProviderSettingsPanel.tsx  |  34 ++-
- .../settings/SettingsPanels.logic.test.ts          |  29 ++
- .../components/settings/SettingsPanels.logic.ts    |  10 +
- .../src/components/settings/providerDriverMeta.ts  |  22 +-
- docs/README.md                                     |   2 +-
- packages/contracts/src/model.ts                    |   8 +
- packages/contracts/src/providerRuntime.test.ts     |  19 ++
- packages/contracts/src/providerRuntime.ts          |   2 +
- packages/contracts/src/settings.test.ts            |  26 ++
- packages/contracts/src/settings.ts                 |  57 ++++
- pnpm-lock.yaml                                     | 300 +++++++++++++++++++++
- pnpm-workspace.yaml                                |   4 +
- scripts/lib/cli-external-packages.test.ts          |  16 +-
- scripts/lib/cli-external-packages.ts               |  10 +
- 25 files changed, 702 insertions(+), 28 deletions(-)
+ apps/server/src/serverSettings.test.ts             |  55 ++++
+ apps/server/src/serverSettings.ts                  |  16 +-
+ apps/web/package.json                              |   1 +
+ .../src/components/settings/providerDriverMeta.ts  |   2 +
+ docs/internals/providers.md                        |  18 ++
+ packages/contracts/src/settings.ts                 |   2 +-
+ pnpm-lock.yaml                                     | 343 +++++++++++++++++++++
+ pnpm-workspace.yaml                                |   6 +
+ 12 files changed, 448 insertions(+), 2 deletions(-)
 ```
 
 ## Capture Provenance
 
 - **capture_mode**: `working-tree-all`
-- **pathspecs**: (none)
+- **pathspecs**: packages/provider-copilot/, apps/server/package.json, apps/server/src/provider/builtInDrivers.ts, apps/server/src/serverSettings.ts, apps/server/src/serverSettings.test.ts, apps/web/package.json, apps/web/src/components/settings/providerDriverMeta.ts, apps/mobile/package.json, apps/mobile/src/lib/providerClients.ts, packages/contracts/src/settings.ts, pnpm-workspace.yaml, pnpm-lock.yaml, docs/user/providers-copilot.md, docs/internals/providers.md
 - **claim_ids**: (none)
-- **base_commit**: `d531667fe40facba5e8fb14418031972a6edfccf`
+- **base_commit**: `010dacb26afec7a34fb8a3010a2cd3396d5b4550`
 - **upper_commit**: `working-tree`
 
 ## Replay Instructions
@@ -52,4 +40,3 @@ To re-apply this feature to a clean checkout:
 # From the feature's artifacts directory:
 git apply .tpatch/features/copilot-cli-provider/artifacts/post-apply.patch
 ```
-

@@ -11,6 +11,24 @@ session or catalog state. For a new driver, start with [adding a provider](./add
 
 ## Process and account isolation
 
+The `githubCopilot` driver in
+[`packages/provider-copilot`](../../packages/provider-copilot/src/server/driver.ts)
+uses SDK 1.0.8 in `copilot-cli` mode with the reviewed CLI 1.0.75 dependency closure.
+Each V2 session owns one native client/thread. The SDK owns session paths under
+the instance's resolved Copilot home; T3 never rewrites native transcripts or
+claims unsupported rollback/fork capabilities. Resume disables pending-work
+continuation and refuses `alreadyInUse` without aborting the other owner.
+Legacy `copilot` settings migrate to this driver while existing instance IDs survive.
+
+Only a root `session.idle` successfully terminates a user turn.
+`assistant.turn_end`, `assistant.idle`, and all child events are non-terminal.
+Task snapshots update V2 native subagents and pending background work separately;
+upstream V2 retains queueing and delegation ownership. Project skills travel
+through `snapshotForCwd` and the existing workspace-snapshot transport, never an
+instance-global union. Cold scans use metadata-only `skills.discover`, not hidden
+native sessions or MCP initialization. Background text generation disables tools, skills, MCP,
+and config discovery and deletes only its owned ephemeral session.
+
 The `opencode` driver probes the installed version and runs the 1.x or 2.x runtime. OpenCode's MCP
 registrations are directory-scoped, while T3's MCP connection is thread-scoped, so threads in one
 directory must not share one T3 MCP entry.

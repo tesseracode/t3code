@@ -867,6 +867,61 @@ it.layer(NodeServices.layer)("server settings", (it) => {
     }).pipe(Effect.provide(layerServerSettings())),
   );
 
+  it.effect("migrates legacy Copilot settings to the native GitHub Copilot driver", () =>
+    Effect.gen(function* () {
+      const serverConfig = yield* ServerConfig.ServerConfig;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
+      yield* fileSystem.writeFileString(
+        serverConfig.settingsPath,
+        JSON.stringify({
+          providers: {
+            copilot: { enabled: true, homePath: "/legacy-account", enableConfigDiscovery: false },
+            githubCopilot: { enabled: false, homePath: "/canonical-account" },
+          },
+        }),
+      );
+      const settings = yield* serverSettings.getSettings;
+      assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("githubCopilot")], {
+        driver: ProviderDriverKind.make("githubCopilot"),
+        enabled: false,
+        config: { homePath: "/canonical-account" },
+      });
+      assert.isUndefined(settings.providerInstances[ProviderInstanceId.make("copilot")]);
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
+
+  it.effect(
+    "preserves legacy Copilot instance ids while migrating their native driver and account settings",
+    () =>
+      Effect.gen(function* () {
+        const serverConfig = yield* ServerConfig.ServerConfig;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
+        yield* fileSystem.writeFileString(
+          serverConfig.settingsPath,
+          JSON.stringify({
+            providerInstances: {
+              copilot_work: {
+                driver: "copilot",
+                enabled: true,
+                config: { homePath: "/work-account" },
+              },
+            },
+          }),
+        );
+        const settings = yield* serverSettings.getSettings;
+        assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("copilot_work")], {
+          driver: ProviderDriverKind.make("githubCopilot"),
+          enabled: true,
+          config: { homePath: "/work-account" },
+        });
+        const persisted = yield* fileSystem.readFileString(serverConfig.settingsPath);
+        assert.include(persisted, '"githubCopilot"');
+        assert.notInclude(persisted, '"driver": "copilot"');
+      }).pipe(Effect.provide(layerServerSettings())),
+  );
+
   it.effect("enables previously used optional providers while migrating legacy settings", () =>
     Effect.gen(function* () {
       const serverConfig = yield* ServerConfig.ServerConfig;
