@@ -1,0 +1,38 @@
+{
+  "kind": "post-landing exact source accounting, not an integrated helper result",
+  "executed_at": "2026-10-29T17:31:53.774209+00:00",
+  "landing_commit": "8181ed81576dc83c213a521ef344a3bdfacef465",
+  "base_commit": "6c925ff7c8ad226f5535ba3464636377a292437e",
+  "patch_sha256": "9ac66594f926d0d35387331473d86d5e8059f00edbef5b773b46daf5084609a4",
+  "paths": [
+    {
+      "path": "packages/client-runtime/src/state/attention.test.ts",
+      "landed_sha256": "cb33663db917da12961566c211297b2781ade2e80f62acec007da8b6b33f30da"
+    },
+    {
+      "path": "packages/client-runtime/src/state/commandPermissions.test.ts",
+      "landed_sha256": "53fe674cc704427d40b109358626eb30e17560f1d5b69076285fab591adea60a"
+    },
+    {
+      "path": "packages/client-runtime/src/state/attention.ts",
+      "landed_sha256": "8d727d4e28c726a9617f8ca21d332e112a12262355a24a3c349fb99f76270d0a"
+    },
+    {
+      "path": "apps/server/src/tws/TwsCliDecoder.ts",
+      "landed_sha256": "04554b82b7eb0ba7a2bccceab82e97bd594358592fc4bdcd6adc571c50118f95"
+    },
+    {
+      "path": "docs/internals/tws-context.md",
+      "landed_sha256": "d6ca7edf0ade24404d343d92ffc32b070a8d02c48fc6538cb496f8ec540edfba"
+    },
+    {
+      "path": "apps/mobile/src/state/attention.ts",
+      "landed_sha256": null
+    },
+    {
+      "path": "apps/mobile/src/state/tws.ts",
+      "landed_sha256": null
+    }
+  ],
+  "original_canonical_roots_unchanged": true
+}

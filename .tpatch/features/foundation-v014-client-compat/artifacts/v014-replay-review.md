@@ -39,3 +39,7 @@ Two `tpatch land --no-record` attempts failed exit1 with cannot stage path set /
   - base `9eeed4917c626acc293212efa6d3e6788593a3f19ecd9beba4a4eac517b72c3d`; current `deleted`.
 - `apps/mobile/src/state/tws.ts` — Delete only unreachable, unimported app-local factory instance. Shared authenticated TWS contracts/factories remain and web consumes them.
   - base `3b6e4d6670ebd44ea1899b3fbd3224803c3c853d22157b02881516690de89d4b`; current `deleted`.
+
+## Post-landing confirmation
+
+Ordinary scoped landing `8181ed81576dc83c213a521ef344a3bdfacef465` retains the four matching tpatch trailers. All seven paths were inspected and post-commit hashes rechecked; the committed product diff equals the complete canonical patch exactly. Original Foundation/attention canonical bytes remain unchanged. See `v014-exact-accounting.json`.
