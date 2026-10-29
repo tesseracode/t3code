@@ -1,5 +1,35 @@
 # Specification: copilot-runtime-packaging
 
+## Stable v0.1.3 manual port
+
+The criteria below retain the original consolidation/preview history, including
+its old path counts and approved batch limits; they are not new platform passes.
+The maintained port targets upstream `v0.1.3`
+(`d2c440312e5f39d59827ed466838a623516454d6`) on Node 26.12.1/pnpm 12.14.0.
+Preserve upstream package boundaries, `boot.cjs`, V2 Chromium profile migration,
+PE-only native signing, file limits, locks, TLS and self-containment probes.
+
+External roots must follow the actual reachable workspace dependency owners,
+including the new `packages/provider-copilot` SDK owner, rather than a fixed
+server-only import list. The native-provider root owns its SDK manifest and
+lockfile; final integration must also externalize the full reviewed Copilot
+closure. Do not generate a competing lockfile while that owner is absent.
+
+The historical `windows-portable-packaging-tests` hard edge is obsolete:
+its real upstream commit `0a590fa01af66ec135d2ebf2d5542b08a37dc275` is reachable
+from v0.1.3 and the relevant host-portable packaging tests remain upstream.
+Drop only this root's edge; preserve the historical feature's blocked attempt
+and do not claim it `upstream_merged` or manufacture `satisfied_by` evidence.
+`copilot-cli-provider` remains a hard integration dependency.
+
+The v0.1.3 preview workflow is manual-only, unsigned and build-only, with at most
+four authorized CI attempts per Linux x64/Windows x64 target, owned by the
+integration operator. No release, signing, deployment or installation is
+authorized by this port. Current manifests must be generated from actual builds
+with the real base/build commits and verified version-only transform; historical
+artifacts cannot qualify the new candidates. Mac native build/UI and receiving
+Windows/WSL/Ubuntu qualification remain separate, explicitly pending gates.
+
 ## Exact dependency closure
 
 1. Require SDK 1.0.8, CLI and matching platform packages 1.0.75, Koffi and

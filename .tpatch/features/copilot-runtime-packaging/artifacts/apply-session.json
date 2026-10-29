@@ -1,9 +1,8 @@
 {
   "slug": "copilot-runtime-packaging",
-  "completed_at": "2026-09-26T04:58:56Z",
-  "base_commit": "06fb8876807cd02fce21e49295515ad2f0aebfd7",
+  "completed_at": "2026-10-29T08:16:46Z",
+  "base_commit": "75b2ad95056ea428008d551e2980f1ac389defaf",
   "has_patch": true,
-  "operator_notes": "Windows receiving run exposed Cargo absolute-path and cross-shell uname fixture assumptions. Fix tests only: deterministic POSIX/Windows executable resolution, native-shell filesystem ownership, and correct composite-project placement of the packaging consistency test. Production runtime and exact dependency pins unchanged.",
-  "validation_status": "passed",
-  "validation_notes": "Complete nine-file gate: macOS217 pass/14 capability skips; native Linux231 pass/0 skips. Desktop/scripts typechecks and targeted lint pass. Windows full no-skip execution remains required; no packaged runtime result is inferred."
+  "validation_status": "needs_review",
+  "validation_notes": "Integrated real native+license parents. 86 distinct dependency/closure/artifact tests passed, all self-containment cases included under TMPDIR=/tmp; scripts types and changed-boundary lint passed. Packaged runtime, visual and receiving-host gates remain pending."
 }

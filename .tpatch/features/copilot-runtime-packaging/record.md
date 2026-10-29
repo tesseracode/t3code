@@ -1,44 +1,19 @@
 # Implementation Record: copilot-runtime-packaging
 
-**Recorded**: 2026-10-03T03:56:18Z
-**Files changed**: 27
-**Patch size**: 139921 bytes
-**Capture mode**: working-tree-all
-
-## Change Summary
-
-```
- .../artifacts/apply-recipe.json                    |   2 +-
- .../artifacts/patch-generations.json               | 105 ++++++++-
- .../artifacts/post-apply.patch                     |  12 +-
- .../features/copilot-runtime-packaging/status.json |   6 +-
- apps/desktop/src/app/DesktopAppIdentity.test.ts    |  14 ++
- apps/desktop/src/app/DesktopAppIdentity.ts         |   1 +
- apps/desktop/src/app/DesktopClerk.test.ts          |  21 +-
- apps/desktop/src/app/DesktopClerk.ts               |  27 ++-
- apps/desktop/src/app/DesktopConfig.ts              |   1 +
- apps/desktop/src/app/DesktopEnvironment.ts         |  10 +-
- .../backend/DesktopBackendConfiguration.test.ts    |  30 +++
- .../src/backend/DesktopBackendConfiguration.ts     |  16 ++
- apps/desktop/src/wsl/DesktopWslEnvironment.test.ts | 242 +++++++++++++++++++--
- apps/desktop/src/wsl/DesktopWslEnvironment.ts      | 124 ++++++-----
- docs/operations/release.md                         |  41 ++++
- packages/shared/package.json                       |   4 +
- pnpm-lock.yaml                                     |   7 +
- pnpm-workspace.yaml                                |   4 +
- scripts/build-cli-archive.ts                       |  11 +-
- scripts/build-desktop-artifact.test.ts             | 220 ++++++++++++++-----
- scripts/build-desktop-artifact.ts                  |  93 +++++++-
- 21 files changed, 847 insertions(+), 144 deletions(-)
-```
+**Recorded**: 2026-10-29T08:17:29Z
+**Files changed**: 29
+**Patch size**: 156575 bytes
+**Capture mode**: staged-index
+**Pathspecs**: .github/workflows/fork-native-preview.yml,apps/desktop/src/app/DesktopClerk.test.ts,apps/desktop/src/app/DesktopClerk.ts,apps/desktop/src/app/DesktopConfig.ts,apps/desktop/src/app/DesktopEnvironment.ts,apps/desktop/src/app/DesktopUserData.test.ts,apps/desktop/src/app/DesktopUserData.ts,apps/desktop/src/backend/DesktopBackendConfiguration.test.ts,apps/desktop/src/backend/DesktopBackendConfiguration.ts,apps/desktop/src/wsl/DesktopWslEnvironment.test.ts,apps/desktop/src/wsl/DesktopWslEnvironment.ts,docs/operations/fork-native-preview.md,docs/operations/release.md,packages/shared/package.json,packages/shared/src/copilotRuntime.test.ts,packages/shared/src/copilotRuntime.ts,scripts/build-cli-archive.ts,scripts/build-desktop-artifact.test.ts,scripts/build-desktop-artifact.ts,scripts/fork-preview-bootstrap.cjs,scripts/fork-preview-manifest.mjs,scripts/lib/cli-external-packages.test.ts,scripts/lib/cli-external-packages.ts,scripts/lib/copilot-payload.test.ts,scripts/lib/copilot-payload.ts,scripts/lib/fork-preview.test.ts,scripts/lib/fork-preview.ts,scripts/lib/runtime-external-dependencies.test.ts,scripts/lib/runtime-external-dependencies.ts
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: (none)
+- **capture_mode**: `staged-index`
+- **pathspecs**: .github/workflows/fork-native-preview.yml, apps/desktop/src/app/DesktopClerk.test.ts, apps/desktop/src/app/DesktopClerk.ts, apps/desktop/src/app/DesktopConfig.ts, apps/desktop/src/app/DesktopEnvironment.ts, apps/desktop/src/app/DesktopUserData.test.ts, apps/desktop/src/app/DesktopUserData.ts, apps/desktop/src/backend/DesktopBackendConfiguration.test.ts, apps/desktop/src/backend/DesktopBackendConfiguration.ts, apps/desktop/src/wsl/DesktopWslEnvironment.test.ts, apps/desktop/src/wsl/DesktopWslEnvironment.ts, docs/operations/fork-native-preview.md, docs/operations/release.md, packages/shared/package.json, packages/shared/src/copilotRuntime.test.ts, packages/shared/src/copilotRuntime.ts, scripts/build-cli-archive.ts, scripts/build-desktop-artifact.test.ts, scripts/build-desktop-artifact.ts, scripts/fork-preview-bootstrap.cjs, scripts/fork-preview-manifest.mjs, scripts/lib/cli-external-packages.test.ts, scripts/lib/cli-external-packages.ts, scripts/lib/copilot-payload.test.ts, scripts/lib/copilot-payload.ts, scripts/lib/fork-preview.test.ts, scripts/lib/fork-preview.ts, scripts/lib/runtime-external-dependencies.test.ts, scripts/lib/runtime-external-dependencies.ts
 - **claim_ids**: (none)
-- **base_commit**: `f9d3bd9fe183ce00ebe36af8242e28e42abf8270`
+- **base_commit**: `75b2ad95056ea428008d551e2980f1ac389defaf`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 29 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
@@ -48,4 +23,3 @@ To re-apply this feature to a clean checkout:
 # From the feature's artifacts directory:
 git apply .tpatch/features/copilot-runtime-packaging/artifacts/post-apply.patch
 ```
-

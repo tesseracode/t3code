@@ -1,8 +1,8 @@
 # Manual Validation
 
-**Status**: passed
-**Timestamp**: 2026-09-26T04:58:56Z
+**Status**: needs_review
+**Timestamp**: 2026-10-29T08:16:46Z
 
 ## Notes
 
-Complete nine-file gate: macOS217 pass/14 capability skips; native Linux231 pass/0 skips. Desktop/scripts typechecks and targeted lint pass. Windows full no-skip execution remains required; no packaged runtime result is inferred.
+Integrated real native+license parents. 86 distinct dependency/closure/artifact tests passed, all self-containment cases included under TMPDIR=/tmp; scripts types and changed-boundary lint passed. Packaged runtime, visual and receiving-host gates remain pending.

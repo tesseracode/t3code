@@ -15,8 +15,8 @@ import * as Layer from "effect/Layer";
 import * as PlatformError from "effect/PlatformError";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import * as Sink from "effect/Sink";
 import * as Schema from "effect/Schema";
+import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
@@ -52,6 +52,8 @@ import {
   WindowsDesktopBuildPrerequisitesMissingError,
   WindowsPackagedPayloadValidationError,
   stageCursorSdkPlatformPackages,
+  stageLinuxCaptureHelper,
+  createStageWorkspaceConfig,
   WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT,
   WINDOWS_SERVER_ASAR_IGNORE_GLOBS,
   WINDOWS_SERVER_ASAR_RESOURCE,
@@ -67,6 +69,9 @@ import {
 } from "./update-release-package-versions.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+import { SpawnExecutableResolution } from "@t3tools/shared/shell";
+import { fromYaml } from "@t3tools/shared/schemaYaml";
+import { COPILOT_DEPENDENCY_OVERRIDES } from "./lib/copilot-payload.ts";
 
 const encodeModuleUrl = Schema.encodeEffect(Schema.fromJsonString(Schema.String));
 const decodePackageVersion = Schema.decodeUnknownEffect(
@@ -134,6 +139,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
   readonly wslRuntime?: "valid" | "loose-server-tree" | "missing-pty" | "bad-digest";
   readonly targetArch?: "x64" | "arm64";
   readonly ptyPrebuildArch?: "x64" | "arm64";
+  readonly wslExtraMembers?: ReadonlyArray<string>;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -183,6 +189,9 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
         : yield* makeLinuxCliArchiveFixture({
             root: path.join(tempDir, "wsl-runtime"),
             stem,
+            ...(input.wslExtraMembers
+              ? { extraMembers: input.wslExtraMembers.map((member) => `${stem}/${member}`) }
+              : {}),
             ...(input.wslRuntime === "missing-pty" || input.ptyPrebuildArch !== undefined
               ? { omitMembers: [`${stem}/node_modules/node-pty/build/Release/pty.node`] }
               : {}),
@@ -285,6 +294,37 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.equal(yield* fs.readFileString(path.join(root, "version.txt")), "0.0.44");
       for (const relativePath of releasePackageFiles) {
         assert.equal(yield* fs.readFileString(path.join(root, relativePath)), original);
+      }
+    }),
+  );
+  it.effect("keeps source SDK and generated stage overrides on the reviewed closure", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const file = yield* path.fromFileUrl(new URL("../pnpm-workspace.yaml", import.meta.url));
+      const workspace = yield* Schema.decodeEffect(
+        fromYaml(Schema.Struct({ overrides: Schema.Record(Schema.String, Schema.String) })),
+      )(yield* fs.readFileString(file));
+      for (const platform of ["win", "linux", "mac"] as const) {
+        const arches =
+          platform === "mac"
+            ? (["x64", "arm64", "universal"] as const)
+            : (["x64", "arm64"] as const);
+        for (const arch of arches) {
+          const staged = createStageWorkspaceConfig({
+            platform,
+            arch,
+            overrides: { ...workspace.overrides },
+          });
+          for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
+            assert.equal(staged.overrides?.[selector], version, selector);
+          }
+          for (const cpu of ["x64", "arm64"]) {
+            const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${cpu}`;
+            assert.equal(staged.overrides?.[selector], platform === "linux" ? "-" : undefined);
+            assert.isUndefined(workspace.overrides[selector]);
+          }
+        }
       }
     }),
   );
@@ -641,67 +681,71 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
-  it.effect("unpacks target Windows natives while excluding the other architecture", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const tempDir = yield* fs.makeTempDirectoryScoped({
-          prefix: "t3-windows-architecture-test-",
-        });
-        const sourceDir = path.join(tempDir, "server");
-        const nativeFiles = [
-          "node_modules/node-pty/prebuilds/win32-x64/conpty/OpenConsole.exe",
-          "node_modules/node-pty/prebuilds/win32-arm64/conpty/OpenConsole.exe",
-          "node_modules/node-pty/third_party/conpty/1.0.0/win10-x64/OpenConsole.exe",
-          "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64/OpenConsole.exe",
-          "node_modules/node-pty/prebuilds/win32-x64/pty.node",
-          "node_modules/node-pty/prebuilds/linux-x64/pty.node",
-        ];
+  it.effect(
+    "unpacks target Windows natives from hidden stages while excluding the other architecture",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const tempDir = yield* fs.makeTempDirectoryScoped({
+            prefix: "t3-windows-architecture-test-",
+          });
+          const sourceDir = path.join(tempDir, ".server");
+          const nativeFiles = [
+            "node_modules/node-pty/prebuilds/win32-x64/conpty/OpenConsole.exe",
+            "node_modules/node-pty/prebuilds/win32-arm64/conpty/OpenConsole.exe",
+            "node_modules/node-pty/third_party/conpty/1.0.0/win10-x64/OpenConsole.exe",
+            "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64/OpenConsole.exe",
+            "node_modules/node-pty/prebuilds/win32-x64/pty.node",
+            "node_modules/node-pty/prebuilds/linux-x64/pty.node",
+          ];
 
-        for (const nativeFile of nativeFiles) {
-          const nativePath = path.join(sourceDir, nativeFile);
-          yield* fs.makeDirectory(path.dirname(nativePath), { recursive: true });
-          yield* fs.writeFileString(nativePath, nativeFile.includes("linux") ? "\x7fELF" : "MZ");
-        }
+          for (const nativeFile of nativeFiles) {
+            const nativePath = path.join(sourceDir, nativeFile);
+            yield* fs.makeDirectory(path.dirname(nativePath), { recursive: true });
+            yield* fs.writeFileString(nativePath, nativeFile.includes("linux") ? "\x7fELF" : "MZ");
+          }
 
-        const asarPath = path.join(tempDir, "server.asar");
-        yield* packWindowsServerAsar({ sourceDir, asarPath, arch: "x64" });
-        const unpackedRoot = `${asarPath}.unpacked`;
+          const asarPath = path.join(tempDir, "server.asar");
+          yield* packWindowsServerAsar({ sourceDir, asarPath, arch: "x64" });
+          const unpackedRoot = `${asarPath}.unpacked`;
 
-        assert.isTrue(
-          yield* fs.exists(
-            path.join(
-              unpackedRoot,
-              "node_modules/node-pty/prebuilds/win32-x64/conpty/OpenConsole.exe",
+          assert.isTrue(
+            yield* fs.exists(
+              path.join(
+                unpackedRoot,
+                "node_modules/node-pty/prebuilds/win32-x64/conpty/OpenConsole.exe",
+              ),
             ),
-          ),
-        );
-        assert.isTrue(
-          yield* fs.exists(
-            path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-x64/pty.node"),
-          ),
-        );
-        assert.isFalse(
-          yield* fs.exists(path.join(unpackedRoot, "node_modules/node-pty/prebuilds/linux-x64")),
-        );
-        assert.equal(
-          extractFile(
-            asarPath,
-            path.join("node_modules", "node-pty", "prebuilds", "linux-x64", "pty.node"),
-          ).toString(),
-          "\x7fELF",
-        );
-        assert.isFalse(
-          yield* fs.exists(path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-arm64")),
-        );
-        assert.isFalse(
-          yield* fs.exists(
-            path.join(unpackedRoot, "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64"),
-          ),
-        );
-      }),
-    ),
+          );
+          assert.isTrue(
+            yield* fs.exists(
+              path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-x64/pty.node"),
+            ),
+          );
+          assert.isFalse(
+            yield* fs.exists(path.join(unpackedRoot, "node_modules/node-pty/prebuilds/linux-x64")),
+          );
+          assert.equal(
+            extractFile(
+              asarPath,
+              path.join("node_modules", "node-pty", "prebuilds", "linux-x64", "pty.node"),
+            ).toString(),
+            "\x7fELF",
+          );
+          assert.isFalse(
+            yield* fs.exists(
+              path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-arm64"),
+            ),
+          );
+          assert.isFalse(
+            yield* fs.exists(
+              path.join(unpackedRoot, "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64"),
+            ),
+          );
+        }),
+      ),
   );
 
   it.effect("reports missing Windows toolchain capabilities before building", () =>
@@ -835,6 +879,101 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
+  it.effect("builds and stages native capture helpers for each Linux architecture", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const actualHost = yield* HostProcess.Platform;
+        const repoRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-kde-stage-test-" });
+        const protocols = path.join(repoRoot, "native/hyprland-snap-shot/protocols");
+        yield* fs.makeDirectory(protocols, { recursive: true });
+        yield* fs.writeFileString(path.join(protocols, "capture.xml"), "BSD protocol notice");
+        for (const hostPlatform of ["linux", "win32"] as const) {
+          for (const backend of ["kde", "hyprland"] as const) {
+            for (const [arch, target] of [
+              ["x64", "x86_64-unknown-linux-gnu"],
+              ["arm64", "aarch64-unknown-linux-gnu"],
+            ] as const) {
+              const binary = path.join(
+                repoRoot,
+                `native/${backend}-snap-shot/target`,
+                target,
+                `release/t3-${backend}-snap-shot`,
+              );
+              const stageResourcesDir = path.join(repoRoot, "stage", hostPlatform, backend, arch);
+              const cargo = hostPlatform === "win32" ? "C:\\Rustup Tools\\bin\\cargo.EXE" : "cargo";
+              const chmodCalls: Array<{ file: string; mode: number }> = [];
+              const spawner = Layer.succeed(
+                ChildProcessSpawner.ChildProcessSpawner,
+                ChildProcessSpawner.make((command) =>
+                  Effect.gen(function* () {
+                    assert.equal(command._tag, "StandardCommand");
+                    if (command._tag !== "StandardCommand") return mockProcess(1);
+                    assert.equal(command.command, cargo);
+                    assert.deepEqual(command.args, [
+                      "build",
+                      "--locked",
+                      "--release",
+                      "--manifest-path",
+                      path.join(repoRoot, `native/${backend}-snap-shot/Cargo.toml`),
+                      "--target",
+                      target,
+                    ]);
+                    yield* fs.makeDirectory(path.dirname(binary), { recursive: true });
+                    yield* fs.writeFileString(binary, `helper-${arch}`);
+                    return mockProcess(0);
+                  }),
+                ),
+              );
+              yield* stageLinuxCaptureHelper({
+                backend,
+                repoRoot,
+                stageResourcesDir,
+                arch,
+                verbose: false,
+              }).pipe(
+                Effect.provide(spawner),
+                Effect.provideService(HostProcess.Platform, hostPlatform),
+                Effect.provideService(SpawnExecutableResolution, (name) => {
+                  assert.equal(name, "cargo");
+                  return cargo;
+                }),
+                Effect.provideService(FileSystem.FileSystem, {
+                  ...fs,
+                  chmod: (file, mode) =>
+                    fs.chmod(file, mode).pipe(
+                      Effect.tap(() =>
+                        Effect.sync(() => {
+                          chmodCalls.push({ file, mode });
+                        }),
+                      ),
+                    ),
+                }),
+                Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }))),
+              );
+              const installed = path.join(
+                stageResourcesDir,
+                `${backend}-capture/t3-${backend}-snap-shot`,
+              );
+              assert.equal(yield* fs.readFileString(installed), `helper-${arch}`);
+              assert.deepEqual(chmodCalls, [{ file: installed, mode: 0o755 }]);
+              if (actualHost !== "win32")
+                assert.equal((yield* fs.stat(installed)).mode & 0o777, 0o755);
+              if (backend === "hyprland")
+                assert.equal(
+                  yield* fs.readFileString(
+                    path.join(stageResourcesDir, "hyprland-capture/protocols/capture.xml"),
+                  ),
+                  "BSD protocol notice",
+                );
+            }
+          }
+        }
+      }),
+    ),
+  );
+
   // The fixture's t3code.exe is a text placeholder, not an executable. These
   // cases reach the native-load probe, so pin only that host-platform check to
   // Linux. Host-native paths and the real Windows tar/archive checks still run.
@@ -917,6 +1056,54 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           assert.equal(error.reason, "wsl-runtime-invalid");
         }),
       ),
+  );
+
+  it.effect("validates Copilot commands in the embedded Linux CLI archive", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const required = [
+          "node_modules/@github/copilot-sdk/package.json",
+          "node_modules/@github/copilot/package.json",
+          "node_modules/@github/copilot-linux-x64/package.json",
+          "node_modules/@github/copilot-linux-x64/copilot",
+          "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-x64/rg",
+          "node_modules/@github/copilot-linux-x64/tgrep/bin/linux-x64/tgrep",
+        ];
+        const cases = [
+          { members: required, valid: true },
+          ...required.map((missing) => ({
+            members: required.filter((file) => file !== missing),
+            valid: false,
+          })),
+          ...[
+            "node_modules/@github/copilot-linux-arm64/package.json",
+            "node_modules/@github/copilot-win32-x64/copilot.exe",
+            "node_modules/@github/copilot-linux-x64/ripgrep/bin/linux-arm64/rg",
+          ].map((extra) => ({ members: [...required, extra], valid: false })),
+        ];
+        for (const testCase of cases) {
+          const fixture = yield* makeWindowsPayloadFixture({
+            copyUnpackedNatives: true,
+            wslRuntime: "valid",
+            wslExtraMembers: testCase.members,
+          });
+          const validation = validateWindowsPackagedPayload({
+            stageDistDir: fixture.stageDistDir,
+            appExecutableName: fixture.appExecutableName,
+            targetArch: "x64",
+            appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
+            expectWslRuntime: true,
+          });
+          if (testCase.valid) {
+            assert.equal((yield* validation).packagedAppDir, fixture.packagedAppDir);
+          } else {
+            const error = yield* validation.pipe(Effect.flip);
+            assert.instanceOf(error, WindowsPackagedPayloadValidationError);
+            assert.equal(error.reason, "wsl-runtime-invalid");
+          }
+        }
+      }),
+    ).pipe(Effect.provideService(HostProcess.Platform, "linux")),
   );
 
   it.effect("rejects an embedded archive built for a different release version", () =>
