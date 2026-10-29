@@ -1,5 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
-import type { MessageOptions, SessionConfig, SessionEvent } from "@github/copilot-sdk";
+import type {
+  CopilotSession,
+  MessageOptions,
+  SessionConfig,
+  SessionEvent,
+} from "@github/copilot-sdk";
 import {
   DEFAULT_SERVER_SETTINGS,
   MessageId,
@@ -68,6 +73,10 @@ function fakeSdk() {
   let resumed: string | undefined;
   let conflict = false;
   let continuePendingWork: boolean | undefined;
+  const permissionReplies: Array<
+    Parameters<CopilotSession["rpc"]["permissions"]["handlePendingPermissionRequest"]>[0]
+  > = [];
+  let permissionResponse = async (): Promise<{ success: boolean }> => ({ success: true });
   let background: Awaited<ReturnType<SessionHandle["rpc"]["tasks"]["list"]>> = { tasks: [] };
   const sent: MessageOptions[] = [];
   const emit = (type: SessionEvent["type"], data: unknown = {}, agentId?: string) => {
@@ -105,6 +114,16 @@ function fakeSdk() {
       },
       skills: { list: async () => ({ skills: [] }) },
       tasks: { list: async () => background, cancel: async () => ({ cancelled: true }) },
+      permissions: {
+        handlePendingPermissionRequest: async (
+          response: Parameters<
+            CopilotSession["rpc"]["permissions"]["handlePendingPermissionRequest"]
+          >[0],
+        ) => {
+          permissionReplies.push(response);
+          return permissionResponse();
+        },
+      },
     },
   };
   const client: ClientHandle = {
@@ -152,6 +171,10 @@ function fakeSdk() {
     },
     setTasks: (tasks: typeof background) => {
       background = tasks;
+    },
+    permissionReplies,
+    setPermissionResponse: (response: () => Promise<{ success: boolean }>) => {
+      permissionResponse = response;
     },
   };
 }
@@ -258,6 +281,119 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 
 describe("native Copilot V2", () => {
   it.effect(
+    "waits for the native permission receipt and never replaces V2-owned response delivery",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const { runtime, start, drain, emitted, takeEvent } = yield* setup(fake);
+          yield* start();
+          const permission = {
+            kind: "read" as const,
+            path: "/workspace/data",
+            intention: "Read input",
+          };
+          fake.emit("permission.requested", {
+            requestId: "native-permission",
+            permissionRequest: permission,
+          });
+          const snapshot = yield* drain();
+          assert.equal(snapshot.runtimeRequests.length, 1);
+          const request = snapshot.runtimeRequests[0]!;
+          assert.equal(request.nativeRequestRef?.nativeId, "native-permission");
+          yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "approval_request" &&
+              event.turnItem.requestId === request.id,
+          );
+          const called = promiseGate();
+          const receipt = promiseGate();
+          fake.setPermissionResponse(async () => {
+            called.resolve();
+            await receipt.promise;
+            return { success: true };
+          });
+          const observedBeforeReply = emitted.length;
+          const replying = yield* Effect.forkChild(
+            runtime.respondToRuntimeRequest({ requestId: request.id, decision: "accept" }),
+          );
+          yield* Effect.promise(() => called.promise);
+          assert.isUndefined(replying.pollUnsafe());
+          receipt.resolve();
+          yield* Fiber.join(replying);
+          fake.emit("assistant.message", {
+            messageId: "reply-boundary",
+            content: "Receipt delivered",
+          });
+          yield* takeEvent((event) => event.type === "message.updated");
+          assert.equal(
+            emitted
+              .slice(observedBeforeReply)
+              .filter(
+                (event) =>
+                  event.type === "runtime_request.updated" ||
+                  event.type === "node.updated" ||
+                  (event.type === "turn_item.updated" &&
+                    event.turnItem.type === "approval_request"),
+              ).length,
+            0,
+          );
+          assert.deepEqual(fake.permissionReplies, [
+            { requestId: "native-permission", result: { kind: "approve-once" } },
+          ]);
+          assert.equal((yield* drain()).runtimeRequests.length, 0);
+          yield* runtime.respondToRuntimeRequest({ requestId: request.id, decision: "accept" });
+          assert.equal(fake.permissionReplies.length, 1);
+          assert.isTrue(
+            Exit.isFailure(
+              yield* runtime
+                .respondToRuntimeRequest({ requestId: request.id, decision: "decline" })
+                .pipe(Effect.exit),
+            ),
+          );
+        }),
+      ),
+  );
+
+  it.effect(
+    "does not publish empty tool-only assistant rows and preserves streamed whitespace",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const { start, drain, emitted } = yield* setup(fake);
+          yield* start();
+          fake.emit("assistant.message", {
+            messageId: "tool-only",
+            content: "",
+            toolRequests: [
+              { toolCallId: "shell", name: "bash", arguments: { command: "printf done" } },
+            ],
+          });
+          assert.equal((yield* drain()).messages.length, 0);
+          fake.emit("assistant.message_delta", {
+            messageId: "real-text",
+            deltaContent: "  ready\n",
+          });
+          fake.emit("assistant.message", { messageId: "real-text", content: "" });
+          const snapshot = yield* drain();
+          assert.equal(snapshot.messages.length, 1);
+          assert.equal(snapshot.messages[0]?.text, "  ready\n");
+          assert.isFalse(snapshot.messages[0]!.streaming);
+          assert.isFalse(
+            emitted.some(
+              (event) =>
+                event.type === "turn_item.updated" &&
+                event.turnItem.type === "assistant_message" &&
+                event.turnItem.text.length === 0,
+            ),
+          );
+        }),
+      ),
+  );
+
+  it.effect(
     "completes exactly once on root session.idle, never assistant or child boundaries",
     () =>
       provide(
@@ -340,9 +476,29 @@ describe("native Copilot V2", () => {
       provide(
         Effect.gen(function* () {
           const fake = fakeSdk();
+          fake.session.getEvents = async () => [
+            {
+              type: "assistant.message",
+              id: "history-tool-only",
+              timestamp: "2026-10-29T00:00:00Z",
+              parentId: null,
+              data: { messageId: "history-tool-only", content: "", toolRequests: [] },
+            },
+            {
+              type: "assistant.message",
+              id: "history-text",
+              timestamp: "2026-10-29T00:00:00Z",
+              parentId: null,
+              data: { messageId: "history-text", content: "Previous response" },
+            },
+          ];
           const { runtime, start, drain, thread } = yield* setup(fake, "native-copilot");
           assert.equal(thread.nativeThreadRef?.nativeId, "native-copilot");
           assert.equal(fake.resumed, "native-copilot");
+          assert.deepEqual(
+            (yield* drain()).messages.map((message) => message.text),
+            ["Previous response"],
+          );
           yield* start();
           const snapshot = yield* drain();
           yield* runtime.interruptTurn({
@@ -360,10 +516,19 @@ describe("native Copilot V2", () => {
         const fake = fakeSdk();
         const { runtime, start, drain } = yield* setup(fake);
         yield* start();
-        const permission = fake.config.onPermissionRequest!(
-          { kind: "read", path: "/workspace/data", intention: "Read input" },
-          { sessionId: "native-copilot" },
+        const permission = {
+          kind: "read" as const,
+          path: "/workspace/data",
+          intention: "Read input",
+        };
+        assert.deepEqual(
+          fake.config.onPermissionRequest!(permission, { sessionId: "native-copilot" }),
+          { kind: "no-result" },
         );
+        fake.emit("permission.requested", {
+          requestId: "native-read",
+          permissionRequest: permission,
+        });
         const pendingPermission = (yield* drain()).runtimeRequests[0]!;
         assert.equal(pendingPermission.kind, "file-read");
         const unsupported = yield* runtime
@@ -377,13 +542,14 @@ describe("native Copilot V2", () => {
           requestId: pendingPermission.id,
           decision: "accept",
         });
-        assert.deepEqual(yield* Effect.promise(() => Promise.resolve(permission)), {
-          kind: "approve-once",
-        });
+        assert.deepEqual(fake.permissionReplies, [
+          { requestId: "native-read", result: { kind: "approve-once" } },
+        ]);
         const question = fake.config.onUserInputRequest!(
           { question: "Which?", choices: ["A", "B"] },
           { sessionId: "native-copilot" },
         );
+
         const pendingQuestion = (yield* drain()).runtimeRequests.find(
           (request) => request.status === "pending",
         )!;
@@ -399,6 +565,50 @@ describe("native Copilot V2", () => {
         yield* drain();
       }),
     ),
+  );
+
+  it.effect(
+    "rejects unsuccessful or failed native permission receipts and never takes hook-resolved ownership",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          for (const fail of ["already-resolved", "transport"] as const) {
+            const fake = fakeSdk();
+            const { runtime, start, drain } = yield* setup(fake);
+            yield* start();
+            fake.setPermissionResponse(async () => {
+              if (fail === "transport") throw new Error("Permission transport failed.");
+              return { success: false };
+            });
+            fake.emit("permission.requested", {
+              requestId: "already-owned",
+              permissionRequest: { kind: "read", path: "/workspace/data", intention: "Read" },
+              resolvedByHook: true,
+            });
+            assert.equal((yield* drain()).runtimeRequests.length, 0);
+            fake.emit("permission.requested", {
+              requestId: "native-read",
+              permissionRequest: { kind: "read", path: "/workspace/data", intention: "Read" },
+            });
+            const request = (yield* drain()).runtimeRequests[0]!;
+            assert.isTrue(
+              Exit.isFailure(
+                yield* runtime
+                  .respondToRuntimeRequest({ requestId: request.id, decision: "accept" })
+                  .pipe(Effect.exit),
+              ),
+            );
+            assert.isTrue(
+              Exit.isFailure(
+                yield* runtime
+                  .respondToRuntimeRequest({ requestId: request.id, decision: "accept" })
+                  .pipe(Effect.exit),
+              ),
+            );
+            assert.equal(fake.permissionReplies.length, 2);
+          }
+        }),
+      ),
   );
 
   it.effect(

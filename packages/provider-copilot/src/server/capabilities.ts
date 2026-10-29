@@ -47,7 +47,7 @@ export const capabilities = {
     supportsFileReadApproval: true,
     supportsFileChangeApproval: true,
     supportsApplyPatchApproval: true,
-    approvalsHaveNativeRequestIds: false,
+    approvalsHaveNativeRequestIds: true,
     approvalCallbacksAreLiveOnly: true,
     approvalsCanOriginateFromSubagents: true,
   },
@@ -87,7 +87,7 @@ export const capabilities = {
     nativeThreadIds: "strong",
     nativeTurnIds: "none",
     nativeItemIds: "strong",
-    nativeRequestIds: "none",
+    nativeRequestIds: "weak",
   },
   runtimePolicy: { enforcement: "client-boundary" },
 } as const satisfies OrchestrationV2ProviderCapabilities;

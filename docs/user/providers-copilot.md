@@ -32,6 +32,10 @@ file changes, and **Full access** allows tool requests without prompting.
 Only one-time approval is offered; Copilot's account-wide permission rules remain
 under its own control.
 
+Permission answers wait for the native runtime to acknowledge applying the
+decision. An unconfirmed answer is not proof that the tool did not run; do not
+repeat the action automatically.
+
 Model/tool steps and subagent activity do not end your submitted turn: the root
 native session must become idle. Background tasks remain visible independently.
 Automatic native compaction is shown in the thread. Explicit manual compaction,
