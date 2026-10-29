@@ -69,6 +69,13 @@ export function createThreadNotificationGate<Key>(
       for (const key of handled.keys()) if (!keys.has(key)) handled.delete(key);
       for (const key of lastSettled.keys()) if (!keys.has(key)) lastSettled.delete(key);
     },
+    /** Policy edits must not turn old observations into new completions. */
+    consumePendingCompletions(): void {
+      for (const [key, { at }] of pending) {
+        skip(key, at);
+        cancel(key);
+      }
+    },
     clear(): void {
       for (const key of pending.keys()) cancel(key);
       handled.clear();

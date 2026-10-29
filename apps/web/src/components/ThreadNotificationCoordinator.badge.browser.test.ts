@@ -576,3 +576,35 @@ it("retains upstream guest-request alerts on canonical-capable environments", as
   state.shells.set("one", shell({ pendingGuestMessageCount: 1 }));
   expect(TestNotification.sent.map((entry) => entry.title)).toEqual(["Guest request"]);
 });
+
+it.each([
+  "enabling before grace",
+  "enabling after grace",
+  "category changes",
+  "environment mute changes",
+])("does not replay a fallback completion after %s policy changes", async (policyChange) => {
+  await using app = setup();
+  const enabling = policyChange.startsWith("enabling");
+  state.mode = enabling ? "off" : "notifications";
+  app.start();
+  using _timers = fakeTimers();
+  const completed = {
+    latestTurn: {
+      turnId: "turn",
+      state: "completed",
+      completedAt: "2026-09-13T07:00:01.000Z",
+    },
+  };
+  state.shells.set("one", shell(completed));
+  if (policyChange !== "enabling before grace")
+    await vi.advanceTimersByTimeAsync(WORKING_EXIT_GRACE_MS);
+  expect(TestNotification.sent).toHaveLength(enabling ? 0 : 1);
+  if (enabling) state.mode = "notifications";
+  else if (policyChange === "category changes")
+    state.policy = { notificationCategories: ["completion"] };
+  else state.policy = { notificationMutedEnvironments: [EnvironmentId.make("two")] };
+  app.changeSettings();
+  state.shells.set("one", shell({ ...completed, title: "Renamed completed thread" }));
+  await vi.advanceTimersByTimeAsync(WORKING_EXIT_GRACE_MS);
+  expect(TestNotification.sent).toHaveLength(enabling ? 0 : 1);
+});

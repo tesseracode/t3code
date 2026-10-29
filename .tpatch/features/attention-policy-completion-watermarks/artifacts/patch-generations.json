@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "feature": "attention-policy-completion-watermarks",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_912d2e070bfe",
+      "kind": "record",
+      "patch_sha256": "c93803f59c055124c2c58954dea3b2a92891d891a7e12e65c5c235cdf40b1369",
+      "git_patch_id": "08cec4bdcb33cf53a48561a06bd3d2d674d4681d",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "751a98b9b03c47a5b8a404a06025ce14663c4fdb3c91f30eb81f767067c3e0bd",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "ee5c462a9d408f38ac2c7495ec91dfcc617b1ac1",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+        "apps/web/src/components/ThreadNotificationCoordinator.logic.ts",
+        "apps/web/src/components/ThreadNotificationCoordinator.tsx",
+        "docs/internals/attention-notifications.md"
+      ],
+      "dependencies": [
+        {
+          "slug": "attention-notifications",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 4,
+          "parent_patch_sha256": "6feb99da51a9427557a215cfcfcde7a8b8f7de07489c01d724556f2876e860d1",
+          "parent_recipe_sha256": "8d9797d8e72e39081b7a66612c42f8813f13cd09f93a72317349ec2678153c52"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

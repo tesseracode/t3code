@@ -555,7 +555,7 @@ export function startThreadNotifications(
     if (policyKey !== nextPolicyKey) {
       for (const entry of watched.values()) {
         entry.completions.clear();
-        entry.gate.clear();
+        entry.gate.consumePendingCompletions();
       }
       policyKey = nextPolicyKey;
     }
