@@ -1,6 +1,6 @@
 diff --git a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml
 new file mode 100644
-index 000000000..a466c1bc0
+index 000000000..532aa76c6
 --- /dev/null
 +++ b/.github/workflows/fork-native-preview.yml
 @@ -0,0 +1,154 @@
@@ -22,8 +22,8 @@ index 000000000..a466c1bc0
 +  cancel-in-progress: false
 +
 +env:
-+  PREVIEW_VERSION: ${{ inputs.version || format('0.1.3-preview.{0}.{1}', github.run_number, github.run_attempt) }}
-+  PRODUCT_BASE: d2c440312e5f39d59827ed466838a623516454d6
++  PREVIEW_VERSION: ${{ inputs.version || format('0.1.4-preview.{0}.{1}', github.run_number, github.run_attempt) }}
++  PRODUCT_BASE: 783581d461dc72cdd8f78fc8abb4ad536dfc4547
 +  T3CODE_CLERK_PUBLISHABLE_KEY: ""
 +  T3CODE_CLERK_JWT_TEMPLATE: ""
 +  T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ""
@@ -159,7 +159,7 @@ index 000000000..a466c1bc0
 +          if-no-files-found: error
 +          retention-days: 14
 diff --git a/apps/desktop/src/app/DesktopClerk.test.ts b/apps/desktop/src/app/DesktopClerk.test.ts
-index a244ff4b3..cd3b44420 100644
+index 34b7286c3..f2cf12686 100644
 --- a/apps/desktop/src/app/DesktopClerk.test.ts
 +++ b/apps/desktop/src/app/DesktopClerk.test.ts
 @@ -56,10 +56,13 @@ const layerDesktopClerk = (
@@ -176,7 +176,7 @@ index a244ff4b3..cd3b44420 100644
      appDataDirectory: "/tmp/app-data",
      platform,
    } as unknown as DesktopEnvironment.DesktopEnvironment["Service"]);
-@@ -108,6 +111,28 @@ describe("DesktopClerk", () => {
+@@ -108,6 +111,29 @@ describe("DesktopClerk", () => {
      requestSingleInstanceLockMock.mockReset().mockReturnValue(true);
      storageMock.mockReset();
    });
@@ -199,6 +199,7 @@ index a244ff4b3..cd3b44420 100644
 +        "setPath:userData:/tmp/fork-preview/electron",
 +        "requestSingleInstanceLock",
 +        "on:second-instance",
++        "on:open-url",
 +      ]);
 +    });
 +  });
@@ -206,10 +207,10 @@ index a244ff4b3..cd3b44420 100644
    it.each([
      {
 diff --git a/apps/desktop/src/app/DesktopClerk.ts b/apps/desktop/src/app/DesktopClerk.ts
-index 3e0d753d1..4442d3f1a 100644
+index 992e1fe05..5e645f88b 100644
 --- a/apps/desktop/src/app/DesktopClerk.ts
 +++ b/apps/desktop/src/app/DesktopClerk.ts
-@@ -83,15 +83,23 @@ export const desktopClerkFrontendApiHostname = resolveDesktopClerkFrontendApiHos
+@@ -84,15 +84,23 @@ export const desktopClerkFrontendApiHostname = resolveDesktopClerkFrontendApiHos
      : __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__,
  );
  
@@ -239,7 +240,7 @@ index 3e0d753d1..4442d3f1a 100644
    });
  }
  
-@@ -121,7 +129,12 @@ export const make = Effect.gen(function* () {
+@@ -131,7 +139,12 @@ export const make = Effect.gen(function* () {
  
    yield* Effect.acquireRelease(
      Effect.try({
@@ -266,7 +267,7 @@ index 11f975a6b..9fa9072de 100644
    mockUpdateServerPort: Config.Port("T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT").pipe(
      Config.withDefault(3000),
 diff --git a/apps/desktop/src/app/DesktopEnvironment.ts b/apps/desktop/src/app/DesktopEnvironment.ts
-index 1066198b8..294324117 100644
+index 1066198b8..1c2e7a5e3 100644
 --- a/apps/desktop/src/app/DesktopEnvironment.ts
 +++ b/apps/desktop/src/app/DesktopEnvironment.ts
 @@ -39,6 +39,7 @@ export class DesktopEnvironment extends Context.Service<
@@ -277,7 +278,7 @@ index 1066198b8..294324117 100644
      readonly appVersion: string;
      readonly appPath: string;
      readonly resourcesPath: string;
-@@ -168,10 +169,10 @@ const make = Effect.fn("desktop.environment.make")(function* (
+@@ -168,10 +169,12 @@ const make = Effect.fn("desktop.environment.make")(function* (
      input.isPackaged && input.platform === "win32"
        ? path.join(input.resourcesPath, "server.asar")
        : appRoot;
@@ -287,12 +288,14 @@ index 1066198b8..294324117 100644
 -  });
 +  const branding = {
 +    ...resolveDesktopAppBranding({ isDevelopment, appVersion: input.appVersion }),
-+    ...(config.isolatedPreview ? { displayName: "T3 Code Fork Preview" } : {}),
++    ...(config.isolatedPreview
++      ? { baseName: "T3 Code Fork Preview", displayName: "T3 Code Fork Preview" }
++      : {}),
 +  };
    const displayName = branding.displayName;
    const stateDir = resolveDesktopStateDir({
      baseDir,
-@@ -192,6 +193,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
+@@ -192,6 +195,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
      processArch: input.processArch,
      isPackaged: input.isPackaged,
      isDevelopment,
@@ -592,7 +595,7 @@ index 7464d8fbe..112397698 100644
      Effect.gen(function* () {
        const fileSystem = yield* FileSystem.FileSystem;
 diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
-index ca69f5d02..da7dcfed7 100644
+index 492903139..b946705cb 100644
 --- a/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 +++ b/apps/desktop/src/backend/DesktopBackendConfiguration.ts
 @@ -687,6 +687,19 @@ const resolveWslStartConfig = Effect.fn("desktop.backendConfiguration.resolveWsl
@@ -974,7 +977,7 @@ index 67549f6b8..c30376e0d 100644
      const fixture = createFixture();
      expect(fixture.install().status).toBe(0);
 diff --git a/apps/desktop/src/wsl/DesktopWslEnvironment.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.ts
-index 369397296..789d0500b 100644
+index ab52ca07a..0fbb61b9f 100644
 --- a/apps/desktop/src/wsl/DesktopWslEnvironment.ts
 +++ b/apps/desktop/src/wsl/DesktopWslEnvironment.ts
 @@ -11,6 +11,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
@@ -1061,7 +1064,7 @@ index 369397296..789d0500b 100644
    ].join("\n");
  };
  
-@@ -782,6 +798,7 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
+@@ -780,6 +796,7 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
      distro: string | null,
      windowsPath: string,
    ) => Effect.Effect<Option.Option<string>>,
@@ -1069,7 +1072,7 @@ index 369397296..789d0500b 100644
  ): Effect.fn.Return<PrepareWslRuntimeResult, never, ChildProcessSpawner.ChildProcessSpawner> {
    const linuxArchivePath = yield* windowsToWslPath(distro, archive.windowsPath);
    if (Option.isNone(linuxArchivePath)) {
-@@ -793,7 +810,12 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
+@@ -791,7 +808,12 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
  
    const install = yield* runWslShell(
      distro,
@@ -1083,7 +1086,7 @@ index 369397296..789d0500b 100644
      RUNTIME_INSTALL_TIMEOUT,
      { resolveNode: false },
    );
-@@ -826,10 +848,11 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
+@@ -824,10 +846,11 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
  const pruneWslRuntimesImpl = Effect.fn("desktop.wsl.pruneRuntimesImpl")(function* (
    distro: string | null,
    runtimeId: string,
@@ -1096,7 +1099,7 @@ index 369397296..789d0500b 100644
      RUNTIME_PRUNE_TIMEOUT,
      { resolveNode: false },
    );
-@@ -846,10 +869,11 @@ const pruneWslRuntimesImpl = Effect.fn("desktop.wsl.pruneRuntimesImpl")(function
+@@ -844,10 +867,11 @@ const pruneWslRuntimesImpl = Effect.fn("desktop.wsl.pruneRuntimesImpl")(function
  const invalidateWslRuntimeImpl = Effect.fn("desktop.wsl.invalidateRuntimeImpl")(function* (
    distro: string | null,
    runtimeId: string,
@@ -1109,7 +1112,7 @@ index 369397296..789d0500b 100644
      RUNTIME_INVALIDATE_TIMEOUT,
      { resolveNode: false },
    );
-@@ -993,41 +1017,39 @@ const getDistroIpImpl = (
+@@ -991,41 +1015,39 @@ const getDistroIpImpl = (
      Effect.orElseSucceed(() => Option.none<string>()),
    );
  
@@ -1182,7 +1185,7 @@ index 369397296..789d0500b 100644
  
  const makeIsAvailable = Effect.fn("DesktopWslEnvironment.makeIsAvailable")(function* (
    platform: NodeJS.Platform,
-@@ -1156,7 +1178,7 @@ export const layer = Layer.effect(
+@@ -1154,7 +1176,7 @@ export const layer = Layer.effect(
        const key = distro ?? "__default__";
        const cached = userHomeCache.get(key);
        if (cached !== undefined) return Option.some(cached);
@@ -1191,7 +1194,7 @@ index 369397296..789d0500b 100644
        if (Option.isSome(resolved)) userHomeCache.set(key, resolved.value);
        return resolved;
      });
-@@ -1182,13 +1204,17 @@ export const layer = Layer.effect(
+@@ -1180,13 +1202,17 @@ export const layer = Layer.effect(
        getUserHome,
        getDistroIp,
        prepareRuntime: Effect.fn("desktop.wsl.prepareRuntime")(function (distro, archive) {
@@ -1214,13 +1217,13 @@ index 369397296..789d0500b 100644
          return provideSpawner(probeWslRuntimeImpl(distro, linuxAppRoot));
 diff --git a/docs/operations/fork-native-preview.md b/docs/operations/fork-native-preview.md
 new file mode 100644
-index 000000000..5e05c8d9d
+index 000000000..3f4afb7aa
 --- /dev/null
 +++ b/docs/operations/fork-native-preview.md
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,115 @@
 +# Personal fork native previews
 +
-+These are unsigned personal previews of stable `v0.1.3`, not releases.
++These are unsigned personal previews of stable `v0.1.4`, not releases.
 +Each artifact's generated `manifest.json` records the full upstream product-base
 +commit, actual build commit, source-overlay paths, version-only release transform,
 +and artifact hashes. Historical v0.0.42 evidence does not qualify this port.
@@ -1228,7 +1231,7 @@ index 000000000..5e05c8d9d
 +## Isolation and limits
 +
 +Build desktop artifacts with `--fork-preview` and a preview version such as
-+`0.1.3-preview.20261029.1`. The installer identity is
++`0.1.4-preview.20261029.1`. The installer identity is
 +`com.tesseracode.t3code.preview`, named **T3 Code Fork Preview**.
 +
 +The packaged bootstrap selects `~/.t3-fork-preview`, with Electron state below
@@ -1237,6 +1240,8 @@ index 000000000..5e05c8d9d
 +`T3CODE_FORK_PREVIEW_HOME` before launching. Do not set it to an existing install.
 +The preview keeps a separate single-instance lock, disables automatic updates
 +and does not register the stock T3 URL schemes.
++Its runtime application name remains fork-specific after startup branding,
++not just in the installer.
 +Preview startup does not import V1 local storage from stock profiles. Existing
 +storage in the same preview profile is retained; updating a build does not clear
 +previously imported data. Use a fresh owned preview home when qualifying isolation.
@@ -1267,10 +1272,10 @@ index 000000000..5e05c8d9d
 +```sh
 +node scripts/build-desktop-artifact.ts \
 +  --platform mac --arch arm64 --target dmg \
-+  --build-version 0.1.3-preview.20261029.1 --fork-preview --keep-stage
++  --build-version 0.1.4-preview.20261029.1 --fork-preview --keep-stage
 +node scripts/fork-preview-manifest.mjs \
-+  --directory release --target mac-arm64 --version 0.1.3-preview.20261029.1 \
-+  --product-base v0.1.3
++  --directory release --target mac-arm64 --version 0.1.4-preview.20261029.1 \
++  --product-base v0.1.4
 +```
 +
 +Windows uses the same builder with `--platform win --arch x64 --target nsis`
@@ -1283,10 +1288,11 @@ index 000000000..5e05c8d9d
 +There are no push, tag, pull-request, scheduled or reusable-workflow triggers.
 +It uploads Linux and
 +Windows artifacts without release tags, npm publication, signing or deployment.
-+The approved v0.1.3 batch permits at most **four build-only CI attempts per target**
++The approved preview batch permits at most **four build-only CI attempts per target**
 +(Linux x64 and Windows x64), including reruns and new dispatches. Record each
 +attempt's run URL, exact source commit, target, result and remaining budget before
 +retrying; never retry automatically. The parent/integration operator owns dispatch.
++Changing the upstream port does not reset that allowance.
 +The upstream release and signed macOS PR-preview workflows are not appropriate:
 +they can publish or sign.
 +
@@ -1331,10 +1337,10 @@ index 000000000..5e05c8d9d
 +the builder deliberately refuses otherwise. If filesystem policy permits only
 +an in-worktree directory, report that gate as blocked instead of weakening it.
 diff --git a/docs/operations/release.md b/docs/operations/release.md
-index 6f1c39539..377460b4b 100644
+index 39f4f63dd..698d33a4d 100644
 --- a/docs/operations/release.md
 +++ b/docs/operations/release.md
-@@ -57,6 +57,29 @@ the version.
+@@ -58,6 +58,29 @@ the version.
    - nightly releases are aliased to the `nightly` hosted app channel
  - Signing is optional and auto-detected per platform from secrets.
  
@@ -1365,7 +1371,7 @@ index 6f1c39539..377460b4b 100644
  
  Labeling a PR `preview:mac` publishes a signed, notarized Apple Silicon DMG with T3 Connect enabled
 diff --git a/packages/shared/package.json b/packages/shared/package.json
-index f968d2768..28c58ca77 100644
+index cc113b00f..dd07bee3f 100644
 --- a/packages/shared/package.json
 +++ b/packages/shared/package.json
 @@ -3,6 +3,10 @@
@@ -1653,13 +1659,13 @@ index 000000000..e19c44f78
 +  ].join("\n");
 +}
 diff --git a/scripts/build-cli-archive.ts b/scripts/build-cli-archive.ts
-index dfe1de081..b63767551 100644
+index ee7c45ada..86d0aaca0 100644
 --- a/scripts/build-cli-archive.ts
 +++ b/scripts/build-cli-archive.ts
-@@ -26,9 +26,10 @@ import {
-   resolveFffNativeDependencies,
+@@ -27,9 +27,10 @@ import {
    STAGE_INSTALL_ARGS,
  } from "./build-desktop-artifact.ts";
+ import { assertLinuxArm64PageCompatibility } from "./lib/linux-arm64-sea.ts";
 -import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
 +import { collectCliRuntimeExternalDependencies } from "./lib/runtime-external-dependencies.ts";
  import { signWithJsign } from "./lib/windows-jsign.ts";
@@ -1668,7 +1674,7 @@ index dfe1de081..b63767551 100644
  import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
  
  const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
-@@ -134,6 +135,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+@@ -135,6 +136,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
      yield* fs.readFileString(path.join(input.repoRoot, "pnpm-workspace.yaml")),
    );
    const catalog = workspace.catalog ?? {};
@@ -1676,7 +1682,7 @@ index dfe1de081..b63767551 100644
    const serverDependencies = resolveCatalogDependencies(
      serverPackageJson.dependencies,
      catalog,
-@@ -147,7 +149,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+@@ -148,7 +150,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
      });
    }
    const dependencies = {
@@ -1685,7 +1691,7 @@ index dfe1de081..b63767551 100644
      ...resolveFffNativeDependencies(input.platform, input.arch, fffNodeVersion),
    };
    const patchedDependencies = createStagePatchedDependencies(
-@@ -173,7 +175,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+@@ -174,7 +176,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
          arch: input.arch,
          ...(workspace.allowBuilds ? { allowBuilds: workspace.allowBuilds } : {}),
          patchedDependencies,
@@ -1694,7 +1700,7 @@ index dfe1de081..b63767551 100644
        }),
        nodeLinker: "hoisted",
      }),
-@@ -192,6 +194,13 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+@@ -193,6 +195,13 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
      }),
      "vp install --prod (cli archive runtime externals)",
    );
@@ -1709,7 +1715,7 @@ index dfe1de081..b63767551 100644
    const platformKey = cliArchivePlatformKey(input.platform, input.arch);
    const prebuildsDir = path.join(input.stageDir, "node_modules/node-pty/prebuilds");
 diff --git a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts
-index 6ad4413ad..91d53748e 100644
+index a4cef9ba0..6e2db0273 100644
 --- a/scripts/build-desktop-artifact.test.ts
 +++ b/scripts/build-desktop-artifact.test.ts
 @@ -15,8 +15,8 @@ import * as Layer from "effect/Layer";
@@ -1722,7 +1728,7 @@ index 6ad4413ad..91d53748e 100644
  import * as Stream from "effect/Stream";
  import { ChildProcess, ChildProcessSpawner } from "effect/process";
  
-@@ -52,6 +52,8 @@ import {
+@@ -54,6 +54,8 @@ import {
    WindowsDesktopBuildPrerequisitesMissingError,
    WindowsPackagedPayloadValidationError,
    stageCursorSdkPlatformPackages,
@@ -1731,7 +1737,7 @@ index 6ad4413ad..91d53748e 100644
    WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT,
    WINDOWS_SERVER_ASAR_IGNORE_GLOBS,
    WINDOWS_SERVER_ASAR_RESOURCE,
-@@ -67,6 +69,9 @@ import {
+@@ -69,6 +71,9 @@ import {
  } from "./update-release-package-versions.ts";
  import * as HostProcess from "@t3tools/shared/HostProcess";
  import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
@@ -1741,7 +1747,7 @@ index 6ad4413ad..91d53748e 100644
  
  const encodeModuleUrl = Schema.encodeEffect(Schema.fromJsonString(Schema.String));
  const decodePackageVersion = Schema.decodeUnknownEffect(
-@@ -134,6 +139,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
+@@ -136,6 +141,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
    readonly wslRuntime?: "valid" | "loose-server-tree" | "missing-pty" | "bad-digest";
    readonly targetArch?: "x64" | "arm64";
    readonly ptyPrebuildArch?: "x64" | "arm64";
@@ -1749,7 +1755,7 @@ index 6ad4413ad..91d53748e 100644
  }) {
    const fs = yield* FileSystem.FileSystem;
    const path = yield* Path.Path;
-@@ -183,6 +189,9 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
+@@ -185,6 +191,9 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
          : yield* makeLinuxCliArchiveFixture({
              root: path.join(tempDir, "wsl-runtime"),
              stem,
@@ -1759,7 +1765,7 @@ index 6ad4413ad..91d53748e 100644
              ...(input.wslRuntime === "missing-pty" || input.ptyPrebuildArch !== undefined
                ? { omitMembers: [`${stem}/node_modules/node-pty/build/Release/pty.node`] }
                : {}),
-@@ -288,6 +297,37 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+@@ -310,6 +319,37 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
        }
      }),
    );
@@ -1797,7 +1803,7 @@ index 6ad4413ad..91d53748e 100644
  
    it.effect("restores manifests and releases the checkout lock after interruption", () =>
      Effect.gen(function* () {
-@@ -641,67 +681,71 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+@@ -663,67 +703,71 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
      ),
    );
  
@@ -1928,7 +1934,7 @@ index 6ad4413ad..91d53748e 100644
    );
  
    it.effect("reports missing Windows toolchain capabilities before building", () =>
-@@ -835,6 +879,101 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+@@ -857,6 +901,101 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
      ),
    );
  
@@ -2030,7 +2036,7 @@ index 6ad4413ad..91d53748e 100644
    // The fixture's t3code.exe is a text placeholder, not an executable. These
    // cases reach the native-load probe, so pin only that host-platform check to
    // Linux. Host-native paths and the real Windows tar/archive checks still run.
-@@ -919,6 +1058,54 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+@@ -941,6 +1080,54 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
        ),
    );
  
@@ -2086,7 +2092,7 @@ index 6ad4413ad..91d53748e 100644
      Effect.scoped(
        Effect.gen(function* () {
 diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
-index ac2ed7826..7bbdeed3d 100644
+index 3a8686f24..f22db588a 100644
 --- a/scripts/build-desktop-artifact.ts
 +++ b/scripts/build-desktop-artifact.ts
 @@ -36,6 +36,8 @@ import {
@@ -2231,7 +2237,7 @@ index ac2ed7826..7bbdeed3d 100644
      const bundleEntry = members.find((member) => member.endsWith("/bin.mjs"));
      if (bundleEntry !== undefined) {
        return yield* invalidWslRuntime(
-@@ -3544,6 +3598,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+@@ -3580,6 +3634,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
      });
    }
    const workspaceConfig = yield* readWorkspaceConfig();
@@ -2250,7 +2256,7 @@ index ac2ed7826..7bbdeed3d 100644
    const workspaceCatalog = workspaceConfig.catalog ?? {};
    const workspaceOverrides = workspaceConfig.overrides ?? {};
    const workspacePatchedDependencies = workspaceConfig.patchedDependencies ?? {};
-@@ -3575,17 +3641,17 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+@@ -3611,17 +3677,17 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
        }),
    });
  
@@ -2279,7 +2285,7 @@ index ac2ed7826..7bbdeed3d 100644
    );
    const resolvedDesktopRuntimeDependencies = yield* Effect.try({
      try: () => resolveDesktopRuntimeDependencies(desktopPackageJson.dependencies, workspaceCatalog),
-@@ -3802,7 +3868,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+@@ -3838,7 +3904,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
        ? { ...resolvedDesktopRuntimeDependencies }
        : resolveMergedStageDependencies({
            platform: options.platform,
@@ -2288,7 +2294,7 @@ index ac2ed7826..7bbdeed3d 100644
            desktopDependencies: resolvedDesktopRuntimeDependencies,
            arch: options.arch,
            fffNodeVersion: serverPackageJson.dependencies["@ff-labs/fff-node"],
-@@ -3816,7 +3882,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+@@ -3852,7 +3918,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
        ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
        : undefined;
    const stagePackageJson: StagePackageJson = {
@@ -2297,7 +2303,7 @@ index ac2ed7826..7bbdeed3d 100644
      version: appVersion,
      buildVersion: appVersion,
      t3codeCommitHash: commitHash,
-@@ -3829,7 +3895,9 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+@@ -3865,7 +3931,9 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
      license: "MIT",
      homepage: "https://t3.codes",
      author: "T3 Tools",
@@ -2308,7 +2314,7 @@ index ac2ed7826..7bbdeed3d 100644
      build: yield* createBuildConfig(
        options.platform,
        options.target,
-@@ -3851,8 +3919,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+@@ -3887,8 +3955,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
        electron: electronVersion,
      },
    };
@@ -2328,7 +2334,7 @@ index ac2ed7826..7bbdeed3d 100644
    yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
    const stageWorkspaceConfig = createStageWorkspaceConfig({
      platform: options.platform,
-@@ -3882,6 +3960,13 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+@@ -3918,6 +3996,13 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
    );
    yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
    yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
@@ -2342,7 +2348,7 @@ index ac2ed7826..7bbdeed3d 100644
  
    if (options.platform === "win" && windowsServerAsarPath) {
      yield* stageWindowsServerSidecar({
-@@ -4006,7 +4091,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
+@@ -4042,7 +4127,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
    if (options.platform === "win") {
      yield* validateWindowsPackagedPayload({
        stageDistDir,
@@ -2351,7 +2357,7 @@ index ac2ed7826..7bbdeed3d 100644
        targetArch: options.arch,
        appVersion,
        expectWslRuntime: bundlesWslRuntime({
-@@ -4092,6 +4177,12 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
+@@ -4132,6 +4217,12 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
      ),
      Flag.optional,
    ),
@@ -2441,7 +2447,7 @@ index 000000000..f7fb06e0c
 +}
 diff --git a/scripts/fork-preview-manifest.mjs b/scripts/fork-preview-manifest.mjs
 new file mode 100644
-index 000000000..155269e89
+index 000000000..abf2c7954
 --- /dev/null
 +++ b/scripts/fork-preview-manifest.mjs
 @@ -0,0 +1,95 @@
@@ -2462,7 +2468,7 @@ index 000000000..155269e89
 +});
 +if (!values.directory || !values.target || !values.version)
 +  throw new Error("directory, target and version are required");
-+const baseRef = values["product-base"] || process.env.PRODUCT_BASE || "v0.1.3";
++const baseRef = values["product-base"] || process.env.PRODUCT_BASE || "v0.1.4";
 +const base = NodeChildProcess.execFileSync("git", ["rev-parse", `${baseRef}^{commit}`], {
 +  encoding: "utf8",
 +}).trim();
@@ -2470,8 +2476,8 @@ index 000000000..155269e89
 +  encoding: "utf8",
 +}).trim();
 +NodeChildProcess.execFileSync("git", ["merge-base", "--is-ancestor", base, commit]);
-+if (!/^0\.1\.3-preview\.[0-9A-Za-z.-]+$/.test(values.version))
-+  throw new Error("An explicit v0.1.3 preview version is required");
++if (!/^0\.1\.4-preview\.[0-9A-Za-z.-]+$/.test(values.version))
++  throw new Error("An explicit v0.1.4 preview version is required");
 +const versionFiles = [
 +  "apps/server/package.json",
 +  "apps/desktop/package.json",
@@ -2541,10 +2547,10 @@ index 000000000..155269e89
 +);
 +console.log(JSON.stringify({ target: manifest.target, buildCommit: commit, artifacts }, null, 2));
 diff --git a/scripts/lib/cli-external-packages.test.ts b/scripts/lib/cli-external-packages.test.ts
-index b55e3a9c1..fecfd3b17 100644
+index 09803de29..78ee200bb 100644
 --- a/scripts/lib/cli-external-packages.test.ts
 +++ b/scripts/lib/cli-external-packages.test.ts
-@@ -35,6 +35,13 @@ describe("shouldBundleCliDependency", () => {
+@@ -39,6 +39,13 @@ describe("shouldBundleCliDependency", () => {
        "@napi-rs/keyring",
        "@clerk/electron-passkeys",
        "node-addon-api",
@@ -2559,13 +2565,14 @@ index b55e3a9c1..fecfd3b17 100644
        assert.strictEqual(shouldBundleCliDependency(id), false, id);
      }
 diff --git a/scripts/lib/cli-external-packages.ts b/scripts/lib/cli-external-packages.ts
-index baddb437b..a8b4c71f9 100644
+index 2772e4e49..a8b4c71f9 100644
 --- a/scripts/lib/cli-external-packages.ts
 +++ b/scripts/lib/cli-external-packages.ts
 @@ -1,6 +1,10 @@
  /** Keep bundler externals and staged runtime dependency roots aligned. */
  // Filesystem-loaded externals need dependencies outside the bundle.
- export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
+-const CLI_RUNTIME_EXTERNAL_PREFIXES = [
++export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
 +  // The native SDK resolves its CLI and Koffi bindings relative to installed package files.
 +  "@github/copilot",
 +  "koffi",

@@ -1,6 +1,10 @@
 /** Keep bundler externals and staged runtime dependency roots aligned. */
 // Filesystem-loaded externals need dependencies outside the bundle.
-const CLI_RUNTIME_EXTERNAL_PREFIXES = [
+export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
+  // The native SDK resolves its CLI and Koffi bindings relative to installed package files.
+  "@github/copilot",
+  "koffi",
+  "@koromix/koffi-",
   // Cursor ships computed Webpack imports and platform helper packages.
   "@cursor/sdk",
   // Playwright reads package.json and browsers.json beside its runtime modules.
@@ -30,10 +34,13 @@ const CURSOR_RUNTIME_DEPENDENCIES = [
   "@fastify/busboy",
 ] as const;
 
+const COPILOT_RUNTIME_DEPENDENCIES = ["vscode-jsonrpc", "detect-libc"] as const;
+
 export function isRuntimeExternalCliDependency(id: string): boolean {
   return (
     CLI_RUNTIME_EXTERNAL_PREFIXES.some((prefix) => id.startsWith(prefix)) ||
-    CURSOR_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`))
+    CURSOR_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`)) ||
+    COPILOT_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`))
   );
 }
 

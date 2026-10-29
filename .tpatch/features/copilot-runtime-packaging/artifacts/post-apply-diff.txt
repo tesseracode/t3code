@@ -1,3 +1,4 @@
- apps/desktop/src/app/DesktopLegacyLocalStorage.ts | 2 +-
- docs/operations/fork-native-preview.md            | 3 +++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ .tpatch/FEATURES.md                                    |  2 +-
+ .tpatch/features/copilot-runtime-packaging/spec.md     | 15 +++++++++++----
+ .tpatch/features/copilot-runtime-packaging/status.json |  8 ++++----
+ 3 files changed, 16 insertions(+), 9 deletions(-)

@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./copilotRuntime": {
+      "types": "./src/copilotRuntime.ts",
+      "import": "./src/copilotRuntime.ts"
+    },
     "./changedFileKind": {
       "types": "./src/changedFileKind.ts",
       "import": "./src/changedFileKind.ts"

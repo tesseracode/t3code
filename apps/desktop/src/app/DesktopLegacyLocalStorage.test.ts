@@ -1,0 +1,144 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import { assert, it } from "@effect/vitest";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Path from "effect/Path";
+import { vi } from "vite-plus/test";
+
+const { readStorageMock } = vi.hoisted(() => ({
+  readStorageMock: vi.fn<typeof import("./chromiumLocalStorage.ts").readChromiumLocalStorage>(),
+}));
+
+vi.mock("./chromiumLocalStorage.ts", () => ({
+  readChromiumLocalStorage: readStorageMock,
+}));
+
+import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+import * as DesktopConfig from "./DesktopConfig.ts";
+import * as DesktopLegacyLocalStorage from "./DesktopLegacyLocalStorage.ts";
+
+const fixture = Effect.fn("test.legacyLocalStorageFixture")(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const homeDirectory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-preview-legacy-storage-" });
+  const previewHome = path.join(homeDirectory, "preview");
+  const userDataPath = path.join(previewHome, "electron");
+  const legacyDirectory = path.join(
+    homeDirectory,
+    "Library",
+    "Application Support",
+    "t3code",
+    "Local Storage",
+    "leveldb",
+  );
+  const previewFile = path.join(userDataPath, "Local Storage", "leveldb", "preview.log");
+  yield* fs.makeDirectory(legacyDirectory, { recursive: true });
+  yield* fs.makeDirectory(path.dirname(previewFile), { recursive: true });
+  yield* fs.writeFileString(path.join(legacyDirectory, "000001.log"), "stock fixture");
+  yield* fs.writeFileString(previewFile, "existing same-preview storage");
+  return {
+    homeDirectory,
+    previewHome,
+    userDataPath,
+    legacyDirectory,
+    previewFile,
+    marker: path.join(userDataPath, "v1-local-storage-imported"),
+  };
+});
+
+const legacyLayer = (
+  input: { homeDirectory: string; previewHome: string },
+  isolatedPreview: boolean,
+) =>
+  DesktopLegacyLocalStorage.layer.pipe(
+    Layer.provide(
+      DesktopEnvironment.layer({
+        dirname: input.homeDirectory,
+        platform: "darwin",
+        processArch: "arm64",
+        appVersion: "0.1.3",
+        appPath: input.homeDirectory,
+        resourcesPath: input.homeDirectory,
+        runningUnderArm64Translation: false,
+        isPackaged: true,
+        homeDirectory: input.homeDirectory,
+      }).pipe(
+        Layer.provide(
+          DesktopConfig.layerTest({
+            T3CODE_HOME: input.previewHome,
+            T3CODE_DESKTOP_ISOLATED_PREVIEW: isolatedPreview ? "true" : "false",
+          }),
+        ),
+      ),
+    ),
+  );
+
+it.layer(NodeServices.layer)("DesktopLegacyLocalStorage", (it) => {
+  it.effect(
+    "never probes or imports stock profiles for a preview and preserves its own storage",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          readStorageMock.mockReset();
+          readStorageMock.mockReturnValue(
+            Effect.succeed(new Map([["t3code:theme", "stock theme"]])),
+          );
+          const fs = yield* FileSystem.FileSystem;
+          const input = yield* fixture();
+          yield* Effect.gen(function* () {
+            const legacy = yield* DesktopLegacyLocalStorage.DesktopLegacyLocalStorage;
+            yield* legacy.load(input.userDataPath);
+            assert.isTrue(Option.isNone(yield* legacy.take));
+            yield* legacy.complete;
+          }).pipe(
+            Effect.provide(
+              legacyLayer(input, true).pipe(
+                Layer.provide(
+                  FileSystem.layerNoop({
+                    exists: () =>
+                      Effect.die("An isolated preview must not inspect migration paths."),
+                    readDirectory: () =>
+                      Effect.die("An isolated preview must not scan stock profiles."),
+                    writeFileString: () => Effect.die("Skipped imports must not write a marker."),
+                  }),
+                ),
+              ),
+            ),
+          );
+          assert.isFalse(readStorageMock.mock.calls.length > 0);
+          assert.equal(
+            yield* fs.readFileString(input.previewFile),
+            "existing same-preview storage",
+          );
+          assert.isFalse(yield* fs.exists(input.marker));
+        }),
+      ),
+  );
+
+  it.effect("retains normal V1 import and its completion marker", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        readStorageMock.mockReset();
+        readStorageMock.mockReturnValue(Effect.succeed(new Map([["t3code:theme", "dark"]])));
+        const fs = yield* FileSystem.FileSystem;
+        const input = yield* fixture();
+        yield* Effect.gen(function* () {
+          const legacy = yield* DesktopLegacyLocalStorage.DesktopLegacyLocalStorage;
+          yield* legacy.load(input.userDataPath);
+          assert.deepStrictEqual(yield* legacy.take, Option.some({ "t3code:theme": "dark" }));
+          assert.isFalse(yield* fs.exists(input.marker));
+          yield* legacy.complete;
+          assert.isTrue(yield* fs.exists(input.marker));
+          yield* legacy.load(input.userDataPath);
+          assert.isTrue(Option.isNone(yield* legacy.take));
+        }).pipe(Effect.provide(legacyLayer(input, false)));
+        assert.deepStrictEqual(readStorageMock.mock.calls, [
+          [input.legacyDirectory, "t3code://app"],
+        ]);
+        assert.equal(yield* fs.readFileString(input.previewFile), "existing same-preview storage");
+      }),
+    ),
+  );
+});

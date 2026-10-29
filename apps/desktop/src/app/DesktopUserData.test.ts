@@ -6,6 +6,27 @@ import * as Path from "effect/Path";
 
 import { resolveUserDataPath } from "./DesktopUserData.ts";
 
+it.effect("uses only the preview profile without reading ordinary Chromium credential keys", () =>
+  Effect.gen(function* () {
+    const result = yield* resolveUserDataPath({
+      appDataDirectory: "/owned/ordinary",
+      isDevelopment: false,
+      platform: "win32",
+      isolatedPreview: true,
+      baseDir: "/owned/preview",
+    }).pipe(
+      Effect.provideService(
+        FileSystem.FileSystem,
+        FileSystem.makeNoop({
+          exists: () => Effect.die("The ordinary profile must not be inspected."),
+        }),
+      ),
+      Effect.provideService(Path.Path, yield* Path.Path),
+    );
+    assert.equal(result, "/owned/preview/electron");
+  }).pipe(Effect.provide(NodeServices.layer)),
+);
+
 it.effect.each(["t3code", "T3 Code (Alpha)"])(
   "preserves Windows credential keys from %s without copying browser databases",
   (sourceName) =>
