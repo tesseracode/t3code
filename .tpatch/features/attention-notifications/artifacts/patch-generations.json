@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "attention-notifications",
-  "current_generation": 3,
+  "current_generation": 4,
   "generations": [
     {
       "generation": 1,
@@ -229,7 +229,7 @@
       "git_patch_id": "b497c9011d90132b76699b57cdaba2503dd11d7f",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "2379bd7a3d1b8bb87254bf0f6922f4e22af338dd57696b97ccdcb6f9fe2a215d",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "75bfc266b4d5f23ef817cfa65b96964d6c41a369",
       "upper": {
@@ -317,6 +317,83 @@
           "parent_generation": 24,
           "parent_patch_sha256": "0b9045d1ad70ed82187c1d603aef9f9482dc8612253d74f93e123c09f116db63",
           "parent_recipe_sha256": "e6ab98bce83838f1dca41d6ddcd0fc84903868ce5797ae5f14e35a5393967692"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 4,
+      "generation_id": "pg_cdc775771922",
+      "kind": "amend-refresh",
+      "patch_sha256": "6feb99da51a9427557a215cfcfcde7a8b8f7de07489c01d724556f2876e860d1",
+      "git_patch_id": "cd6ab5d73c9d0d2264397836ea4a4a321317b8ae",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "8d9797d8e72e39081b7a66612c42f8813f13cd09f93a72317349ec2678153c52",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/004-record.patch",
+      "base_commit": "4de99f4a515055662ccd5d59f6f705b2ff973bd4",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/web/src/attentionNotificationPolicy.test.ts",
+        "apps/web/src/attentionNotificationPolicy.ts",
+        "apps/web/src/components/AppSidebarLayout.tsx",
+        "apps/web/src/components/CommandPalette.tsx",
+        "apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+        "apps/web/src/components/ThreadNotificationCoordinator.tsx",
+        "apps/web/src/components/attention/AttentionInbox.tsx",
+        "apps/web/src/components/attention/AttentionSidebarItem.tsx",
+        "apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+        "apps/web/src/components/attention/attentionInbox.logic.test.ts",
+        "apps/web/src/components/attention/attentionInbox.logic.ts",
+        "apps/web/src/components/attention/useOpenAttentionInbox.ts",
+        "apps/web/src/components/settings/NotificationSettings.tsx",
+        "apps/web/src/components/settings/SettingsPanels.tsx",
+        "apps/web/src/components/settings/settingsSearch.ts",
+        "apps/web/src/components/sidebar/SidebarChrome.tsx",
+        "apps/web/src/routeTree.gen.ts",
+        "apps/web/src/routes/_chat.attention.tsx",
+        "apps/web/src/threadNotifications.test.ts",
+        "apps/web/src/threadNotifications.ts",
+        "docs/internals/attention-notifications.md",
+        "docs/internals/overview.md",
+        "docs/user/attention.md",
+        "docs/user/keybindings.md",
+        "docs/user/notifications.md",
+        "docs/user/thread-sidebar.md",
+        "packages/contracts/src/keybindings.ts",
+        "packages/contracts/src/settings.test.ts",
+        "packages/contracts/src/settings.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "attention-inbox",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 3,
+          "parent_patch_sha256": "c817b3b2150735f0f64410a695df2b926d525b3df3c70f450366d4115c7d034a",
+          "parent_recipe_sha256": "2055d20b7900d8710d727bd7947a49c93f555ad9ee61cbf797058cddf7d548db"
+        },
+        {
+          "slug": "phase1-foundation",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 26,
+          "parent_patch_sha256": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+          "parent_recipe_sha256": "4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e"
         }
       ],
       "refs": {

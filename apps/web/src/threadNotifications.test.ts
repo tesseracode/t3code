@@ -40,7 +40,7 @@ beforeEach(() => {
   vi.stubGlobal("AudioContext", FakeAudioContext);
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => ({ arrayBuffer: async () => new ArrayBuffer(0) })),
+    vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) })),
   );
 });
 
