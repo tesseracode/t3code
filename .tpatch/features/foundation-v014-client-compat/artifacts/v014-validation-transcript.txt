@@ -1,0 +1,159 @@
+# initial-test-missing-deps.log
+/bin/bash: node_modules/.bin/vp: No such file or directory
+
+
+# install.log
+Scope: all 38 workspace projects
+✓ Lockfile passes supply-chain policies (verified 56m ago)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages are cloned from the content-addressable store to the virtual store.
+  Content-addressable store is at: /Users/jdbencardinop/Library/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Progress: resolved 262, reused 262, downloaded 0, added 247
+Progress: resolved 506, reused 506, downloaded 0, added 491
+Progress: resolved 1012, reused 1012, downloaded 0, added 997
+Progress: resolved 1210, reused 1210, downloaded 0, added 1195
+Progress: resolved 1344, reused 1344, downloaded 0, added 1329
+Progress: resolved 1667, reused 1667, downloaded 0, added 1652
+Packages: +1675
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 1675, reused 1671, downloaded 0, added 1675, done
+.../.pnpm/koffi@3.3.1/node_modules/koffi install$ node ./cnoke.cjs -P . -D src/koffi --prebuild --release
+.../.pnpm/koffi@3.3.1/node_modules/koffi install: Done
+. prepare$ vp config --no-agent
+. prepare: Done
+
+devDependencies:
++ @coderabbitai/config 1.1.0
++ @shadcn/lint 0.1.5
++ @types/node 24.12.4
++ knip 6.34.0
++ typescript <- @tsc-rs/typescript 0.8.0
++ vite-plus 1.4.0
+
+Done in 10.4s using pnpm v12.14.0
+
+
+# typecheck-before.log
+~/packages/client-runtime$ tsc --noEmit ⊘ cache disabled
+src/state/attention.test.ts(326,9): error TS2741: Property 'inboundFrames' is missing in type '{ client: { readonly "agentSessions.import": <const AsQueue extends boolean = false, const Discard = false>(input: { readonly projectId: string & Brand<"ProjectId">; readonly expectedWorkspaceRoot?: string | undefined; }, options?: ... | undefined) => Effect.Effect<...>; ... 207 more ...; readonly "worktreeSetup.can...' but required in type 'RpcSession'.
+src/state/attention.test.ts(380,5): error TS2353: Object literal may only specify known properties, and 'registerPlatform' does not exist in type '{ readonly entries: SubscriptionRef<ReadonlyMap<string & Brand<"EnvironmentId">, ConnectionCatalogEntry>>; ... 16 more ...; readonly followStream: ...; }'.
+
+
+
+# tests-final.log
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation
+
+
+ Test Files  3 passed (3)
+      Tests  40 passed (40)
+   Start at  10:28:53
+   Duration  3.03s (transform 64%, setup 21%, import 14%, tests 1%)
+
+
+
+# typecheck-final.log
+~/packages/client-runtime$ tsc --noEmit ⊘ cache disabled
+~/apps/server$ tsc --noEmit ⊘ cache disabled
+
+
+---
+vp run: 2/2 successful. (Run `vp run --last-details` for full details)
+
+
+# format-check-final.log
+note: You are running `vp fmt` as a Vite+ built-in command. If you meant to run the fmt npm script, use `vpr fmt` instead.
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 66ms on 5 files using 10 threads.
+
+
+# lint-final.log
+note: You are running `vp lint` as a Vite+ built-in command. If you meant to run the lint npm script, use `vpr lint` instead.
+
+
+# knip-mobile-files.log
+ERROR: Error loading apps/mobile/metro.config.js (Third-party license generation found 1 invalid package notice:)
+ERROR: Please fix or visit https://knip.dev/reference/known-issues
+Unused files (69)
+apps/mobile/src/components/FilePreview.ios.tsx                           
+apps/mobile/src/components/NewThreadButton.android.tsx                   
+apps/mobile/src/components/PdfPreview.android.tsx                        
+apps/mobile/src/components/ScrollComposeButton.android.tsx               
+apps/mobile/src/components/ui/AppActivityIndicator.android.tsx           
+apps/mobile/src/components/ui/AppBar.android.tsx                         
+apps/mobile/src/components/ui/AppSymbol.ios.tsx                          
+apps/mobile/src/components/ui/Button.android.tsx                         
+apps/mobile/src/components/ui/FloatingActionButton.android.tsx           
+apps/mobile/src/components/ui/FrostedCutout.ios.tsx                      
+apps/mobile/src/components/ui/IconButton.android.tsx                     
+apps/mobile/src/components/ui/Menu.android.tsx                           
+apps/mobile/src/components/ui/MenuPopup.android.tsx                      
+apps/mobile/src/components/ui/NativePresentation.ios.tsx                 
+apps/mobile/src/components/ui/NativeSwitch.android.tsx                   
+apps/mobile/src/components/ui/NumberField.android.tsx                    
+apps/mobile/src/components/ui/Progress.android.tsx                       
+apps/mobile/src/components/ui/RadioIndicator.android.tsx                 
+apps/mobile/src/components/ui/ScreenHeaderButton.android.tsx             
+apps/mobile/src/components/ui/SegmentedControl.ios.tsx                   
+apps/mobile/src/components/ui/Sheet.android.tsx                          
+apps/mobile/src/components/ui/SheetHeader.android.tsx                    
+apps/mobile/src/components/ui/SliderRow.android.tsx                      
+apps/mobile/src/components/ui/SplitButton.android.tsx                    
+apps/mobile/src/components/ui/Toolbar.android.tsx                        
+apps/mobile/src/components/VideoPreviewModal.ios.tsx                     
+apps/mobile/src/features/agent-awareness/agentLiveActivity.ios.ts        
+apps/mobile/src/features/development/NativeAppBarExample.android.tsx     
+apps/mobile/src/features/home/AndroidHomeFab.android.tsx                 
+apps/mobile/src/features/home/fab-scroll.ts                              
+apps/mobile/src/features/home/HomeHeader.android.tsx                     
+apps/mobile/src/features/layout/createWorkspaceStackNavigator.android.tsx
+apps/mobile/src/features/layout/createWorkspaceStackNavigator.ios.tsx    
+apps/mobile/src/features/pull-requests/PullRequestToolbar.android.tsx    
+apps/mobile/src/features/review/useReviewHeaderPresentation.android.ts   
+apps/mobile/src/features/settings/SettingsWorkspaceLayout.android.tsx    
+apps/mobile/src/features/threads/ComposerPopoverAnchor.android.tsx       
+apps/mobile/src/features/threads/CustomSnoozeSheet.android.tsx           
+apps/mobile/src/features/threads/CustomSnoozeSheet.ios.tsx               
+apps/mobile/src/features/threads/thread-list-v2-row-appearance.android.ts
+apps/mobile/src/features/threads/ThreadGitControls.android.tsx           
+apps/mobile/src/features/threads/ThreadSettingsRows.android.tsx          
+apps/mobile/src/features/threads/useThreadHeaderOptions.android.ts       
+apps/mobile/src/features/threads/worktree-setup-sheet.android.tsx        
+apps/mobile/src/features/usage/UsageDailyChart.ios.tsx                   
+apps/mobile/src/features/workspace/AndroidWorkspaceNavigation.android.tsx
+apps/mobile/src/features/workspace/AndroidWorkspaceSidebar.android.tsx   
+apps/mobile/src/features/workspace/WorkspaceNativeTabs.ios.tsx           
+apps/mobile/src/features/workspace/WorkspaceRootScreen.android.tsx       
+apps/mobile/src/features/workspace/WorkspaceSidebarTabs.ios.tsx          
+apps/mobile/src/features/workspace/WorkspaceTabPanes.tsx                 
+apps/mobile/src/features/workspace/WorkspaceToolbar.ios.tsx              
+apps/mobile/src/lib/materialYouPalette.android.ts                        
+apps/mobile/src/lib/shareFileFromSource.ios.ts                           
+apps/mobile/src/native/AndroidHingeObserver.android.tsx                  
+apps/mobile/src/native/createV5StackNavigator.ios.tsx                    
+apps/mobile/src/native/NativeColumnContent.ios.tsx                       
+apps/mobile/src/native/NativeHeaderToolbar.android.tsx                   
+apps/mobile/src/native/NativeLayoutObserver.ios.tsx                      
+apps/mobile/src/native/NativeWorkspaceColumns.ios.tsx                    
+apps/mobile/src/native/T3ComposerEditor.android.tsx                      
+apps/mobile/src/native/T3ComposerEditor.ios.tsx                          
+apps/mobile/src/native/T3ComposerEditor.native.tsx                       
+apps/mobile/src/native/T3KeyboardCommands.native.tsx                     
+apps/mobile/src/native/V5StackHeader.ios.tsx                             
+apps/mobile/src/widgets/publishSubscriptionUsage.android.ts              
+apps/mobile/src/widgets/publishSubscriptionUsage.ios.ts                  
+apps/mobile/src/widgets/SubscriptionUsage.android.tsx                    
+apps/mobile/src/widgets/SubscriptionUsage.tsx                            
+
+
+# knip-exports.log
+ERROR: Error loading apps/mobile/metro.config.js (Third-party license generation found 1 invalid package notice:)
+ERROR: Please fix or visit https://knip.dev/reference/known-issues
+Unused exports (2)
+changeRequestsCreatedBy                 PullRequestSyncReactor  function  …estration-v2/PullRequestSyncReactor.ts:142:17
+PASTED_TEXT_ATTACHMENT_THRESHOLD_BYTES                                    packages/client-runtime/src/textPaste.ts:1:14 

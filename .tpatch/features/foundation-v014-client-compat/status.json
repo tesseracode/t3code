@@ -1,0 +1,32 @@
+{
+  "id": "foundation-v014-client-compat",
+  "slug": "foundation-v014-client-compat",
+  "title": "Restore Foundation v0.1.4 source compatibility after integrated validation: update strict RpcSession/EnvironmentRegistry mocks, format the protected TWS command test, make decoder constants and environment-attention worker private while preserving real public factories, and explicitly retire unconsumed mobile wrapper scaffolding without removing shared APIs or adding UI.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-29T17:24:11Z",
+  "updated_at": "2026-10-29T17:29:44Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-10-29T17:29:21Z",
+    "base_commit": "6c925ff7c8ad226f5535ba3464636377a292437e",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "phase1-foundation",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-10-29T17:29:40Z",
+    "passed": false,
+    "recipe_hash_at_verify": "5524869561befb4e5016d2ff64e2b979cebc6c6a310b124fcfcf41beffc0499d",
+    "patch_hash_at_verify": "9ac66594f926d0d35387331473d86d5e8059f00edbef5b773b46daf5084609a4",
+    "parent_snapshot": {
+      "phase1-foundation": "applied"
+    }
+  }
+}

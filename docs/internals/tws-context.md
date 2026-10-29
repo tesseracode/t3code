@@ -53,6 +53,8 @@ Full locator paths are available only through a single-binding provenance read,
 never aggregate shell rows.
 
 Shared client-runtime commands and query atoms reuse environment leases.
-Web/desktop configuration refreshes on an enabled view/reconnect; mobile has
-the same contract/state exports for later presentation. There is no grouping,
+Web/desktop configuration refreshes on an enabled view/reconnect. Mobile shares
+the authenticated contracts and public client-runtime factories, but does not
+instantiate TWS or attention state without a mounted owner; no mobile
+presentation or push delivery is implemented here. There is no grouping,
 tag or provider-state inference in this slice.

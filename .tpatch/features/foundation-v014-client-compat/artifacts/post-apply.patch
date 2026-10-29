@@ -1,0 +1,583 @@
+diff --git a/apps/mobile/src/state/attention.ts b/apps/mobile/src/state/attention.ts
+deleted file mode 100644
+index f2def61ed..000000000
+--- a/apps/mobile/src/state/attention.ts
++++ /dev/null
+@@ -1,4 +0,0 @@
+-import { createAttentionWorkspaceAtoms } from "@t3tools/client-runtime/state/attention";
+-import { connectionAtomRuntime } from "../connection/runtime";
+-
+-export const attentionWorkspace = createAttentionWorkspaceAtoms(connectionAtomRuntime);
+diff --git a/apps/mobile/src/state/tws.ts b/apps/mobile/src/state/tws.ts
+deleted file mode 100644
+index 4107c2b73..000000000
+--- a/apps/mobile/src/state/tws.ts
++++ /dev/null
+@@ -1,4 +0,0 @@
+-import { createTwsEnvironmentAtoms } from "@t3tools/client-runtime/state/tws";
+-import { connectionAtomRuntime } from "../connection/runtime";
+-
+-export const twsEnvironment = createTwsEnvironmentAtoms(connectionAtomRuntime);
+diff --git a/apps/server/src/tws/TwsCliDecoder.ts b/apps/server/src/tws/TwsCliDecoder.ts
+index d928ebed8..0a17b869d 100644
+--- a/apps/server/src/tws/TwsCliDecoder.ts
++++ b/apps/server/src/tws/TwsCliDecoder.ts
+@@ -1,8 +1,8 @@
+ import * as Effect from "effect/Effect";
+ import * as Schema from "effect/Schema";
+ 
+-export const TWS_SUPPORTED_CLI_VERSION = "v1.2.14";
+-export const TWS_SUPPORTED_REPORT_SCHEMA_VERSION = 1;
++const TWS_SUPPORTED_CLI_VERSION = "v1.2.14";
++const TWS_SUPPORTED_REPORT_SCHEMA_VERSION = 1;
+ 
+ export const TwsCommandKind = Schema.Literals([
+   "version",
+diff --git a/docs/internals/tws-context.md b/docs/internals/tws-context.md
+index c5c43d03b..2fa83bc88 100644
+--- a/docs/internals/tws-context.md
++++ b/docs/internals/tws-context.md
+@@ -53,6 +53,8 @@ Full locator paths are available only through a single-binding provenance read,
+ never aggregate shell rows.
+ 
+ Shared client-runtime commands and query atoms reuse environment leases.
+-Web/desktop configuration refreshes on an enabled view/reconnect; mobile has
+-the same contract/state exports for later presentation. There is no grouping,
++Web/desktop configuration refreshes on an enabled view/reconnect. Mobile shares
++the authenticated contracts and public client-runtime factories, but does not
++instantiate TWS or attention state without a mounted owner; no mobile
++presentation or push delivery is implemented here. There is no grouping,
+ tag or provider-state inference in this slice.
+diff --git a/packages/client-runtime/src/state/attention.test.ts b/packages/client-runtime/src/state/attention.test.ts
+index 2bcc09036..10f749cea 100644
+--- a/packages/client-runtime/src/state/attention.test.ts
++++ b/packages/client-runtime/src/state/attention.test.ts
+@@ -329,6 +329,7 @@ const makeSession = Effect.fn(function* (environmentId: EnvironmentId, supported
+     subscribeServerConfig: () => Stream.die("unused"),
+     ready: Effect.void,
+     probe: Effect.die("unexpected probe"),
++    inboundFrames: Effect.die("unexpected liveness observation"),
+     closed: Effect.never,
+   };
+   return { session, calls, subscriptions };
+@@ -377,7 +378,7 @@ const makeHarness = Effect.fn(function* (ids: ReadonlyArray<EnvironmentId> = [A,
+     networkStatus: yield* SubscriptionRef.make<NetworkStatus>("online"),
+     start: Effect.die("unexpected registry start"),
+     register: () => Effect.die("unexpected register"),
+-    registerPlatform: () => Effect.die("unused"),
++    assertKnownAddress: () => Effect.die("unexpected address assertion"),
+     reconcilePlatform: () => Effect.die("unused"),
+     remove: () => Effect.die("unused"),
+     removeRelayEnvironments: () => Effect.die("unused"),
+diff --git a/packages/client-runtime/src/state/attention.ts b/packages/client-runtime/src/state/attention.ts
+index 6e945f364..4360682a6 100644
+--- a/packages/client-runtime/src/state/attention.ts
++++ b/packages/client-runtime/src/state/attention.ts
+@@ -36,243 +36,240 @@ function authorizationLost(state: SupervisorConnectionState) {
+ }
+ 
+ /** Owns only a subscription; connection lifecycle belongs to the existing supervisor. */
+-export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttentionState")(
+-  function* () {
+-    const supervisor = yield* EnvironmentSupervisor;
+-    const observer = yield* EnvironmentRpcSubscriptionObserver;
+-    const environmentId = supervisor.target.environmentId;
+-    const state = yield* SubscriptionRef.make(emptyEnvironmentAttention());
+-    let sync = emptyAttentionSync();
++const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttentionState")(function* () {
++  const supervisor = yield* EnvironmentSupervisor;
++  const observer = yield* EnvironmentRpcSubscriptionObserver;
++  const environmentId = supervisor.target.environmentId;
++  const state = yield* SubscriptionRef.make(emptyEnvironmentAttention());
++  let sync = emptyAttentionSync();
+ 
+-    const clear = Effect.fn(function* (
+-      status: "unauthorized" | "unsupported" | "error",
+-      reason: string,
+-    ) {
+-      sync = emptyAttentionSync();
+-      yield* SubscriptionRef.set(state, { ...emptyEnvironmentAttention(), status, reason });
+-    });
+-    const markStale = (reason: string) =>
+-      SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
+-        ...current,
+-        status:
+-          current.status === "unauthorized"
+-            ? "unauthorized"
+-            : current.hasSnapshot
+-              ? "stale"
+-              : "loading",
+-        reason: current.status === "unauthorized" ? "unauthorized" : reason,
+-        notificationCandidates: HashMap.empty(),
+-      }));
+-    const ownsSession = Effect.fn(function* (session: RpcSession) {
+-      const active = yield* SubscriptionRef.get(supervisor.session);
+-      return (
+-        Option.isSome(active) &&
+-        active.value === session &&
+-        !authorizationLost(yield* SubscriptionRef.get(supervisor.state))
+-      );
+-    });
++  const clear = Effect.fn(function* (
++    status: "unauthorized" | "unsupported" | "error",
++    reason: string,
++  ) {
++    sync = emptyAttentionSync();
++    yield* SubscriptionRef.set(state, { ...emptyEnvironmentAttention(), status, reason });
++  });
++  const markStale = (reason: string) =>
++    SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
++      ...current,
++      status:
++        current.status === "unauthorized"
++          ? "unauthorized"
++          : current.hasSnapshot
++            ? "stale"
++            : "loading",
++      reason: current.status === "unauthorized" ? "unauthorized" : reason,
++      notificationCandidates: HashMap.empty(),
++    }));
++  const ownsSession = Effect.fn(function* (session: RpcSession) {
++    const active = yield* SubscriptionRef.get(supervisor.session);
++    return (
++      Option.isSome(active) &&
++      active.value === session &&
++      !authorizationLost(yield* SubscriptionRef.get(supervisor.state))
++    );
++  });
++
++  const consume = Effect.fn("attention.consumeSession")(function* (session: RpcSession) {
++    // The delivery token binds server-side authentication, not just environment ID.
++    // A replacement RPC session must establish a fresh fence before reusing authority.
++    sync = emptyAttentionSync();
++    yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
++      ...current,
++      status: current.hasSnapshot ? "syncing" : "loading",
++      reason: null,
++      notificationCandidates: HashMap.empty(),
++    }));
++    const config = yield* Effect.exit(session.initialConfig);
++    if (!(yield* ownsSession(session))) return;
++    if (Exit.isFailure(config)) {
++      if (Cause.hasInterrupts(config.cause)) return yield* Effect.interrupt;
++      if (
++        config.cause.reasons.some(
++          (reason) =>
++            reason._tag === "Fail" &&
++            reason.error._tag === "ConnectionBlockedError" &&
++            (reason.error.reason === "authentication" || reason.error.reason === "permission"),
++        )
++      ) {
++        yield* clear("unauthorized", "unauthorized");
++      } else {
++        yield* markStale("configuration-unavailable");
++      }
++      yield* Effect.logWarning("Attention configuration unavailable.", { environmentId });
++      return;
++    }
++    if (config.value.environment.environmentId !== environmentId) {
++      yield* clear("error", "environment-mismatch");
++      yield* Effect.logWarning("Attention configuration environment mismatch.", {
++        environmentId,
++      });
++      return;
++    }
++    if (config.value.environment.capabilities.attentionSync !== true) {
++      yield* clear("unsupported", "attention-sync-unsupported");
++      return;
++    }
+ 
+-    const consume = Effect.fn("attention.consumeSession")(function* (session: RpcSession) {
+-      // The delivery token binds server-side authentication, not just environment ID.
+-      // A replacement RPC session must establish a fresh fence before reusing authority.
+-      sync = emptyAttentionSync();
+-      yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
+-        ...current,
+-        status: current.hasSnapshot ? "syncing" : "loading",
+-        reason: null,
+-        notificationCandidates: HashMap.empty(),
+-      }));
+-      const config = yield* Effect.exit(session.initialConfig);
++    let failures = 0;
++    while (yield* ownsSession(session)) {
++      let retry = false;
++      let terminal = false;
++      const input = sync.cursor !== null && sync.status === "stale" ? { cursor: sync.cursor } : {};
++      const completeObservation = yield* observer.observe({
++        environmentId,
++        method: WS_METHODS.attentionSubscribe,
++        input,
++      });
++      // oxlint-disable-next-line t3code/no-rpc-permission-bypass -- This owned read-only stream must stay on the exact authenticated session; the observer and server scope checks still apply.
++      const result = yield* session.client[WS_METHODS.attentionSubscribe](input).pipe(
++        Stream.tap((message) =>
++          Effect.gen(function* () {
++            if (retry || terminal) return;
++            if (!(yield* ownsSession(session))) {
++              terminal = true;
++              return;
++            }
++            if (message.type !== "reset-required" && message.environmentId !== environmentId) {
++              yield* clear("error", "environment-mismatch");
++              yield* Effect.logWarning("Attention stream environment mismatch.", {
++                environmentId,
++              });
++              terminal = true;
++              return;
++            }
++            const before = sync;
++            sync = reduceAttentionStream(sync, message);
++            if (sync.status === "reset-required") {
++              retry = message.type === "reset-required" && message.reason !== "message-too-large";
++              terminal = !retry;
++              yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
++                ...current,
++                status: retry ? (current.hasSnapshot ? "stale" : "loading") : "error",
++                reason: sync.reason,
++                notificationCandidates: HashMap.empty(),
++              }));
++              yield* Effect.logWarning("Attention stream requires resynchronization.", {
++                environmentId,
++                reason: sync.reason,
++                retry,
++              });
++            } else if (sync.status === "live") {
++              yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
++                status: "live",
++                hasSnapshot: true,
++                entries: sync.entries,
++                reason: null,
++                notificationCandidates: projectAttentionNotifications(
++                  current.notificationCandidates ?? HashMap.empty(),
++                  before,
++                  sync,
++                  message,
++                ),
++              }));
++            } else if (message.type === "begin") {
++              yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
++                ...current,
++                status: current.hasSnapshot ? "syncing" : "loading",
++                reason: null,
++                notificationCandidates: HashMap.empty(),
++              }));
++            }
++          }),
++        ),
++        Stream.takeUntil(() => retry || terminal),
++        Stream.runDrain,
++        Effect.ensuring(completeObservation),
++        Effect.exit,
++      );
+       if (!(yield* ownsSession(session))) return;
+-      if (Exit.isFailure(config)) {
+-        if (Cause.hasInterrupts(config.cause)) return yield* Effect.interrupt;
+-        if (
+-          config.cause.reasons.some(
+-            (reason) =>
+-              reason._tag === "Fail" &&
+-              reason.error._tag === "ConnectionBlockedError" &&
+-              (reason.error.reason === "authentication" || reason.error.reason === "permission"),
+-          )
+-        ) {
++      if (Exit.isFailure(result)) {
++        if (Cause.hasInterrupts(result.cause)) return yield* Effect.interrupt;
++        const failuresOnly = result.cause.reasons.filter((reason) => reason._tag === "Fail");
++        const expected = failuresOnly.length === result.cause.reasons.length;
++        const unauthorized = failuresOnly.some(
++          (reason) => reason.error._tag === "EnvironmentAuthorizationError",
++        );
++        if (unauthorized) {
+           yield* clear("unauthorized", "unauthorized");
+-        } else {
+-          yield* markStale("configuration-unavailable");
++          yield* Effect.logWarning("Attention access revoked.", { environmentId });
++          return;
+         }
+-        yield* Effect.logWarning("Attention configuration unavailable.", { environmentId });
+-        return;
+-      }
+-      if (config.value.environment.environmentId !== environmentId) {
+-        yield* clear("error", "environment-mismatch");
+-        yield* Effect.logWarning("Attention configuration environment mismatch.", {
++        const transport =
++          expected &&
++          failuresOnly.length > 0 &&
++          failuresOnly.every((reason) => isRpcClientError(reason.error));
++        const unavailable =
++          expected &&
++          failuresOnly.length > 0 &&
++          failuresOnly.every(
++            (reason) =>
++              reason.error._tag === "AttentionSyncError" && reason.error.reason === "unavailable",
++          );
++        sync = attentionSyncFailed(sync, "disconnected");
++        yield* Effect.logWarning("Attention subscription failed.", {
+           environmentId,
++          transport,
++          unavailable,
+         });
++        if (transport) {
++          yield* markStale("transport-unavailable");
++          return;
++        }
++        if (!unavailable) {
++          yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
++            ...current,
++            status: "error",
++            reason: "attention-protocol-error",
++          }));
++          return;
++        }
++        yield* markStale("attention-unavailable");
++      } else if (terminal) {
+         return;
+-      }
+-      if (config.value.environment.capabilities.attentionSync !== true) {
+-        yield* clear("unsupported", "attention-sync-unsupported");
+-        return;
+-      }
+-
+-      let failures = 0;
+-      while (yield* ownsSession(session)) {
+-        let retry = false;
+-        let terminal = false;
+-        const input =
+-          sync.cursor !== null && sync.status === "stale" ? { cursor: sync.cursor } : {};
+-        const completeObservation = yield* observer.observe({
++      } else if (!retry) {
++        sync = attentionSyncFailed(sync, "disconnected");
++        yield* markStale("stream-ended");
++        yield* Effect.logWarning("Attention subscription ended before its connection.", {
+           environmentId,
+-          method: WS_METHODS.attentionSubscribe,
+-          input,
+         });
+-        // oxlint-disable-next-line t3code/no-rpc-permission-bypass -- This owned read-only stream must stay on the exact authenticated session; the observer and server scope checks still apply.
+-        const result = yield* session.client[WS_METHODS.attentionSubscribe](input).pipe(
+-          Stream.tap((message) =>
+-            Effect.gen(function* () {
+-              if (retry || terminal) return;
+-              if (!(yield* ownsSession(session))) {
+-                terminal = true;
+-                return;
+-              }
+-              if (message.type !== "reset-required" && message.environmentId !== environmentId) {
+-                yield* clear("error", "environment-mismatch");
+-                yield* Effect.logWarning("Attention stream environment mismatch.", {
+-                  environmentId,
+-                });
+-                terminal = true;
+-                return;
+-              }
+-              const before = sync;
+-              sync = reduceAttentionStream(sync, message);
+-              if (sync.status === "reset-required") {
+-                retry = message.type === "reset-required" && message.reason !== "message-too-large";
+-                terminal = !retry;
+-                yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
+-                  ...current,
+-                  status: retry ? (current.hasSnapshot ? "stale" : "loading") : "error",
+-                  reason: sync.reason,
+-                  notificationCandidates: HashMap.empty(),
+-                }));
+-                yield* Effect.logWarning("Attention stream requires resynchronization.", {
+-                  environmentId,
+-                  reason: sync.reason,
+-                  retry,
+-                });
+-              } else if (sync.status === "live") {
+-                yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
+-                  status: "live",
+-                  hasSnapshot: true,
+-                  entries: sync.entries,
+-                  reason: null,
+-                  notificationCandidates: projectAttentionNotifications(
+-                    current.notificationCandidates ?? HashMap.empty(),
+-                    before,
+-                    sync,
+-                    message,
+-                  ),
+-                }));
+-              } else if (message.type === "begin") {
+-                yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
+-                  ...current,
+-                  status: current.hasSnapshot ? "syncing" : "loading",
+-                  reason: null,
+-                  notificationCandidates: HashMap.empty(),
+-                }));
+-              }
+-            }),
+-          ),
+-          Stream.takeUntil(() => retry || terminal),
+-          Stream.runDrain,
+-          Effect.ensuring(completeObservation),
+-          Effect.exit,
+-        );
+-        if (!(yield* ownsSession(session))) return;
+-        if (Exit.isFailure(result)) {
+-          if (Cause.hasInterrupts(result.cause)) return yield* Effect.interrupt;
+-          const failuresOnly = result.cause.reasons.filter((reason) => reason._tag === "Fail");
+-          const expected = failuresOnly.length === result.cause.reasons.length;
+-          const unauthorized = failuresOnly.some(
+-            (reason) => reason.error._tag === "EnvironmentAuthorizationError",
+-          );
+-          if (unauthorized) {
+-            yield* clear("unauthorized", "unauthorized");
+-            yield* Effect.logWarning("Attention access revoked.", { environmentId });
+-            return;
+-          }
+-          const transport =
+-            expected &&
+-            failuresOnly.length > 0 &&
+-            failuresOnly.every((reason) => isRpcClientError(reason.error));
+-          const unavailable =
+-            expected &&
+-            failuresOnly.length > 0 &&
+-            failuresOnly.every(
+-              (reason) =>
+-                reason.error._tag === "AttentionSyncError" && reason.error.reason === "unavailable",
+-            );
+-          sync = attentionSyncFailed(sync, "disconnected");
+-          yield* Effect.logWarning("Attention subscription failed.", {
+-            environmentId,
+-            transport,
+-            unavailable,
+-          });
+-          if (transport) {
+-            yield* markStale("transport-unavailable");
+-            return;
+-          }
+-          if (!unavailable) {
+-            yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
+-              ...current,
+-              status: "error",
+-              reason: "attention-protocol-error",
+-            }));
+-            return;
+-          }
+-          yield* markStale("attention-unavailable");
+-        } else if (terminal) {
+-          return;
+-        } else if (!retry) {
+-          sync = attentionSyncFailed(sync, "disconnected");
+-          yield* markStale("stream-ended");
+-          yield* Effect.logWarning("Attention subscription ended before its connection.", {
+-            environmentId,
+-          });
+-        }
+-        yield* Effect.sleep([3_000, 4_000, 8_000, 16_000][Math.min(failures++, 3)]!);
+       }
+-    });
++      yield* Effect.sleep([3_000, 4_000, 8_000, 16_000][Math.min(failures++, 3)]!);
++    }
++  });
+ 
+-    yield* Stream.merge(
+-      SubscriptionRef.changes(supervisor.session),
+-      SubscriptionRef.changes(supervisor.state),
+-    ).pipe(
+-      Stream.mapEffect(() =>
+-        Effect.gen(function* () {
+-          const session = yield* SubscriptionRef.get(supervisor.session);
+-          const unauthorized = authorizationLost(yield* SubscriptionRef.get(supervisor.state));
+-          return { session: Option.getOrNull(session), unauthorized };
+-        }),
+-      ),
+-      Stream.changesWith(
+-        (left, right) => left.session === right.session && left.unauthorized === right.unauthorized,
+-      ),
+-      Stream.switchMap(({ session, unauthorized }) =>
+-        Stream.fromEffect(
+-          unauthorized
+-            ? clear("unauthorized", "unauthorized")
+-            : session !== null
+-              ? consume(session)
+-              : Effect.gen(function* () {
+-                  sync = attentionSyncFailed(sync, "disconnected");
+-                  yield* markStale("disconnected");
+-                }),
+-        ),
++  yield* Stream.merge(
++    SubscriptionRef.changes(supervisor.session),
++    SubscriptionRef.changes(supervisor.state),
++  ).pipe(
++    Stream.mapEffect(() =>
++      Effect.gen(function* () {
++        const session = yield* SubscriptionRef.get(supervisor.session);
++        const unauthorized = authorizationLost(yield* SubscriptionRef.get(supervisor.state));
++        return { session: Option.getOrNull(session), unauthorized };
++      }),
++    ),
++    Stream.changesWith(
++      (left, right) => left.session === right.session && left.unauthorized === right.unauthorized,
++    ),
++    Stream.switchMap(({ session, unauthorized }) =>
++      Stream.fromEffect(
++        unauthorized
++          ? clear("unauthorized", "unauthorized")
++          : session !== null
++            ? consume(session)
++            : Effect.gen(function* () {
++                sync = attentionSyncFailed(sync, "disconnected");
++                yield* markStale("disconnected");
++              }),
+       ),
+-      Stream.runDrain,
+-      Effect.forkScoped,
+-    );
+-    return state;
+-  },
+-);
++    ),
++    Stream.runDrain,
++    Effect.forkScoped,
++  );
++  return state;
++});
+ 
+ const EMPTY_WORKSPACE: AttentionWorkspaceState = { isReady: false, environments: new Map() };
+ 
+diff --git a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts
+index 5e476d393..9eb7c3b07 100644
+--- a/packages/client-runtime/src/state/commandPermissions.test.ts
++++ b/packages/client-runtime/src/state/commandPermissions.test.ts
+@@ -147,23 +147,21 @@ describe("command permissions", () => {
+     WS_METHODS.scheduledTasksDelete,
+     ORCHESTRATION_V2_WS_METHODS.stopWorkflow,
+     WS_METHODS.twsSetContext,
+-  ])(
+-    "uses the target grant for both availability and execution of %s",
+-    (method) =>
+-      Effect.scoped(
+-        Effect.gen(function* () {
+-          const registry = yield* setup;
+-          const permissions = createCommandPermissions(runtime, method);
+-          registry.set(sessions(env), AsyncResult.success(grant(true)));
+-          expect(registry.get(permissions.permissionAtom(env))).toBe(true);
+-          expect(permissions.permissionAtom(env)).toBe(permissions.permissionAtom(env));
+-          yield* permissions.authorize(registry, env);
+-          registry.set(sessions(other), AsyncResult.success(grant(false)));
+-          expect(registry.get(permissions.permissionAtom(other))).toBe(false);
+-          const denied = yield* permissions.authorize(registry, other).pipe(Effect.flip);
+-          expect(denied._tag).toBe("EnvironmentAuthorizationError");
+-        }),
+-      ),
++  ])("uses the target grant for both availability and execution of %s", (method) =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const registry = yield* setup;
++        const permissions = createCommandPermissions(runtime, method);
++        registry.set(sessions(env), AsyncResult.success(grant(true)));
++        expect(registry.get(permissions.permissionAtom(env))).toBe(true);
++        expect(permissions.permissionAtom(env)).toBe(permissions.permissionAtom(env));
++        yield* permissions.authorize(registry, env);
++        registry.set(sessions(other), AsyncResult.success(grant(false)));
++        expect(registry.get(permissions.permissionAtom(other))).toBe(false);
++        const denied = yield* permissions.authorize(registry, other).pipe(Effect.flip);
++        expect(denied._tag).toBe("EnvironmentAuthorizationError");
++      }),
++    ),
+   );
+   it.effect("waits for an initial grant", () =>
+     Effect.scoped(

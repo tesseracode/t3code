@@ -1,0 +1,9 @@
+{
+  "slug": "foundation-v014-client-compat",
+  "completed_at": "2026-10-29T17:29:21Z",
+  "base_commit": "6c925ff7c8ad226f5535ba3464636377a292437e",
+  "has_patch": false,
+  "operator_notes": "Complete seven-path cohesive compatibility root; five preimage-bearing recipe writes plus two explicitly attested supported manual removals; preserve complete existing parent canonicals.",
+  "validation_status": "needs_review",
+  "validation_notes": "40 focused tests, client-runtime/server typechecks, scoped format/lint pass. Scoped Knip attempts blocked by missing integrated license context and unrelated narrowed-workspace findings; primary will rerun integrated helper. No app/dev server or repo-wide check."
+}

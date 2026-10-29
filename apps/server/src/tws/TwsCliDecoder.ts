@@ -1,8 +1,8 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-export const TWS_SUPPORTED_CLI_VERSION = "v1.2.14";
-export const TWS_SUPPORTED_REPORT_SCHEMA_VERSION = 1;
+const TWS_SUPPORTED_CLI_VERSION = "v1.2.14";
+const TWS_SUPPORTED_REPORT_SCHEMA_VERSION = 1;
 
 export const TwsCommandKind = Schema.Literals([
   "version",
