@@ -1,0 +1,49 @@
+{
+  "kind": "actual-git-index-replay-byte-proof-not-runtime-tests",
+  "executed_at": "2026-10-29T16:58:38.744132+00:00",
+  "roots": [
+    {
+      "feature": "phase1-foundation",
+      "base_commit": "8605454d5cba4ab065f43fa694e62868fe093e31",
+      "landing_commit": "c36a114404f0dcd90e0ec39d410d1043d12547b1",
+      "patch_sha256": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+      "recipe_sha256": "4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e",
+      "product_paths": 93,
+      "exact_committed_diff": true,
+      "all_recipe_contents_and_baseline_preimages_exact": true,
+      "git_cached_replay_product_tree_equal": true,
+      "replay_tree": "ce987b65709f76ca829010e0b691c2c5402934e7",
+      "commands": [
+        "git diff --binary 8605454d5cba4ab065f43fa694e62868fe093e31 c36a114404f0dcd90e0ec39d410d1043d12547b1 -- apps packages docs",
+        "git read-tree 8605454d5cba4ab065f43fa694e62868fe093e31",
+        "git apply --cached .tpatch/features/phase1-foundation/artifacts/post-apply.patch",
+        "git write-tree",
+        "git ls-tree <replay-tree> -- apps packages docs",
+        "git ls-tree c36a114404f0dcd90e0ec39d410d1043d12547b1 -- apps packages docs"
+      ]
+    },
+    {
+      "feature": "attention-notifications",
+      "base_commit": "4de99f4a515055662ccd5d59f6f705b2ff973bd4",
+      "landing_commit": "fe1c5d9a11c206c5aab6171edec002810b63c4dd",
+      "patch_sha256": "6feb99da51a9427557a215cfcfcde7a8b8f7de07489c01d724556f2876e860d1",
+      "recipe_sha256": "8d9797d8e72e39081b7a66612c42f8813f13cd09f93a72317349ec2678153c52",
+      "product_paths": 29,
+      "exact_committed_diff": true,
+      "all_recipe_contents_and_baseline_preimages_exact": true,
+      "git_cached_replay_product_tree_equal": true,
+      "replay_tree": "13219e1fab3a836969c09a149edb0ac33e522bb8",
+      "commands": [
+        "git diff --binary 4de99f4a515055662ccd5d59f6f705b2ff973bd4 fe1c5d9a11c206c5aab6171edec002810b63c4dd -- apps packages docs",
+        "git read-tree 4de99f4a515055662ccd5d59f6f705b2ff973bd4",
+        "git apply --cached .tpatch/features/attention-notifications/artifacts/post-apply.patch",
+        "git write-tree",
+        "git ls-tree <replay-tree> -- apps packages docs",
+        "git ls-tree fe1c5d9a11c206c5aab6171edec002810b63c4dd -- apps packages docs"
+      ]
+    }
+  ],
+  "sequential_combined_replay_product_tree_equal": true,
+  "combined_replay_tree": "34e3b7c26768c7cda0177fe95bf4506129fd71a8",
+  "validation_limits": "No product tests, typechecks, builds, live provider turns, servers, browsers or simulators executed. Does not override failed tpatch structural verifier or platform gates."
+}
