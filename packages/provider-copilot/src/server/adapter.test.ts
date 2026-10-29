@@ -356,6 +356,122 @@ describe("native Copilot V2", () => {
       ),
   );
 
+  it.effect.each(["applied", "already-resolved", "transport-error"] as const)(
+    "keeps V2-owned answers intact when idle precedes a %s permission receipt",
+    (outcome) =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const { runtime, start, drain, emitted, takeEvent } = yield* setup(fake);
+          yield* start();
+          fake.emit("permission.requested", {
+            requestId: "native-idle-race",
+            permissionRequest: { kind: "read", path: "/workspace/data", intention: "Read input" },
+          });
+          const request = (yield* drain()).runtimeRequests[0]!;
+          yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "approval_request" &&
+              event.turnItem.requestId === request.id,
+          );
+          const called = promiseGate();
+          const receipt = promiseGate();
+          fake.setPermissionResponse(async () => {
+            called.resolve();
+            await receipt.promise;
+            if (outcome === "transport-error") throw new Error("Permission transport failed.");
+            return { success: outcome === "applied" };
+          });
+          const observedBeforeReply = emitted.length;
+          const replying = yield* Effect.forkChild(
+            runtime
+              .respondToRuntimeRequest({
+                requestId: request.id,
+                decision: "accept",
+              })
+              .pipe(Effect.exit),
+          );
+          yield* Effect.promise(() => called.promise);
+          const duplicate = yield* Effect.forkChild(
+            runtime
+              .respondToRuntimeRequest({
+                requestId: request.id,
+                decision: "accept",
+              })
+              .pipe(Effect.exit),
+          );
+          const conflicting = yield* Effect.forkChild(
+            runtime
+              .respondToRuntimeRequest({
+                requestId: request.id,
+                decision: "decline",
+              })
+              .pipe(Effect.exit),
+          );
+          fake.emit("permission.requested", {
+            requestId: "native-unanswered",
+            permissionRequest: { kind: "read", path: "/workspace/other", intention: "Read later" },
+          });
+          const duringDelivery = yield* drain();
+          fake.emit("session.idle");
+          yield* takeEvent((event) => event.type === "turn.terminal");
+          assert.equal(
+            emitted
+              .slice(observedBeforeReply)
+              .filter(
+                (event) =>
+                  (event.type === "runtime_request.updated" &&
+                    event.runtimeRequest.id === request.id) ||
+                  (event.type === "node.updated" && event.node.runtimeRequestId === request.id) ||
+                  (event.type === "turn_item.updated" &&
+                    (event.turnItem.type === "approval_request" ||
+                      event.turnItem.type === "user_input_request") &&
+                    event.turnItem.requestId === request.id),
+              ).length,
+            0,
+          );
+          assert.deepEqual(
+            duringDelivery.runtimeRequests.map((entry) => entry.nativeRequestRef?.nativeId),
+            ["native-unanswered"],
+          );
+          assert.isTrue(
+            emitted
+              .slice(observedBeforeReply)
+              .some(
+                (event) =>
+                  event.type === "runtime_request.updated" &&
+                  event.runtimeRequest.nativeRequestRef?.nativeId === "native-unanswered" &&
+                  event.runtimeRequest.status === "cancelled",
+              ),
+          );
+          assert.equal((yield* drain()).runtimeRequests.length, 0);
+          assert.isUndefined(replying.pollUnsafe());
+          receipt.resolve();
+          const firstResult = yield* Fiber.join(replying);
+          const duplicateResult = yield* Fiber.join(duplicate);
+          assert.equal(Exit.isSuccess(firstResult), outcome === "applied");
+          assert.equal(Exit.isSuccess(duplicateResult), outcome === "applied");
+          assert.isTrue(Exit.isFailure(yield* Fiber.join(conflicting)));
+          assert.equal(fake.permissionReplies.length, 1);
+          assert.equal((yield* drain()).runtimeRequests.length, 0);
+          if (outcome !== "applied") {
+            assert.isTrue(
+              Exit.isFailure(
+                yield* runtime
+                  .respondToRuntimeRequest({
+                    requestId: request.id,
+                    decision: "accept",
+                  })
+                  .pipe(Effect.exit),
+              ),
+            );
+            assert.equal(fake.permissionReplies.length, 2);
+          }
+        }),
+      ),
+  );
+
   it.effect(
     "does not publish empty tool-only assistant rows and preserves streamed whitespace",
     () =>

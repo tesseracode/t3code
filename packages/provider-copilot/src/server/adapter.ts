@@ -115,6 +115,9 @@ interface ActiveTurn {
 type PendingResponse = {
   readonly owner: ActiveTurn;
   readonly nativePermissionId?: string;
+  responseOwnedByV2?: true;
+  permissionReplyKey?: string;
+  permissionReplyReceipt?: Deferred.Deferred<void, ProviderAdapter.ProviderAdapterV2Error>;
   readonly request: OrchestrationV2RuntimeRequest;
   readonly item: OrchestrationV2TurnItem;
   readonly node: OrchestrationV2ExecutionNode;
@@ -282,7 +285,9 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       });
       const settlePending = Effect.fnUntraced(function* () {
         const now = yield* DateTime.now;
-        for (const entry of pending.values()) {
+        for (const [requestId, entry] of pending) {
+          if (entry.responseOwnedByV2) continue;
+          pending.delete(requestId);
           entry.cancel();
           entry.owner.items.set(entry.request.id, {
             ...entry.item,
@@ -307,7 +312,6 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             node: { ...entry.node, status: "cancelled", completedAt: now },
           });
         }
-        pending.clear();
       });
       yield* Effect.addFinalizer(() =>
         Effect.gen(function* () {
@@ -377,6 +381,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         yield* settlePending();
         for (const [key, item] of turn.items) {
           if (item.type === "subagent") continue;
+          if (
+            (item.type === "approval_request" || item.type === "user_input_request") &&
+            pending.get(item.requestId)?.responseOwnedByV2
+          )
+            continue;
           if (item.status !== "running" && item.status !== "pending") continue;
           yield* putItem(turn, key, {
             ...item,
@@ -1480,28 +1489,52 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                 ),
               });
             }
-            const now = yield* DateTime.now;
-            if (entry.nativePermissionId) {
-              yield* decidePermission(
-                entry.nativePermissionId,
-                response.decision === "accept"
-                  ? { kind: "approve-once" }
-                  : {
-                      kind: "reject",
-                      ...(response.feedback ? { feedback: response.feedback } : {}),
-                    },
-              );
-              confirmedPermissionReplies.set(response.requestId, permissionReplyKey);
+            if (entry.responseOwnedByV2) {
+              if (!entry.nativePermissionId || entry.permissionReplyKey !== permissionReplyKey) {
+                return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({
+                  driver: COPILOT_DRIVER,
+                  requestId: response.requestId,
+                });
+              }
+              if (entry.permissionReplyReceipt)
+                return yield* Deferred.await(entry.permissionReplyReceipt);
             }
-            pending.delete(response.requestId);
-            entry.owner.items.set(response.requestId, {
-              ...entry.item,
-              status: "completed",
-              completedAt: now,
-              updatedAt: now,
-            });
-            // The decider owns resolution and delivery state; callback handoff is the last operation.
-            if (!entry.nativePermissionId) entry.resolve(response);
+            // V2 already recorded the answer. Ownership must survive even a failed native receipt.
+            entry.responseOwnedByV2 = true;
+            const receipt = Deferred.makeUnsafe<void, ProviderAdapter.ProviderAdapterV2Error>();
+            if (entry.nativePermissionId) {
+              entry.permissionReplyKey = permissionReplyKey;
+              entry.permissionReplyReceipt = receipt;
+            }
+            return yield* Effect.gen(function* () {
+              const now = yield* DateTime.now;
+              if (entry.nativePermissionId) {
+                yield* decidePermission(
+                  entry.nativePermissionId,
+                  response.decision === "accept"
+                    ? { kind: "approve-once" }
+                    : {
+                        kind: "reject",
+                        ...(response.feedback ? { feedback: response.feedback } : {}),
+                      },
+                );
+                confirmedPermissionReplies.set(response.requestId, permissionReplyKey);
+              }
+              pending.delete(response.requestId);
+              entry.owner.items.set(response.requestId, {
+                ...entry.item,
+                status: "completed",
+                completedAt: now,
+                updatedAt: now,
+              });
+              // The decider owns resolution and delivery state; callback handoff is the last operation.
+              if (!entry.nativePermissionId) entry.resolve(response);
+            }).pipe(
+              Effect.onExit((exit) => {
+                delete entry.permissionReplyReceipt;
+                return Deferred.done(receipt, exit);
+              }),
+            );
           },
         ),
         readThreadSnapshot: Effect.fn("CopilotAdapter.readThreadSnapshot")(function* () {
@@ -1515,7 +1548,9 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             providerThread,
             providerTurns: [...turns.values()],
             messages: [...messages.values()],
-            runtimeRequests: [...pending.values()].map((entry) => entry.request),
+            runtimeRequests: [...pending.values()]
+              .filter((entry) => !entry.responseOwnedByV2)
+              .map((entry) => entry.request),
           };
         }),
         rollbackThread: (rollback) =>
