@@ -19,7 +19,7 @@ index 000000000..4107c2b73
 +
 +export const twsEnvironment = createTwsEnvironmentAtoms(connectionAtomRuntime);
 diff --git a/apps/server/src/auth/RpcAuthorization.ts b/apps/server/src/auth/RpcAuthorization.ts
-index 5cbc70925..258fffc03 100644
+index a1b05c32a..e3473824c 100644
 --- a/apps/server/src/auth/RpcAuthorization.ts
 +++ b/apps/server/src/auth/RpcAuthorization.ts
 @@ -38,6 +38,11 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
@@ -35,7 +35,7 @@ index 5cbc70925..258fffc03 100644
    [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: AuthOrchestrationOperateScope,
    [ORCHESTRATION_V2_WS_METHODS.getWorkflowScript]: AuthOrchestrationReadScope,
 diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts
-index 4678aff95..1507fc26e 100644
+index 2b9b1f95b..9ddd718ab 100644
 --- a/apps/server/src/environment/ServerEnvironment.ts
 +++ b/apps/server/src/environment/ServerEnvironment.ts
 @@ -214,6 +214,8 @@ export const make = Effect.gen(function* () {
@@ -48,7 +48,7 @@ index 4678aff95..1507fc26e 100644
        connectionProbe: true,
        attachmentUploads: true,
 diff --git a/apps/server/src/observability/RpcInstrumentation.ts b/apps/server/src/observability/RpcInstrumentation.ts
-index 4a23878e4..5a84f6338 100644
+index fcbbde88f..370d2864c 100644
 --- a/apps/server/src/observability/RpcInstrumentation.ts
 +++ b/apps/server/src/observability/RpcInstrumentation.ts
 @@ -11,6 +11,12 @@ type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
@@ -657,10 +657,10 @@ index 000000000..f2bb3a34c
 +    }),
 +  );
 diff --git a/apps/server/src/orchestration-v2/EffectWorker.test.ts b/apps/server/src/orchestration-v2/EffectWorker.test.ts
-index e2c957b07..18b64a252 100644
+index cb1309303..710b87142 100644
 --- a/apps/server/src/orchestration-v2/EffectWorker.test.ts
 +++ b/apps/server/src/orchestration-v2/EffectWorker.test.ts
-@@ -273,6 +273,38 @@ it.effect.each([
+@@ -272,6 +272,38 @@ it.effect.each([
    }),
  );
  
@@ -700,7 +700,7 @@ index e2c957b07..18b64a252 100644
    Effect.gen(function* () {
      const now = yield* DateTime.now;
 diff --git a/apps/server/src/orchestration-v2/EffectWorker.ts b/apps/server/src/orchestration-v2/EffectWorker.ts
-index 6c0feea35..d610d52a4 100644
+index d174db2fb..d282725f8 100644
 --- a/apps/server/src/orchestration-v2/EffectWorker.ts
 +++ b/apps/server/src/orchestration-v2/EffectWorker.ts
 @@ -388,6 +388,14 @@ export const layerExecutor: Layer.Layer<
@@ -719,7 +719,7 @@ index 6c0feea35..d610d52a4 100644
                    willRetry || Cause.hasInterruptsOnly(cause)
                      ? Effect.void
 diff --git a/apps/server/src/orchestration-v2/EventSink.ts b/apps/server/src/orchestration-v2/EventSink.ts
-index af8fa5a95..a796f8111 100644
+index b210d3c98..cd25dca9f 100644
 --- a/apps/server/src/orchestration-v2/EventSink.ts
 +++ b/apps/server/src/orchestration-v2/EventSink.ts
 @@ -34,6 +34,7 @@ import * as EventStore from "./EventStore.ts";
@@ -730,7 +730,7 @@ index af8fa5a95..a796f8111 100644
  
  export class EventSinkWriteError extends Schema.TaggedError<EventSinkWriteError>()(
    "EventSinkWriteError",
-@@ -218,6 +219,7 @@ const layerBase: Layer.Layer<
+@@ -220,6 +221,7 @@ const layerBase: Layer.Layer<
      const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
      const projectStore = yield* ProjectStore.ProjectStoreV2;
      const turnItemPositions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
@@ -738,7 +738,7 @@ index af8fa5a95..a796f8111 100644
      const liveEvents = yield* PubSub.unbounded<OrchestrationV2StoredEvent>();
      const liveEventsByType = new Map<
        OrchestrationV2DomainEvent["type"],
-@@ -353,9 +355,14 @@ const layerBase: Layer.Layer<
+@@ -355,9 +357,14 @@ const layerBase: Layer.Layer<
      const applyStoredEvents =
        /* This helper runs for individual orchestration events; the enclosing operation owns the span. */
        Effect.fnUntraced(function* (storedEvents: ReadonlyArray<OrchestrationV2StoredEvent>) {
@@ -756,7 +756,7 @@ index af8fa5a95..a796f8111 100644
          const sequence = storedEvents.at(-1)?.sequence;
          if (sequence !== undefined) {
            const now = DateTime.formatIso(yield* DateTime.now);
-@@ -754,6 +761,7 @@ const layerBase: Layer.Layer<
+@@ -764,6 +771,7 @@ const layerBase: Layer.Layer<
              }
              const event = yield* eventStore.appendProjectEvent(input.event);
              yield* projectStore.apply(event);
@@ -764,7 +764,7 @@ index af8fa5a95..a796f8111 100644
              const receipt = { ...reserved, resultSequence: event.sequence };
              yield* commandReceipts.upsert(receipt);
              return { receipt, event };
-@@ -988,7 +996,7 @@ const layerBase: Layer.Layer<
+@@ -998,7 +1006,7 @@ const layerBase: Layer.Layer<
          ),
      } satisfies EventSinkV2Shape);
    }),
@@ -1884,10 +1884,10 @@ index 000000000..60067234a
 +  ),
 +);
 diff --git a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts
-index 0c6ca268f..b66c611a4 100644
+index 91acb8816..bd5c1b23b 100644
 --- a/apps/server/src/orchestration-v2/Orchestrator.ts
 +++ b/apps/server/src/orchestration-v2/Orchestrator.ts
-@@ -507,6 +507,7 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
+@@ -506,6 +506,7 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
      case "queued-run.edit":
      case "runtime-request.respond":
      case "runtime-request.delivery.fail":
@@ -1895,7 +1895,7 @@ index 0c6ca268f..b66c611a4 100644
      case "thread.user-input.dismiss":
      case "checkpoint.rollback":
      case "checkpoint.rollback.fail":
-@@ -7931,6 +7932,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+@@ -8555,6 +8556,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
        const now = yield* DateTime.now;
        const resolvedRequest = {
          ...runtimeRequest,
@@ -1904,7 +1904,7 @@ index 0c6ca268f..b66c611a4 100644
          status: "resolved" as const,
          resolvedAt: now,
          ...(command.decision === undefined ? {} : { decision: command.decision }),
-@@ -8176,16 +8179,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+@@ -8766,16 +8769,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
    );
  
    /**
@@ -1926,7 +1926,7 @@ index 0c6ca268f..b66c611a4 100644
      >,
      events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
    ) {
-@@ -8193,11 +8195,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+@@ -8783,11 +8785,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
        .getThread(command.threadId)
        .pipe(mapDispatchError(command));
      if (thread.deletedAt !== null) return;
@@ -1959,7 +1959,7 @@ index 0c6ca268f..b66c611a4 100644
      yield* emit(
        events,
        command,
-@@ -12061,7 +12082,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+@@ -12676,7 +12697,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
          yield* dispatchCheckpointRollbackFail(command, events);
          break;
        case "runtime-request.delivery.fail":
@@ -5504,7 +5504,7 @@ index 67f238b74..263a5d752 100644
    );
  });
 diff --git a/apps/server/src/persistence/Migrations.ts b/apps/server/src/persistence/Migrations.ts
-index f85cb14e3..08d724a9b 100644
+index cc395406e..cce395fc5 100644
 --- a/apps/server/src/persistence/Migrations.ts
 +++ b/apps/server/src/persistence/Migrations.ts
 @@ -2,6 +2,7 @@ import * as Migrator from "effect/sql/Migrator";
@@ -5515,7 +5515,7 @@ index f85cb14e3..08d724a9b 100644
  
  import Migration0001 from "./Migrations/001_OrchestrationEvents.ts";
  import Migration0002 from "./Migrations/002_OrchestrationCommandReceipts.ts";
-@@ -201,40 +202,62 @@ export interface RunMigrationsOptions {
+@@ -207,40 +208,62 @@ export interface RunMigrationsOptions {
  export const runMigrations = Effect.fn("runMigrations")(function* ({
    toMigrationInclusive,
  }: RunMigrationsOptions = {}) {
@@ -5889,10 +5889,10 @@ index 000000000..c076672a8
 +  TwsBindingRepositoryShape
 +>()("t3/persistence/Services/TwsBindings/TwsBindingRepository") {}
 diff --git a/apps/server/src/server.ts b/apps/server/src/server.ts
-index f461a9918..8e50569c7 100644
+index 741fc7310..70cda25d6 100644
 --- a/apps/server/src/server.ts
 +++ b/apps/server/src/server.ts
-@@ -179,6 +179,9 @@ import * as CursorUsageAccounts from "@t3tools/provider-cursor/server/CursorUsag
+@@ -186,6 +186,9 @@ import * as CursorUsageAccounts from "@t3tools/provider-cursor/server/CursorUsag
  import * as UsageService from "./usage/UsageService.ts";
  import * as CodexUsageHistory from "./usage/CodexUsageHistory.ts";
  import * as RuntimeLayer from "./orchestration-v2/runtimeLayer.ts";
@@ -5902,7 +5902,7 @@ index f461a9918..8e50569c7 100644
  import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
  import * as ThreadSearch from "./orchestration-v2/ThreadSearch.ts";
  import * as ThreadSettlementService from "./orchestration-v2/ThreadSettlementService.ts";
-@@ -680,7 +683,12 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
+@@ -693,7 +696,12 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
    ),
  );
  
@@ -10054,10 +10054,10 @@ index 000000000..9c1031419
 +  Layer.provide(ProcessRunnerLive),
 +);
 diff --git a/apps/server/src/ws.test.ts b/apps/server/src/ws.test.ts
-index f0d2e104c..d5eb71f4e 100644
+index ac60becc2..1097a0692 100644
 --- a/apps/server/src/ws.test.ts
 +++ b/apps/server/src/ws.test.ts
-@@ -438,6 +438,8 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
+@@ -513,6 +513,8 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
    Layer.mock(RelayClient.RelayClient)({}),
    Layer.mock(RepositoryIdentityResolver.RepositoryIdentityResolver)({}),
    Layer.mock(ResourceTelemetry.ResourceTelemetry)({}),
@@ -10066,14 +10066,14 @@ index f0d2e104c..d5eb71f4e 100644
    Layer.mock(ReviewService.ReviewService)({}),
    Layer.mock(ScheduledTasks.ScheduledTaskService)({}),
    Layer.mock(SecretRequests.SecretRequests)({}),
-@@ -887,3 +889,5 @@ it.effect("thread resume across compacted history keeps message order and final
+@@ -959,3 +961,5 @@ it.effect("thread resume across compacted history keeps message order and final
      ),
    ),
  );
 +import * as AttentionSync from "./orchestration-v2/AttentionSync.ts";
 +import { TwsContextService } from "./tws/TwsContextService.ts";
 diff --git a/apps/server/src/ws.ts b/apps/server/src/ws.ts
-index e5696e6f5..a6aab4543 100644
+index 34eb11815..d70acbb01 100644
 --- a/apps/server/src/ws.ts
 +++ b/apps/server/src/ws.ts
 @@ -1,4 +1,6 @@
@@ -10083,7 +10083,7 @@ index e5696e6f5..a6aab4543 100644
  import * as Context from "effect/Context";
  import * as Crypto from "effect/Crypto";
  import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
-@@ -1239,6 +1241,8 @@ export const layerWsRpc = (
+@@ -1224,6 +1226,8 @@ export const layerWsRpc = (
    Layer.effectContext(
      Effect.gen(function* () {
        const currentSessionId = currentSession.sessionId;
@@ -10092,7 +10092,7 @@ index e5696e6f5..a6aab4543 100644
        const sql = yield* SqlClient.SqlClient;
        const threadManagement = yield* ThreadManagementService.ThreadManagementService;
        const intakeContext = yield* Effect.context<
-@@ -1902,6 +1906,12 @@ export const layerWsRpc = (
+@@ -1859,6 +1863,12 @@ export const layerWsRpc = (
        });
  
        const handlers = ServerWsRpcGroup.of({
@@ -10105,7 +10105,7 @@ index e5696e6f5..a6aab4543 100644
          [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command) =>
            Effect.annotateCurrentSpan({
              "orchestration_v2.command_id": command.commandId,
-@@ -2549,6 +2559,17 @@ export const layerWsRpc = (
+@@ -2508,6 +2518,17 @@ export const layerWsRpc = (
              const settings = yield* providerInstanceMutation === undefined
                ? serverSettings.updateSettings(nextPatch)
                : serverSettings.updateProviderInstance(providerInstanceMutation, nextPatch);
@@ -10125,7 +10125,7 @@ index e5696e6f5..a6aab4543 100644
          [WS_METHODS.serverDiscoverSourceControl]: (_input) => sourceControlDiscovery.discover,
 diff --git a/apps/web/src/components/settings/TwsIntegrationSettings.tsx b/apps/web/src/components/settings/TwsIntegrationSettings.tsx
 new file mode 100644
-index 000000000..bf724d0a7
+index 000000000..3f5c35ced
 --- /dev/null
 +++ b/apps/web/src/components/settings/TwsIntegrationSettings.tsx
 @@ -0,0 +1,120 @@
@@ -10150,7 +10150,7 @@ index 000000000..bf724d0a7
 +  const [pending, setPending] = useState(false);
 +  const [observation, setObservation] = useState<TwsIntegrationState | null>(null);
 +  const [failed, setFailed] = useState(false);
-+  // oxlint-disable-next-line t3code/react-effect-budget -- Reconnecting an enabled environment must refresh its external observation even without a settings interaction.
++  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Reconnecting an enabled environment refreshes its external TWS observation.
 +  useEffect(() => {
 +    if (!enabled || !supported || !connected) return;
 +    let active = true;
@@ -10270,10 +10270,10 @@ index a771e92ce..7f80225ce 100644
    );
  }
 diff --git a/apps/web/src/components/settings/settingsSearch.ts b/apps/web/src/components/settings/settingsSearch.ts
-index 1bd8f1bb0..0bfa5b94f 100644
+index 36f63bf64..c4339fe83 100644
 --- a/apps/web/src/components/settings/settingsSearch.ts
 +++ b/apps/web/src/components/settings/settingsSearch.ts
-@@ -581,6 +581,13 @@ export const SETTINGS_SEARCH_ITEMS = [
+@@ -611,6 +611,13 @@ export const SETTINGS_SEARCH_ITEMS = [
      scope: "project-defaults",
      searchTerms: ["git submodule init recursive top-level none worktree t3.json"],
    },
@@ -10480,10 +10480,10 @@ index 000000000..80eb219bb
 +The integration supplies context for later workspace grouping and tag surfaces.
 +TWS's reported agent state is not used as coding-agent activity or attention.
 diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json
-index 03779b627..07e5e012d 100644
+index 0d38301b5..38c977026 100644
 --- a/packages/client-runtime/package.json
 +++ b/packages/client-runtime/package.json
-@@ -35,6 +35,10 @@
+@@ -43,6 +43,10 @@
        "types": "./src/worktreeSetup.ts",
        "default": "./src/worktreeSetup.ts"
      },
@@ -10494,7 +10494,7 @@ index 03779b627..07e5e012d 100644
      "./load-balancing": {
        "types": "./src/load-balancing.ts",
        "default": "./src/load-balancing.ts"
-@@ -131,6 +135,10 @@
+@@ -143,6 +147,10 @@
        "types": "./src/state/auth.ts",
        "default": "./src/state/auth.ts"
      },
@@ -10505,7 +10505,7 @@ index 03779b627..07e5e012d 100644
      "./state/assets": {
        "types": "./src/state/assets.ts",
        "default": "./src/state/assets.ts"
-@@ -287,6 +295,10 @@
+@@ -307,6 +315,10 @@
        "types": "./src/state/subagentDisplay.ts",
        "default": "./src/state/subagentDisplay.ts"
      },
@@ -10847,7 +10847,7 @@ index 000000000..4246313fc
 +  };
 +}
 diff --git a/packages/client-runtime/src/rpc/client.ts b/packages/client-runtime/src/rpc/client.ts
-index c364b3448..a59e5bdca 100644
+index 2832a4e23..695d1dbbc 100644
 --- a/packages/client-runtime/src/rpc/client.ts
 +++ b/packages/client-runtime/src/rpc/client.ts
 @@ -49,6 +49,7 @@ export type EnvironmentRpcTag = keyof WsRpcProtocolClient & string;
@@ -10855,9 +10855,9 @@ index c364b3448..a59e5bdca 100644
  
  export type EnvironmentSubscriptionRpcTag =
 +  | typeof WS_METHODS.attentionSubscribe
-   | typeof WS_METHODS.codexAuthCallbackSubscribe
    | typeof WS_METHODS.providerAuthSubscribe
    | typeof WS_METHODS.providerInstallSubscribe
+   | typeof ORCHESTRATION_V2_WS_METHODS.subscribeShell
 diff --git a/packages/client-runtime/src/state/attention.test.ts b/packages/client-runtime/src/state/attention.test.ts
 new file mode 100644
 index 000000000..2bcc09036
@@ -12466,6 +12466,23 @@ index 000000000..b7bcefbd0
 +  }
 +  return { hints, rejectedCount };
 +}
+diff --git a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts
+index adfad46a4..5e476d393 100644
+--- a/packages/client-runtime/src/state/commandPermissions.test.ts
++++ b/packages/client-runtime/src/state/commandPermissions.test.ts
+@@ -143,7 +143,11 @@ describe("command permissions", () => {
+     ),
+   );
+ 
+-  it.effect.each([WS_METHODS.scheduledTasksDelete, ORCHESTRATION_V2_WS_METHODS.stopWorkflow])(
++  it.effect.each([
++    WS_METHODS.scheduledTasksDelete,
++    ORCHESTRATION_V2_WS_METHODS.stopWorkflow,
++    WS_METHODS.twsSetContext,
++  ])(
+     "uses the target grant for both availability and execution of %s",
+     (method) =>
+       Effect.scoped(
 diff --git a/packages/client-runtime/src/state/tws.ts b/packages/client-runtime/src/state/tws.ts
 new file mode 100644
 index 000000000..167e1ec3c
@@ -12881,19 +12898,19 @@ index 000000000..128e84686
 +  },
 +) {}
 diff --git a/packages/contracts/src/clientRpcPermissions.ts b/packages/contracts/src/clientRpcPermissions.ts
-index 3fda40a04..4823ac470 100644
+index 3cd80feea..84c08e785 100644
 --- a/packages/contracts/src/clientRpcPermissions.ts
 +++ b/packages/contracts/src/clientRpcPermissions.ts
-@@ -14,6 +14,7 @@ import { WS_METHODS } from "./rpc.ts";
+@@ -15,6 +15,7 @@ import { WS_METHODS } from "./rpc.ts";
  
  /** Incremental client enforcement; the server still authorizes every request. */
  export const CLIENT_GUARDED_RPC_SCOPES = {
 +  [WS_METHODS.twsSetContext]: AuthOrchestrationOperateScope,
    [WS_METHODS.previewClose]: AuthPreviewOperateScope,
-   [WS_METHODS.serverRunStorageCleanup]: AuthSettingsWriteScope,
-   [WS_METHODS.serverCheckOtlpEndpoint]: AuthSettingsWriteScope,
+   // Stopping a server signals its processes, as closing a terminal does.
+   [WS_METHODS.previewStopLocalServer]: AuthTerminalOperateScope,
 diff --git a/packages/contracts/src/environment.ts b/packages/contracts/src/environment.ts
-index 7b47d8820..1cd305b85 100644
+index a65a91e0d..8e0a32444 100644
 --- a/packages/contracts/src/environment.ts
 +++ b/packages/contracts/src/environment.ts
 @@ -70,6 +70,10 @@ export const ServerSelfUpdateCapability = Schema.Literals([
@@ -12908,7 +12925,7 @@ index 7b47d8820..1cd305b85 100644
    connectionProbe: Schema.optionalKey(Schema.Boolean),
    attachmentUploads: Schema.optionalKey(Schema.Boolean),
 @@ -84,6 +88,8 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
-   /** Absent on older servers; serialize context as legacy text for them. */
+   /** Every protocol-2 server sends this; older mobile builds still read it. */
    inlineMessageContext: Schema.optionalKey(Schema.Boolean),
    requiredWorktreeBootstrap: Schema.optionalKey(Schema.Boolean),
 +  /** Server exposes provider-neutral GitHub Issue / Azure Boards work-item APIs. */
@@ -12917,7 +12934,7 @@ index 7b47d8820..1cd305b85 100644
    threadAutoSettlement: Schema.optionalKey(Schema.Boolean),
    storageCleanup: Schema.optionalKey(Schema.Boolean),
 diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts
-index 38c28ab65..b445b8f9e 100644
+index e61597e52..bc07d5f37 100644
 --- a/packages/contracts/src/index.ts
 +++ b/packages/contracts/src/index.ts
 @@ -1,4 +1,9 @@
@@ -12931,10 +12948,10 @@ index 38c28ab65..b445b8f9e 100644
  export * from "./composerContext.ts";
  export * from "./composerContextClipboard.ts";
 diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts
-index f4e830397..9f8241186 100644
+index cecd9c004..09482a808 100644
 --- a/packages/contracts/src/orchestrationV2.ts
 +++ b/packages/contracts/src/orchestrationV2.ts
-@@ -1110,6 +1110,7 @@ export function latestProviderTurnForAttempt<
+@@ -1176,6 +1176,7 @@ export function latestProviderTurnForAttempt<
  
  export const OrchestrationV2RuntimeRequest = Schema.Struct({
    id: RuntimeRequestId,
@@ -12942,7 +12959,7 @@ index f4e830397..9f8241186 100644
    nodeId: NodeId,
    providerTurnId: Schema.NullOr(ProviderTurnId),
    nativeRequestRef: Schema.NullOr(OrchestrationV2ProviderRef),
-@@ -3269,7 +3270,7 @@ const OrchestrationV2InternalCommand = Schema.Union([
+@@ -3414,7 +3415,7 @@ const OrchestrationV2InternalCommand = Schema.Union([
    }),
    /** Delivering the answer to request `requestId` failed on its last attempt. */
    Schema.Struct({
@@ -12952,10 +12969,10 @@ index f4e830397..9f8241186 100644
      threadId: ThreadId,
      requestId: RuntimeRequestId,
 diff --git a/packages/contracts/src/rpc.ts b/packages/contracts/src/rpc.ts
-index 1e191ec9c..624a17ee4 100644
+index 658f6276e..612608dae 100644
 --- a/packages/contracts/src/rpc.ts
 +++ b/packages/contracts/src/rpc.ts
-@@ -27,6 +27,23 @@ import * as Schema from "effect/Schema";
+@@ -37,6 +37,23 @@ import * as Schema from "effect/Schema";
  import * as Rpc from "effect/rpc/Rpc";
  import * as RpcGroup from "effect/rpc/RpcGroup";
  import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
@@ -12978,8 +12995,8 @@ index 1e191ec9c..624a17ee4 100644
 +} from "./attentionSync.ts";
  import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
  import {
-   CodexAuthCallbackInput,
-@@ -382,6 +399,13 @@ import { VcsError } from "./vcs.ts";
+   ProviderAuthCancelInput,
+@@ -396,6 +413,12 @@ import { VcsError } from "./vcs.ts";
  import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
  
  export const WS_METHODS = {
@@ -12989,11 +13006,10 @@ index 1e191ec9c..624a17ee4 100644
 +  twsSetContext: "tws.context.set",
 +  twsProvenance: "tws.provenance",
 +  attentionSubscribe: "attention.subscribe",
-+  // Project registry methods
-   projectsList: "projects.list",
-   projectsAdd: "projects.add",
-   projectsRemove: "projects.remove",
-@@ -1916,6 +1940,37 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
+   projectsListEntries: "projects.listEntries",
+   projectsListIgnoredFiles: "projects.listIgnoredFiles",
+   projectsReadFile: "projects.readFile",
+@@ -1925,6 +1948,37 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
  
  export const WsRpcGroup = RpcGroup.make(
    WsGuestShareCreateRpc,
@@ -13032,10 +13048,10 @@ index 1e191ec9c..624a17ee4 100644
    WsServerGetConfigRpc,
    WsServerRefreshProvidersRpc,
 diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts
-index c7c847df3..9e32ebcab 100644
+index 013e4f3ee..5202bf1c7 100644
 --- a/packages/contracts/src/settings.ts
 +++ b/packages/contracts/src/settings.ts
-@@ -1116,6 +1116,7 @@ export const ServerSettings = Schema.Struct({
+@@ -1154,6 +1154,7 @@ export const ServerSettings = Schema.Struct({
    previousWorktreesDirectories: Schema.Array(TrimmedString).pipe(
      Schema.withDecodingDefault(Effect.succeed([])),
    ),
@@ -13043,7 +13059,7 @@ index c7c847df3..9e32ebcab 100644
    responseStreamingMode: ResponseStreamingMode.pipe(
      Schema.withDecodingDefault(Effect.succeed("paragraph" as const)),
    ),
-@@ -1471,6 +1472,7 @@ export const ServerSettingsPatch = Schema.Struct({
+@@ -1523,6 +1524,7 @@ export const ServerSettingsPatch = Schema.Struct({
      }),
    ),
    worktreesDirectory: Schema.optionalKey(TrimmedString),

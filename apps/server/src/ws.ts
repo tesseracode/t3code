@@ -1,4 +1,6 @@
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
+import * as AttentionSync from "./orchestration-v2/AttentionSync.ts";
+import { TwsContextService } from "./tws/TwsContextService.ts";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
@@ -1224,6 +1226,8 @@ export const layerWsRpc = (
   Layer.effectContext(
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
+      const attention = yield* AttentionSync.AttentionSync;
+      const twsContext = yield* TwsContextService;
       const sql = yield* SqlClient.SqlClient;
       const threadManagement = yield* ThreadManagementService.ThreadManagementService;
       const intakeContext = yield* Effect.context<
@@ -1859,6 +1863,12 @@ export const layerWsRpc = (
       });
 
       const handlers = ServerWsRpcGroup.of({
+        [WS_METHODS.attentionSubscribe]: (input) => attention.subscribe(input, currentSession),
+        [WS_METHODS.twsRefresh]: () => twsContext.refresh(),
+        [WS_METHODS.twsQuery]: (input) => twsContext.query(input),
+        [WS_METHODS.twsGetContexts]: (input) => twsContext.getContexts(input.threadIds),
+        [WS_METHODS.twsSetContext]: (input) => twsContext.setContext(input),
+        [WS_METHODS.twsProvenance]: (input) => twsContext.provenance(input.bindingId),
         [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command) =>
           Effect.annotateCurrentSpan({
             "orchestration_v2.command_id": command.commandId,
@@ -2508,6 +2518,17 @@ export const layerWsRpc = (
             const settings = yield* providerInstanceMutation === undefined
               ? serverSettings.updateSettings(nextPatch)
               : serverSettings.updateProviderInstance(providerInstanceMutation, nextPatch);
+            if (patch.twsIntegrationEnabled !== undefined) {
+              yield* twsContext.configure(settings.twsIntegrationEnabled).pipe(
+                Effect.catchTags({
+                  TwsContextError: (error) =>
+                    Effect.logWarning(
+                      "TWS preference was saved but observation invalidation failed.",
+                      { reason: error.reason },
+                    ),
+                }),
+              );
+            }
             return ServerSettings.redactServerSettingsForClient(settings);
           }),
         [WS_METHODS.serverDiscoverSourceControl]: (_input) => sourceControlDiscovery.discover,

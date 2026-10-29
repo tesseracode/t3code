@@ -1176,6 +1176,7 @@ export function latestProviderTurnForAttempt<
 
 export const OrchestrationV2RuntimeRequest = Schema.Struct({
   id: RuntimeRequestId,
+  responseDelivery: Schema.optional(Schema.Literals(["pending", "confirmed", "failed"])),
   nodeId: NodeId,
   providerTurnId: Schema.NullOr(ProviderTurnId),
   nativeRequestRef: Schema.NullOr(OrchestrationV2ProviderRef),
@@ -3414,7 +3415,7 @@ const OrchestrationV2InternalCommand = Schema.Union([
   }),
   /** Delivering the answer to request `requestId` failed on its last attempt. */
   Schema.Struct({
-    type: Schema.Literal("runtime-request.delivery.fail"),
+    type: Schema.Literals(["runtime-request.delivery.fail", "runtime-request.delivery.confirm"]),
     commandId: CommandId,
     threadId: ThreadId,
     requestId: RuntimeRequestId,

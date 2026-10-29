@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "phase1-foundation",
-  "current_generation": 25,
+  "current_generation": 26,
   "generations": [
     {
       "generation": 1,
@@ -1400,7 +1400,9 @@
         "pathspecs": [],
         "claim_ids": []
       },
-      "touched_paths": ["apps/server/src/orchestration/AttentionSync.test.ts"],
+      "touched_paths": [
+        "apps/server/src/orchestration/AttentionSync.test.ts"
+      ],
       "dependencies": [
         {
           "slug": "copilot-cli-provider",
@@ -5072,7 +5074,7 @@
       "git_patch_id": "8497f73d08cab7e6eeb2fbdca629f57917a1d579",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "7914dd4615c2c463b260d93355614b42020c6998a5d62d45ce390197a582ea78",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/025-fixup.patch",
       "base_commit": "81c2157c19b6984d2d76365bf243d1ae90f61548",
       "upper": {
@@ -5246,6 +5248,214 @@
           "parent_generation": 9,
           "parent_patch_sha256": "38333be0dcb886cdac0f24e44ce4756611fe1e4ab82c584820a5554f5f9eae01",
           "parent_recipe_sha256": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e"
+        },
+        {
+          "slug": "tws-identity-bindings",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "2aff1a6c2726968b459e9282584f83e05798580a82ac77d9a0ecc9e90b05645e",
+          "parent_recipe_sha256": "63b18576300252c49752400e437a32d5e390d34ddd19cc92e84336fbf7760217"
+        },
+        {
+          "slug": "tws-readonly-cli-adapter",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "e0aec536d901c1c604647ad10144b4da0e4d6b24df67ae4979cf47a165429cfa",
+          "parent_recipe_sha256": "e873e30981f4784c07a95e939af9ed5f1cab9c5548b53e65c6f16892754a3874"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 26,
+      "generation_id": "pg_d4e3aa889560",
+      "kind": "amend-refresh",
+      "patch_sha256": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+      "git_patch_id": "6c3cd0dc866f98ec2c1c84ebbbefa5d25e97b75b",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/026-record.patch",
+      "base_commit": "8605454d5cba4ab065f43fa694e62868fe093e31",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/mobile/src/state/attention.ts",
+        "apps/mobile/src/state/tws.ts",
+        "apps/server/src/auth/RpcAuthorization.ts",
+        "apps/server/src/environment/ServerEnvironment.ts",
+        "apps/server/src/observability/RpcInstrumentation.ts",
+        "apps/server/src/orchestration-v2/AttentionEvidence.ts",
+        "apps/server/src/orchestration-v2/AttentionSync.ts",
+        "apps/server/src/orchestration-v2/EffectWorker.test.ts",
+        "apps/server/src/orchestration-v2/EffectWorker.ts",
+        "apps/server/src/orchestration-v2/EventSink.ts",
+        "apps/server/src/orchestration-v2/FoundationProjection.test.ts",
+        "apps/server/src/orchestration-v2/FoundationProjection.ts",
+        "apps/server/src/orchestration-v2/Orchestrator.ts",
+        "apps/server/src/orchestration-v2/ProjectionMaintenance.ts",
+        "apps/server/src/persistence/ForkMigrations.test.ts",
+        "apps/server/src/persistence/ForkMigrations.ts",
+        "apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.test.ts",
+        "apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.ts",
+        "apps/server/src/persistence/ForkMigrations/045_TwsBindings.test.ts",
+        "apps/server/src/persistence/ForkMigrations/045_TwsBindings.ts",
+        "apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts",
+        "apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts",
+        "apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts",
+        "apps/server/src/persistence/ForkMigrations/049_TwsContext.ts",
+        "apps/server/src/persistence/ForkMigrations/050_FoundationV2.ts",
+        "apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts",
+        "apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.ts",
+        "apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts",
+        "apps/server/src/persistence/Layers/TwsBindings.test.ts",
+        "apps/server/src/persistence/Layers/TwsBindings.ts",
+        "apps/server/src/persistence/Migrations.test.ts",
+        "apps/server/src/persistence/Migrations.ts",
+        "apps/server/src/persistence/OrchestrationEventStore.ts",
+        "apps/server/src/persistence/Services/ProjectionThreadAttentionAudit.ts",
+        "apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts",
+        "apps/server/src/persistence/Services/TwsBindings.ts",
+        "apps/server/src/server.ts",
+        "apps/server/src/serverRuntimeStartup.autoPull.test.ts",
+        "apps/server/src/serverRuntimeStartup.test.ts",
+        "apps/server/src/serverRuntimeStartup.ts",
+        "apps/server/src/tws/TwsBindingMatch.test.ts",
+        "apps/server/src/tws/TwsBindingMatch.ts",
+        "apps/server/src/tws/TwsCliAdapter.test.ts",
+        "apps/server/src/tws/TwsCliAdapter.ts",
+        "apps/server/src/tws/TwsCliDecoder.test.ts",
+        "apps/server/src/tws/TwsCliDecoder.ts",
+        "apps/server/src/tws/TwsContextInference.ts",
+        "apps/server/src/tws/TwsContextModel.ts",
+        "apps/server/src/tws/TwsContextService.test.ts",
+        "apps/server/src/tws/TwsContextService.ts",
+        "apps/server/src/tws/TwsContextStore.ts",
+        "apps/server/src/tws/TwsExecutionResolver.ts",
+        "apps/server/src/tws/TwsTopology.test.ts",
+        "apps/server/src/tws/TwsTopology.ts",
+        "apps/server/src/tws/TwsTopologyRefresh.ts",
+        "apps/server/src/tws/runtimeLayer.ts",
+        "apps/server/src/ws.test.ts",
+        "apps/server/src/ws.ts",
+        "apps/web/src/components/settings/TwsIntegrationSettings.tsx",
+        "apps/web/src/components/settings/WorktreesSettings.tsx",
+        "apps/web/src/components/settings/settingsSearch.ts",
+        "apps/web/src/state/attention.ts",
+        "apps/web/src/state/tws.ts",
+        "docs/internals/foundation.md",
+        "docs/internals/tws-context.md",
+        "docs/user/tws.md",
+        "packages/client-runtime/package.json",
+        "packages/client-runtime/src/attentionSync.test.ts",
+        "packages/client-runtime/src/attentionSync.ts",
+        "packages/client-runtime/src/rpc/client.ts",
+        "packages/client-runtime/src/state/attention.test.ts",
+        "packages/client-runtime/src/state/attention.ts",
+        "packages/client-runtime/src/state/attentionNotifications.test.ts",
+        "packages/client-runtime/src/state/attentionNotifications.ts",
+        "packages/client-runtime/src/state/attentionProjection.ts",
+        "packages/client-runtime/src/state/commandPermissions.test.ts",
+        "packages/client-runtime/src/state/tws.ts",
+        "packages/contracts/src/attention.test.ts",
+        "packages/contracts/src/attention.ts",
+        "packages/contracts/src/attentionSync.test.ts",
+        "packages/contracts/src/attentionSync.ts",
+        "packages/contracts/src/clientRpcPermissions.ts",
+        "packages/contracts/src/environment.ts",
+        "packages/contracts/src/index.ts",
+        "packages/contracts/src/orchestrationV2.ts",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/settings.ts",
+        "packages/contracts/src/twsBindings.test.ts",
+        "packages/contracts/src/twsBindings.ts",
+        "packages/contracts/src/twsContext.test.ts",
+        "packages/contracts/src/twsContext.ts",
+        "packages/contracts/src/workItem.test.ts",
+        "packages/contracts/src/workItem.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 23,
+          "parent_patch_sha256": "5c62d508b66669f6d1c55821cb2ddac16e2936f5bfdcf5ff05b9d7ea2a53af2a",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        },
+        {
+          "slug": "copilot-plan-compaction",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-skill-discovery",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-text-generation",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-tool-detail",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-turn-timing",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "durable-thread-attention-ledger",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "6953cbea041b0d8c529f63e9e525c43322ac763ad0b8d65d2fd8bd1074d7ff75",
+          "parent_recipe_sha256": "e45b16ac455fd4b42b53edcff818f8b1145377f95453b69bb79852b169ae04c0"
+        },
+        {
+          "slug": "hosting-work-item-contracts",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "5268b20b56b371838563fcda3770cc50c30c1b43ba96a591db4a2058d38e0e86",
+          "parent_recipe_sha256": "a1f9c190d469f54999eeb023102e21f88445f2aedae82b2b581d865ebef8c684"
+        },
+        {
+          "slug": "session-search",
+          "kind": "soft",
+          "satisfied_by": "",
+          "parent_generation": 11,
+          "parent_patch_sha256": "e98b6ddf7a85432e3adb7ce5bb29ffc4cfae0a2d196c6239bd7d893955f20019",
+          "parent_recipe_sha256": "5af95ca68cb59a1cb0c223b7188235c0cc7feee6368b59398b8c5730af52e9c6"
         },
         {
           "slug": "tws-identity-bindings",

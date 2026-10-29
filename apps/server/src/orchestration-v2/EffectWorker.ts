@@ -388,6 +388,14 @@ export const layerExecutor: Layer.Layer<
                   : { answers: effect.request.answers }),
               })
               .pipe(
+                Effect.tap(() =>
+                  threads.dispatch({
+                    type: "runtime-request.delivery.confirm",
+                    commandId: CommandId.make(`${effect.commandId}:delivery-confirmed`),
+                    threadId: effect.threadId,
+                    requestId,
+                  }),
+                ),
                 Effect.tapCause((cause) =>
                   willRetry || Cause.hasInterruptsOnly(cause)
                     ? Effect.void
