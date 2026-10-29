@@ -761,7 +761,7 @@ export function GeneralSettingsPanel() {
         <NotificationSettings />
         <SettingsRow
           {...searchableSetting("in-app-notifications")}
-          description="Show a toast when another thread finishes, fails, or needs input or approval while this app has focus."
+          description="Show a static alert for another thread while this client has focus. Categories, environment mutes and quiet hours apply to every channel."
           control={
             <Switch
               checked={settings.inAppNotificationsEnabled}

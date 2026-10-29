@@ -1,8 +1,8 @@
 {
   "slug": "attention-notifications",
-  "completed_at": "2026-10-29T08:54:38Z",
-  "base_commit": "75bfc266b4d5f23ef817cfa65b96964d6c41a369",
+  "completed_at": "2026-10-29T09:27:22Z",
+  "base_commit": "19785c67a95d6281213f07d78186d70a7ce1f44c",
   "has_patch": true,
   "validation_status": "needs_review",
-  "validation_notes": "42 focused inbox/notification tests, 2 persisted policy tests, two owner typechecks and 21-file scoped lint passed. Integrated native/provider visual and independent review gates remain pending."
+  "validation_notes": "UI source unchanged from its 42-test validated version; corrected parent has 39 targeted tests. Exact new anchor replay and independent/runtime review remain separate gates."
 }

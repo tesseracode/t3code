@@ -1,5 +1,5 @@
  .tpatch/FEATURES.md                                |   2 +-
- .../features/attention-notifications/status.json   |   8 +-
+ .../features/attention-notifications/status.json   |   6 +-
  apps/web/src/components/AppSidebarLayout.tsx       |   2 +
  apps/web/src/components/CommandPalette.tsx         |  13 +
  ...adNotificationCoordinator.badge.browser.test.ts | 322 ++++++++++++++++-
@@ -16,4 +16,4 @@
  packages/contracts/src/keybindings.ts              |   1 +
  packages/contracts/src/settings.test.ts            |  25 ++
  packages/contracts/src/settings.ts                 |  25 ++
- 18 files changed, 996 insertions(+), 148 deletions(-)
+ 18 files changed, 995 insertions(+), 147 deletions(-)
