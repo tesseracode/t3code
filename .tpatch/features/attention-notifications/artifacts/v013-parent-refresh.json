@@ -1,0 +1,8 @@
+{
+  "parentLanding": "69959d14397bd6a680d474e05827f18ea50f571e",
+  "previousChildLanding": "55fd4d7c7600d2540042d293d0fdd0f94f4bf8d9",
+  "attempt": "Recapture the unchanged full 28-file child patch from its historical base after integrating the parent correction",
+  "result": "verification refused",
+  "reason": "The latest canonical parent is not present at the child's historical verification baseline.",
+  "resolution": "Use supported unapply/reapply to establish a genuine forward-applicable anchor containing the corrected parent. Do not invent a successful historical baseline or rewrite generation manifests."
+}
