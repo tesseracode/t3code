@@ -1,6 +1,7 @@
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 
 import { AdvancedSettings } from "./AdvancedSettings";
+import { TwsIntegrationSettings } from "./TwsIntegrationSettings";
 import { BranchNamingSettings } from "./BranchNamingSettings";
 import { WorktreeSubmodulesRow } from "./ProjectDefaultsSettings";
 import { ScopedSwitch } from "./ScopedSwitch";
@@ -68,6 +69,7 @@ export function WorktreesSettingsPanel() {
         <BranchNamingSettings />
       </SettingsSection>
       <WorktreeCleanupSection />
+      {!isProjectScope && <TwsIntegrationSettings />}
     </SettingsPageContainer>
   );
 }

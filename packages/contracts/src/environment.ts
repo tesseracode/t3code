@@ -70,6 +70,10 @@ export const ServerSelfUpdateCapability = Schema.Literals([
 export type ServerSelfUpdateCapability = typeof ServerSelfUpdateCapability.Type;
 
 export const ExecutionEnvironmentCapabilities = Schema.Struct({
+  /** Optional read-only TWS context API; use the environment setting to opt in. */
+  twsContext: Schema.optionalKey(Schema.Boolean),
+  /** Owned, paginated attention bootstrap/replay/live stream protocol v1. */
+  attentionSync: Schema.optionalKey(Schema.Boolean),
   repositoryIdentity: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   connectionProbe: Schema.optionalKey(Schema.Boolean),
   attachmentUploads: Schema.optionalKey(Schema.Boolean),
@@ -84,6 +88,8 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   /** Absent on older servers; serialize context as legacy text for them. */
   inlineMessageContext: Schema.optionalKey(Schema.Boolean),
   requiredWorktreeBootstrap: Schema.optionalKey(Schema.Boolean),
+  /** Server exposes provider-neutral GitHub Issue / Azure Boards work-item APIs. */
+  workItems: Schema.optionalKey(Schema.Boolean),
   threadSettlement: Schema.optionalKey(Schema.Boolean),
   threadAutoSettlement: Schema.optionalKey(Schema.Boolean),
   storageCleanup: Schema.optionalKey(Schema.Boolean),

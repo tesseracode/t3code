@@ -24,6 +24,7 @@ import * as PubSub from "effect/PubSub";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import type * as Scope from "effect/Scope";
 
 import { replayAndBufferProjectedLiveEvents } from "../orchestration-v2/LiveStreamBudget.ts";
 
@@ -104,6 +105,11 @@ export class OrchestrationEventStore extends Context.Service<
     readonly publishCommitted: (
       events: ReadonlyArray<ApplicationStoredEvent>,
     ) => Effect.Effect<void>;
+    readonly subscribeCommitted: Effect.Effect<
+      Stream.Stream<ApplicationStoredEvent>,
+      never,
+      Scope.Scope
+    >;
 
     readonly streamApplicationEvents: (input?: {
       readonly afterSequence?: number;
@@ -751,6 +757,7 @@ const makeEventStore = Effect.gen(function* () {
     publishCommitted: (events) => PubSub.publishAll(committedEvents, events).pipe(Effect.asVoid),
     streamApplicationEvents,
     streamProjectedApplicationEvents,
+    subscribeCommitted: PubSub.subscribe(committedEvents).pipe(Effect.map(Stream.fromSubscription)),
   } satisfies OrchestrationEventStore["Service"];
 });
 

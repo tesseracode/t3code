@@ -179,6 +179,9 @@ import * as CursorUsageAccounts from "@t3tools/provider-cursor/server/CursorUsag
 import * as UsageService from "./usage/UsageService.ts";
 import * as CodexUsageHistory from "./usage/CodexUsageHistory.ts";
 import * as RuntimeLayer from "./orchestration-v2/runtimeLayer.ts";
+import * as FoundationProjection from "./orchestration-v2/FoundationProjection.ts";
+import * as AttentionSync from "./orchestration-v2/AttentionSync.ts";
+import { TwsContextLive } from "./tws/runtimeLayer.ts";
 import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
 import * as ThreadSearch from "./orchestration-v2/ThreadSearch.ts";
 import * as ThreadSettlementService from "./orchestration-v2/ThreadSettlementService.ts";
@@ -680,7 +683,12 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
   ),
 );
 
-const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
+const layerRuntimeDependencies = Layer.mergeAll(
+  AttentionSync.layer,
+  TwsContextLive,
+  FoundationProjection.layer,
+).pipe(
+  Layer.provideMerge(layerRuntimeCoreDependencies),
   Layer.provideMerge(layerUsage),
   Layer.provideMerge(layerBackground),
   Layer.provideMerge(layerResourceDiagnostics),

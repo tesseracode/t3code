@@ -273,6 +273,38 @@ it.effect.each([
   }),
 );
 
+it.effect("confirms an answer only after successful native delivery", () =>
+  Effect.gen(function* () {
+    const now = yield* DateTime.now;
+    const receipts = yield* Ref.make<ReadonlyArray<string>>([]);
+    const layer = layerExecutorFor({
+      events: yield* Ref.make<ReadonlyArray<string>>([]),
+      respond: () => Effect.void,
+      threads: {
+        dispatch: (command) =>
+          Ref.update(receipts, (current) => [...current, command.type]).pipe(
+            Effect.as({ sequence: 1, storedEvents: [] }),
+          ),
+      },
+    });
+    yield* Effect.gen(function* () {
+      const executor = yield* EffectWorker.OrchestrationEffectExecutorV2;
+      yield* executor.execute(
+        {
+          ...restartEffect(now, { type: "detach" }),
+          request: {
+            type: "runtime-request.respond",
+            providerSessionId: oldSessionId,
+            requestId: RuntimeRequestId.make("runtime-request:delivered"),
+          },
+        },
+        { willRetry: false },
+      );
+    }).pipe(Effect.provide(layer));
+    assert.deepEqual(yield* Ref.get(receipts), ["runtime-request.delivery.confirm"]);
+  }),
+);
+
 it.effect("does not report an answer whose last delivery attempt is interrupted", () =>
   Effect.gen(function* () {
     const now = yield* DateTime.now;

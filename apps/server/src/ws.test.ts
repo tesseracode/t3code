@@ -438,6 +438,8 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(RelayClient.RelayClient)({}),
   Layer.mock(RepositoryIdentityResolver.RepositoryIdentityResolver)({}),
   Layer.mock(ResourceTelemetry.ResourceTelemetry)({}),
+  Layer.mock(AttentionSync.AttentionSync)({}),
+  Layer.mock(TwsContextService)({}),
   Layer.mock(ReviewService.ReviewService)({}),
   Layer.mock(ScheduledTasks.ScheduledTaskService)({}),
   Layer.mock(SecretRequests.SecretRequests)({}),
@@ -887,3 +889,5 @@ it.effect("thread resume across compacted history keeps message order and final 
     ),
   ),
 );
+import * as AttentionSync from "./orchestration-v2/AttentionSync.ts";
+import { TwsContextService } from "./tws/TwsContextService.ts";

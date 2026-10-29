@@ -1,5 +1,7 @@
 import { assert, it } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as FoundationProjection from "./orchestration-v2/FoundationProjection.ts";
+import { TwsContextService } from "./tws/TwsContextService.ts";
 import {
   DEFAULT_SERVER_SETTINGS,
   ProjectId,
@@ -69,6 +71,8 @@ it.effect.each([
       };
       const imports = { importedThreadCount: 0, importedMessageCount: 0 };
       const dependencies = Layer.mergeAll(
+        Layer.mock(FoundationProjection.FoundationProjection)({ bootstrap: Effect.void }),
+        Layer.mock(TwsContextService)({ start: Effect.void }),
         NodeCrypto.layer,
         Path.layer,
         Layer.mock(ServerConfig.ServerConfig)({

@@ -582,6 +582,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["git submodule init recursive top-level none worktree t3.json"],
   },
   {
+    id: "tws-integration",
+    title: "Tesseraworkspaces",
+    to: "/settings/worktrees",
+    scope: "environment",
+    searchTerms: ["tws topology feature stack readonly optional integration environment"],
+  },
+  {
     id: "start-from-origin",
     title: "Start from remote",
     to: "/settings/worktrees",
