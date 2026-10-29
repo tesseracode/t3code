@@ -66,10 +66,10 @@ index 4a23878e4..5a84f6338 100644
    [ORCHESTRATION_V2_WS_METHODS.stopWorkflow]: "orchestration",
 diff --git a/apps/server/src/orchestration-v2/AttentionEvidence.ts b/apps/server/src/orchestration-v2/AttentionEvidence.ts
 new file mode 100644
-index 000000000..f3fb62a86
+index 000000000..71312967e
 --- /dev/null
 +++ b/apps/server/src/orchestration-v2/AttentionEvidence.ts
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,58 @@
 +import {
 +  ApprovalRequestId,
 +  type EventId,
@@ -123,6 +123,7 @@ index 000000000..f3fb62a86
 +        readonly type: "lifecycle.observed";
 +        readonly payload: {
 +          readonly threadId: ThreadId;
++          readonly authority: "run" | "provider";
 +          readonly lifecycle: ProviderLifecycleEvidence;
 +        };
 +      }
@@ -774,10 +775,10 @@ index af8fa5a95..a796f8111 100644
  export const layerFromStores = layerBase;
 diff --git a/apps/server/src/orchestration-v2/FoundationProjection.test.ts b/apps/server/src/orchestration-v2/FoundationProjection.test.ts
 new file mode 100644
-index 000000000..dfa241686
+index 000000000..e0b208281
 --- /dev/null
 +++ b/apps/server/src/orchestration-v2/FoundationProjection.test.ts
-@@ -0,0 +1,627 @@
+@@ -0,0 +1,746 @@
 +import { assert, it } from "@effect/vitest";
 +import {
 +  EnvironmentId,
@@ -945,7 +946,10 @@ index 000000000..dfa241686
 +        { ...event, id: EventId.make(`request-event-${++sequence}`), threadId, occurredAt: time },
 +      ],
 +    });
-+  const lifecycle = (status: "running" | "completed" | "failed" | "interrupted") =>
++  const lifecycle = (
++    status: "running" | "completed" | "failed" | "interrupted" | "cancelled",
++    context: { turnId?: ProviderTurnId; rootId?: NodeId; ordinal?: number } = {},
++  ) =>
 +    sink.write({
 +      events: [
 +        {
@@ -954,12 +958,12 @@ index 000000000..dfa241686
 +          threadId,
 +          occurredAt: time,
 +          payload: {
-+            id: providerTurnId,
++            id: context.turnId ?? providerTurnId,
 +            providerThreadId,
-+            nodeId,
++            nodeId: context.rootId ?? nodeId,
 +            runAttemptId: null,
 +            nativeTurnRef: null,
-+            ordinal: 1,
++            ordinal: context.ordinal ?? 1,
 +            status,
 +            startedAt: time,
 +            completedAt: status === "running" ? null : time,
@@ -967,7 +971,10 @@ index 000000000..dfa241686
 +        },
 +      ],
 +    });
-+  const runLifecycle = (status: "completed" | "failed" | "interrupted") =>
++  const runLifecycle = (
++    status: "starting" | "running" | "completed" | "failed" | "interrupted" | "cancelled",
++    rootId = nodeId,
++  ) =>
 +    sink.write({
 +      events: [
 +        {
@@ -976,7 +983,12 @@ index 000000000..dfa241686
 +          threadId,
 +          runId,
 +          occurredAt: time,
-+          payload: { ...run, status, completedAt: time },
++          payload: {
++            ...run,
++            rootNodeId: rootId,
++            status,
++            completedAt: status === "running" || status === "starting" ? null : time,
++          },
 +        },
 +      ],
 +    });
@@ -1013,6 +1025,114 @@ index 000000000..dfa241686
 +  };
 +});
 +
++it.effect("keeps a V2 run live across root provider turns until authoritative termination", () =>
++  Effect.gen(function* () {
++    const h = yield* harness();
++    yield* h.lifecycle("running");
++    yield* h.lifecycle("completed");
++    const secondRoot = NodeId.make("second-root");
++    const secondTurn = ProviderTurnId.make("second-native-turn");
++    yield* h.sink.write({
++      events: [
++        {
++          id: EventId.make("second-root-created"),
++          type: "node.updated",
++          threadId,
++          occurredAt: time,
++          payload: { ...root, id: secondRoot, rootNodeId: secondRoot },
++        },
++      ],
++    });
++    const continuation = { turnId: secondTurn, rootId: secondRoot, ordinal: 2 };
++    yield* h.lifecycle("running", continuation);
++    yield* h.write({
++      type: "runtime-request.updated",
++      payload: { ...request, nodeId: secondRoot, providerTurnId: secondTurn },
++    });
++    assert.equal((yield* h.summary).phase, "waiting_for_approval");
++    assert.equal((yield* h.summary).approvalCount, 1);
++    yield* h.runLifecycle("failed", secondRoot);
++    assert.equal((yield* h.summary).failureCount, 1);
++    assert.equal((yield* h.summary).phase, "failed");
++    yield* h.lifecycle("running", continuation);
++    assert.equal((yield* h.summary).phase, "failed");
++    yield* h.runLifecycle("starting", secondRoot);
++    yield* h.lifecycle("running", continuation);
++    assert.equal((yield* h.summary).failureCount, 0);
++    yield* h.write({
++      type: "runtime-request.updated",
++      payload: {
++        ...request,
++        id: RuntimeRequestId.make("after-retry"),
++        nodeId: secondRoot,
++        providerTurnId: secondTurn,
++      },
++    });
++    yield* h.lifecycle("completed", continuation);
++    assert.equal((yield* h.summary).approvalCount, 1);
++    assert.equal((yield* h.summary).phase, "waiting_for_approval");
++    yield* h.runLifecycle("completed", secondRoot);
++    assert.equal((yield* h.summary).approvalCount, 0);
++    assert.equal((yield* h.summary).phase, "completed");
++    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
++  }).pipe(Effect.provide(layer)),
++);
++
++it.effect.each(["failed", "interrupted", "cancelled"] as const)(
++  "does not terminally fence or resolve run requests on native %s",
++  (status) =>
++    Effect.gen(function* () {
++      const h = yield* harness();
++      yield* h.lifecycle("running");
++      yield* h.write({ type: "runtime-request.updated", payload: request });
++      yield* h.lifecycle(status);
++      assert.equal((yield* h.summary).approvalCount, 1);
++      assert.equal((yield* h.summary).failureCount, 0);
++      assert.equal((yield* h.summary).phase, "waiting_for_approval");
++      yield* h.lifecycle("running", { turnId: ProviderTurnId.make("retry-native"), ordinal: 2 });
++      yield* h.runLifecycle("completed");
++      assert.equal((yield* h.summary).approvalCount, 0);
++      assert.equal((yield* h.summary).phase, "completed");
++    }).pipe(Effect.provide(layer)),
++);
++
++it.effect.each(["completed", "failed", "interrupted", "cancelled"] as const)(
++  "keeps authoritative run %s fenced until authoritative recovery",
++  (status) =>
++    Effect.gen(function* () {
++      const h = yield* harness();
++      yield* h.lifecycle("running");
++      yield* h.write({ type: "runtime-request.updated", payload: request });
++      yield* h.runLifecycle(status);
++      const terminal = yield* h.summary;
++      const lateTurn = ProviderTurnId.make("late-native");
++      yield* h.lifecycle("running", { turnId: lateTurn, ordinal: 2 });
++      yield* h.write({
++        type: "runtime-request.updated",
++        payload: {
++          ...request,
++          id: RuntimeRequestId.make("late-request"),
++          providerTurnId: lateTurn,
++        },
++      });
++      assert.deepEqual(yield* h.summary, terminal);
++      yield* h.runLifecycle("running");
++      yield* h.write({
++        type: "runtime-request.updated",
++        payload: {
++          ...request,
++          id: RuntimeRequestId.make("retry-request"),
++          providerTurnId: lateTurn,
++        },
++      });
++      assert.equal((yield* h.summary).approvalCount, 1);
++      assert.equal((yield* h.summary).phase, "waiting_for_approval");
++      yield* h.runLifecycle("completed");
++      assert.equal((yield* h.summary).approvalCount, 0);
++      assert.equal((yield* h.summary).phase, "completed");
++    }).pipe(Effect.provide(layer)),
++);
++
 +it.effect.each([
 +  { status: "failed", order: "provider-first" },
 +  { status: "failed", order: "run-first" },
@@ -1028,17 +1148,16 @@ index 000000000..dfa241686
 +    const native = h.lifecycle(status);
 +    const app = h.runLifecycle(status);
 +    yield* order === "provider-first" ? native : app;
-+    const first = yield* h.items();
 +    const summary = yield* h.summary;
++    if (order === "provider-first") {
++      assert.equal(summary.phase, "waiting_for_approval");
++      assert.equal(summary.failureCount, 0);
++    }
 +    yield* order === "provider-first" ? app : native;
 +    const final = yield* h.items();
-+    assert.deepEqual(
-+      final.map((item) => item.attentionId),
-+      first.map((item) => item.attentionId),
-+    );
 +    assert.isTrue(final.every((item) => item.turnId === TurnId.make(runId)));
 +    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
-+    assert.equal((yield* h.summary).revision, summary.revision);
++    if (order === "run-first") assert.equal((yield* h.summary).revision, summary.revision);
 +    assert.equal((yield* h.summary).phase, status);
 +    assert.equal(
 +      final.filter((item) => item.kind === "failure").length,
@@ -1075,14 +1194,15 @@ index 000000000..dfa241686
 +  }).pipe(Effect.provide(layer)),
 +);
 +
-+it.effect("uses canonical run completion to close the same root provider failure", () =>
++it.effect("uses only run failure and completion for the terminal failure lifecycle", () =>
 +  Effect.gen(function* () {
 +    const h = yield* harness();
 +    yield* h.lifecycle("running");
 +    yield* h.lifecycle("failed");
++    assert.equal((yield* h.summary).failureCount, 0);
++    yield* h.runLifecycle("failed");
 +    const failure = (yield* h.items())[0]!;
 +    assert.equal(failure.turnId, TurnId.make(runId));
-+    yield* h.runLifecycle("failed");
 +    yield* h.runLifecycle("completed");
 +    const resolved = (yield* h.items())[0]!;
 +    assert.equal(resolved.attentionId, failure.attentionId);
@@ -1108,7 +1228,7 @@ index 000000000..dfa241686
 +    });
 +    yield* h.lifecycle("failed");
 +    assert.equal((yield* h.summary).failureCount, 0);
-+    assert.equal((yield* h.summary).turnId, null);
++    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
 +    yield* h.write({ type: "runtime-request.updated", payload: request });
 +    assert.equal((yield* h.items())[0]?.turnId, null);
 +    assert.equal(
@@ -1218,12 +1338,12 @@ index 000000000..dfa241686
 +        },
 +      });
 +      assert.equal((yield* h.summary).phase, "waiting_for_approval");
-+      yield* h.lifecycle("failed");
++      yield* h.runLifecycle("failed");
 +      assert.equal((yield* h.summary).failureCount, 1);
 +      assert.equal((yield* h.summary).inputCount, 1);
-+      yield* h.lifecycle("running");
++      yield* h.runLifecycle("running");
 +      assert.equal((yield* h.summary).failureCount, 0);
-+      yield* h.lifecycle("completed");
++      yield* h.runLifecycle("completed");
 +      assert.equal((yield* h.summary).inputCount, 1);
 +      const identity = (yield* h.items()).find((item) => item.kind === "user_input")!.attentionId;
 +      yield* h.sink.write({
@@ -1332,7 +1452,7 @@ index 000000000..dfa241686
 +      assert.equal((yield* h.summary).disconnectCount, 0);
 +      yield* h.sink.write({ events: [{ ...lost, id: EventId.make("delayed-duplicate") }] });
 +      assert.equal((yield* h.summary).disconnectCount, 0);
-+      yield* h.lifecycle("interrupted");
++      yield* h.runLifecycle("interrupted");
 +      yield* h.sink.write({
 +        events: [
 +          { ...lost, id: EventId.make("post-stop"), rawEventId: RawEventId.make("different-loss") },
@@ -1407,10 +1527,10 @@ index 000000000..dfa241686
 +);
 diff --git a/apps/server/src/orchestration-v2/FoundationProjection.ts b/apps/server/src/orchestration-v2/FoundationProjection.ts
 new file mode 100644
-index 000000000..768fa1ffa
+index 000000000..60067234a
 --- /dev/null
 +++ b/apps/server/src/orchestration-v2/FoundationProjection.ts
-@@ -0,0 +1,353 @@
+@@ -0,0 +1,352 @@
 +import {
 +  ApprovalRequestId,
 +  EventId,
@@ -1514,14 +1634,15 @@ index 000000000..768fa1ffa
 +    ) =>
 +      project({
 +        ...common,
-+        ...(event.type === "provider-turn.updated" && event.payload.completedAt !== null
-+          ? { occurredAt: DateTime.formatIso(event.payload.completedAt) }
-+          : {}),
 +        type: "lifecycle.observed",
 +        payload: {
 +          threadId: event.threadId,
++          authority:
++            event.type === "run.created" || event.type === "run.updated" ? "run" : "provider",
 +          lifecycle: {
-+            providerEventId: EventId.make(`${event.rawEventId ?? event.id}:${runId}:${transition}`),
++            providerEventId: EventId.make(
++              `${event.rawEventId ?? event.id}:${event.type}:${runId}:${transition}`,
++            ),
 +            providerKey,
 +            turnId: TurnId.make(runId),
 +            transition,
@@ -1640,13 +1761,9 @@ index 000000000..768fa1ffa
 +          if (root?.is_root !== 1 || root.run_id === null || owner === undefined) break;
 +          yield* sql`UPDATE foundation_v2_nodes SET provider_turn_id = ${turn.id}, provider_thread_id = ${turn.providerThreadId}
 +            WHERE thread_id = ${source.threadId} AND node_id = ${turn.nodeId}`;
-+          const transition =
-+            turn.status === "pending"
-+              ? "starting"
-+              : turn.status === "cancelled"
-+                ? "interrupted"
-+                : turn.status;
-+          yield* lifecycle(source, root.run_id, owner.provider_key, transition);
++          // A run can continue across multiple root native turns; their terminals are audit evidence only.
++          if (turn.status === "running")
++            yield* lifecycle(source, root.run_id, owner.provider_key, "running");
 +          break;
 +        }
 +        case "run.created":
@@ -1662,6 +1779,8 @@ index 000000000..768fa1ffa
 +                providerKey: run.providerInstanceId,
 +              },
 +            });
++          } else if (run.status === "running") {
++            yield* lifecycle(source, run.id, run.providerInstanceId, "running");
 +          } else if (run.status === "rolled_back") {
 +            yield* project({
 +              ...common,
@@ -3657,10 +3776,10 @@ index 000000000..506dbd2f2
 +);
 diff --git a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
 new file mode 100644
-index 000000000..f935099a2
+index 000000000..82eba3aa1
 --- /dev/null
 +++ b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
-@@ -0,0 +1,591 @@
+@@ -0,0 +1,598 @@
 +// @effect-diagnostics nodeBuiltinImport:off
 +import * as NodeCrypto from "node:crypto";
 +import {
@@ -3986,6 +4105,9 @@ index 000000000..f935099a2
 +  ) {
 +    const evidence = event.payload.lifecycle;
 +    if (!evidence) return;
++    const authoritativeRun = event.payload.authority === "run";
++    if (!authoritativeRun && ["completed", "failed", "interrupted"].includes(evidence.transition))
++      return;
 +    const threadId = event.payload.threadId;
 +    const states =
 +      yield* sql<AwarenessState>`SELECT * FROM projection_thread_awareness WHERE thread_id = ${threadId}`;
@@ -4019,9 +4141,7 @@ index 000000000..f935099a2
 +      return;
 +    }
 +    if (evidence.transition === "ready") return;
-+    const turnId =
-+      evidence.turnId ??
-+      (state.stop_requested && state.provider_key === evidence.providerKey ? state.turn_id : null);
++    const turnId = evidence.turnId;
 +    // A provider state without an attributable turn is not proof about another turn.
 +    if (turnId === null) return;
 +    const turns = yield* sql<{ readonly phase: string; readonly source_sequence: number }>`
@@ -4029,7 +4149,11 @@ index 000000000..f935099a2
 +      WHERE thread_id = ${threadId} AND provider_key = ${evidence.providerKey} AND turn_id = ${turnId}
 +    `;
 +    const turn = turns[0];
-+    if (turn?.phase === "completed" || turn?.phase === "interrupted") return;
++    if (
++      !authoritativeRun &&
++      (turn?.phase === "completed" || turn?.phase === "interrupted" || turn?.phase === "failed")
++    )
++      return;
 +    const current = state.turn_id === turnId && state.provider_key === evidence.providerKey;
 +    const closesHistoricalTurn =
 +      !current &&
@@ -4049,10 +4173,9 @@ index 000000000..f935099a2
 +      !state.pending_start
 +    )
 +      return;
-+    let transition = evidence.transition;
++    const transition = evidence.transition;
 +    if (transition === "disconnected") {
-+      if (state.stop_requested && current) transition = "interrupted";
-+      else if (!current || turn?.phase !== "running") return;
++      if (!current || turn?.phase !== "running") return;
 +    }
 +    const phase = transition === "disconnected" ? "stale" : transition;
 +    yield* sql`
@@ -4178,6 +4301,9 @@ index 000000000..f935099a2
 +          WHERE thread_id = ${event.payload.threadId}`;
 +        break;
 +      case "run.starting":
++        yield* sql`DELETE FROM projection_thread_attention_turns
++          WHERE thread_id = ${event.payload.threadId} AND provider_key = ${event.payload.providerKey}
++            AND turn_id = ${event.payload.runId} AND phase IN ('completed', 'failed', 'interrupted')`;
 +        yield* sql`UPDATE projection_thread_awareness SET pending_start = 1, stop_requested = 0,
 +          turn_id = ${event.payload.runId}, provider_key = ${event.payload.providerKey},
 +          base_phase = NULL, lifecycle_observed_at = ${event.occurredAt}
@@ -10183,10 +10309,10 @@ index 000000000..4107c2b73
 +export const twsEnvironment = createTwsEnvironmentAtoms(connectionAtomRuntime);
 diff --git a/docs/internals/foundation.md b/docs/internals/foundation.md
 new file mode 100644
-index 000000000..0250290bb
+index 000000000..15c942392
 --- /dev/null
 +++ b/docs/internals/foundation.md
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,58 @@
 +# Environment-local foundation projections
 +
 +Foundation consumes committed V2 orchestration, not the retired V1 engine.
@@ -10204,6 +10330,13 @@ index 000000000..0250290bb
 +keep a null value, and unattributed root lifecycle events create no live item.
 +The immutable audit and canonical source events retain their original
 +source/native-turn identities; this mapping does not rewrite historical IDs.
++Only authoritative V2 run termination closes callbacks and terminally fences
++run-scoped attention. A root provider turn completing, failing or stopping does
++not terminate its owning run: goal continuation and retries can start another
++root native turn within that same run. Those native lifecycle events remain in
++the immutable canonical event history. Provider liveness can recover a live
++run's disconnect, but cannot reopen a terminated run; an accepted run retry or
++running transition is authoritative recovery.
 +A response intent is not confirmation:
 +live responses record pending delivery, then a worker receipt confirms or
 +records a failed delivery. Canonical provider resolution and turn termination

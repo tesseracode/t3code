@@ -323,6 +323,9 @@ const make = Effect.gen(function* () {
   ) {
     const evidence = event.payload.lifecycle;
     if (!evidence) return;
+    const authoritativeRun = event.payload.authority === "run";
+    if (!authoritativeRun && ["completed", "failed", "interrupted"].includes(evidence.transition))
+      return;
     const threadId = event.payload.threadId;
     const states =
       yield* sql<AwarenessState>`SELECT * FROM projection_thread_awareness WHERE thread_id = ${threadId}`;
@@ -356,9 +359,7 @@ const make = Effect.gen(function* () {
       return;
     }
     if (evidence.transition === "ready") return;
-    const turnId =
-      evidence.turnId ??
-      (state.stop_requested && state.provider_key === evidence.providerKey ? state.turn_id : null);
+    const turnId = evidence.turnId;
     // A provider state without an attributable turn is not proof about another turn.
     if (turnId === null) return;
     const turns = yield* sql<{ readonly phase: string; readonly source_sequence: number }>`
@@ -366,7 +367,11 @@ const make = Effect.gen(function* () {
       WHERE thread_id = ${threadId} AND provider_key = ${evidence.providerKey} AND turn_id = ${turnId}
     `;
     const turn = turns[0];
-    if (turn?.phase === "completed" || turn?.phase === "interrupted") return;
+    if (
+      !authoritativeRun &&
+      (turn?.phase === "completed" || turn?.phase === "interrupted" || turn?.phase === "failed")
+    )
+      return;
     const current = state.turn_id === turnId && state.provider_key === evidence.providerKey;
     const closesHistoricalTurn =
       !current &&
@@ -386,10 +391,9 @@ const make = Effect.gen(function* () {
       !state.pending_start
     )
       return;
-    let transition = evidence.transition;
+    const transition = evidence.transition;
     if (transition === "disconnected") {
-      if (state.stop_requested && current) transition = "interrupted";
-      else if (!current || turn?.phase !== "running") return;
+      if (!current || turn?.phase !== "running") return;
     }
     const phase = transition === "disconnected" ? "stale" : transition;
     yield* sql`
@@ -515,6 +519,9 @@ const make = Effect.gen(function* () {
           WHERE thread_id = ${event.payload.threadId}`;
         break;
       case "run.starting":
+        yield* sql`DELETE FROM projection_thread_attention_turns
+          WHERE thread_id = ${event.payload.threadId} AND provider_key = ${event.payload.providerKey}
+            AND turn_id = ${event.payload.runId} AND phase IN ('completed', 'failed', 'interrupted')`;
         yield* sql`UPDATE projection_thread_awareness SET pending_start = 1, stop_requested = 0,
           turn_id = ${event.payload.runId}, provider_key = ${event.payload.providerKey},
           base_phase = NULL, lifecycle_observed_at = ${event.occurredAt}

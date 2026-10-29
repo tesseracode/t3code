@@ -165,7 +165,10 @@ const harness = Effect.fn("foundationHarness")(function* () {
         { ...event, id: EventId.make(`request-event-${++sequence}`), threadId, occurredAt: time },
       ],
     });
-  const lifecycle = (status: "running" | "completed" | "failed" | "interrupted") =>
+  const lifecycle = (
+    status: "running" | "completed" | "failed" | "interrupted" | "cancelled",
+    context: { turnId?: ProviderTurnId; rootId?: NodeId; ordinal?: number } = {},
+  ) =>
     sink.write({
       events: [
         {
@@ -174,12 +177,12 @@ const harness = Effect.fn("foundationHarness")(function* () {
           threadId,
           occurredAt: time,
           payload: {
-            id: providerTurnId,
+            id: context.turnId ?? providerTurnId,
             providerThreadId,
-            nodeId,
+            nodeId: context.rootId ?? nodeId,
             runAttemptId: null,
             nativeTurnRef: null,
-            ordinal: 1,
+            ordinal: context.ordinal ?? 1,
             status,
             startedAt: time,
             completedAt: status === "running" ? null : time,
@@ -187,7 +190,10 @@ const harness = Effect.fn("foundationHarness")(function* () {
         },
       ],
     });
-  const runLifecycle = (status: "completed" | "failed" | "interrupted") =>
+  const runLifecycle = (
+    status: "starting" | "running" | "completed" | "failed" | "interrupted" | "cancelled",
+    rootId = nodeId,
+  ) =>
     sink.write({
       events: [
         {
@@ -196,7 +202,12 @@ const harness = Effect.fn("foundationHarness")(function* () {
           threadId,
           runId,
           occurredAt: time,
-          payload: { ...run, status, completedAt: time },
+          payload: {
+            ...run,
+            rootNodeId: rootId,
+            status,
+            completedAt: status === "running" || status === "starting" ? null : time,
+          },
         },
       ],
     });
@@ -233,6 +244,114 @@ const harness = Effect.fn("foundationHarness")(function* () {
   };
 });
 
+it.effect("keeps a V2 run live across root provider turns until authoritative termination", () =>
+  Effect.gen(function* () {
+    const h = yield* harness();
+    yield* h.lifecycle("running");
+    yield* h.lifecycle("completed");
+    const secondRoot = NodeId.make("second-root");
+    const secondTurn = ProviderTurnId.make("second-native-turn");
+    yield* h.sink.write({
+      events: [
+        {
+          id: EventId.make("second-root-created"),
+          type: "node.updated",
+          threadId,
+          occurredAt: time,
+          payload: { ...root, id: secondRoot, rootNodeId: secondRoot },
+        },
+      ],
+    });
+    const continuation = { turnId: secondTurn, rootId: secondRoot, ordinal: 2 };
+    yield* h.lifecycle("running", continuation);
+    yield* h.write({
+      type: "runtime-request.updated",
+      payload: { ...request, nodeId: secondRoot, providerTurnId: secondTurn },
+    });
+    assert.equal((yield* h.summary).phase, "waiting_for_approval");
+    assert.equal((yield* h.summary).approvalCount, 1);
+    yield* h.runLifecycle("failed", secondRoot);
+    assert.equal((yield* h.summary).failureCount, 1);
+    assert.equal((yield* h.summary).phase, "failed");
+    yield* h.lifecycle("running", continuation);
+    assert.equal((yield* h.summary).phase, "failed");
+    yield* h.runLifecycle("starting", secondRoot);
+    yield* h.lifecycle("running", continuation);
+    assert.equal((yield* h.summary).failureCount, 0);
+    yield* h.write({
+      type: "runtime-request.updated",
+      payload: {
+        ...request,
+        id: RuntimeRequestId.make("after-retry"),
+        nodeId: secondRoot,
+        providerTurnId: secondTurn,
+      },
+    });
+    yield* h.lifecycle("completed", continuation);
+    assert.equal((yield* h.summary).approvalCount, 1);
+    assert.equal((yield* h.summary).phase, "waiting_for_approval");
+    yield* h.runLifecycle("completed", secondRoot);
+    assert.equal((yield* h.summary).approvalCount, 0);
+    assert.equal((yield* h.summary).phase, "completed");
+    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
+  }).pipe(Effect.provide(layer)),
+);
+
+it.effect.each(["failed", "interrupted", "cancelled"] as const)(
+  "does not terminally fence or resolve run requests on native %s",
+  (status) =>
+    Effect.gen(function* () {
+      const h = yield* harness();
+      yield* h.lifecycle("running");
+      yield* h.write({ type: "runtime-request.updated", payload: request });
+      yield* h.lifecycle(status);
+      assert.equal((yield* h.summary).approvalCount, 1);
+      assert.equal((yield* h.summary).failureCount, 0);
+      assert.equal((yield* h.summary).phase, "waiting_for_approval");
+      yield* h.lifecycle("running", { turnId: ProviderTurnId.make("retry-native"), ordinal: 2 });
+      yield* h.runLifecycle("completed");
+      assert.equal((yield* h.summary).approvalCount, 0);
+      assert.equal((yield* h.summary).phase, "completed");
+    }).pipe(Effect.provide(layer)),
+);
+
+it.effect.each(["completed", "failed", "interrupted", "cancelled"] as const)(
+  "keeps authoritative run %s fenced until authoritative recovery",
+  (status) =>
+    Effect.gen(function* () {
+      const h = yield* harness();
+      yield* h.lifecycle("running");
+      yield* h.write({ type: "runtime-request.updated", payload: request });
+      yield* h.runLifecycle(status);
+      const terminal = yield* h.summary;
+      const lateTurn = ProviderTurnId.make("late-native");
+      yield* h.lifecycle("running", { turnId: lateTurn, ordinal: 2 });
+      yield* h.write({
+        type: "runtime-request.updated",
+        payload: {
+          ...request,
+          id: RuntimeRequestId.make("late-request"),
+          providerTurnId: lateTurn,
+        },
+      });
+      assert.deepEqual(yield* h.summary, terminal);
+      yield* h.runLifecycle("running");
+      yield* h.write({
+        type: "runtime-request.updated",
+        payload: {
+          ...request,
+          id: RuntimeRequestId.make("retry-request"),
+          providerTurnId: lateTurn,
+        },
+      });
+      assert.equal((yield* h.summary).approvalCount, 1);
+      assert.equal((yield* h.summary).phase, "waiting_for_approval");
+      yield* h.runLifecycle("completed");
+      assert.equal((yield* h.summary).approvalCount, 0);
+      assert.equal((yield* h.summary).phase, "completed");
+    }).pipe(Effect.provide(layer)),
+);
+
 it.effect.each([
   { status: "failed", order: "provider-first" },
   { status: "failed", order: "run-first" },
@@ -248,17 +367,16 @@ it.effect.each([
     const native = h.lifecycle(status);
     const app = h.runLifecycle(status);
     yield* order === "provider-first" ? native : app;
-    const first = yield* h.items();
     const summary = yield* h.summary;
+    if (order === "provider-first") {
+      assert.equal(summary.phase, "waiting_for_approval");
+      assert.equal(summary.failureCount, 0);
+    }
     yield* order === "provider-first" ? app : native;
     const final = yield* h.items();
-    assert.deepEqual(
-      final.map((item) => item.attentionId),
-      first.map((item) => item.attentionId),
-    );
     assert.isTrue(final.every((item) => item.turnId === TurnId.make(runId)));
     assert.equal((yield* h.summary).turnId, TurnId.make(runId));
-    assert.equal((yield* h.summary).revision, summary.revision);
+    if (order === "run-first") assert.equal((yield* h.summary).revision, summary.revision);
     assert.equal((yield* h.summary).phase, status);
     assert.equal(
       final.filter((item) => item.kind === "failure").length,
@@ -295,14 +413,15 @@ it.effect("attributes the starting summary before any native provider turn arriv
   }).pipe(Effect.provide(layer)),
 );
 
-it.effect("uses canonical run completion to close the same root provider failure", () =>
+it.effect("uses only run failure and completion for the terminal failure lifecycle", () =>
   Effect.gen(function* () {
     const h = yield* harness();
     yield* h.lifecycle("running");
     yield* h.lifecycle("failed");
+    assert.equal((yield* h.summary).failureCount, 0);
+    yield* h.runLifecycle("failed");
     const failure = (yield* h.items())[0]!;
     assert.equal(failure.turnId, TurnId.make(runId));
-    yield* h.runLifecycle("failed");
     yield* h.runLifecycle("completed");
     const resolved = (yield* h.items())[0]!;
     assert.equal(resolved.attentionId, failure.attentionId);
@@ -328,7 +447,7 @@ it.effect("does not substitute native turn identity when root run ownership is u
     });
     yield* h.lifecycle("failed");
     assert.equal((yield* h.summary).failureCount, 0);
-    assert.equal((yield* h.summary).turnId, null);
+    assert.equal((yield* h.summary).turnId, TurnId.make(runId));
     yield* h.write({ type: "runtime-request.updated", payload: request });
     assert.equal((yield* h.items())[0]?.turnId, null);
     assert.equal(
@@ -438,12 +557,12 @@ it.effect(
         },
       });
       assert.equal((yield* h.summary).phase, "waiting_for_approval");
-      yield* h.lifecycle("failed");
+      yield* h.runLifecycle("failed");
       assert.equal((yield* h.summary).failureCount, 1);
       assert.equal((yield* h.summary).inputCount, 1);
-      yield* h.lifecycle("running");
+      yield* h.runLifecycle("running");
       assert.equal((yield* h.summary).failureCount, 0);
-      yield* h.lifecycle("completed");
+      yield* h.runLifecycle("completed");
       assert.equal((yield* h.summary).inputCount, 1);
       const identity = (yield* h.items()).find((item) => item.kind === "user_input")!.attentionId;
       yield* h.sink.write({
@@ -552,7 +671,7 @@ it.effect(
       assert.equal((yield* h.summary).disconnectCount, 0);
       yield* h.sink.write({ events: [{ ...lost, id: EventId.make("delayed-duplicate") }] });
       assert.equal((yield* h.summary).disconnectCount, 0);
-      yield* h.lifecycle("interrupted");
+      yield* h.runLifecycle("interrupted");
       yield* h.sink.write({
         events: [
           { ...lost, id: EventId.make("post-stop"), rawEventId: RawEventId.make("different-loss") },

@@ -51,6 +51,7 @@ export type AttentionEvidence = Common &
         readonly type: "lifecycle.observed";
         readonly payload: {
           readonly threadId: ThreadId;
+          readonly authority: "run" | "provider";
           readonly lifecycle: ProviderLifecycleEvidence;
         };
       }

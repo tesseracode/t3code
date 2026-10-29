@@ -101,14 +101,15 @@ const make = Effect.gen(function* () {
     ) =>
       project({
         ...common,
-        ...(event.type === "provider-turn.updated" && event.payload.completedAt !== null
-          ? { occurredAt: DateTime.formatIso(event.payload.completedAt) }
-          : {}),
         type: "lifecycle.observed",
         payload: {
           threadId: event.threadId,
+          authority:
+            event.type === "run.created" || event.type === "run.updated" ? "run" : "provider",
           lifecycle: {
-            providerEventId: EventId.make(`${event.rawEventId ?? event.id}:${runId}:${transition}`),
+            providerEventId: EventId.make(
+              `${event.rawEventId ?? event.id}:${event.type}:${runId}:${transition}`,
+            ),
             providerKey,
             turnId: TurnId.make(runId),
             transition,
@@ -227,13 +228,9 @@ const make = Effect.gen(function* () {
           if (root?.is_root !== 1 || root.run_id === null || owner === undefined) break;
           yield* sql`UPDATE foundation_v2_nodes SET provider_turn_id = ${turn.id}, provider_thread_id = ${turn.providerThreadId}
             WHERE thread_id = ${source.threadId} AND node_id = ${turn.nodeId}`;
-          const transition =
-            turn.status === "pending"
-              ? "starting"
-              : turn.status === "cancelled"
-                ? "interrupted"
-                : turn.status;
-          yield* lifecycle(source, root.run_id, owner.provider_key, transition);
+          // A run can continue across multiple root native turns; their terminals are audit evidence only.
+          if (turn.status === "running")
+            yield* lifecycle(source, root.run_id, owner.provider_key, "running");
           break;
         }
         case "run.created":
@@ -249,6 +246,8 @@ const make = Effect.gen(function* () {
                 providerKey: run.providerInstanceId,
               },
             });
+          } else if (run.status === "running") {
+            yield* lifecycle(source, run.id, run.providerInstanceId, "running");
           } else if (run.status === "rolled_back") {
             yield* project({
               ...common,
