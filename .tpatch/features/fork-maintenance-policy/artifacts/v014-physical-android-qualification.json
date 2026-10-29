@@ -1,0 +1,72 @@
+{
+  "sourceCommit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+  "upstreamBase": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "scope": "Later physical Android checkpoint; does not change the earlier emulator-only qualification record.",
+  "device": {
+    "model": "Samsung Galaxy A54 SM-A546U1",
+    "androidVersion": "16",
+    "sdk": 36,
+    "abi": "arm64-v8a"
+  },
+  "installation": {
+    "userApprovedInPlaceUpdate": true,
+    "packageId": "com.t3tools.t3code.dev",
+    "previousVersionName": "1.2.0",
+    "versionName": "2.2.0",
+    "versionCode": 1,
+    "apkSha256": "e27ea13bef29bb23132069e3782379bb147786b6d5d25b82b51394b989649838",
+    "oldAndNewSigningCertificateMatched": true,
+    "installedApkMatchedCandidate": true,
+    "uidRetained": true,
+    "uninstalledOrClearedData": false,
+    "previousSavedEnvironmentRetained": true
+  },
+  "connection": {
+    "transport": "Owned adb reverse tcp:16534 tcp:16534; USB only",
+    "serverOrigin": "http://127.0.0.1:16534",
+    "environmentId": "79292b49-5e53-4be6-ad59-f605034fbfb9",
+    "pairing": "Fresh credential submitted through normal Add environment fields and keyboard action",
+    "connectedStatusObserved": true,
+    "savedPairingSurvivedColdLaunch": true,
+    "metroRunning": false,
+    "otaUpdatesEnabled": false,
+    "otherSavedEnvironment": "Retained but unreachable during this check; not upgraded or reconfigured."
+  },
+  "runtime": {
+    "provider": "devReplay",
+    "threadId": "0396325b-00e6-43c3-8bdb-f3324f646afd",
+    "newPaidModelTurns": 0,
+    "runs": [
+      {
+        "ordinal": 4,
+        "status": "completed",
+        "phoneObservation": "Visible after cold restart; not claimed as live-stream proof."
+      },
+      {
+        "ordinal": 5,
+        "status": "completed",
+        "prompt": "Physical Android post-restart live-stream check.",
+        "reply": "todo list fixture complete",
+        "phoneObservation": "New message received without another reload; expanded prompt and completion captured visibly in the thread."
+      }
+    ]
+  },
+  "visualEvidence": {
+    "file": "v014-public-physical-android.png",
+    "url": "https://github.com/user-attachments/assets/7c83c62e-0e77-4ace-a5ed-89851b73fddf",
+    "sha256": "8873d1f2f2e08f7e824b794e68ce9ac79630f519c4ca0b986c577e01621ccb9a",
+    "scope": "Actual physical phone screenshot cropped to exclude status bar and personal environment header; not a simulator capture."
+  },
+  "independentReview": {
+    "model": "GPT-6.1 Sol",
+    "harness": "GitHub Copilot CLI code-review agent",
+    "result": "No significant inaccuracies or overclaims found in the bounded evidence.",
+    "boundary": "Supports installation/data retention, cold reconnect and post-restart live updates over USB. Initial-list freshness remains unresolved."
+  },
+  "limitations": [
+    "After initial pairing, the list initially showed both fixture threads, then only the native thread with a working indicator while the authoritative runs were completed. Cause unisolated. A cold restart restored both threads; the next Replay turn streamed correctly without another reload. Initial-list freshness is not qualified by this check.",
+    "Deep-link harness attempts were not used as pairing proof; Release ignores development-only prefill and auto-connect parameters.",
+    "USB connectivity does not establish LAN, VPN, relay, or unplugged access.",
+    "Notifications, background delivery, computer use, physical iPhone, Windows/WSL/Ubuntu runtime, and long-plan behavior remain outside this checkpoint."
+  ]
+}
