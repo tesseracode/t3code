@@ -1,0 +1,112 @@
+{
+  "schema_version": "1.1",
+  "slug": "tpatch-local-capture-ignore",
+  "verified_at": "2026-10-29T21:36:41Z",
+  "verdict": "passed",
+  "exit_code": 0,
+  "repository": {
+    "object_format": "sha1",
+    "commit_id_hex_len": 40,
+    "shallow": false,
+    "partial_clone": false,
+    "git_version": "git version 2.55.0",
+    "git_floor_satisfied": true
+  },
+  "baseline": {
+    "mode": "dual-anchor",
+    "current_commit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+    "current_probe": "isolated-index",
+    "historical_anchor": {
+      "state": "available",
+      "commit": "fed030d5cfba9b76789105d7f40933957d7b37cf",
+      "replay_anchor_commit": "16a55122c16fdd957ac7bba8e00aed970584d0f2",
+      "candidates_collected": 1,
+      "candidates_qualified": 1
+    }
+  },
+  "landing_evidence": {
+    "state": "exact",
+    "attestation_commit": "16a55122c16fdd957ac7bba8e00aed970584d0f2",
+    "candidates": 1,
+    "parent_count": 1,
+    "patch_presence": "present-nonempty",
+    "recipe_presence": "present-nonempty-with-ops",
+    "patch_sha_match": true,
+    "recipe_sha_match": true,
+    "base_commit_match": true,
+    "base_commit_reachable": true
+  },
+  "target_mode": "landed",
+  "checks": [
+    {
+      "id": "status_loaded",
+      "severity": "block-abort",
+      "passed": true
+    },
+    {
+      "id": "intent_files_present",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_parses",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_op_targets_resolve",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "dep_metadata_valid",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "satisfied_by_reachable",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "no satisfied_by deps to check"
+    },
+    {
+      "id": "dependency_gate_satisfied",
+      "severity": "warn",
+      "passed": true
+    },
+    {
+      "id": "recipe_replay_clean",
+      "severity": "block",
+      "passed": true,
+      "mode": "historical-anchor"
+    },
+    {
+      "id": "post_apply_patch_replay_clean",
+      "severity": "block",
+      "passed": true,
+      "mode": "dual-anchor",
+      "anchor_results": {
+        "current": "materialized-clean",
+        "historical": "passed"
+      }
+    },
+    {
+      "id": "reconcile_outcome_consistent",
+      "severity": "warn",
+      "passed": true
+    },
+    {
+      "id": "write_file_preimage_fresh",
+      "severity": "block",
+      "passed": true,
+      "mode": "historical-anchor",
+      "member_baselines": {
+        "tpatch-local-capture-ignore": "fed030d5cfba9b76789105d7f40933957d7b37cf"
+      }
+    }
+  ],
+  "lifecycle_state": "applied",
+  "recipe_hash_at_verify": "c77cda0e424f249f633d57d3cc08f61cf8100b749dc4936483ae9b7414e7b4ee",
+  "patch_hash_at_verify": "2534669ad7e0a2e7fe801555eab601a73bba3a5a6a4a52ff109b13e03f65e729"
+}

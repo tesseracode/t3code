@@ -1,0 +1,38 @@
+{
+  "sourceCommit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+  "upstreamBase": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "file": "T3CodeDev-v014-source-16d428db8-android-arm64.apk",
+  "bytes": 107828375,
+  "sha256": "e27ea13bef29bb23132069e3782379bb147786b6d5d25b82b51394b989649838",
+  "packageId": "com.t3tools.t3code.dev",
+  "versionName": "2.2.0",
+  "versionCode": 1,
+  "buildType": "release",
+  "appVariant": "development",
+  "abis": [
+    "arm64-v8a"
+  ],
+  "signing": "Android debug certificate; not a Play Store production release",
+  "signerSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "embeddedJavaScript": {
+    "path": "assets/index.android.bundle",
+    "bytes": 18908552,
+    "sha256": "4072b51cbd565ba5ec568555e0a7920f7f758e952110024fda78087ba65af7f6"
+  },
+  "otaUpdatesEnabled": false,
+  "otaEvidence": "aapt2 dump xmltree built APK: expo.modules.updates.ENABLED=false",
+  "buildOverrides": {
+    "APP_VARIANT": "development",
+    "T3CODE_MOBILE_UPDATES_ENABLED": "0",
+    "T3_NATIVE_CLIENT_CACHE": "off",
+    "EXPO_NO_DOTENV": "1",
+    "reactNativeArchitectures": "arm64-v8a"
+  },
+  "qualification": {
+    "emulatorColdLaunchWithMetroStopped": true,
+    "savedConnectionAndThreadRestored": true,
+    "physicalPhoneInstall": false,
+    "freshServerMessageReceivedWithoutMetro": true,
+    "liveProbeRun": "run:thread:0396325b-00e6-43c3-8bdb-f3324f646afd:ordinal:3"
+  }
+}

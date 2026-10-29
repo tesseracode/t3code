@@ -1,0 +1,190 @@
+{
+  "schema_version": "1.1",
+  "slug": "foundation-v014-client-compat",
+  "verified_at": "2026-10-29T21:36:53Z",
+  "verdict": "passed",
+  "exit_code": 0,
+  "repository": {
+    "object_format": "sha1",
+    "commit_id_hex_len": 40,
+    "shallow": false,
+    "partial_clone": false,
+    "git_version": "git version 2.55.0",
+    "git_floor_satisfied": true
+  },
+  "baseline": {
+    "mode": "dual-anchor",
+    "current_commit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+    "current_probe": "isolated-index",
+    "historical_anchor": {
+      "state": "available",
+      "commit": "e91fac691b614b5946c00b6daf8db1f81b86d83b",
+      "replay_anchor_commit": "a7d9b2984929eaa70ee6056568f5a5d4631f335a",
+      "candidates_collected": 1,
+      "candidates_qualified": 1
+    }
+  },
+  "landing_evidence": {
+    "state": "exact",
+    "attestation_commit": "a7d9b2984929eaa70ee6056568f5a5d4631f335a",
+    "candidates": 1,
+    "parent_count": 1,
+    "patch_presence": "present-nonempty",
+    "recipe_presence": "present-nonempty-with-ops",
+    "patch_sha_match": true,
+    "recipe_sha_match": true,
+    "base_commit_match": true,
+    "base_commit_reachable": false
+  },
+  "target_mode": "landed",
+  "checks": [
+    {
+      "id": "status_loaded",
+      "severity": "block-abort",
+      "passed": true
+    },
+    {
+      "id": "intent_files_present",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_parses",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_op_targets_resolve",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "dep_metadata_valid",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "satisfied_by_reachable",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "no satisfied_by deps to check"
+    },
+    {
+      "id": "dependency_gate_satisfied",
+      "severity": "warn",
+      "passed": true
+    },
+    {
+      "id": "recipe_replay_clean",
+      "severity": "block",
+      "passed": true,
+      "mode": "historical-anchor"
+    },
+    {
+      "id": "post_apply_patch_replay_clean",
+      "severity": "block",
+      "passed": true,
+      "mode": "dual-anchor",
+      "anchor_results": {
+        "current": "materialized-clean",
+        "historical": "passed"
+      }
+    },
+    {
+      "id": "reconcile_outcome_consistent",
+      "severity": "warn",
+      "passed": true,
+      "skipped": true,
+      "reason": "no Reconcile.Outcome set"
+    },
+    {
+      "id": "write_file_preimage_fresh",
+      "severity": "block",
+      "passed": true,
+      "mode": "historical-anchor",
+      "member_baselines": {
+        "copilot-cli-provider": "114f257eecd04ad283cd4016573eb51347c0e757",
+        "foundation-v014-client-compat": "e91fac691b614b5946c00b6daf8db1f81b86d83b",
+        "phase1-foundation": "02649e82b38f891549e6fadbc28c6bd4f300bcff"
+      }
+    }
+  ],
+  "lifecycle_state": "applied",
+  "recipe_hash_at_verify": "5524869561befb4e5016d2ff64e2b979cebc6c6a310b124fcfcf41beffc0499d",
+  "patch_hash_at_verify": "9ac66594f926d0d35387331473d86d5e8059f00edbef5b773b46daf5084609a4",
+  "parent_snapshot": {
+    "phase1-foundation": "applied"
+  },
+  "advisories": [
+    {
+      "code": "base-commit-unreachable",
+      "severity": "warn",
+      "slug": "foundation-v014-client-compat",
+      "message": "base-commit-unreachable: landing a7d9b2984929eaa70ee6056568f5a5d4631f335a for foundation-v014-client-compat attests base commit 6c925ff7c8ad226f5535ba3464636377a292437e, which is not reachable from HEAD; the landing was most likely rebased or cherry-picked — this is advisory only and does not affect the verdict"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "apps/mobile/src/state/attention.ts",
+      "message": "later-touch: later feature foundation-v014-client-compat touched apps/mobile/src/state/attention.ts after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "apps/mobile/src/state/tws.ts",
+      "message": "later-touch: later feature foundation-v014-client-compat touched apps/mobile/src/state/tws.ts after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "apps/server/src/tws/TwsCliDecoder.ts",
+      "message": "later-touch: later feature foundation-v014-client-compat touched apps/server/src/tws/TwsCliDecoder.ts after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "apps/web/src/components/settings/settingsSearch.ts",
+      "message": "later-touch: later feature attention-notifications touched apps/web/src/components/settings/settingsSearch.ts after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "docs/internals/tws-context.md",
+      "message": "later-touch: later feature foundation-v014-client-compat touched docs/internals/tws-context.md after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "packages/client-runtime/src/state/attention.test.ts",
+      "message": "later-touch: later feature foundation-v014-client-compat touched packages/client-runtime/src/state/attention.test.ts after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "packages/client-runtime/src/state/attention.ts",
+      "message": "later-touch: later feature foundation-v014-client-compat touched packages/client-runtime/src/state/attention.ts after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "packages/client-runtime/src/state/commandPermissions.test.ts",
+      "message": "later-touch: later feature foundation-v014-client-compat touched packages/client-runtime/src/state/commandPermissions.test.ts after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    },
+    {
+      "code": "later-touch",
+      "severity": "warn",
+      "slug": "phase1-foundation",
+      "path": "packages/contracts/src/settings.ts",
+      "message": "later-touch: later feature attention-notifications touched packages/contracts/src/settings.ts after phase1-foundation was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)"
+    }
+  ]
+}

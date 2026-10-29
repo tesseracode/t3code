@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.1",
+  "slug": "attention-policy-completion-watermarks",
+  "verified_at": "2026-10-29T21:36:59Z",
+  "verdict": "failed",
+  "exit_code": 2,
+  "repository": {
+    "object_format": "sha1",
+    "commit_id_hex_len": 40,
+    "shallow": false,
+    "partial_clone": false,
+    "git_version": "git version 2.55.0",
+    "git_floor_satisfied": true
+  },
+  "baseline": {
+    "mode": "dual-anchor",
+    "current_commit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+    "current_probe": "isolated-index",
+    "historical_anchor": {
+      "state": "available",
+      "commit": "38fee1a2dc83f0ef10106a1f20049b8b2e0a904e",
+      "replay_anchor_commit": "32bc736fc80cfe5c0c89cf8207a500a254e5f47f",
+      "candidates_collected": 1,
+      "candidates_qualified": 1
+    }
+  },
+  "landing_evidence": {
+    "state": "exact",
+    "attestation_commit": "32bc736fc80cfe5c0c89cf8207a500a254e5f47f",
+    "candidates": 1,
+    "parent_count": 1,
+    "patch_presence": "present-nonempty",
+    "recipe_presence": "present-nonempty-with-ops",
+    "patch_sha_match": true,
+    "recipe_sha_match": true,
+    "base_commit_match": true,
+    "base_commit_reachable": false
+  },
+  "target_mode": "landed",
+  "checks": [
+    {
+      "id": "status_loaded",
+      "severity": "block-abort",
+      "passed": true
+    },
+    {
+      "id": "intent_files_present",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_parses",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_op_targets_resolve",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "dep_metadata_valid",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "satisfied_by_reachable",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "no satisfied_by deps to check"
+    },
+    {
+      "id": "dependency_gate_satisfied",
+      "severity": "warn",
+      "passed": true
+    },
+    {
+      "id": "recipe_replay_clean",
+      "severity": "block",
+      "passed": false,
+      "remediation": "hard parent phase1-foundation landed at c7a5bf96545ff55cff9985c9b993c758d4ff8daf but its canonical patch is not present at the verification baseline; verify phase1-foundation first — do not re-apply it into the shadow",
+      "mode": "historical-anchor"
+    },
+    {
+      "id": "post_apply_patch_replay_clean",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "skipped: parent-replay aborted before V8",
+      "mode": "dual-anchor",
+      "anchor_results": {
+        "current": "materialized-clean",
+        "historical": "skipped"
+      }
+    },
+    {
+      "id": "reconcile_outcome_consistent",
+      "severity": "warn",
+      "passed": true,
+      "skipped": true,
+      "reason": "no Reconcile.Outcome set"
+    },
+    {
+      "id": "write_file_preimage_fresh",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "skipped: parent-replay aborted before V10",
+      "mode": "historical-anchor"
+    }
+  ],
+  "lifecycle_state": "applied",
+  "recipe_hash_at_verify": "751a98b9b03c47a5b8a404a06025ce14663c4fdb3c91f30eb81f767067c3e0bd",
+  "patch_hash_at_verify": "c93803f59c055124c2c58954dea3b2a92891d891a7e12e65c5c235cdf40b1369",
+  "parent_snapshot": {
+    "attention-notifications": "applied"
+  },
+  "failed_at": "parent-landing-drift",
+  "parent_slug": "phase1-foundation",
+  "advisories": [
+    {
+      "code": "base-commit-unreachable",
+      "severity": "warn",
+      "slug": "attention-policy-completion-watermarks",
+      "message": "base-commit-unreachable: landing 32bc736fc80cfe5c0c89cf8207a500a254e5f47f for attention-policy-completion-watermarks attests base commit ee5c462a9d408f38ac2c7495ec91dfcc617b1ac1, which is not reachable from HEAD; the landing was most likely rebased or cherry-picked — this is advisory only and does not affect the verdict"
+    }
+  ]
+}

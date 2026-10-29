@@ -1,0 +1,112 @@
+[
+  {
+    "type": "session.resume",
+    "timestamp": "2026-10-29T20:45:50.647Z",
+    "model": null
+  },
+  {
+    "type": "session.model_change",
+    "timestamp": "2026-10-29T20:45:50.702Z",
+    "model": null
+  },
+  {
+    "type": "system.message",
+    "timestamp": "2026-10-29T20:45:52.336Z",
+    "model": null
+  },
+  {
+    "type": "user.message",
+    "timestamp": "2026-10-29T20:45:52.343Z",
+    "model": null
+  },
+  {
+    "type": "assistant.turn_start",
+    "timestamp": "2026-10-29T20:45:52.358Z",
+    "model": null
+  },
+  {
+    "type": "assistant.message",
+    "timestamp": "2026-10-29T20:45:54.512Z",
+    "model": "gpt-6-astra"
+  },
+  {
+    "type": "tool.execution_start",
+    "timestamp": "2026-10-29T20:45:54.515Z",
+    "model": "gpt-6-astra"
+  },
+  {
+    "type": "permission.requested",
+    "timestamp": "2026-10-29T20:45:54.522Z",
+    "model": null
+  },
+  {
+    "type": "permission.completed",
+    "timestamp": "2026-10-29T20:47:43.005Z",
+    "model": null
+  },
+  {
+    "type": "tool.execution_complete",
+    "timestamp": "2026-10-29T20:47:43.050Z",
+    "model": "gpt-6-astra"
+  },
+  {
+    "type": "assistant.turn_end",
+    "timestamp": "2026-10-29T20:47:43.089Z",
+    "model": null
+  },
+  {
+    "type": "assistant.turn_start",
+    "timestamp": "2026-10-29T20:47:43.093Z",
+    "model": null
+  },
+  {
+    "type": "assistant.message",
+    "timestamp": "2026-10-29T20:47:44.464Z",
+    "model": "gpt-6-astra"
+  },
+  {
+    "type": "tool.execution_start",
+    "timestamp": "2026-10-29T20:47:44.465Z",
+    "model": "gpt-6-astra"
+  },
+  {
+    "type": "permission.requested",
+    "timestamp": "2026-10-29T20:47:44.473Z",
+    "model": null
+  },
+  {
+    "type": "permission.completed",
+    "timestamp": "2026-10-29T20:48:04.043Z",
+    "model": null
+  },
+  {
+    "type": "tool.execution_complete",
+    "timestamp": "2026-10-29T20:48:04.075Z",
+    "model": "gpt-6-astra"
+  },
+  {
+    "type": "assistant.turn_end",
+    "timestamp": "2026-10-29T20:48:04.098Z",
+    "model": null
+  },
+  {
+    "type": "assistant.turn_start",
+    "timestamp": "2026-10-29T20:48:04.100Z",
+    "model": null
+  },
+  {
+    "type": "assistant.message",
+    "timestamp": "2026-10-29T20:48:05.294Z",
+    "model": "gpt-6-astra"
+  },
+  {
+    "type": "assistant.turn_end",
+    "timestamp": "2026-10-29T20:48:05.295Z",
+    "model": null
+  },
+  {
+    "type": "session.usage_checkpoint",
+    "timestamp": "2026-10-29T20:48:05.302Z",
+    "model": null
+  }
+]
