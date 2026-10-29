@@ -1,0 +1,116 @@
+{
+  "base": "dde51c8e18801099e417c80dd369e3a9216af8f3",
+  "command": "tpatch record copilot-runtime-packaging --staged --files <all 31 canonical paths> --regenerate-recipe",
+  "recorded_patch_matched_staged_source": true,
+  "old_recipe_sha256": "82238092ca0c7a35c5feda5369696ccea02acb8ffb3dccdfc803e2fce5429312",
+  "observed_stale_fields_after_regenerate_recipe": [
+    {
+      "path": ".github/workflows/fork-native-preview.yml",
+      "stale_fields": [
+        "content"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopClerk.test.ts",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopClerk.ts",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopEnvironment.ts",
+      "stale_fields": [
+        "content"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "docs/operations/fork-native-preview.md",
+      "stale_fields": [
+        "content"
+      ]
+    },
+    {
+      "path": "docs/operations/release.md",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "packages/shared/package.json",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "scripts/build-cli-archive.ts",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "scripts/build-desktop-artifact.test.ts",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "scripts/build-desktop-artifact.ts",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "scripts/fork-preview-manifest.mjs",
+      "stale_fields": [
+        "content"
+      ]
+    },
+    {
+      "path": "scripts/lib/cli-external-packages.test.ts",
+      "stale_fields": [
+        "preimage_hash",
+        "content"
+      ]
+    },
+    {
+      "path": "scripts/lib/cli-external-packages.ts",
+      "stale_fields": [
+        "preimage_hash"
+      ]
+    }
+  ],
+  "correction": "Deterministically regenerated 31 write-file operations from the actual HEAD:index postimages and actual base commit preimages; no generation manifest authored or edited. Re-record through tpatch to capture corrected recipe identity.",
+  "corrected_recipe_sha256": "ae91f19743933798857adb183bb7fc5a7ab23de890989200ed3ba147e7f35a0a",
+  "intermediate_recipe_identity_note": "corrected_recipe_sha256 records the first deterministic correction before the final runtime-name documentation clarification; final CLI generation and digests follow.",
+  "same_patch_record_note": "A subsequent same-patch record legitimately skipped a generation and retained the previous recipe identity. No generation manifest was manually edited.",
+  "final_recipe_sha256": "51b9a9efa32b33a41e4f420f31935f9aa9ed122c18b789b89c59805deb203e6d",
+  "final_patch_sha256": "009ecb7d9a722e78ec8d271043c07ef6184a1ddbf9d16cb61223e74f7c81e860",
+  "final_actual_generation": 15,
+  "final_capture_mode": "staged-index"
+}

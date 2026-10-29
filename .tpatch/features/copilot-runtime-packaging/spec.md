@@ -1,11 +1,11 @@
 # Specification: copilot-runtime-packaging
 
-## Stable v0.1.3 manual port
+## Stable v0.1.4 manual port
 
 The criteria below retain the original consolidation/preview history, including
 its old path counts and approved batch limits; they are not new platform passes.
-The maintained port targets upstream `v0.1.3`
-(`d2c440312e5f39d59827ed466838a623516454d6`) on Node 26.12.1/pnpm 12.14.0.
+The maintained port targets upstream `v0.1.4`
+(`783581d461dc72cdd8f78fc8abb4ad536dfc4547`) on Node 26.12.1/pnpm 12.14.0.
 Preserve upstream package boundaries, `boot.cjs`, V2 Chromium profile migration,
 PE-only native signing, file limits, locks, TLS and self-containment probes.
 
@@ -22,7 +22,7 @@ Drop only this root's edge; preserve the historical feature's blocked attempt
 and do not claim it `upstream_merged` or manufacture `satisfied_by` evidence.
 `copilot-cli-provider` remains a hard integration dependency.
 
-The v0.1.3 preview workflow is manual-only, unsigned and build-only, with at most
+The preview workflow is manual-only, unsigned and build-only, with at most
 four authorized CI attempts per Linux x64/Windows x64 target, owned by the
 integration operator. No release, signing, deployment or installation is
 authorized by this port. Current manifests must be generated from actual builds
@@ -35,6 +35,13 @@ it probes markers or discovers stock profiles. Retain normal V1 migration and
 existing same-preview Chromium storage; do not delete prior data or replace OS
 cryptography. The complete maintained root includes its parent-authored CLI
 external boundaries and the corrected Windows CI `C:\t3\tmp` workspace separation.
+The maintained full root has 31 source paths, including both legacy-storage
+files and the complete 144-line migration regression suite. Historical path
+counts below describe earlier generations, not the current replay.
+Retain v0.1.4 startup recovery, boot self-checks, Cursor Zod externals, Linux
+arm64 page compatibility and downloaded Node/toolchain cache behavior.
+No project builds/tests, application launches, provider turns or CI dispatches
+are authorized during this replay; qualification follows full-set integration.
 
 ## Exact dependency closure
 

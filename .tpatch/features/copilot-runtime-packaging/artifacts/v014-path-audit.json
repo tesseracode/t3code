@@ -1,0 +1,380 @@
+{
+  "base_commit": "dde51c8e18801099e417c80dd369e3a9216af8f3",
+  "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "canonical_intent_commit": "5ce5d79bbdbf17b1d50a0f2a9ee7bda9651c1170",
+  "source_paths": 31,
+  "patch_sha256": "009ecb7d9a722e78ec8d271043c07ef6184a1ddbf9d16cb61223e74f7c81e860",
+  "recipe_sha256": "51b9a9efa32b33a41e4f420f31935f9aa9ed122c18b789b89c59805deb203e6d",
+  "actual_cli_generation": {
+    "generation": 15,
+    "generation_id": "pg_57a5c5bb950d",
+    "capture_mode": "staged-index"
+  },
+  "patch_equals_full_staged_source_diff": true,
+  "no_unmerged_entries": true,
+  "git_diff_check": "passed",
+  "paths": [
+    {
+      "path": ".github/workflows/fork-native-preview.yml",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "9eba1a3be94d1169ceb5b885893270784dc2eaead52f72e24a752463d894d153",
+      "source_bytes": 7491,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopClerk.test.ts",
+      "base_exists": true,
+      "base_sha256": "2d1361bf735a6db81c5a568a38a3a18b2e27cc9e0a9404643a4864d8992dccce",
+      "recipe_preimage_hash": "sha256:2d1361bf735a6db81c5a568a38a3a18b2e27cc9e0a9404643a4864d8992dccce",
+      "source_sha256": "848acd1352ba445acb32657867d3975639216e370a4f14df6e3f130070951ac2",
+      "source_bytes": 20053,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopClerk.ts",
+      "base_exists": true,
+      "base_sha256": "0268e08c9c3c896dec5c5d04e7971429bf3a04d0804683643ec46c31c3c0e94a",
+      "recipe_preimage_hash": "sha256:0268e08c9c3c896dec5c5d04e7971429bf3a04d0804683643ec46c31c3c0e94a",
+      "source_sha256": "1707fe62e8188405fe726943c2e7223297716d1be7cbf60740b690efdb6c7060",
+      "source_bytes": 9806,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopConfig.ts",
+      "base_exists": true,
+      "base_sha256": "604bdb890ca37f754f2b3e6ddb267c9967fb9c971e46e7d9eb6541f9e6963a79",
+      "recipe_preimage_hash": "sha256:604bdb890ca37f754f2b3e6ddb267c9967fb9c971e46e7d9eb6541f9e6963a79",
+      "source_sha256": "0f2f38eca0681fa8609784c74fc960dccf2db40d6ed606ad4b2025ebc6c5d526",
+      "source_bytes": 3038,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopEnvironment.ts",
+      "base_exists": true,
+      "base_sha256": "eb4bd8f453dbe90438f2e1dce4d174f97d5ece65bc124ba44a0fe8b6b66e5bf9",
+      "recipe_preimage_hash": "sha256:eb4bd8f453dbe90438f2e1dce4d174f97d5ece65bc124ba44a0fe8b6b66e5bf9",
+      "source_sha256": "5265bcfca2051e3457cc6782b7ab3916a02dfc70db0e6a0649764efb9af13973",
+      "source_bytes": 10295,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "1691f9748feceb764f16d0c111ac72a47893dacd8d57470d183271986f7d1569",
+      "source_bytes": 5517,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopLegacyLocalStorage.ts",
+      "base_exists": true,
+      "base_sha256": "d026244299f35addc2664c35fcc47ba282322afe70f8f8b77f67db514802b636",
+      "recipe_preimage_hash": "sha256:d026244299f35addc2664c35fcc47ba282322afe70f8f8b77f67db514802b636",
+      "source_sha256": "f811cb3926ed8c6642d56c52837eb013e289ec6a874da8ee295e79783b0ea073",
+      "source_bytes": 4269,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopUserData.test.ts",
+      "base_exists": true,
+      "base_sha256": "6272f2c24d515234f68905edf605ed75e2e73115fe29dd5fa6b0ddd8feb25f67",
+      "recipe_preimage_hash": "sha256:6272f2c24d515234f68905edf605ed75e2e73115fe29dd5fa6b0ddd8feb25f67",
+      "source_sha256": "05c0630f734d1ab2f6e7261c01c14cd867196eb16cabd0f8bd23ff3a73ff1dec",
+      "source_bytes": 2725,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopUserData.ts",
+      "base_exists": true,
+      "base_sha256": "610de275daac72bd186bda13ee9ca9063223c9df2de65d44144ba82d27c30ee6",
+      "recipe_preimage_hash": "sha256:610de275daac72bd186bda13ee9ca9063223c9df2de65d44144ba82d27c30ee6",
+      "source_sha256": "70cea2bd11e7545e354925e7512b5c060b8cde8917ccd448e7323f1d20e3707d",
+      "source_bytes": 4011,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+      "base_exists": true,
+      "base_sha256": "5c215f088a03c079a6e608458dc94a07faf316bb8d896f17940bcc60d21f9205",
+      "recipe_preimage_hash": "sha256:5c215f088a03c079a6e608458dc94a07faf316bb8d896f17940bcc60d21f9205",
+      "source_sha256": "926c57abbd07ef8b26b55a294cefa3bb24d511802df849fea2543897727fa288",
+      "source_bytes": 42955,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+      "base_exists": true,
+      "base_sha256": "8fa293505bfc573bdf011b094558513e141b920a0bcf261a96beb75376a61f77",
+      "recipe_preimage_hash": "sha256:8fa293505bfc573bdf011b094558513e141b920a0bcf261a96beb75376a61f77",
+      "source_sha256": "04401503e94edcaabc062d56ab354e9de24c1373db06a8153f178b2274723d18",
+      "source_bytes": 32039,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+      "base_exists": true,
+      "base_sha256": "208db2434a40702ab5b44d018925a16563367d2daf93bc7c9f150e5de7fd3845",
+      "recipe_preimage_hash": "sha256:208db2434a40702ab5b44d018925a16563367d2daf93bc7c9f150e5de7fd3845",
+      "source_sha256": "c4ec5a7e1771a1e13a2d3d84383c4dd0fc0d9cc9771aec7db4eaf2cc3274ecb8",
+      "source_bytes": 27978,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+      "base_exists": true,
+      "base_sha256": "3751d78476cb2466013a0b1448d5ddbbe7c214e2b1394eb1ff33e5d55390a7c0",
+      "recipe_preimage_hash": "sha256:3751d78476cb2466013a0b1448d5ddbbe7c214e2b1394eb1ff33e5d55390a7c0",
+      "source_sha256": "c5e63354324e9f4fa614488ce41dcbda24527b80ad36488e71c331724d92a65a",
+      "source_bytes": 46102,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "docs/operations/fork-native-preview.md",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "a30a9ffadb083db20cc94cba426b779b588623640da0eb035505e331e710222a",
+      "source_bytes": 6357,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "docs/operations/release.md",
+      "base_exists": true,
+      "base_sha256": "baa4d2150e453d18f32b1b3ec87c8bf9c51935ee5925ef4d6af28e93f2ca275e",
+      "recipe_preimage_hash": "sha256:baa4d2150e453d18f32b1b3ec87c8bf9c51935ee5925ef4d6af28e93f2ca275e",
+      "source_sha256": "d3a72eb5d203b7558a864ac3e330f4fcb58b0ac4bd4195dc251578b820043ea7",
+      "source_bytes": 44544,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "packages/shared/package.json",
+      "base_exists": true,
+      "base_sha256": "b34f7425e86e1887e91aa4e4b58be728964533cfa92892635ff5c6c27cb31228",
+      "recipe_preimage_hash": "sha256:b34f7425e86e1887e91aa4e4b58be728964533cfa92892635ff5c6c27cb31228",
+      "source_sha256": "11335abee1b01f01dc8d8d5e0a6c1fa889ebbd99dd468f3c42d5f005adb77137",
+      "source_bytes": 15876,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "packages/shared/src/copilotRuntime.test.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "72889e710d74e4a2492ed7ff349d4477962e3898cd9045fcce11a0ba652b723a",
+      "source_bytes": 5956,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "packages/shared/src/copilotRuntime.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "1e8b536f80fe38bd873282225174f3c71b65aa011e90392b47f53b49a477f3fe",
+      "source_bytes": 5964,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/build-cli-archive.ts",
+      "base_exists": true,
+      "base_sha256": "c2575ac2721f1abada29f8234e3294301414e7b1ee8de92dd7b15f01c1bbb36d",
+      "recipe_preimage_hash": "sha256:c2575ac2721f1abada29f8234e3294301414e7b1ee8de92dd7b15f01c1bbb36d",
+      "source_sha256": "d472d8f9cf86ea9c6ce55e141ae68392f4bfc9631cb4672a8020ba279b29400f",
+      "source_bytes": 22000,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/build-desktop-artifact.test.ts",
+      "base_exists": true,
+      "base_sha256": "658109b6df185387d36909b9855e4dd2c21cadfad3656ae7a605f76294084329",
+      "recipe_preimage_hash": "sha256:658109b6df185387d36909b9855e4dd2c21cadfad3656ae7a605f76294084329",
+      "source_sha256": "8065e69a887c19eba328814b59dc8e2dd58927082ed91a06832effff537e94ab",
+      "source_bytes": 78786,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/build-desktop-artifact.ts",
+      "base_exists": true,
+      "base_sha256": "886665c910717b3c79b18e7019db9adef15cf31b30ea735505f0705b3237dd6c",
+      "recipe_preimage_hash": "sha256:886665c910717b3c79b18e7019db9adef15cf31b30ea735505f0705b3237dd6c",
+      "source_sha256": "eab3bb934bd2f9e59722790bd7a6faa62c342734c4522ea42ca2d5b722186c81",
+      "source_bytes": 155452,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/fork-preview-bootstrap.cjs",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "773aa2a0a074b5206ef73bc5f21723d310710368649cb45492c29ecdf4ac36a7",
+      "source_bytes": 2720,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/fork-preview-manifest.mjs",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "47733460444ca33f0fccdf5e2a8e915709d5b69c2ea158784d6f075cc330c429",
+      "source_bytes": 3590,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/lib/cli-external-packages.test.ts",
+      "base_exists": true,
+      "base_sha256": "c1a8b93b8d716f40d3ea3f3d07cdd85c7ad37c7db7f462b383932ae1d75734b4",
+      "recipe_preimage_hash": "sha256:c1a8b93b8d716f40d3ea3f3d07cdd85c7ad37c7db7f462b383932ae1d75734b4",
+      "source_sha256": "2da80e9211b77ae4d1fcad8f91416a87b635477f2c852783e08a660c39ed35a3",
+      "source_bytes": 10301,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/lib/cli-external-packages.ts",
+      "base_exists": true,
+      "base_sha256": "e867edbf7d2bd53aa86893baf94f4e6b0fc9186bf7837192c12184dcf85a07c6",
+      "recipe_preimage_hash": "sha256:e867edbf7d2bd53aa86893baf94f4e6b0fc9186bf7837192c12184dcf85a07c6",
+      "source_sha256": "41430c8128607e1e152b72918bb2ca36c749c7359e9f9fb5dbdc890e35358aba",
+      "source_bytes": 3299,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/lib/copilot-payload.test.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "3859c39a0e5e8987117a09e428821a8c8f412bbbf104fdad4c993594cf8c0a4d",
+      "source_bytes": 18062,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/lib/copilot-payload.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "cf29f326effd1effe27dc2383bda62ce6761f3c24abc9953b23d74e02dee9bf0",
+      "source_bytes": 16017,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/lib/fork-preview.test.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "758dcc62c0291121b4f2cc1b874a4c35f43cdc7eeb88bd53f79bd12207c09247",
+      "source_bytes": 4380,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/lib/fork-preview.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "b6c618a416aa5ac1970f9de1d9f245185a982ebd396a91638a7763d3ee19d346",
+      "source_bytes": 868,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/lib/runtime-external-dependencies.test.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "e9e2281b8e05faedf67a4c8ee8f014fc203a9b32e84495efa831593038b58be3",
+      "source_bytes": 2751,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    },
+    {
+      "path": "scripts/lib/runtime-external-dependencies.ts",
+      "base_exists": false,
+      "base_sha256": null,
+      "recipe_preimage_hash": "",
+      "source_sha256": "a9106937302f5fef9df40a25f8168771c22055bd5f154f16160c0fc4d54cce60",
+      "source_bytes": 3996,
+      "recipe_matches_final_source": true,
+      "index_matches_final_source": true
+    }
+  ],
+  "unchanged_base_paths": [
+    {
+      "path": "pnpm-workspace.yaml",
+      "base_and_current_sha256": "cd68836b2f8fac2d69ab6e5e0373bc285a7f8e8e6784a6e72e530e828ca2f3c4"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "base_and_current_sha256": "9ff6da038ad5862f4ec4d76a7ae7a7d45cc25b9807e5eefaa44030dd525d7450"
+    },
+    {
+      "path": "packages/provider-copilot/package.json",
+      "base_and_current_sha256": "ee082ad34a8b01aa515a8b564aac43588272df4f29def794a9b9afc32803dc9e"
+    },
+    {
+      "path": ".tpatch/upstream.lock",
+      "base_and_current_sha256": "8f6caa63eb6768ed2caf2b8dbf786e03aca00cfb48cc4899175723ed1b910ae3"
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopStartupRecovery.ts",
+      "base_and_current_sha256": "96fdd6d6d36d908cb30d0baa22d69abc5a0876ebcd63280d379f4fc034f8fd03"
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopStartupRecovery.test.ts",
+      "base_and_current_sha256": "c1bc6d74429f480035e78391dfba40e11019633c9963565fadd4283cddd8eda4"
+    },
+    {
+      "path": "apps/desktop/src/app/DesktopApp.ts",
+      "base_and_current_sha256": "4f1afeaa5ac4c17b2a3d4b383169afffa7bcc22cd13faf28e79f460c99c44174"
+    },
+    {
+      "path": "apps/server/scripts/cli.ts",
+      "base_and_current_sha256": "1dfb3329a39ad5ed25d0cb9ab2bcf74037f3341a08be6bf611f5ecc95092fb8f"
+    },
+    {
+      "path": "scripts/lib/linux-arm64-sea.ts",
+      "base_and_current_sha256": "8209ab825f35aee3e81635b20191addeacd8403e41b04ad2c87e75f63f1e5f9f"
+    },
+    {
+      "path": "apps/desktop/src/boot.ts",
+      "base_and_current_sha256": "cd27122790401742964718d6684342572c9a8305c394e9198c4d7dad0486a178"
+    },
+    {
+      "path": "apps/desktop/src/compileCache.ts",
+      "base_and_current_sha256": "973b559ea6478902203b4fef23be4fa4385b5e2632e74e12747c4b8d6c2e4098"
+    },
+    {
+      "path": "apps/server/vite.config.ts",
+      "base_and_current_sha256": "71925063e5e0501233aeabdf4f6f42602b0791113c50e8e7b63d08c641eb2146"
+    }
+  ],
+  "project_validation": "not run; primary full-set replay required",
+  "tpatch_verify": "failed: native parent landing evidence ambiguous; exact unmodified report retained"
+}
