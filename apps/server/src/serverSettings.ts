@@ -74,7 +74,12 @@ const textDecoder = new TextDecoder();
 const foldProviderInstanceEnabledFlags = (settings: ServerSettings): ServerSettings => {
   let changed = false;
   const providerInstances: Record<string, ProviderInstanceConfig> = {};
-  for (const [instanceId, instance] of Object.entries(settings.providerInstances)) {
+  for (const [instanceId, previous] of Object.entries(settings.providerInstances)) {
+    const instance =
+      previous.driver === "copilot"
+        ? { ...previous, driver: ProviderDriverKind.make("githubCopilot") }
+        : previous;
+    if (instance !== previous) changed = true;
     const config = instance.config;
     // Leave malformed flags for driver schema validation rather than silently repairing them.
     if (
@@ -368,6 +373,11 @@ function migrateLegacyProviderSettings(
   }
 
   const legacyEntries = new Map(Object.entries(legacyProviders));
+  // The native SDK driver replaces the original opt-in Copilot driver, not the ACP registry.
+  if (!legacyEntries.has("githubCopilot") && legacyEntries.has("copilot")) {
+    legacyEntries.set("githubCopilot", legacyEntries.get("copilot"));
+  }
+  legacyEntries.delete("copilot");
   for (const driver of HISTORY_RESTORED_DRIVERS) {
     if (!legacyEntries.has(driver)) legacyEntries.set(driver, {});
   }
@@ -735,6 +745,9 @@ const make = Effect.gen(function* () {
             ),
           );
 
+    const needsCopilotDriverMigration = Object.values(settings.providerInstances).some(
+      (instance) => instance.driver === "copilot",
+    );
     const loaded = foldProviderInstanceEnabledFlags(
       legacyProviders === undefined
         ? settings
@@ -773,6 +786,7 @@ const make = Effect.gen(function* () {
       : folded;
     if (
       migrated !== loaded ||
+      needsCopilotDriverMigration ||
       (settingsFileTrusted && legacyProviders !== undefined) ||
       hasLegacySourceControl
     ) {
