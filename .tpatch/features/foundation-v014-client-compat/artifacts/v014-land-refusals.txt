@@ -1,0 +1,32 @@
+
+# land.log
+error: land: cannot stage path set: exit status 128
+
+
+# deleted-stage-preflight.log
+fatal: pathspec 'apps/mobile/src/state/attention.ts' did not match any files
+
+
+# land-retry.log
+error: land: cannot stage path set: exit status 128
+
+
+# manual-stage-preflight.log
+remove 'apps/mobile/src/state/attention.ts'
+remove 'apps/mobile/src/state/tws.ts'
+add '.tpatch/features/foundation-v014-client-compat/analysis.md'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/apply-recipe.json'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/apply-session.json'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/manual-validation.md'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/patch-generations.json'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/post-apply-diff.txt'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/post-apply.patch'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/v014-compat-provenance.json'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/v014-structural-verify.txt'
+add '.tpatch/features/foundation-v014-client-compat/artifacts/v014-validation-transcript.txt'
+add '.tpatch/features/foundation-v014-client-compat/exploration.md'
+add '.tpatch/features/foundation-v014-client-compat/patches/001-record.patch'
+add '.tpatch/features/foundation-v014-client-compat/record.md'
+add '.tpatch/features/foundation-v014-client-compat/request.md'
+add '.tpatch/features/foundation-v014-client-compat/spec.md'
+add '.tpatch/features/foundation-v014-client-compat/status.json'

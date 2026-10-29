@@ -329,6 +329,7 @@ const makeSession = Effect.fn(function* (environmentId: EnvironmentId, supported
     subscribeServerConfig: () => Stream.die("unused"),
     ready: Effect.void,
     probe: Effect.die("unexpected probe"),
+    inboundFrames: Effect.die("unexpected liveness observation"),
     closed: Effect.never,
   };
   return { session, calls, subscriptions };
@@ -377,7 +378,7 @@ const makeHarness = Effect.fn(function* (ids: ReadonlyArray<EnvironmentId> = [A,
     networkStatus: yield* SubscriptionRef.make<NetworkStatus>("online"),
     start: Effect.die("unexpected registry start"),
     register: () => Effect.die("unexpected register"),
-    registerPlatform: () => Effect.die("unused"),
+    assertKnownAddress: () => Effect.die("unexpected address assertion"),
     reconcilePlatform: () => Effect.die("unused"),
     remove: () => Effect.die("unused"),
     removeRelayEnvironments: () => Effect.die("unused"),

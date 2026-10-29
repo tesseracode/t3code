@@ -1,0 +1,15 @@
+verify foundation-v014-client-compat — failed
+  baseline: current @ 6c925ff
+  landing evidence: none
+  ✓ [block-abort] status_loaded
+  ✓ [block] intent_files_present
+  ✓ [block] recipe_parses
+  ✓ [block] recipe_op_targets_resolve
+  ✓ [block] dep_metadata_valid
+  ⊘ [block] satisfied_by_reachable — no satisfied_by deps to check
+  ✓ [warn] dependency_gate_satisfied
+  ✗ [block] recipe_replay_clean — hard parent copilot-cli-provider has ambiguous landing evidence; verify copilot-cli-provider first — replaying or skipping it would validate foundation-v014-client-compat against an unknown baseline
+  ⊘ [block] post_apply_patch_replay_clean — skipped: parent-replay aborted before V8
+  ⊘ [warn] reconcile_outcome_consistent — no Reconcile.Outcome set
+  ⊘ [block] write_file_preimage_fresh — skipped: parent-replay aborted before V10
+error: verify failed (1 check(s) did not pass)
