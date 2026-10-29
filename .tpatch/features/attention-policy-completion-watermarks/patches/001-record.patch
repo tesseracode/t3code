@@ -1,0 +1,86 @@
+diff --git a/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts b/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts
+index ff653bd9e..b2e69cdc9 100644
+--- a/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts
++++ b/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts
+@@ -576,3 +576,35 @@ it("retains upstream guest-request alerts on canonical-capable environments", as
+   state.shells.set("one", shell({ pendingGuestMessageCount: 1 }));
+   expect(TestNotification.sent.map((entry) => entry.title)).toEqual(["Guest request"]);
+ });
++
++it.each([
++  "enabling before grace",
++  "enabling after grace",
++  "category changes",
++  "environment mute changes",
++])("does not replay a fallback completion after %s policy changes", async (policyChange) => {
++  await using app = setup();
++  const enabling = policyChange.startsWith("enabling");
++  state.mode = enabling ? "off" : "notifications";
++  app.start();
++  using _timers = fakeTimers();
++  const completed = {
++    latestTurn: {
++      turnId: "turn",
++      state: "completed",
++      completedAt: "2026-09-13T07:00:01.000Z",
++    },
++  };
++  state.shells.set("one", shell(completed));
++  if (policyChange !== "enabling before grace")
++    await vi.advanceTimersByTimeAsync(WORKING_EXIT_GRACE_MS);
++  expect(TestNotification.sent).toHaveLength(enabling ? 0 : 1);
++  if (enabling) state.mode = "notifications";
++  else if (policyChange === "category changes")
++    state.policy = { notificationCategories: ["completion"] };
++  else state.policy = { notificationMutedEnvironments: [EnvironmentId.make("two")] };
++  app.changeSettings();
++  state.shells.set("one", shell({ ...completed, title: "Renamed completed thread" }));
++  await vi.advanceTimersByTimeAsync(WORKING_EXIT_GRACE_MS);
++  expect(TestNotification.sent).toHaveLength(enabling ? 0 : 1);
++});
+diff --git a/apps/web/src/components/ThreadNotificationCoordinator.logic.ts b/apps/web/src/components/ThreadNotificationCoordinator.logic.ts
+index 77edccfbe..ac337a2ad 100644
+--- a/apps/web/src/components/ThreadNotificationCoordinator.logic.ts
++++ b/apps/web/src/components/ThreadNotificationCoordinator.logic.ts
+@@ -69,6 +69,13 @@ export function createThreadNotificationGate<Key>(
+       for (const key of handled.keys()) if (!keys.has(key)) handled.delete(key);
+       for (const key of lastSettled.keys()) if (!keys.has(key)) lastSettled.delete(key);
+     },
++    /** Policy edits must not turn old observations into new completions. */
++    consumePendingCompletions(): void {
++      for (const [key, { at }] of pending) {
++        skip(key, at);
++        cancel(key);
++      }
++    },
+     clear(): void {
+       for (const key of pending.keys()) cancel(key);
+       handled.clear();
+diff --git a/apps/web/src/components/ThreadNotificationCoordinator.tsx b/apps/web/src/components/ThreadNotificationCoordinator.tsx
+index 35698e05f..8b2e2e64d 100644
+--- a/apps/web/src/components/ThreadNotificationCoordinator.tsx
++++ b/apps/web/src/components/ThreadNotificationCoordinator.tsx
+@@ -555,7 +555,7 @@ export function startThreadNotifications(
+     if (policyKey !== nextPolicyKey) {
+       for (const entry of watched.values()) {
+         entry.completions.clear();
+-        entry.gate.clear();
++        entry.gate.consumePendingCompletions();
+       }
+       policyKey = nextPolicyKey;
+     }
+diff --git a/docs/internals/attention-notifications.md b/docs/internals/attention-notifications.md
+index 15d144a9f..9310719b2 100644
+--- a/docs/internals/attention-notifications.md
++++ b/docs/internals/attention-notifications.md
+@@ -20,6 +20,10 @@ turn, not an open item. Explicitly unsupported environments use the existing
+ shell transition detector exclusively; unknown or failed canonical sync does
+ not activate fallback.
+ 
++Policy edits consume pending shell completions without forgetting handled or
++skipped timestamps. Updating a previously completed thread after opt-in,
++category or mute changes must not replay that completion through legacy fallback.
++
+ On V2, canonical completion candidates join the upstream run-settlement grace
+ gate by owning run identity. Either stream may arrive first; an intervening
+ continuation cancels completion. Guest requests retain upstream shell delivery.

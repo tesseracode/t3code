@@ -1,0 +1,251 @@
+# regression-before.log
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: browserType.launch: Executable doesn't exist at /Users/jdbencardinop/Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     npx playwright install                                 ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+ ❯ node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js:1098:55
+ ❯ PlaywrightBrowserProvider.createContext node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js:1271:19
+ ❯ PlaywrightBrowserProvider.openBrowserPage node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js:1345:19
+ ❯ PlaywrightBrowserProvider.openPage node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js:1366:23
+ ❯ TestProject._openBrowserPage node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js:6726:3
+ ❯ BrowserWorker.openPage node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js:4668:3
+ ❯ BrowserWorker.openPages node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js:4648:3
+ ❯ BrowserWorker.runTests node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js:4592:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files   (1)
+      Tests  no tests
+     Errors  1 error
+   Start at  10:33:49
+   Duration  181ms
+
+error during close browserType.launch: Executable doesn't exist at /Users/jdbencardinop/Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     npx playwright install                                 ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+    at /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js:1098:55
+    at async PlaywrightBrowserProvider.createContext (/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js:1271:19)
+    at async PlaywrightBrowserProvider.openBrowserPage (/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js:1345:19)
+    at async PlaywrightBrowserProvider.openPage (/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js:1366:23)
+    at async TestProject._openBrowserPage (/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js:6726:3)
+    at async BrowserWorker.openPage (/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js:4668:3)
+    at async BrowserWorker.openPages (/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js:4648:3)
+    at async BrowserWorker.runTests (/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js:4592:3) {
+  name: 'Error',
+  type: 'Unhandled Error',
+  stacks: [
+    {
+      method: '',
+      file: '/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js',
+      line: 1098,
+      column: 55
+    },
+    {
+      method: 'PlaywrightBrowserProvider.createContext',
+      file: '/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js',
+      line: 1271,
+      column: 19
+    },
+    {
+      method: 'PlaywrightBrowserProvider.openBrowserPage',
+      file: '/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js',
+      line: 1345,
+      column: 19
+    },
+    {
+      method: 'PlaywrightBrowserProvider.openPage',
+      file: '/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/@vitest+browser-playwright@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@volar+ty_91887ba70f895bfbb902634e70aa345b/node_modules/@vitest/browser-playwright/dist/index.js',
+      line: 1366,
+      column: 23
+    },
+    {
+      method: 'TestProject._openBrowserPage',
+      file: '/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js',
+      line: 6726,
+      column: 3
+    },
+    {
+      method: 'BrowserWorker.openPage',
+      file: '/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js',
+      line: 4668,
+      column: 3
+    },
+    {
+      method: 'BrowserWorker.openPages',
+      file: '/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js',
+      line: 4648,
+      column: 3
+    },
+    {
+      method: 'BrowserWorker.runTests',
+      file: '/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/node_modules/.pnpm/vitest@5.0.5_@tsc-rs+typescript@0.8.0_@types+node@24.12.4_@vitest+browser-playwright@5._844b5ecc141c2e2bcf9965912e411c65/node_modules/vitest/dist/chunks/index.1TqnEahn.js',
+      line: 4592,
+      column: 3
+    }
+  ]
+}
+
+
+# browser-install.log
+Downloading Chrome Headless Shell 148.0.7778.96 (playwright chromium-headless-shell v1223)[2m from https://cdn.playwright.dev/builds/cft/148.0.7778.96/mac-arm64/chrome-headless-shell-mac-arm64.zip[22m
+|                                                                                |   0% of 92.4 MiB
+|■■■■■■■■                                                                        |  10% of 92.4 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 92.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 92.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 92.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 92.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 92.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 92.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 92.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 92.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 92.4 MiB
+Chrome Headless Shell 148.0.7778.96 (playwright chromium-headless-shell v1223) downloaded to /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/.tpatch/local/v014-attention-watermarks/browsers/chromium_headless_shell-1223
+Downloading FFmpeg (playwright ffmpeg v1011)[2m from https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-mac-arm64.zip[22m
+|                                                                                |   1% of 1 MiB
+|■■■■■■■■                                                                        |  10% of 1 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  31% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  41% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  81% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  91% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 1 MiB
+FFmpeg (playwright ffmpeg v1011) downloaded to /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation/.tpatch/local/v014-attention-watermarks/browsers/ffmpeg-1011
+
+
+# regression-red.log
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation
+
+stdout | src/components/ThreadNotificationCoordinator.badge.browser.test.ts > does not replay a fallback completion after enabling after grace policy changes
+[10:34:14.582] WARN (#38): Could not discover the primary environment. {
+  error: [ConnectionTransientError: Remote environment endpoint returned an invalid response from http://localhost:61615/.well-known/t3/environment.],
+}
+ ❯ |@t3tools/web (browser) (chromium)| src/components/ThreadNotificationCoordinator.badge.browser.test.ts (18 tests | 4 failed | 14 skipped) 26ms
+   × does not replay a fallback completion after enabling before grace policy changes 10ms
+   × does not replay a fallback completion after enabling after grace policy changes 3ms
+   × does not replay a fallback completion after category changes policy changes 6ms
+   × does not replay a fallback completion after environment mute changes policy changes 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@t3tools/web (browser) (chromium)| src/components/ThreadNotificationCoordinator.badge.browser.test.ts > does not replay a fallback completion after enabling before grace policy changes
+ FAIL  |@t3tools/web (browser) (chromium)| src/components/ThreadNotificationCoordinator.badge.browser.test.ts > does not replay a fallback completion after enabling after grace policy changes
+AssertionError: expected [ EventTarget{ …(3) } ] to have a length of +0 but got 1
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 1[39m
+
+ ❯ Proxy.<anonymous> node_modules/.vite/vitest/ef98362b8a6b0c8cd804b0d227aa1ffeaba89786/deps/index.aTZaPVhf-BqblidDz.js?v=6f27f45e:1986:20
+ ❯ Proxy.<anonymous> node_modules/.vite/vitest/ef98362b8a6b0c8cd804b0d227aa1ffeaba89786/deps/index.aTZaPVhf-BqblidDz.js?v=6f27f45e:1786:14
+ ❯ src/components/ThreadNotificationCoordinator.badge.browser.test.ts:609:33
+    607|   state.shells.set("one", shell({ ...completed, title: "Renamed comple…
+    608|   await vi.advanceTimersByTimeAsync(WORKING_EXIT_GRACE_MS);
+    609|   expect(TestNotification.sent).toHaveLength(enabling ? 0 : 1);
+       |                                 ^
+    610| });
+    611|
+ ❯ node_modules/.vite/vitest/ef98362b8a6b0c8cd804b0d227aa1ffeaba89786/deps/plugins.DPQHVT0p-DA7dDqu8.js?v=6f27f45e:5237:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@t3tools/web (browser) (chromium)| src/components/ThreadNotificationCoordinator.badge.browser.test.ts > does not replay a fallback completion after category changes policy changes
+ FAIL  |@t3tools/web (browser) (chromium)| src/components/ThreadNotificationCoordinator.badge.browser.test.ts > does not replay a fallback completion after environment mute changes policy changes
+AssertionError: expected [ EventTarget{ …(3) }, …(1) ] to have a length of 1 but got 2
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 2[39m
+
+ ❯ Proxy.<anonymous> node_modules/.vite/vitest/ef98362b8a6b0c8cd804b0d227aa1ffeaba89786/deps/index.aTZaPVhf-BqblidDz.js?v=6f27f45e:1986:20
+ ❯ Proxy.<anonymous> node_modules/.vite/vitest/ef98362b8a6b0c8cd804b0d227aa1ffeaba89786/deps/index.aTZaPVhf-BqblidDz.js?v=6f27f45e:1786:14
+ ❯ src/components/ThreadNotificationCoordinator.badge.browser.test.ts:609:33
+    607|   state.shells.set("one", shell({ ...completed, title: "Renamed comple…
+    608|   await vi.advanceTimersByTimeAsync(WORKING_EXIT_GRACE_MS);
+    609|   expect(TestNotification.sent).toHaveLength(enabling ? 0 : 1);
+       |                                 ^
+    610| });
+    611|
+ ❯ node_modules/.vite/vitest/ef98362b8a6b0c8cd804b0d227aa1ffeaba89786/deps/plugins.DPQHVT0p-DA7dDqu8.js?v=6f27f45e:5237:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 14 skipped (18)
+   Start at  10:34:11
+   Duration  3.43s (worker 61%, import 37%, tests 2%)
+
+
+
+# regression-green.log
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 14 skipped (18)
+   Start at  10:35:13
+   Duration  3.33s (worker 76%, import 23%, tests 1%)
+
+
+
+# tests-after.log
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v014-foundation
+
+
+ Test Files  3 passed (3)
+      Tests  39 passed (39)
+   Start at  10:34:37
+   Duration  4.22s (transform 59%, worker 22%, import 13%, setup 6%, tests 1%)
+
+
+
+# typecheck.log
+~/apps/web$ tsc --noEmit
+
+
+
+# format-check.log
+note: You are running `vp fmt` as a Vite+ built-in command. If you meant to run the fmt npm script, use `vpr fmt` instead.
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 67ms on 4 files using 10 threads.
+
+
+# lint.log
+note: You are running `vp lint` as a Vite+ built-in command. If you meant to run the lint npm script, use `vpr lint` instead.

@@ -20,6 +20,10 @@ turn, not an open item. Explicitly unsupported environments use the existing
 shell transition detector exclusively; unknown or failed canonical sync does
 not activate fallback.
 
+Policy edits consume pending shell completions without forgetting handled or
+skipped timestamps. Updating a previously completed thread after opt-in,
+category or mute changes must not replay that completion through legacy fallback.
+
 On V2, canonical completion candidates join the upstream run-settlement grace
 gate by owning run identity. Either stream may arrive first; an intervening
 continuation cancels completion. Guest requests retain upstream shell delivery.
