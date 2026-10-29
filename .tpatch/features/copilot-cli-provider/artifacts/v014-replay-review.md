@@ -204,14 +204,16 @@ The actual historical canonical patches were inspected, not only their titles:
 
 | Historical feature/intent | v0.1.4 source outcome | Graph decision |
 |---|---|---|
-| `copilot-skill-controls`: server adapter enable/disable/reload, provider registry forwarding and `server.setSkillEnabled` RPC | **NOT COVERED** by this native root. Current native handles expose only skill listing/discovery; there is no toggle service/RPC. The old implementation also picked an arbitrary active session and swallowed errors, so blindly restoring it would violate workspace isolation and truthful delivery. | Do **not** mark upstream-merged or add a blanket supersedes edge. Keep history and explicit missing-capability evidence; restoring management requires separately authorized service/contract work. |
+| `copilot-skill-controls`: server adapter enable/disable/reload, provider registry forwarding and `server.setSkillEnabled` RPC | **Historical-only, already absent from the supplied installed baseline**, not a v0.1.3/v0.1.4 installed-feature regression. Neither deployed server `bc9eeb9a` nor mobile `aeb0b482` has the mutation route. Current native handles expose only skill listing/discovery. The historical implementation picked an arbitrary active session and swallowed errors. | Do **not** mark upstream-merged or add a blanket supersedes edge. Preserve history without treating `state: applied` as deployed proof. Restoration is not required by the previous-installed-feature preservation scope. |
 | Its requested UI toggles | The historical canonical patch contains no UI toggle implementation. UI request/backlog is **not** evidence of shipped UI and is not authorized here. | No new functionality implemented. |
-| `copilot-skill-controls-ws-rpc`: register the legacy RPC in `WsRpcGroup` to avoid undefined entries | The current V2 RPC contract has neither the legacy declaration nor handler/registration. The old dangling declaration failure shape is absent, but management semantics are still missing. | Cannot honestly call the entire feature upstream-merged or superseded by this root. If management is later restored, include contract/group/transport coverage in the authorized replacement. |
+| `copilot-skill-controls-ws-rpc`: register the legacy RPC in `WsRpcGroup` to avoid undefined entries | Both supplied installed contract snapshots, and current V2, lack the legacy declaration and registration altogether. The old dangling-declaration failure shape is absent. This does not establish a deployed management feature. | Cannot honestly call the entire historical feature upstream-merged or superseded by this root. If management is later authorized, include contract/group/transport coverage in that replacement. |
 | Its same-origin HTTP define fix | **Already upstream independently**: web Vite config clears HTTP/WS origins in single-origin dev and explicitly defines both. Left untouched. | One independently upstream-covered subcomponent does not retire the whole mixed feature. |
 
-Native discovery is maintained; mid-session enable/disable/reload is an explicit
-missing historical server capability, not silently claimed as covered. No legacy
-feature statuses, supersedes edges, or unrelated maintained roots were edited.
+Native discovery is maintained. Mid-session enable/disable/reload exists in
+historical patch intent but was already absent from the supplied installed source.
+Earlier shipment/removal, if any, is not established by this audit; do not claim
+v0.1.3 first dropped it. No legacy feature statuses, supersedes edges, or unrelated
+maintained roots were edited.
 
 ## Source validation and deferred commands
 
@@ -347,6 +349,61 @@ No pin, override, package payload policy or packaging root was changed for this
 research. Newer API/schema/runtime availability would need separate authorization,
 compatibility review and real qualification. Existing supported/unsupported
 integration capability flags remain unchanged.
+
+### Installed-source clarification (2026-10-29 follow-up)
+
+After integration at `8605454d5cba4ab065f43fa694e62868fe093e31`, the preservation
+baseline was checked directly, rather than inferred from historical tpatch state:
+
+- Deployed server source:
+  `bc9eeb9a6f5e3fe2e6d58d9c1b14d5ed93d6c2be`.
+- Deployed mobile source:
+  `aeb0b48220d2cb83698e2298a163261f75ec5681`.
+- `git grep` over each snapshot's relevant `apps/` and `packages/` source found
+  no `setSkillEnabled`, `server.setSkillEnabled`, `serverSetSkillEnabled`,
+  `WsServerSetSkillEnabledRpc`, or `skills.enable/disable/reload` implementation.
+- Installed server `apps/server/src/provider/Layers/CopilotAdapter.ts:107`
+  narrows its native skill handle to `Pick<...["skills"], "list">`. Its complete
+  returned adapter surface contains discovery/session operations, not a toggle.
+  At lines 2197 and 2284 it enables native skill loading and lists skills:
+  discovery is real, but neither operation is mid-session management.
+- Both installed `packages/contracts/src/rpc.ts` snapshots have settings get/
+  update methods at lines 390–391, declarations at 592/598 and group entries at
+  1434–1435, with no skill-mutation declaration or registration in the file.
+  No corresponding server handler or registry mutator exists.
+- Mobile `composerSlashSkillSearch.ts` and shared `providerSkills.ts` read
+  `skill.enabled` to filter discovered skills; they do not enable/disable skills.
+  No installed mobile mutation callsite was found.
+
+**Correct classification:** historical-only API / earlier omission relative to
+these installed snapshots, **not a demonstrated shipped regression introduced
+by v0.1.3 or v0.1.4**. Whether some still-earlier version shipped it is unproven.
+Consequently no recovery implementation, new V2 boundary, or behavioral tradeoff
+requiring approval is proposed under this preservation task. No broad code work,
+application/provider execution, or tests were performed for this clarification.
+
+### Callback decisions versus this integration's approval UI
+
+The official **1.0.8** high-level `onPermissionRequest` callback is not restricted
+to one-time approvals. Its published `PermissionRequestResult` accepts native
+`PermissionDecision` plus `{kind:"no-result"}`. Native decision kinds include
+`approve-once`, `approve-for-session`, `approve-for-location` (approval plus
+`locationKey`), `approve-permanently` (a URL `domain`), `reject` (optional feedback)
+and `user-not-available`, plus legacy approval/denial outcome variants.
+SDK **1.0.28** additionally accepts `approve-read-only-for-session` with directories.
+These types do not mean every decision applies to every request kind.
+
+T3's current Copilot UI intentionally offers only **Allow once / Deny**; it maps
+those to `approve-once` / `reject` through the native pending-permission RPC and
+requires `{success:true}`. The callback's `no-result` delegates delivery to that
+RPC rather than generating a second SDK-owned response. Persistent grants being
+unexposed by this integration is an integration boundary, **not an SDK inability**.
+
+Official pinned sources:
+https://github.com/github/copilot-sdk/blob/v1.0.8/nodejs/src/types.ts and
+https://github.com/github/copilot-sdk/blob/v1.0.8/nodejs/src/generated/rpc.ts .
+The published npm 1.0.8 and 1.0.28 declaration unions were read again for this
+clarification; pinned package/runtime versions were not changed.
 
 ### Post-research source integrity
 
