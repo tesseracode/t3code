@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: needs_review
-**Timestamp**: 2026-10-29T08:16:46Z
+**Timestamp**: 2026-10-29T10:46:02Z
 
 ## Notes
 
-Integrated real native+license parents. 86 distinct dependency/closure/artifact tests passed, all self-containment cases included under TMPDIR=/tmp; scripts types and changed-boundary lint passed. Packaged runtime, visual and receiving-host gates remain pending.
+Real CI Windows failure proved ancestor node_modules contamination. TEMP/TMP/TMPDIR now point to C:\t3\tmp outside checkout; targeted format passed, actual second CI gate pending.

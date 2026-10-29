@@ -1,9 +1,9 @@
 diff --git a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml
 new file mode 100644
-index 000000000..4a791369c
+index 000000000..a466c1bc0
 --- /dev/null
 +++ b/.github/workflows/fork-native-preview.yml
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,154 @@
 +name: Fork native preview (build only)
 +
 +on:
@@ -91,14 +91,15 @@ index 000000000..4a791369c
 +        shell: pwsh
 +        working-directory: C:\t3\s
 +    env:
-+      TEMP: C:\t3\s\.t3\native-build-temp
-+      TMP: C:\t3\s\.t3\native-build-temp
++      TEMP: C:\t3\tmp
++      TMP: C:\t3\tmp
++      TMPDIR: C:\t3\tmp
 +    steps:
 +      - name: Checkout exact source into a short path
 +        working-directory: ${{ github.workspace }}
 +        run: |
 +          $ErrorActionPreference = 'Stop'
-+          New-Item -ItemType Directory -Force C:\t3\s, C:\t3\s\.t3\native-build-temp | Out-Null
++          New-Item -ItemType Directory -Force C:\t3\s, C:\t3\tmp | Out-Null
 +          Set-Location C:\t3\s
 +          git init .
 +          git remote add origin "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY.git"

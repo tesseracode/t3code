@@ -1,8 +1,8 @@
 {
   "slug": "copilot-runtime-packaging",
-  "completed_at": "2026-10-29T08:16:46Z",
-  "base_commit": "75b2ad95056ea428008d551e2980f1ac389defaf",
+  "completed_at": "2026-10-29T10:46:02Z",
+  "base_commit": "6748897368aa67ea6824a1c8f23e68583a654041",
   "has_patch": true,
   "validation_status": "needs_review",
-  "validation_notes": "Integrated real native+license parents. 86 distinct dependency/closure/artifact tests passed, all self-containment cases included under TMPDIR=/tmp; scripts types and changed-boundary lint passed. Packaged runtime, visual and receiving-host gates remain pending."
+  "validation_notes": "Real CI Windows failure proved ancestor node_modules contamination. TEMP/TMP/TMPDIR now point to C:\\t3\\tmp outside checkout; targeted format passed, actual second CI gate pending."
 }

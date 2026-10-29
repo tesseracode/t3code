@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-runtime-packaging",
-  "current_generation": 9,
+  "current_generation": 11,
   "generations": [
     {
       "generation": 1,
@@ -778,7 +778,7 @@
       "git_patch_id": "02bcc8d0f2e4cc79213d68a13160895d79810ef0",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "5c259914dc7185078c4c37675547e402b0e4f251283321dfa35433c74be01e35",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/009-record.patch",
       "base_commit": "75b2ad95056ea428008d551e2980f1ac389defaf",
       "upper": {
@@ -860,6 +860,196 @@
           "parent_generation": 16,
           "parent_patch_sha256": "c2c91db4de2b0831a1a0595c7467f4183e0160ac9cd1828baa2531febb702bfa",
           "parent_recipe_sha256": "cf4000ceeb9a924f0afea7762868cbcb7f81c77bdbc1f264327026b54c4efaa8"
+        },
+        {
+          "slug": "copilot-koffi-packaging-pin",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 6,
+          "parent_patch_sha256": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306",
+          "parent_recipe_sha256": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8"
+        },
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        },
+        {
+          "slug": "wsl-runtime-executable-modes",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
+          "parent_recipe_sha256": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 10,
+      "generation_id": "pg_42691d62c5eb",
+      "kind": "amend-refresh",
+      "patch_sha256": "d72604b9dd3bb714d1b880ce621d1110cb55f86db85de35758b458be757cf642",
+      "git_patch_id": "92b4fa5cbe6deb1812cd7da6bf8d6ec55ae0098f",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "6cef7f421c064705ac884a52d4d993e95a8ddd539c59e02358417a4ebbafc197",
+      "canonical_patch": "",
+      "audit_patch": "",
+      "base_commit": "6748897368aa67ea6824a1c8f23e68583a654041",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          ".github/workflows/fork-native-preview.yml"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/workflows/fork-native-preview.yml"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 21,
+          "parent_patch_sha256": "d2c6f42fbdf5c69f24b421c4aa741997224a1ef08a8af8fad2861d9a3c526eda",
+          "parent_recipe_sha256": "2087aed362ffc4abf2c983563ebfc8776530f09563c898fe3231198bcc352e40"
+        },
+        {
+          "slug": "copilot-koffi-packaging-pin",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 6,
+          "parent_patch_sha256": "cc8ec433949367f794286c7b84daa25b6ffce30f8eef1d7c1d0784a8e88c2306",
+          "parent_recipe_sha256": "341a182e119a3fbd7b1c6068d831d6ddcc1e6c1831ecb0702e63d4ed23e582c8"
+        },
+        {
+          "slug": "copilot-package-payload-pruning",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c91f83112a2e93eb6ad884f37634af2c3d4fe08764a81179349cb3cfb4d9e440",
+          "parent_recipe_sha256": "58009f23ed4a2e5d58ff2174e309234d922de81888d2eb5247a3da61786e849c"
+        },
+        {
+          "slug": "wsl-runtime-executable-modes",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "1f4917e7133c7544168aa5ba13b34e753fa918c50b54e0292c9655c603f43b81",
+          "parent_recipe_sha256": "c2dcdac9711f0631a09995516e7d575503857004f12cabfbd252088c5a941e3d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 11,
+      "generation_id": "pg_4d922d35745f",
+      "kind": "amend-refresh",
+      "patch_sha256": "c83c528a5130d1adefd5bda456ccdecdebac9e48ad1278677e4cdf6a82faa02b",
+      "git_patch_id": "1f66a05f9ff608d4dd5a8e04e162a23d1698de20",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "6cef7f421c064705ac884a52d4d993e95a8ddd539c59e02358417a4ebbafc197",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/011-record.patch",
+      "base_commit": "75b2ad95056ea428008d551e2980f1ac389defaf",
+      "upper": {
+        "kind": "commit",
+        "ref": "HEAD",
+        "commit": "8d30ab7b0ad1a5821ba2143a630fc8c76a9a5f8d"
+      },
+      "capture": {
+        "mode": "committed-range",
+        "pathspecs": [
+          ".github/workflows/fork-native-preview.yml",
+          "apps/desktop/src/app/DesktopClerk.test.ts",
+          "apps/desktop/src/app/DesktopClerk.ts",
+          "apps/desktop/src/app/DesktopConfig.ts",
+          "apps/desktop/src/app/DesktopEnvironment.ts",
+          "apps/desktop/src/app/DesktopUserData.test.ts",
+          "apps/desktop/src/app/DesktopUserData.ts",
+          "apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+          "apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+          "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+          "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+          "docs/operations/fork-native-preview.md",
+          "docs/operations/release.md",
+          "packages/shared/package.json",
+          "packages/shared/src/copilotRuntime.test.ts",
+          "packages/shared/src/copilotRuntime.ts",
+          "scripts/build-cli-archive.ts",
+          "scripts/build-desktop-artifact.test.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/fork-preview-bootstrap.cjs",
+          "scripts/fork-preview-manifest.mjs",
+          "scripts/lib/cli-external-packages.test.ts",
+          "scripts/lib/cli-external-packages.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts",
+          "scripts/lib/fork-preview.test.ts",
+          "scripts/lib/fork-preview.ts",
+          "scripts/lib/runtime-external-dependencies.test.ts",
+          "scripts/lib/runtime-external-dependencies.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/workflows/fork-native-preview.yml",
+        "apps/desktop/src/app/DesktopClerk.test.ts",
+        "apps/desktop/src/app/DesktopClerk.ts",
+        "apps/desktop/src/app/DesktopConfig.ts",
+        "apps/desktop/src/app/DesktopEnvironment.ts",
+        "apps/desktop/src/app/DesktopUserData.test.ts",
+        "apps/desktop/src/app/DesktopUserData.ts",
+        "apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+        "apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+        "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+        "docs/operations/fork-native-preview.md",
+        "docs/operations/release.md",
+        "packages/shared/package.json",
+        "packages/shared/src/copilotRuntime.test.ts",
+        "packages/shared/src/copilotRuntime.ts",
+        "scripts/build-cli-archive.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/fork-preview-bootstrap.cjs",
+        "scripts/fork-preview-manifest.mjs",
+        "scripts/lib/cli-external-packages.test.ts",
+        "scripts/lib/cli-external-packages.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts",
+        "scripts/lib/fork-preview.test.ts",
+        "scripts/lib/fork-preview.ts",
+        "scripts/lib/runtime-external-dependencies.test.ts",
+        "scripts/lib/runtime-external-dependencies.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 21,
+          "parent_patch_sha256": "d2c6f42fbdf5c69f24b421c4aa741997224a1ef08a8af8fad2861d9a3c526eda",
+          "parent_recipe_sha256": "2087aed362ffc4abf2c983563ebfc8776530f09563c898fe3231198bcc352e40"
         },
         {
           "slug": "copilot-koffi-packaging-pin",

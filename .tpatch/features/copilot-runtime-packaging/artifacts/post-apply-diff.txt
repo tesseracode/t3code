@@ -1,3 +1,2 @@
- scripts/lib/cli-external-packages.test.ts | 7 +++++++
- scripts/lib/cli-external-packages.ts      | 9 ++++++++-
- 2 files changed, 15 insertions(+), 1 deletion(-)
+ .github/workflows/fork-native-preview.yml | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
