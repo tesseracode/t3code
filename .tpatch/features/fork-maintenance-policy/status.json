@@ -1,0 +1,17 @@
+{
+  "id": "fork-maintenance-policy",
+  "slug": "fork-maintenance-policy",
+  "title": "Document the approved fork integration, feature, reconciliation and candidate-release branch targets, exact replay accounting, and visual/behavioral reviewer gates. Preserve upstream defaults and require explicit production promotion.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-29T07:30:53Z",
+  "updated_at": "2026-10-29T07:32:19Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-29T07:32:20Z",
+  "apply": {
+    "completed_at": "2026-10-29T07:32:19Z",
+    "base_commit": "e3bc7d48dc3e61e30e648d62a03a333f40b0a172",
+    "has_patch": true
+  },
+  "reconcile": {}
+}
