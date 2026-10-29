@@ -1,8 +1,8 @@
 diff --git a/third-party-licenses.config.json b/third-party-licenses.config.json
-index 01955554a..23b809c59 100644
+index e6d38a17e..bcf492e93 100644
 --- a/third-party-licenses.config.json
 +++ b/third-party-licenses.config.json
-@@ -152,6 +152,16 @@
+@@ -229,6 +229,16 @@
      }
    ],
    "packageOverrides": [
@@ -17,5 +17,5 @@ index 01955554a..23b809c59 100644
 +      }
 +    },
      {
-       "license": "MIT",
-       "name": "@react-grab/cli",
+       "name": "entities",
+       "version": "8.1.0",

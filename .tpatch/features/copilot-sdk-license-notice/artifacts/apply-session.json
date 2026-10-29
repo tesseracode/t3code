@@ -1,6 +1,8 @@
 {
   "slug": "copilot-sdk-license-notice",
-  "completed_at": "2026-09-23T05:23:14Z",
-  "base_commit": "48ad137732f1850c9736b87f08c94f430a4bcd2c",
-  "has_patch": true
+  "completed_at": "2026-10-29T08:10:56Z",
+  "base_commit": "89d3dbcad7c9090ad0993f30d1c696789a97f267",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Node26.12.1: vp test run scripts/lib/third-party-licenses.test.ts --project root passed 19 tests. Real generateThirdPartyLicenseManifest for server/web/mobile/desktop produced 1001 entries with the pinned SDK1.0.8 MIT notice. No missing-notice bypass."
 }
