@@ -1,0 +1,8 @@
+{
+  "slug": "tpatch-local-capture-ignore",
+  "completed_at": "2026-10-29T07:20:53Z",
+  "base_commit": "aeb0b48220d2cb83698e2298a163261f75ec5681",
+  "has_patch": false,
+  "validation_status": "passed",
+  "validation_notes": "Seven-root exact replay has only this one-line non-tpatch difference."
+}
