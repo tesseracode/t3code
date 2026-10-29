@@ -5,9 +5,9 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-05-12T02:47:48Z",
-  "updated_at": "2026-10-29T16:39:35Z",
-  "last_command": "verify",
-  "notes": "Patch recorded",
+  "updated_at": "2026-10-29T18:04:35Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-29T18:05:07Z",
   "apply": {
     "completed_at": "2026-10-29T16:38:27Z",
     "base_commit": "fed030d5cfba9b76789105d7f40933957d7b37cf",
