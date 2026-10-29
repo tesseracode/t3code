@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "feature": "fork-maintenance-check-scope",
+  "attempt_id": "ua_368c3b0e11d2",
+  "attempted_at": "2026-10-29T17:42:27Z",
+  "mode": "patch",
+  "actor": "copilot",
+  "previous_state": "applied",
+  "result": "unapplied",
+  "canonical_patch_sha256": "5ab0fd9943b79e9a5337f28f39fd6f8030629f964d88f6108683c3347c694cdc",
+  "reverse_patch": "artifacts/unapply/ua_368c3b0e11d2/reverse.patch",
+  "touched_paths": [
+    ".github/scripts/ci-changes.cjs",
+    "scripts/lib/ci-changes.test.ts",
+    "vite.config.ts"
+  ],
+  "dependency_blockers": [],
+  "preflight": {
+    "clean_tree": true,
+    "conflict_markers": [],
+    "leftovers": []
+  }
+}
