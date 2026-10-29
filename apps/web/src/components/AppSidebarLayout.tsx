@@ -37,7 +37,6 @@ import {
   usePanelNavigationSuppression,
 } from "../panelAnimations";
 import { BackgroundThreadAnnouncer } from "./BackgroundThreadAnnouncer";
-import { AttentionWorkspaceRetention } from "./attention/AttentionWorkspaceRetention";
 import LegacyThreadSidebar from "./LegacySidebar";
 import ThreadSidebar from "./Sidebar";
 import { SidebarBrandWidthProbe } from "./sidebar/SidebarChrome";
@@ -450,7 +449,6 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
         </Sidebar>
         {children}
         <BackgroundThreadAnnouncer />
-        <AttentionWorkspaceRetention />
         <SidebarControl />
       </SidebarProvider>
     </PanelAnimationSuppressionProvider>

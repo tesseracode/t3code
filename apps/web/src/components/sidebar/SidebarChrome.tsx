@@ -7,7 +7,6 @@ import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { usePullRequestsSupported } from "../../state/environments";
 import { T3Wordmark } from "../T3Wordmark";
-import { AttentionSidebarItem } from "../attention/AttentionSidebarItem";
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageBackdropVariant,
@@ -205,7 +204,6 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
         </SidebarMenuItem>
       ) : (
         <>
-          <AttentionSidebarItem />
           <SidebarUtilityItem
             icon={<SettingsIcon />}
             label="Settings"

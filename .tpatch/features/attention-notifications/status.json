@@ -2,12 +2,12 @@
   "id": "attention-notifications",
   "slug": "attention-notifications",
   "title": "ATT-06 (#8): extend the existing renderer notification coordinator with canonical scoped material-revision eligibility, replay-safe completion awareness, client-local category/environment-mute/quiet-hour policy, static OS payloads, explicit delivery errors and unavailable click routing. Preserve opt-in modes, legacy fallback only for explicitly unsupported servers, and the existing browser/Electron sound/toast/badge boundary. No server-only sink, native emitter, relay/mobile delivery, preference sync or user-wide lease.",
-  "state": "applied",
+  "state": "unapplied",
   "compatibility": "unknown",
   "requested_at": "2026-09-30T06:30:05Z",
   "updated_at": "2026-10-29T09:26:06Z",
-  "last_command": "verify",
-  "notes": "Patch recorded",
+  "last_command": "feature unapply",
+  "notes": "Patch removed from working tree; audit: artifacts/unapply/ua_6bfc53717f7a/unapply-session.json",
   "apply": {
     "completed_at": "2026-10-29T08:54:38Z",
     "base_commit": "75bfc266b4d5f23ef817cfa65b96964d6c41a369",
@@ -23,14 +23,5 @@
       "slug": "attention-inbox",
       "kind": "supersedes"
     }
-  ],
-  "verify": {
-    "verified_at": "2026-10-29T09:26:02Z",
-    "passed": false,
-    "recipe_hash_at_verify": "4bafcb6da971ef3c89ad72ed13f24fb8d4e9fc580906352d470237f9ab7fc806",
-    "patch_hash_at_verify": "93dc0cb5694033539a6cdd0019615ccbfc4d40518b96042d04b0271e78f18630",
-    "parent_snapshot": {
-      "phase1-foundation": "applied"
-    }
-  }
+  ]
 }

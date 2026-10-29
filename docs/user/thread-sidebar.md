@@ -3,13 +3,6 @@
 Use a new thread for a separate task. Choose **New worktree** when its code changes
 need a separate branch and working directory.
 
-## Attention across environments
-
-The sidebar's [attention inbox](./attention.md) collects actionable requests
-from connected environments. Its badge counts threads needing action, not
-unread messages or desktop notifications. Stale or incomplete totals are
-labelled; opening a row uses the environment that owns its thread.
-
 ## Start a thread
 
 On web and desktop, a new thread keeps the current project and carries your model

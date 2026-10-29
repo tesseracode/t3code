@@ -1,29 +1,10 @@
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import type { ClientSettings } from "@t3tools/contracts/settings";
-import { create } from "zustand";
 
 import completionUrl from "./assets/notification-completion.mp3";
 import inputUrl from "./assets/notification-input.mp3";
 
 type NotificationMode = ClientSettings["notificationMode"];
-export const useNotificationDeliveryStatus = create<{ issue: string | null }>(() => ({
-  issue: null,
-}));
-
-export function reportNotificationDeliveryFailure(message: string, error?: unknown) {
-  if (useNotificationDeliveryStatus.getState().issue === message) return;
-  console.warn(message, error ?? "");
-  useNotificationDeliveryStatus.setState({ issue: message });
-}
-
-export function notificationPermissionIssue(): string | null {
-  if (typeof Notification === "undefined" || window.isSecureContext === false)
-    return "System notifications require a supported secure browser or the desktop app. The attention inbox remains available.";
-  if (Notification.permission !== "granted")
-    return "System notification permission is not granted. Enable it from Settings; the attention inbox remains available.";
-  return null;
-}
-
 export const NOTIFICATION_MODE_LABELS = {
   off: "Off",
   notifications: "Notifications only",
@@ -96,11 +77,7 @@ export function setNotificationBadge(count: number) {
       originalFavicon = undefined;
     }
   }
-  void bridge
-    ?.setNotificationBadge?.({ count, image })
-    .catch((error) =>
-      reportNotificationDeliveryFailure("Could not update the notification badge.", error),
-    );
+  void bridge?.setNotificationBadge?.({ count, image }).catch(() => undefined);
 }
 
 let audioContext: AudioContext | undefined;
@@ -110,16 +87,8 @@ const playingUntil = new Map<string, number>();
 
 /** Called from a gesture so browsers allow later background playback. */
 export function unlockNotificationAudio() {
-  try {
-    audioContext ??= new AudioContext();
-    void audioContext
-      .resume()
-      .catch((error) =>
-        reportNotificationDeliveryFailure("Notification audio is unavailable.", error),
-      );
-  } catch (error) {
-    reportNotificationDeliveryFailure("Notification audio is unavailable.", error);
-  }
+  audioContext ??= new AudioContext();
+  void audioContext.resume().catch(() => undefined);
 }
 
 export async function playNotificationSound(
@@ -133,11 +102,7 @@ export async function playNotificationSound(
     let buffer = buffers.get(url);
     if (!buffer) {
       buffer = fetch(url)
-        .then((response) => {
-          if (!response.ok)
-            throw new Error(`Notification audio request failed (${response.status}).`);
-          return response.arrayBuffer();
-        })
+        .then((response) => response.arrayBuffer())
         .then((data) => context.decodeAudioData(data));
       buffers.set(url, buffer);
     }
@@ -150,8 +115,7 @@ export async function playNotificationSound(
     source.connect(context.destination);
     source.start();
     playingUntil.set(url, context.currentTime + decoded.duration);
-  } catch (error) {
+  } catch {
     buffers.delete(url);
-    reportNotificationDeliveryFailure("Could not play notification audio.", error);
   }
 }

@@ -3,7 +3,6 @@
 | Slug | Title | State | Compatibility |
 |------|-------|-------|---------------|
 | `attention-inbox` | ATT-05 (#7): add one virtualized web/desktop /attention inbox and persistent sidebar actionable-thread badge using Foundation shared attention state. Reuse sidebar variants, Settings, command palette, scoped routing and configurable attention.open command without a default shortcut. Scoped environment/project/kind/priority filters, explicit incomplete/stale/unavailable states, existing thread response UI, device-local reversible revision-based seen emphasis capped at 2000. No OS notifications, relay mutation, mobile UI, server authority or full-thread loads to render the inbox. | applied | unknown |
-| `attention-notifications` | ATT-06 (#8): extend the existing renderer notification coordinator with canonical scoped material-revision eligibility, replay-safe completion awareness, client-local category/environment-mute/quiet-hour policy, static OS payloads, explicit delivery errors and unavailable click routing. Preserve opt-in modes, legacy fallback only for explicitly unsupported servers, and the existing browser/Electron sound/toast/badge boundary. No server-only sink, native emitter, relay/mobile delivery, preference sync or user-wide lease. | applied | unknown |
 | `background-tasks-ui` | Add background task tracking and UI across providers. Maintain a live count of active background agents/subagents, show a badge indicator in the status bar, and add a collapsible task panel to view active/completed background tasks. For Copilot: track via subagent.started/completed, system.notification (agent_completed), and session.background_tasks_changed. For Claude: track via collab_agent_tool_call lifecycle. Requires: adapter-level task registry, new runtime event for task count updates, and frontend task panel component. Depends on copilot-command-events for system.notification handling. | requested | unknown |
 | `copilot-cli-provider` | Expand the providers so that not only claude and codex are
  supported, but add the ability to use the copilot cli, as requested in
@@ -50,6 +49,12 @@
 | `windows-wsl-support` | Add Windows and WSL support for T3 Code. Support running projects from both Windows filesystem and WSL distros in the same desktop instance, with desktop-managed environment registration, isolated per-environment state, wsl.exe server spawning, wslpath translation, auto-install of the server binary inside WSL, and native file watching via inotify. | upstream_merged | unknown |
 | `wsl-runtime-executable-modes` | Normalize and verify executable permissions for Linux command payloads after extracting Windows-built wsl-runtime.tar.gz. When Copilot SDK is present, require and chmod the target Linux Copilot, rg, and tgrep executables before promoting the runtime; reject missing or non-executable payloads and invalidate warm caches whose modes are broken. | applied | unknown |
 | `wsl-runtime-fixture-newlines` | Correct the WSL executable-mode test fixture so its Copilot, rg, and tgrep stub commands explicitly emit the newline-delimited output asserted by the executed-shell test. | applied | unknown |
+
+## Unapplied
+
+| Slug | Title | State | Note |
+|------|-------|-------|------|
+| `attention-notifications` | ATT-06 (#8): extend the existing renderer notification coordinator with canonical scoped material-revision eligibility, replay-safe completion awareness, client-local category/environment-mute/quiet-hour policy, static OS payloads, explicit delivery errors and unavailable click routing. Preserve opt-in modes, legacy fallback only for explicitly unsupported servers, and the existing browser/Electron sound/toast/badge boundary. No server-only sink, native emitter, relay/mobile delivery, preference sync or user-wide lease. | unapplied | Patch removed from working tree; audit: artifacts/unapply/ua_6bfc53717f7a/unapply-session.json |
 
 ## Rejected
 

@@ -3,13 +3,6 @@
 Customize shortcuts in **Settings → Keybindings** on web and desktop. That page
 also lists the command IDs and defaults available in your version.
 
-## Attention inbox
-
-Use **Open attention inbox** in the command palette, or bind `attention.open`
-in Settings → Keybindings. It has no default shortcut. In the inbox,
-Up/Down and Home/End select a row; Enter opens its owning thread. Seen emphasis
-is local to this client and does not resolve the underlying request.
-
 ## Composer controls
 
 In **Settings → Chat → Send shortcut**, choose whether Enter sends, requires
