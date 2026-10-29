@@ -1,8 +1,8 @@
 # Manual Validation
 
-**Status**: passed
-**Timestamp**: 2026-10-01T15:12:06Z
+**Status**: needs_review
+**Timestamp**: 2026-10-29T08:54:38Z
 
 ## Notes
 
-Canonical source replay equals the tested product; deterministic recipe uses actual updated-parent bytes, not retained historical preimages.
+42 focused inbox/notification tests, 2 persisted policy tests, two owner typechecks and 21-file scoped lint passed. Integrated native/provider visual and independent review gates remain pending.

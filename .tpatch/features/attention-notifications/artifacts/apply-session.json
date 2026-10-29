@@ -1,8 +1,8 @@
 {
   "slug": "attention-notifications",
-  "completed_at": "2026-10-01T15:12:06Z",
-  "base_commit": "c964ad3328feb63da34425ae41aec7aca4dad096",
+  "completed_at": "2026-10-29T08:54:38Z",
+  "base_commit": "75bfc266b4d5f23ef817cfa65b96964d6c41a369",
   "has_patch": true,
-  "validation_status": "passed",
-  "validation_notes": "Canonical source replay equals the tested product; deterministic recipe uses actual updated-parent bytes, not retained historical preimages."
+  "validation_status": "needs_review",
+  "validation_notes": "42 focused inbox/notification tests, 2 persisted policy tests, two owner typechecks and 21-file scoped lint passed. Integrated native/provider visual and independent review gates remain pending."
 }

@@ -41,6 +41,17 @@ Provider-specific behavior belongs behind an adapter. Orchestration works with n
 and events, so adding a provider should not require branches throughout the domain or clients.
 See [provider constraints](./providers.md).
 
+### Attention and notification ownership
+
+The fork's [Foundation](./foundation.md) retains immutable local attention
+evidence separately from its mutable current projection. Shared client state
+aggregates compact, environment-scoped attention without loading every thread.
+The web/desktop inbox and [notification coordinator](./attention-notifications.md)
+consume that state; notification preferences remain client-local and never
+resolve requests or turn server-only environments into interactive emitters.
+Disconnected or unsupported environments remain explicit rather than silently
+switching authority.
+
 ## Settings ownership
 
 Client preferences stay in the current client; environment defaults and project overrides stay
