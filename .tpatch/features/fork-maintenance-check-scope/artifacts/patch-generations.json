@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "fork-maintenance-check-scope",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "e565e517bce538251f24c88f4ec05ae2718cd52d",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "b0d35faa248db7155eae58594e216421aec47954f666337d3068bc95924b9a95",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "a67761be595832d5145b64079eea1dc441f7f4dc",
       "upper": {
@@ -21,6 +21,44 @@
       },
       "capture": {
         "mode": "staged-index",
+        "pathspecs": [
+          ".github/scripts/ci-changes.cjs",
+          "scripts/lib/ci-changes.test.ts",
+          "vite.config.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/scripts/ci-changes.cjs",
+        "scripts/lib/ci-changes.test.ts",
+        "vite.config.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_37c141a14b46",
+      "kind": "amend-refresh",
+      "patch_sha256": "dc0acca276a3999c02e1da071d3b01fad31b1c931bb02f5b2407cde5386011a4",
+      "git_patch_id": "3f9f90e6f330a10bb4a084f0977dd6410560d29c",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "c4fd8351b78b7c6b41254f70c7e8881c14f1b16133e277bc08e314622e3e9d92",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "3f9e8448cfb55f09c0025837031bb02d63c9d59d",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
         "pathspecs": [
           ".github/scripts/ci-changes.cjs",
           "scripts/lib/ci-changes.test.ts",

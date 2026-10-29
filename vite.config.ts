@@ -154,6 +154,8 @@ export default defineConfig({
   fmt: {
     ignorePatterns: [
       ".repos/**",
+      // Preserve hash-bound patch recipes and historical evidence.
+      ".tpatch/**",
       "infra/task-cache/vendor/**",
       // Macroscope requires one glob per line; Markdown formatting corrupts it.
       ".macroscope/ignore.md",
@@ -187,6 +189,7 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: [
+      ".tpatch/**",
       ".repos",
       ".repos/**",
       "infra/task-cache/vendor/**",

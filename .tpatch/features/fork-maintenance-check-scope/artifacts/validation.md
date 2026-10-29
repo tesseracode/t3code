@@ -18,3 +18,14 @@ selection, while similarly named directories still select all jobs.
 
 All application checks and independent feature/replay integrity remain required.
 The full integrated checker and independent reviewer are separate later gates.
+
+The integrated TypeScript check found that the new test imported the transitive
+`vitest` package instead of this repository's declared `vite-plus/test` export.
+The runtime test had passed; that was not proof of type resolution. A supported
+unapply/reapply established a genuine new base for recording the complete
+three-path correction, rather than replacing the root with a one-line patch.
+The strict reapply guard initially refused the corrected import because it was
+not byte-identical to the preserved canonical. The old canonical was therefore
+rematerialized first, then the correction was made before recording the complete
+still-uncommitted root. The final corrected source is the same source that passed
+the focused test, format and owning-package type checks.

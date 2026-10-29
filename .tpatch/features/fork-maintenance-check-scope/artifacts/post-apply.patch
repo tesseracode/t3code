@@ -13,11 +13,11 @@ index 77a526076..cb6ae9566 100644
  ];
 diff --git a/scripts/lib/ci-changes.test.ts b/scripts/lib/ci-changes.test.ts
 new file mode 100644
-index 000000000..314d949d6
+index 000000000..72f9eb364
 --- /dev/null
 +++ b/scripts/lib/ci-changes.test.ts
 @@ -0,0 +1,32 @@
-+import { describe, expect, it } from "vitest";
++import { describe, expect, it } from "vite-plus/test";
 +import { decide } from "../../.github/scripts/ci-changes.cjs";
 +
 +const packages = [

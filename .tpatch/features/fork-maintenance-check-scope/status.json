@@ -2,15 +2,15 @@
   "id": "fork-maintenance-check-scope",
   "slug": "fork-maintenance-check-scope",
   "title": "Keep administrative .tpatch archives out of application formatting, lint and package-impact classification while preserving all product checks and exact replay verification.",
-  "state": "unapplied",
+  "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-10-29T17:25:03Z",
-  "updated_at": "2026-10-29T17:42:27Z",
-  "last_command": "feature unapply",
-  "notes": "Patch removed from working tree; audit: artifacts/unapply/ua_368c3b0e11d2/unapply-session.json",
+  "updated_at": "2026-10-29T17:46:09Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-29T17:46:15Z",
   "apply": {
-    "completed_at": "2026-10-29T17:30:59Z",
-    "base_commit": "a67761be595832d5145b64079eea1dc441f7f4dc",
+    "completed_at": "2026-10-29T17:45:44Z",
+    "base_commit": "3f9e8448cfb55f09c0025837031bb02d63c9d59d",
     "has_patch": true
   },
   "reconcile": {}
