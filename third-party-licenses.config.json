@@ -230,6 +230,16 @@
   ],
   "packageOverrides": [
     {
+      "name": "@github/copilot-sdk",
+      "version": "1.0.8",
+      "license": "MIT",
+      "sourceUrl": "https://github.com/github/copilot-sdk/blob/a54b0b5885534ba5ad073cfe99c7f0085b1be11c/LICENSE",
+      "generatedNotice": {
+        "licenseId": "MIT",
+        "copyrights": ["Copyright GitHub, Inc."]
+      }
+    },
+    {
       "name": "entities",
       "version": "8.1.0",
       "license": "BSD-2-Clause",

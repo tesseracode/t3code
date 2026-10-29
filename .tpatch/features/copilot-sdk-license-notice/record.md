@@ -1,6 +1,6 @@
 # Implementation Record: copilot-sdk-license-notice
 
-**Recorded**: 2026-10-29T08:10:56Z
+**Recorded**: 2026-10-29T16:47:20Z
 **Files changed**: 1
 **Patch size**: 649 bytes
 **Capture mode**: working-tree-all
@@ -18,7 +18,7 @@
 - **capture_mode**: `working-tree-all`
 - **pathspecs**: third-party-licenses.config.json
 - **claim_ids**: (none)
-- **base_commit**: `89d3dbcad7c9090ad0993f30d1c696789a97f267`
+- **base_commit**: `8605454d5cba4ab065f43fa694e62868fe093e31`
 - **upper_commit**: `working-tree`
 
 ## Replay Instructions
@@ -29,3 +29,4 @@ To re-apply this feature to a clean checkout:
 # From the feature's artifacts directory:
 git apply .tpatch/features/copilot-sdk-license-notice/artifacts/post-apply.patch
 ```
+
