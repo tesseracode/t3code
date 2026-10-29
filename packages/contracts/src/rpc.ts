@@ -37,6 +37,23 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
+import {
+  TwsContextError,
+  TwsContextQuery,
+  TwsContextQueryResult,
+  TwsContextSetInput,
+  TwsThreadContext,
+  TwsIntegrationState,
+  TwsTopologyQuery,
+  TwsTopologyQueryResult,
+  TwsProvenanceInput,
+  TwsProvenance,
+} from "./twsContext.ts";
+import {
+  AttentionSubscribeInput,
+  AttentionStreamMessage,
+  AttentionSyncError,
+} from "./attentionSync.ts";
 import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import {
   ProviderAuthCancelInput,
@@ -396,6 +413,12 @@ import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
 
 export const WS_METHODS = {
+  twsRefresh: "tws.refresh",
+  twsQuery: "tws.query",
+  twsGetContexts: "tws.contexts.get",
+  twsSetContext: "tws.context.set",
+  twsProvenance: "tws.provenance",
+  attentionSubscribe: "attention.subscribe",
   projectsListEntries: "projects.listEntries",
   projectsListIgnoredFiles: "projects.listIgnoredFiles",
   projectsReadFile: "projects.readFile",
@@ -1925,6 +1948,37 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
 
 export const WsRpcGroup = RpcGroup.make(
   WsGuestShareCreateRpc,
+  Rpc.make(WS_METHODS.twsRefresh, {
+    payload: Schema.Struct({}),
+    success: TwsIntegrationState,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.twsQuery, {
+    payload: TwsTopologyQuery,
+    success: TwsTopologyQueryResult,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.twsGetContexts, {
+    payload: TwsContextQuery,
+    success: TwsContextQueryResult,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.twsSetContext, {
+    payload: TwsContextSetInput,
+    success: TwsThreadContext,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.twsProvenance, {
+    payload: TwsProvenanceInput,
+    success: TwsProvenance,
+    error: Schema.Union([TwsContextError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.attentionSubscribe, {
+    payload: AttentionSubscribeInput,
+    success: AttentionStreamMessage,
+    error: Schema.Union([AttentionSyncError, EnvironmentAuthorizationError]),
+    stream: true,
+  }),
   WsServerProbeRpc,
   WsServerGetConfigRpc,
   WsServerRefreshProvidersRpc,

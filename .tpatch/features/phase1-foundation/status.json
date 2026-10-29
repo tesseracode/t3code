@@ -5,12 +5,12 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-03T10:11:24Z",
-  "updated_at": "2026-10-29T09:29:31Z",
+  "updated_at": "2026-10-29T16:51:36Z",
   "last_command": "verify",
-  "notes": "landed at 2026-10-29T09:18:58Z",
+  "notes": "landed at 2026-10-29T16:52:04Z",
   "apply": {
-    "completed_at": "2026-10-29T09:16:09Z",
-    "base_commit": "81c2157c19b6984d2d76365bf243d1ae90f61548",
+    "completed_at": "2026-10-29T16:51:25Z",
+    "base_commit": "8605454d5cba4ab065f43fa694e62868fe093e31",
     "has_patch": true
   },
   "reconcile": {
@@ -69,10 +69,10 @@
     }
   ],
   "verify": {
-    "verified_at": "2026-10-29T09:29:25Z",
-    "passed": true,
-    "recipe_hash_at_verify": "7914dd4615c2c463b260d93355614b42020c6998a5d62d45ce390197a582ea78",
-    "patch_hash_at_verify": "89822db2cae70bd24f730fb49d2c99c055edd4d2c6af3a3fe4e56abaffe36ad8",
+    "verified_at": "2026-10-29T16:51:31Z",
+    "passed": false,
+    "recipe_hash_at_verify": "4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e",
+    "patch_hash_at_verify": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
     "parent_snapshot": {
       "copilot-cli-provider": "applied"
     }

@@ -10,6 +10,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as EventStore from "./EventStore.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import * as FoundationProjection from "./FoundationProjection.ts";
 
 export interface ProjectionVerificationV2 {
   readonly valid: boolean;
@@ -66,6 +67,7 @@ export const layer: Layer.Layer<
     const sql = yield* SqlClient.SqlClient;
     const eventStore = yield* EventStore.EventStoreV2;
     const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+    const foundation = yield* FoundationProjection.FoundationProjection;
 
     const verify = Effect.gen(function* () {
       const expectedThreadRows = yield* sql<{ readonly thread_id: string }>`
@@ -117,6 +119,7 @@ export const layer: Layer.Layer<
       yield* sql.withTransaction(
         Effect.gen(function* () {
           const throughSequence = yield* eventStore.latestSequence();
+          yield* foundation.rebuild;
           yield* sql`DELETE FROM orchestration_v2_projection_context_transfers`;
           yield* sql`DELETE FROM orchestration_v2_projection_context_handoffs`;
           yield* sql`DELETE FROM orchestration_v2_projection_checkpoints`;
@@ -402,4 +405,4 @@ export const layer: Layer.Layer<
       compactEventStore,
     });
   }),
-);
+).pipe(Layer.provide(FoundationProjection.layer));

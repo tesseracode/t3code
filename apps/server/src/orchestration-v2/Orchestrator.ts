@@ -506,6 +506,7 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "queued-run.edit":
     case "runtime-request.respond":
     case "runtime-request.delivery.fail":
+    case "runtime-request.delivery.confirm":
     case "thread.user-input.dismiss":
     case "checkpoint.rollback":
     case "checkpoint.rollback.fail":
@@ -8555,6 +8556,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const now = yield* DateTime.now;
       const resolvedRequest = {
         ...runtimeRequest,
+        responseDelivery:
+          providerSessionId === null ? ("confirmed" as const) : ("pending" as const),
         status: "resolved" as const,
         resolvedAt: now,
         ...(command.decision === undefined ? {} : { decision: command.decision }),
@@ -8766,16 +8769,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   );
 
   /**
-   * Respond resolves the request before delivery, and a failed delivery cannot
-   * tell whether the provider is still waiting, so the answer stays recorded and
-   * the timeline shows the failure instead of a run spinning with no question.
+   * Preserve the recorded answer while attention distinguishes delivery intent
+   * from confirmation. A failed delivery does not prove a callback can be retried.
    */
-  const dispatchRuntimeRequestDeliveryFail = Effect.fn(
-    "Orchestrator.dispatchRuntimeRequestDeliveryFail",
+  const dispatchRuntimeRequestDeliveryReceipt = Effect.fn(
+    "Orchestrator.dispatchRuntimeRequestDeliveryReceipt",
   )(function* (
     command: Extract<
       OrchestrationV2InternalCommand,
-      { readonly type: "runtime-request.delivery.fail" }
+      { readonly type: "runtime-request.delivery.fail" | "runtime-request.delivery.confirm" }
     >,
     events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
   ) {
@@ -8783,11 +8785,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       .getThread(command.threadId)
       .pipe(mapDispatchError(command));
     if (thread.deletedAt !== null) return;
-    const node = (yield* projectionStore
+    const responseContext = yield* projectionStore
       .getRuntimeResponseContext(command.threadId, command.requestId)
-      .pipe(mapDispatchError(command))).node;
+      .pipe(mapDispatchError(command));
+    const node = responseContext.node;
     if (node === undefined) return;
     const now = yield* DateTime.now;
+    const request = responseContext.request;
+    if (request === undefined || request.responseDelivery === "confirmed") return;
+    if (request.responseDelivery === "pending")
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "runtime-request.updated",
+        threadId: command.threadId,
+        nodeId: node.id,
+        occurredAt: now,
+        payload: {
+          ...request,
+          responseDelivery:
+            command.type === "runtime-request.delivery.confirm" ? "confirmed" : "failed",
+        },
+      });
+    if (command.type === "runtime-request.delivery.confirm") return;
     yield* emit(
       events,
       command,
@@ -12676,7 +12697,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         yield* dispatchCheckpointRollbackFail(command, events);
         break;
       case "runtime-request.delivery.fail":
-        yield* dispatchRuntimeRequestDeliveryFail(command, events);
+      case "runtime-request.delivery.confirm":
+        yield* dispatchRuntimeRequestDeliveryReceipt(command, events);
         break;
       case "thread.background-work.settle":
         yield* dispatchBackgroundWorkSettle(command, events, effects);

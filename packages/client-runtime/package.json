@@ -43,6 +43,10 @@
       "types": "./src/worktreeSetup.ts",
       "default": "./src/worktreeSetup.ts"
     },
+    "./attention-sync": {
+      "types": "./src/attentionSync.ts",
+      "default": "./src/attentionSync.ts"
+    },
     "./load-balancing": {
       "types": "./src/load-balancing.ts",
       "default": "./src/load-balancing.ts"
@@ -142,6 +146,10 @@
     "./state/auth": {
       "types": "./src/state/auth.ts",
       "default": "./src/state/auth.ts"
+    },
+    "./state/attention": {
+      "types": "./src/state/attention.ts",
+      "default": "./src/state/attention.ts"
     },
     "./state/assets": {
       "types": "./src/state/assets.ts",
@@ -306,6 +314,10 @@
     "./state/subagent-display": {
       "types": "./src/state/subagentDisplay.ts",
       "default": "./src/state/subagentDisplay.ts"
+    },
+    "./state/tws": {
+      "types": "./src/state/tws.ts",
+      "default": "./src/state/tws.ts"
     },
     "./state/subagentRuntime": {
       "types": "./src/state/subagentRuntime.ts",
