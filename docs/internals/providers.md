@@ -28,6 +28,10 @@ successful native receipt on that runtime. Startup/closed requests remain denied
 through the SDK handler. Questions and plan approval retain the SDK callback
 handoff boundary; that callback alone is not a native RPC acknowledgement.
 The adapter never re-emits app-owned reply resolution or delivery state.
+Reply ownership is marked before awaiting native delivery. Answered requests stay
+out of pending snapshots, terminal cleanup, and stale turn-item publication even
+when the receipt fails or root idle arrives first. Identical in-flight permission
+replies share one receipt; conflicting replies are rejected.
 
 Only a root `session.idle` successfully terminates a user turn.
 `assistant.turn_end`, `assistant.idle`, and all child events are non-terminal.
