@@ -1,5 +1,5 @@
-# Test run — 2026-10-29T08:10:00Z
-# Command: PATH=/Users/jdbencardinop/.nvm/versions/node/v26.12.1/bin:$PATH node_modules/.bin/vp test run packages/contracts/src/attention.test.ts packages/contracts/src/attentionSync.test.ts packages/contracts/src/twsBindings.test.ts packages/contracts/src/twsContext.test.ts packages/contracts/src/workItem.test.ts packages/client-runtime/src/attentionSync.test.ts packages/client-runtime/src/state/attention.test.ts packages/client-runtime/src/state/attentionNotifications.test.ts apps/server/src/tws/TwsBindingMatch.test.ts apps/server/src/tws/TwsCliAdapter.test.ts apps/server/src/tws/TwsCliDecoder.test.ts apps/server/src/tws/TwsTopology.test.ts apps/server/src/tws/TwsContextService.test.ts apps/server/src/persistence/ForkMigrations.test.ts apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.test.ts apps/server/src/persistence/ForkMigrations/045_TwsBindings.test.ts apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts apps/server/src/persistence/Layers/TwsBindings.test.ts apps/server/src/persistence/Migrations.test.ts apps/server/src/persistence/reconcileV2PreviewMigration.test.ts apps/server/src/orchestration-v2/FoundationProjection.test.ts apps/server/src/orchestration-v2/EffectWorker.test.ts apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts apps/server/src/orchestration-v2/ProjectionRecovery.test.ts apps/server/src/orchestration-v2/ProjectionSettlement.test.ts apps/server/src/auth/RpcAuthorization.test.ts apps/server/src/ws.test.ts apps/server/src/serverRuntimeStartup.test.ts apps/server/src/serverRuntimeStartup.autoPull.test.ts
+# Test run — 2026-10-29T08:37:48Z
+# Command: PATH=/Users/jdbencardinop/.nvm/versions/node/v26.12.1/bin:$PATH node_modules/.bin/vp test run apps/server/src/orchestration-v2/FoundationProjection.test.ts apps/server/src/persistence/ForkMigrations.test.ts packages/contracts/src/attention.test.ts packages/client-runtime/src/state/attentionNotifications.test.ts
 # Directory: /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-foundation
 
 note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
@@ -7,8 +7,8 @@ note: You are running `vp test` as a Vite+ built-in command. If you meant to run
  RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-foundation
 
 
- Test Files  29 passed (29)
-      Tests  182 passed (182)
-   Start at  01:09:41
-   Duration  19.35s (transform 66%, import 23%, tests 7%, setup 5%)
+ Test Files  4 passed (4)
+      Tests  31 passed (31)
+   Start at  01:37:44
+   Duration  4.45s (transform 60%, tests 17%, import 13%, setup 10%)
 
