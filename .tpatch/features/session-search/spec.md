@@ -1,8 +1,8 @@
 # Spec: session-search
 
-## Current acceptance criteria on v0.1.3
+## Current acceptance criteria on v0.1.4
 
-The v0.1.3 implementation extends upstream's server-backed `chat.find`,
+The implementation extends upstream's server-backed `chat.find`,
 `ThreadFindProvider`, `ThreadFindBar`, and existing incremental timeline.
 It does not replay the former parallel client-only search implementation.
 The historical criteria below remain an unedited intent reference, as do
@@ -40,10 +40,13 @@ the recorded historical patches and blocked reconciliation evidence.
 8. Use upstream's server-backed full-thread search and automatic targeted history
    loading rather than resurrecting the old loaded-window limitation and manual
    pagination bar. This expands coverage; it does not claim hidden resource bodies.
-9. Focused service tests prove SQLite/memory agreement, mixed message/plan/activity
+9. Focused service tests prove SQLite occurrence ordering, mixed message/plan/activity
    ordering, Unicode, wrap, folded-answer de-duplication, and hidden/resource bounds.
    Real headless component tests prove nested activity materialization, visible
    highlight/navigation, unchanged message highlights, folds, and keyboard controls.
+   The removed, unreachable in-memory search implementation stays removed on v0.1.4;
+   its former parity assertion becomes explicit occurrence/index assertions.
+   Pending approval summaries remain searchable without losing approval actions.
    The coordinator owns separate integrated browser/visual verification.
 10. Negotiate activity inclusion across the wire. Older clients must never receive
     activity matches they cannot reveal; older servers must not cause newer clients

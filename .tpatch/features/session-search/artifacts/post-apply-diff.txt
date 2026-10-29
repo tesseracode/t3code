@@ -1,21 +1,11 @@
- .../server/src/orchestration-v2/ThreadFind.test.ts | 140 +++++++++++++++++++++
- apps/server/src/orchestration-v2/ThreadFind.ts     |  84 ++++++++++---
- .../chat/MessagesTimeline.browser.test.tsx         | 107 ++++++++++++++++
- .../src/components/chat/MessagesTimeline.logic.ts  |  23 +++-
- apps/web/src/components/chat/MessagesTimeline.tsx  |  14 ++-
- apps/web/src/components/chat/ThreadFindBar.tsx     |  12 ++
- .../src/components/chat/TimelineWorkEntryRow.tsx   | 109 ++++++++++------
- .../src/components/chat/TimelineWorkGroupRows.tsx  |  37 ++++--
- .../chat/threadFindHighlights.browser.test.tsx     |  20 +++
- .../src/components/chat/threadFindHighlights.ts    |  20 +--
- apps/web/src/components/chat/threadFindPosition.ts |   9 +-
- apps/web/src/components/chat/timelineRowContext.ts |   2 +
- apps/web/src/components/chat/useThreadFind.ts      |   4 +
- .../src/components/chat/useThreadFindNavigation.ts |  11 ++
- .../components/chat/useThreadFindPositionReader.ts |  21 +++-
- docs/user/keybindings.md                           |  13 +-
- packages/contracts/src/orchestrationV2.ts          |   4 +
- packages/shared/src/threadFindText.ts              | 121 +++++++++++++++++-
- packages/shared/src/threadSearch.test.ts           |  25 +++-
- packages/shared/src/threadSearch.ts                |  54 ++++++--
- 20 files changed, 729 insertions(+), 101 deletions(-)
+ .tpatch/FEATURES.md                                |   2 +-
+ .../session-search/artifacts/apply-recipe.json     |  62 +++-
+ .../session-search/artifacts/apply-session.json    |   8 +-
+ .../session-search/artifacts/manual-validation.md  |   6 +-
+ .../artifacts/patch-generations.json               |  68 ++++-
+ .../session-search/artifacts/post-apply-diff.txt   |  30 +-
+ .../session-search/artifacts/post-apply.patch      | 331 ++++++++++++---------
+ .tpatch/features/session-search/record.md          |  43 +--
+ .tpatch/features/session-search/spec.md            |   9 +-
+ .tpatch/features/session-search/status.json        |  20 +-
+ 10 files changed, 347 insertions(+), 232 deletions(-)

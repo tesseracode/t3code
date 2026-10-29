@@ -7,7 +7,12 @@ import {
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
-import { searchableMessageSegments, searchablePlanSegments } from "@t3tools/shared/threadFindText";
+import {
+  searchableMessageSegments,
+  searchablePlanSegments,
+  threadFindActivityText,
+  THREAD_FIND_ACTIVITY_TYPES,
+} from "@t3tools/shared/threadFindText";
 import { countThreadSearchOccurrences } from "@t3tools/shared/threadSearch";
 import * as Cache from "effect/Cache";
 import * as Data from "effect/Data";
@@ -21,6 +26,7 @@ import {
   ProjectionStoreThreadNotFoundError,
   type ProjectionStoreV2Error,
 } from "./ProjectionStore.ts";
+import { projectTurnItemForWire } from "./WireProjection.ts";
 
 interface FindRow {
   readonly position: number;
@@ -40,7 +46,7 @@ interface FindDocument extends FindRow {
 }
 class TextKey extends Data.Class<{
   text: string;
-  role: "user" | "assistant" | "plan";
+  role: "user" | "assistant" | "plan" | "activity";
   streaming: boolean;
   hasContext: boolean;
   cwd: string | undefined;
@@ -58,9 +64,15 @@ function textKey(
         ? item.markdown
         : item.type === "user_message" || item.type === "assistant_message"
           ? item.text
-          : "",
+          : (threadFindActivityText(projectTurnItemForWire(item)) ?? ""),
     role:
-      item.type === "proposed_plan" ? "plan" : item.type === "user_message" ? "user" : "assistant",
+      item.type === "proposed_plan"
+        ? "plan"
+        : item.type === "user_message"
+          ? "user"
+          : item.type === "assistant_message"
+            ? "assistant"
+            : "activity",
     streaming: item.type === "assistant_message" && item.streaming,
     hasContext: item.type === "user_message" && item.context !== undefined,
     cwd,
@@ -69,6 +81,7 @@ function textKey(
 }
 
 function parseText(key: TextKey): readonly string[] {
+  if (key.role === "activity") return [key.text];
   return key.role === "plan"
     ? searchablePlanSegments(key.text, key.cwd)
     : (searchableMessageSegments(
@@ -133,6 +146,7 @@ function resultForSelection(
   selected: ReturnType<typeof selectMatch>,
   documents: readonly FindDocument[],
   snapshotSequence: number,
+  includeActivity = false,
 ): OrchestrationV2SearchThreadResult {
   let startIndex = 0;
   const entries = documents.flatMap(({ entryId, runId, count }) => {
@@ -149,6 +163,7 @@ function resultForSelection(
           (_, i) => entries[(selectedEntry + i - 8 + entries.length) % entries.length]!,
         );
   return {
+    ...(includeActivity ? { activityIncluded: true as const } : {}),
     snapshotSequence,
     totalMatches: selected.totalMatches,
     activeIndex: selected.activeIndex,
@@ -180,6 +195,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
         cwd: Schema.optional(Schema.String),
         query: Schema.String,
         skills: OrchestrationV2SearchThreadInput.fields.skills,
+        includeActivity: Schema.Boolean,
       }),
     ),
   );
@@ -206,8 +222,17 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
       entry_id: string;
       item_type: OrchestrationV2TurnItem["type"];
     }>`
-      SELECT item.thread_id, item.turn_item_id, item.payload_json,
-        COALESCE(json_extract(item.payload_json, '$.messageId'), item.turn_item_id) AS entry_id,
+      SELECT item.thread_id, item.turn_item_id,
+        CASE item.type
+          WHEN 'command_execution' THEN json_remove(item.payload_json, '$.output')
+          WHEN 'file_change' THEN json_remove(item.payload_json, '$.diffStr', '$.oldStr', '$.newStr')
+          WHEN 'file_search' THEN json_remove(item.payload_json, '$.results')
+          WHEN 'web_search' THEN json_remove(item.payload_json, '$.results')
+          ELSE item.payload_json
+        END AS payload_json,
+        CASE WHEN item.type IN ('user_message', 'assistant_message')
+          THEN json_extract(item.payload_json, '$.messageId')
+          ELSE item.turn_item_id END AS entry_id,
         json_extract(item.payload_json, '$.type') AS item_type
       FROM orchestration_v2_projection_turn_items AS item
       JOIN json_each(${sources}) AS wanted
@@ -289,23 +314,33 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
         cwd,
         query: input.query,
         skills: input.skills ?? [],
+        includeActivity: input.includeActivity === true,
       });
       const cached = scans.get(cacheKey);
       if (cached && cached.sequence === (yield* readRevision(cached.sourceThreadIds))) {
         const selected = selectMatch(cached.documents, input);
         scans.delete(cacheKey);
         scans.set(cacheKey, cached);
-        return { result: resultForSelection(selected, cached.documents, cached.sequence) };
+        return {
+          result: resultForSelection(
+            selected,
+            cached.documents,
+            cached.sequence,
+            input.includeActivity,
+          ),
+        };
       }
       const index = yield* readIndex(threadId);
       const sourceThreadIds = [...new Set([threadId, ...index.map((row) => row.sourceThreadId)])];
       const sequence = yield* readRevision(sourceThreadIds);
       const candidates = index
         .map((row, position) => ({ ...row, position }))
-        .filter((row) =>
-          ["user_message", "assistant_message", "proposed_plan", "user_input_request"].includes(
-            row.item.type,
-          ),
+        .filter(
+          (row) =>
+            ["user_message", "assistant_message", "proposed_plan", "user_input_request"].includes(
+              row.item.type,
+            ) ||
+            (input.includeActivity === true && THREAD_FIND_ACTIVITY_TYPES.has(row.item.type)),
         );
       const payloads: FindPayload[] = [];
       for (let start = 0; start < candidates.length; start += 128) {
@@ -347,7 +382,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
         }
         const rows = payloads.filter(
           (row) =>
-            row.type !== "user_input_request" &&
+            (row.type !== "user_input_request" || input.includeActivity === true) &&
             !(row.type === "user_message" && foldedAnswers.has(row.entryId)),
         );
         const documents = new Map<number, FindDocument>();
@@ -374,7 +409,12 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
             const oldest = scans.keys().next().value;
             if (oldest !== undefined) scans.delete(oldest);
           }
-          return resultForSelection(selectMatch(ordered, input), ordered, sequence);
+          return resultForSelection(
+            selectMatch(ordered, input),
+            ordered,
+            sequence,
+            input.includeActivity,
+          );
         });
         if (input.index !== undefined || (input.offset ?? 0) !== 0)
           return Stream.fromEffect(finish);
@@ -393,6 +433,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
               : 0;
           if (occurrence >= document.count) continue;
           const first: OrchestrationV2SearchThreadResult = {
+            ...(input.includeActivity ? { activityIncluded: true as const } : {}),
             complete: false,
             snapshotSequence: sequence,
             totalMatches: 1,

@@ -55,11 +55,25 @@ export function useThreadFindPositionReader({
         timelineViewportElement,
         query,
         (rowId) => {
+          if (entryById.has(rowId)) return rowId;
           const rowIndex = rows.findIndex((row) => row.id === rowId);
           for (const row of rows.slice(Math.max(0, rowIndex))) {
             if (row.kind !== "turn-fold" && row.kind !== "attempt-fold") {
+              if (row.kind === "work") return row.groupedEntries[0]?.id;
+              if (row.kind === "work-live") return row.groupedEntries[0]?.id;
+              if (row.kind === "work-toggle") {
+                const anchor = timelineEntries.find(
+                  (entry) => row.groupId === `work-group:${entry.id}`,
+                );
+                if (anchor) return anchor.id;
+              }
               const entry = entryById.get(row.kind === "assistant-meta" ? row.message.id : row.id);
-              if (entry && (entry.kind === "message" || entry.kind === "proposed-plan"))
+              if (
+                entry &&
+                (entry.kind === "message" ||
+                  entry.kind === "proposed-plan" ||
+                  entry.kind === "work")
+              )
                 return entry.id;
               continue;
             }
@@ -78,7 +92,10 @@ export function useThreadFindPositionReader({
                 (row.kind !== "attempt-fold" || entry.attempt?.id === row.attemptId)
               );
             });
-            if (entry && (entry.kind === "message" || entry.kind === "proposed-plan"))
+            if (
+              entry &&
+              (entry.kind === "message" || entry.kind === "proposed-plan" || entry.kind === "work")
+            )
               return entry.id;
           }
           return undefined;

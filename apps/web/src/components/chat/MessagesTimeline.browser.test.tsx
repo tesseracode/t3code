@@ -786,6 +786,112 @@ describe("MessagesTimeline attachments", () => {
 });
 
 describe("MessagesTimeline thread find", () => {
+  it("reveals and highlights matching members without devirtualizing other activity groups", async () => {
+    setup();
+    const fixture = makeStreamingTimelineFixture();
+    const source = fixture.visibleTurnItems[5]!;
+    const activities = Array.from({ length: 140 }, (_, index) => {
+      const id = TurnItemId.make(`find-tool-${index}`);
+      return {
+        ...source,
+        position: index,
+        sourceItemId: id,
+        item: {
+          ...source.item,
+          providerThreadId: source.item.providerThreadId ?? null,
+          providerTurnId: source.item.providerTurnId ?? null,
+          nativeItemRef: source.item.nativeItemRef ?? null,
+          id,
+          runId: null,
+          type: "command_execution" as const,
+          status: "completed" as const,
+          input:
+            index === 126
+              ? `${"printf 'earlier command'; ".repeat(120)}echo needle ${index}`
+              : `printf 'activity needle ${index}'`,
+          output: "not part of the summary",
+        },
+      };
+    });
+    const entries = deriveTimelineEntriesFromVisibleTurnItems({
+      visibleTurnItems: activities,
+      optimisticMessages: [],
+    });
+    const props = baseProps();
+    const timeline = (index: number) => (
+      <MessagesTimeline
+        {...props}
+        timelineEntries={[
+          ...entries,
+          message("Unchanged **needle** message", { role: "assistant" }, "separator"),
+          ...entries.slice(0, 2).map((entry, index) => {
+            if (entry.kind !== "work") throw new Error("Expected activity");
+            const id = `other-${index}`;
+            return { ...entry, id, entry: { ...entry.entry, id } };
+          }),
+        ]}
+        liveFollowEnabled={false}
+        findOpen
+        findExpanded
+        findActivity
+        findQuery="needle"
+        findNavigationId={index}
+        activeFindMatch={{ entryId: `find-tool-${index}`, runId: null, occurrence: 0 }}
+      />
+    );
+    await using screen = await renderElement(timeline(3));
+    const check = (index: number) => {
+      const active = CSS.highlights.get("t3-thread-find-active");
+      expect(active?.size).toBe(1);
+      const range = [...active!][0]!;
+      if (!(range instanceof Range)) throw new Error("Expected a text range");
+      expect(range.toString()).toBe("needle");
+      const row = range.startContainer.parentElement?.closest("[data-thread-find-entry-id]");
+      expect(row?.getAttribute("data-thread-find-entry-id")).toBe(`find-tool-${index}`);
+      const inner = row?.closest("[data-tool-group-scroll]");
+      if (!inner) throw new Error("Expected a virtualized activity group");
+      const rect = range.getBoundingClientRect();
+      expect(rect.height).toBeGreaterThan(0);
+      expect(rect.top).toBeGreaterThanOrEqual(inner.getBoundingClientRect().top);
+      expect(rect.bottom).toBeLessThanOrEqual(inner.getBoundingClientRect().bottom + 1);
+      const viewport = props.listRef.current!.getScrollableNode()!.getBoundingClientRect();
+      expect(rect.top).toBeGreaterThanOrEqual(viewport.top);
+      expect(rect.bottom).toBeLessThanOrEqual(viewport.bottom + 1);
+      expect(
+        screen.container.querySelectorAll("[data-v2-item-type=command_execution]").length,
+      ).toBeLessThan(80);
+    };
+    await vi.waitFor(() => check(3));
+    await screen.rerender(timeline(126));
+    await vi.waitFor(() => check(126));
+    const revealed = screen.container.querySelector('[data-thread-find-entry-id="find-tool-126"]');
+    expect(revealed?.querySelector("[data-thread-find-fold]")).toBeNull();
+    expect(screen.container.querySelectorAll("[data-tool-group-scroll]")).toHaveLength(1);
+    const messageMatches = collectThreadFindRanges(screen.container, "needle").filter(
+      (match) => match.rowId === "entry-separator",
+    );
+    expect(messageMatches.map((match) => match.range.toString())).toEqual(["needle"]);
+    await screen.rerender(
+      <MessagesTimeline
+        {...props}
+        timelineEntries={[
+          ...entries,
+          message("Unchanged needle message", { role: "assistant" }, "legacy"),
+        ]}
+        findExpanded
+        findQuery="needle"
+        activeFindMatch={{ entryId: "entry-legacy", runId: null, occurrence: 0 }}
+      />,
+    );
+    await vi.waitFor(() =>
+      expect(
+        collectThreadFindRanges(screen.container, "needle").map((match) => match.rowId),
+      ).toEqual(["entry-legacy"]),
+    );
+    await screen.rerender(<MessagesTimeline {...props} timelineEntries={entries} />);
+    expect(CSS.highlights.has("t3-thread-find-active")).toBe(false);
+  });
+
   // Opening find is navigation; on a list already showing the thread the open
   // action navigates, so the list itself releases follow only when it starts
   // showing a thread whose find is already open.
@@ -1088,6 +1194,29 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   await click(screen.button("Why am I being asked this?"));
   await expect.element(page.getByText(/an ask rule in the agent's own settings/)).toBeVisible();
   await click(screen.button("Why am I being asked this?"));
+  await screen.rerender(
+    ui({
+      findOpen: true,
+      findExpanded: true,
+      findActivity: true,
+      findQuery: "long-command",
+      activeFindMatch: { entryId: "approval-0", runId: fixture.runId, occurrence: 79 },
+    }),
+  );
+  await vi.waitFor(() => {
+    const active = CSS.highlights.get("t3-thread-find-active");
+    expect(active?.size).toBe(1);
+    const range = [...active!][0]!;
+    if (!(range instanceof Range)) throw new Error("Expected a text range");
+    expect(range.toString()).toBe("long-command");
+    expect(
+      range.startContainer.parentElement
+        ?.closest("[data-thread-find-entry-id]")
+        ?.getAttribute("data-thread-find-entry-id"),
+    ).toBe("approval-0");
+  });
+  await expect.element(screen.getByRole("button", { name: "Decline", exact: true })).toBeVisible();
+  await screen.rerender(ui());
   await click(screen.buttons("More approval options")[1]!);
   await expect.element(page.getByRole("menuitem", { name: "Always allow Safari" })).toBeVisible();
   await page.getByRole("menuitem", { name: "Always allow Safari" }).click();

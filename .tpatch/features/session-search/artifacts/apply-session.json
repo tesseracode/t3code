@@ -1,8 +1,8 @@
 {
   "slug": "session-search",
-  "completed_at": "2026-10-29T08:04:52Z",
-  "base_commit": "8cbf4544f7b94acc91a545a78a5e1fa74426aeb0",
+  "completed_at": "2026-10-29T16:38:27Z",
+  "base_commit": "fed030d5cfba9b76789105d7f40933957d7b37cf",
   "has_patch": true,
-  "validation_status": "passed",
-  "validation_notes": "tpatch test — command: vp test run packages/shared/src/threadSearch.test.ts packages/shared/src/threadFindText.test.ts apps/server/src/orchestration-v2/ThreadFind.test.ts apps/web/src/components/chat/threadFindStore.test.ts apps/web/src/components/chat/MessagesTimeline.logic.test.ts apps/web/src/components/chat/threadFindHighlights.browser.test.tsx apps/web/src/components/chat/ThreadFindBar.browser.test.tsx apps/web/src/components/chat/MessagesTimeline.browser.test.tsx"
+  "validation_status": "needs_review",
+  "validation_notes": "Full v014 root inspected; staged root recorded before commit. Tests deferred until full integration. See v014-replay-review.md."
 }

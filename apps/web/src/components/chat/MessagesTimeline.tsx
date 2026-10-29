@@ -299,6 +299,7 @@ interface MessagesTimelineProps {
   topFadeEnabled?: boolean;
   historyControls?: MessagesTimelineHistoryControls | undefined;
   findExpanded?: boolean;
+  findActivity?: boolean;
   findQuery?: string;
   activeFindMatch?: ThreadFindMatch | null;
   findNavigationId?: number;
@@ -343,6 +344,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   timelineEntries,
   findOpen = false,
   findExpanded = false,
+  findActivity = false,
   findQuery = "",
   activeFindMatch = null,
   findNavigationId = 0,
@@ -673,6 +675,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     expandedRunIds: visibleExpandedRunIds,
     expandedAttemptIds: visibleExpandedAttemptIds,
     expandedWorkGroupIds,
+    revealedEntryId: findActive ? (activeFindMatch?.entryId ?? null) : null,
     isWorking,
     runlessWorkActive,
     activeTurnStartedAt,
@@ -1019,6 +1022,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
     onRevertToTurnCount,
     onRunShellCommand,
     findActive,
+    findActivity: findActive && findActivity,
+    activeFindEntryId: findActive ? (activeFindMatch?.entryId ?? null) : null,
     onImageExpand,
     onFileOpen,
     onUseArtifactTemplate,
@@ -1185,7 +1190,14 @@ const ConversationTimeline = memo(function ConversationTimeline({
     query: normalizedFindQuery,
     match: activeFindMatch,
     navigationId: findNavigationId,
-    rowIndex: activeFindMatch ? rows.findIndex((row) => row.id === activeFindMatch.entryId) : -1,
+    rowIndex: activeFindMatch
+      ? rows.findIndex(
+          (row) =>
+            row.id === activeFindMatch.entryId ||
+            (row.kind === "work" &&
+              row.groupedEntries.some((entry) => entry.id === activeFindMatch.entryId)),
+        )
+      : -1,
     listRef,
     contentInsetEndAdjustment,
   });

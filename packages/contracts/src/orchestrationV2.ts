@@ -3986,6 +3986,8 @@ export class OrchestrationGetWorkflowScriptError extends Schema.TaggedError<Orch
 
 export const OrchestrationV2SearchThreadInput = Schema.Struct({
   threadId: ThreadId,
+  /** Opt in only when the client can reveal and highlight activity item IDs. */
+  includeActivity: Schema.optionalKey(Schema.Boolean),
   skills: Schema.optionalKey(
     Schema.Array(
       Schema.Struct({
@@ -4009,6 +4011,8 @@ export const OrchestrationV2ThreadFindMatch = Schema.Struct({
   occurrence: NonNegativeInt,
 });
 export const OrchestrationV2SearchThreadResult = Schema.Struct({
+  /** Absent on older servers; their clients must keep activity out of highlight scopes. */
+  activityIncluded: Schema.optionalKey(Schema.Literal(true)),
   complete: Schema.optionalKey(Schema.Boolean),
   snapshotSequence: NonNegativeInt,
   totalMatches: NonNegativeInt,

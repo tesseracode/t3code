@@ -67,20 +67,31 @@ export const WorkGroupSection = memo(function WorkGroupSection({
   isExpandedToolGroup: boolean;
   displayLabel?: string | undefined;
 }) {
-  const { workspaceRoot, routeThreadKey, onToggleWorkEntry, pendingApprovals } =
-    use(TimelineRowCtx);
+  const {
+    workspaceRoot,
+    routeThreadKey,
+    onToggleWorkEntry,
+    pendingApprovals,
+    findActivity,
+    activeFindEntryId,
+  } = use(TimelineRowCtx);
   const onToggleStandaloneEntry = (collapsed: boolean) =>
     onToggleWorkEntry(disclosureAnchorKey, collapsed);
   const nonEmptyEntries = groupedEntries.filter((entry) => {
     const item = entry.projectedItem?.item;
     return (
+      entry.id === activeFindEntryId ||
       (item?.type === "approval_request" && pendingApprovals.has(item.requestId)) ||
       workEntryIsVisibleInGroup(entry, isExpandedToolGroup)
     );
   });
 
   if (nonEmptyEntries.length === 0) return null;
-  if (isExpandedToolGroup && nonEmptyEntries.every((entry) => entry.itemType === "reasoning")) {
+  if (
+    !findActivity &&
+    isExpandedToolGroup &&
+    nonEmptyEntries.every((entry) => entry.itemType === "reasoning")
+  ) {
     return <ReasoningTraceContent entries={nonEmptyEntries} />;
   }
   if (isExpandedToolGroup) {
@@ -132,9 +143,16 @@ function ExpandedWorkGroupEntries({
   entries: TimelineWorkEntry[];
   workspaceRoot: string | undefined;
 }) {
-  const { workGroupViewState: viewState, onToggleWorkEntry } = use(TimelineRowCtx);
+  const {
+    workGroupViewState: viewState,
+    onToggleWorkEntry,
+    activeFindEntryId,
+  } = use(TimelineRowCtx);
+  const findIndex = entries.findIndex((entry) => entry.id === activeFindEntryId);
   const [initialScrollIndex] = useState(() =>
-    resolveWorkGroupScrollIndex(entries, viewState.scrollPositions.get(anchorKey)),
+    findIndex >= 0
+      ? { index: findIndex }
+      : resolveWorkGroupScrollIndex(entries, viewState.scrollPositions.get(anchorKey)),
   );
   const [restoringPosition, setRestoringPosition] = useState(initialScrollIndex !== undefined);
   const listRef = useRef<LegendListRef>(null);
@@ -148,6 +166,7 @@ function ExpandedWorkGroupEntries({
       entries,
       follow:
         fades.viewportHeight > 0 &&
+        activeFindEntryId === null &&
         shouldFollowWorkGroupAppend(appendState.entries, entries, fades.bottom ? Infinity : 0),
     });
   }
@@ -230,6 +249,12 @@ function ExpandedWorkGroupEntries({
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads expanded row sizes from LegendList's measured state after layout
   useLayoutEffect(updateExpandedContentHeight, [entries, updateExpandedContentHeight]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- positions the nested virtual list at the selected activity member
+  useLayoutEffect(() => {
+    if (findIndex < 0 || restoringPosition) return;
+    void listRef.current?.scrollToIndex({ index: findIndex, animated: false });
+  }, [findIndex, restoringPosition]);
+
   return (
     <WorkGroupViewCtx value={groupView}>
       <WorkLogList>
@@ -249,8 +274,10 @@ function ExpandedWorkGroupEntries({
           maintainScrollAtEndThreshold={1 / Math.max(1, fades.viewportHeight)}
           // Measure the restored row even when an intra-row offset puts its
           // estimated bounds outside the list's small bootstrap render window.
-          {...(restoringPosition && initialScrollIndex
-            ? { alwaysRender: { indices: [initialScrollIndex.index] } }
+          {...(findIndex >= 0 || (restoringPosition && initialScrollIndex)
+            ? {
+                alwaysRender: { indices: [findIndex >= 0 ? findIndex : initialScrollIndex!.index] },
+              }
             : {})}
           maintainVisibleContentPosition
           onLoad={handleLoad}

@@ -8,11 +8,16 @@ export function readThreadFindPosition(
   contentInsetEndAdjustment: number,
 ): ThreadFindStart | undefined {
   const viewport = container.getBoundingClientRect();
-  for (const row of container.querySelectorAll<HTMLElement>("[data-timeline-row-id]")) {
+  for (const row of container.querySelectorAll<HTMLElement>(
+    "[data-timeline-row-id], [data-thread-find-entry-id]",
+  )) {
+    if (row.querySelector("[data-thread-find-entry-id]")) continue;
     const rect = row.getBoundingClientRect();
     if (rect.bottom <= viewport.top || rect.top >= viewport.bottom - contentInsetEndAdjustment)
       continue;
-    const rowId = row.dataset.timelineRowId;
+    const group = row.closest("[data-tool-group-scroll]")?.getBoundingClientRect();
+    if (group && (rect.bottom <= group.top || rect.top >= group.bottom)) continue;
+    const rowId = row.dataset.threadFindEntryId ?? row.dataset.timelineRowId;
     const entryId = rowId ? resolveEntry(rowId) : undefined;
     if (!entryId) continue;
     const matches = collectThreadFindRanges(row, query);

@@ -77,6 +77,7 @@ export function useThreadFind({
   const nextTimeline: TimelineFields = {
     findOpen: isOpen,
     findExpanded,
+    findActivity: remote.data?.activityIncluded === true,
     findQuery,
     activeFindMatch:
       entryId !== undefined && occurrence !== undefined
@@ -230,6 +231,7 @@ export function useThreadFind({
 export interface TimelineFields {
   readonly findOpen: boolean;
   readonly findExpanded: boolean;
+  readonly findActivity: boolean;
   readonly findQuery: string;
   readonly activeFindMatch: ThreadFindMatch | null;
   readonly findNavigationId: number;
@@ -241,6 +243,7 @@ function sameTimeline(a: TimelineFields, b: TimelineFields) {
   return (
     a.findOpen === b.findOpen &&
     a.findExpanded === b.findExpanded &&
+    a.findActivity === b.findActivity &&
     a.findQuery === b.findQuery &&
     a.findNavigationId === b.findNavigationId &&
     (aMatch === null || bMatch === null
@@ -286,6 +289,7 @@ function useServerResults(
           input: {
             threadId,
             query: debouncedQuery,
+            includeActivity: true,
             ...(start ? { start } : {}),
             ...(offset !== 0 ? { offset } : {}),
             skills: skillLabels,
