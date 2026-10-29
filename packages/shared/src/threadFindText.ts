@@ -23,7 +23,20 @@ import {
 import { upgradeLegacyContextMessage } from "./composerContextLegacy.ts";
 import { parseComposerContextHref } from "./composerContextReferences.ts";
 import { assistantCitationLabel, parseAssistantCitationHref } from "./assistantCitations.ts";
-import type { OrchestrationV2ConversationMessage } from "@t3tools/contracts";
+import {
+  ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE,
+  type OrchestrationV2ConversationMessage,
+  type OrchestrationV2TurnItem,
+} from "@t3tools/contracts";
+import {
+  dynamicToolTitle,
+  formatSearchToolLabel,
+  collectToolFilePaths,
+  formatReadToolLabel,
+  classifyToolActivity,
+} from "./toolActivity.ts";
+import { htmlRenderFromToolItem, mcpAppFromToolItem } from "./toolOutput.ts";
+import * as Predicate from "effect/Predicate";
 import { proposedPlanTitle, stripDisplayedPlanMarkdown } from "./proposedPlanText.ts";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
@@ -227,4 +240,110 @@ export function searchableMessageSegments(
     skills,
     shouldPreserveAssistantLineBreaks(message.text),
   );
+}
+
+/**
+ * Activity's source summary, also displayed by the timeline while finding.
+ * Inspector bodies, external resources and lifecycle cards are not documents.
+ */
+export const THREAD_FIND_ACTIVITY_TYPES: ReadonlySet<OrchestrationV2TurnItem["type"]> = new Set([
+  "reasoning",
+  "command_execution",
+  "system_notice",
+  "file_search",
+  "web_search",
+  "file_change",
+  "dynamic_tool",
+  "todo_list",
+  "approval_request",
+  "error",
+  "thread_created",
+  "user_input_request",
+]);
+
+export function threadFindActivityText(item: OrchestrationV2TurnItem): string | null {
+  return activityText(item)?.replace(/\r?\n/g, " ") ?? null;
+}
+
+function answerText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(answerText).filter(Boolean).join(", ");
+  return Predicate.isObject(value) ? answerText(value.answers) : "";
+}
+
+function activityText(item: OrchestrationV2TurnItem): string | null {
+  // These belong to the workspace setup card, not activity in the timeline.
+  if (
+    (item.type === "command_execution" && item.input === "Preparing workspace") ||
+    (item.type === "error" &&
+      item.status === "cancelled" &&
+      item.failure.code === ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE)
+  )
+    return null;
+  switch (item.type) {
+    case "reasoning":
+      return item.text.trim().replace(/\s+/g, " ") || null;
+    case "command_execution":
+      return item.input;
+    case "system_notice":
+      return item.message;
+    case "file_search":
+      return item.title?.trim() || formatSearchToolLabel(item) || "Searched files";
+    case "web_search":
+      return item.patterns?.join(", ") || item.title?.trim() || "Searched the web";
+    case "file_change":
+      return item.changes?.map((change) => change.path).join(", ") || item.fileName;
+    case "dynamic_tool": {
+      if (item.status === "completed" && (htmlRenderFromToolItem(item) || mcpAppFromToolItem(item)))
+        return null;
+      const title = dynamicToolTitle(item.toolName, item.input, item.title);
+      if (title) return title;
+      const action = classifyToolActivity({
+        itemType: "dynamic_tool_call",
+        data: { toolName: item.toolName ?? undefined, input: item.input },
+      });
+      if (action === "read") {
+        const paths = collectToolFilePaths({ input: item.input });
+        return formatReadToolLabel(paths[0] ?? "", Math.max(0, paths.length - 1));
+      }
+      if (action === "search") {
+        const label = formatSearchToolLabel({ input: item.input });
+        if (label) return label;
+      }
+      return item.title?.trim() || item.toolName || "Tool call";
+    }
+    case "todo_list": {
+      const done = item.steps.filter((step) => step.status === "completed").length;
+      const current =
+        item.steps.find((step) => step.status === "running") ??
+        item.steps.find((step) => step.status === "pending");
+      return `Tasks ${done}/${item.steps.length}${current ? ` · ${current.text}` : ""}`;
+    }
+    case "approval_request":
+      return item.prompt || item.title?.trim() || "Approval requested";
+    case "user_input_request": {
+      const answer = item.questionAnswer;
+      const question =
+        Object.values(answer?.questionTextById ?? {}).join(" · ") ||
+        item.questions.map((question) => question.question).join(" · ");
+      const response = answer
+        ? Object.values(answer.answers).map(answerText).filter(Boolean).join(" · ") ||
+          Object.values(answer.attachmentsByQuestionId)
+            .flat()
+            .map((attachment) => attachment.name)
+            .join(", ")
+        : "";
+      return (
+        [question, response].filter(Boolean).join(": ") ||
+        item.title?.trim() ||
+        (answer ? "Answered questions" : "Input requested")
+      );
+    }
+    case "error":
+      return item.failure.message || item.title?.trim() || "Provider error";
+    case "thread_created":
+      return "Created thread";
+    default:
+      return null;
+  }
 }

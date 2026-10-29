@@ -22,6 +22,8 @@ import {
   turnItemNeedsDetailFetch,
 } from "@t3tools/client-runtime/work-log/item-detail";
 import { claudeSkillInvocation } from "@t3tools/shared/toolActivity";
+import { threadFindActivityText } from "@t3tools/shared/threadFindText";
+import { findRevealRef } from "./markdownFindContext";
 import { memo, use, useState, type KeyboardEvent } from "react";
 import {
   workEntryDisplayIndicatesToolFailure,
@@ -183,6 +185,22 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? notificationChildThreadId(workEntry.projectedItem.item.source)
       : undefined;
   const groupView = use(WorkGroupViewCtx);
+  const [findRevealed, setFindRevealed] = useState(false);
+  const findText =
+    ctx.findActivity && workEntry.projectedItem
+      ? threadFindActivityText(workEntry.projectedItem.item)
+      : null;
+  const findLabel =
+    findText === null ? null : (
+      <span
+        data-thread-find-text
+        data-thread-find-fold={!findRevealed ? "" : undefined}
+        ref={findRevealRef(() => setFindRevealed(true))}
+        className={findRevealed ? "block whitespace-pre-wrap break-words" : "block truncate"}
+      >
+        {findText}
+      </span>
+    );
   const [expanded, setExpanded] = useState(
     () => groupView?.state.expandedEntries.has(workEntry.id) ?? false,
   );
@@ -213,6 +231,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         : null;
     return (
       <WorkLogRow
+        data-thread-find-entry-id={workEntry.id}
+        aria-current={ctx.activeFindEntryId === workEntry.id ? true : undefined}
         data-v2-item-type="error"
         data-v2-item-visibility={workEntry.projectedItem?.visibility}
         wrapLabel
@@ -225,7 +245,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           <span
             className={cn("text-sm font-medium", warning ? "text-warning" : "text-destructive")}
           >
-            {label}
+            {findLabel ?? label}
           </span>
         }
         trailing={
@@ -385,6 +405,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
 
   return (
     <WorkLogRow
+      data-thread-find-entry-id={workEntry.id}
+      aria-current={ctx.activeFindEntryId === workEntry.id ? true : undefined}
+      wrapLabel={ctx.findActivity && findRevealed}
       data-v2-item-type={workEntry.projectedItem?.item.type}
       data-v2-item-visibility={workEntry.projectedItem?.visibility}
       {...rowToggleProps}
@@ -403,50 +426,56 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         </span>
       }
       label={
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
-            <span
-              className={cn(answerPreview ? "min-w-0" : "min-w-0 flex-1", "truncate", headingClass)}
-            >
-              {isReasoning && !expanded ? (
-                <ChatMarkdown
-                  inline
-                  text={workEntry.detail ?? previewText}
-                  cwd={ctx.markdownCwd}
-                  parseRawHtml={false}
-                  extraRemarkPlugins={[
-                    [
-                      remarkThoughtPreview,
-                      workEntry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought",
-                    ],
-                  ]}
-                />
-              ) : threadLabel ? (
-                <ThreadReadLabel
-                  label={threadLabel}
-                  environmentId={ctx.activeThreadEnvironmentId}
-                  linked
-                />
-              ) : (
-                previewText
-              )}
-            </span>
-            {answerPreview ? (
+        findLabel ?? (
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
               <span
                 className={cn(
-                  "min-w-0 truncate",
-                  !expanded &&
-                    workEntry.questionAnswer &&
-                    hasQuestionAnswer(workEntry.questionAnswer)
-                    ? "text-foreground"
-                    : "text-muted-foreground",
+                  answerPreview ? "min-w-0" : "min-w-0 flex-1",
+                  "truncate",
+                  headingClass,
                 )}
               >
-                {answerPreview}
+                {isReasoning && !expanded ? (
+                  <ChatMarkdown
+                    inline
+                    text={workEntry.detail ?? previewText}
+                    cwd={ctx.markdownCwd}
+                    parseRawHtml={false}
+                    extraRemarkPlugins={[
+                      [
+                        remarkThoughtPreview,
+                        workEntry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought",
+                      ],
+                    ]}
+                  />
+                ) : threadLabel ? (
+                  <ThreadReadLabel
+                    label={threadLabel}
+                    environmentId={ctx.activeThreadEnvironmentId}
+                    linked
+                  />
+                ) : (
+                  previewText
+                )}
               </span>
-            ) : null}
-          </p>
-        </div>
+              {answerPreview ? (
+                <span
+                  className={cn(
+                    "min-w-0 truncate",
+                    !expanded &&
+                      workEntry.questionAnswer &&
+                      hasQuestionAnswer(workEntry.questionAnswer)
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {answerPreview}
+                </span>
+              ) : null}
+            </p>
+          </div>
+        )
       }
       trailing={
         <>

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "session-search",
-  "current_generation": 9,
+  "current_generation": 10,
   "generations": [
     {
       "generation": 1,
@@ -357,7 +357,7 @@
       "git_patch_id": "49153269d5c4fe02b51af2bdaa3f3b9808a04874",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "6cedc2e96274aac9901d7cbd4eec2e83b34318e3fbf8ce4537708204b4d9ad9e",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/012-record.patch",
       "base_commit": "4ab45ef49c4a670e4cff10a13983c190e489de4b",
       "upper": {
@@ -416,6 +416,82 @@
         "packages/contracts/src/keybindings.test.ts",
         "packages/contracts/src/keybindings.ts",
         "packages/shared/src/keybindings.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 10,
+      "generation_id": "pg_b62aba02bf7b",
+      "kind": "amend-refresh",
+      "patch_sha256": "563e59e1794fb07b4c4f77046ead67b9e8045df0d198c5be7fd220ff30ab4d32",
+      "git_patch_id": "61bcf2025467d54a565ddbac7e4dc8b3f227b101",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "888114af033aa6326ae4e7dc51b9249b87a372d8bbc76a46609d77eb0602388f",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "8cbf4544f7b94acc91a545a78a5e1fa74426aeb0",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/src/orchestration-v2/ThreadFind.test.ts",
+          "apps/server/src/orchestration-v2/ThreadFind.ts",
+          "apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+          "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+          "apps/web/src/components/chat/MessagesTimeline.tsx",
+          "apps/web/src/components/chat/ThreadFindBar.browser.test.tsx",
+          "apps/web/src/components/chat/ThreadFindBar.tsx",
+          "apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+          "apps/web/src/components/chat/TimelineWorkGroupRows.tsx",
+          "apps/web/src/components/chat/threadFindHighlights.browser.test.tsx",
+          "apps/web/src/components/chat/threadFindHighlights.ts",
+          "apps/web/src/components/chat/threadFindPosition.ts",
+          "apps/web/src/components/chat/timelineRowContext.ts",
+          "apps/web/src/components/chat/useThreadFind.ts",
+          "apps/web/src/components/chat/useThreadFindNavigation.ts",
+          "apps/web/src/components/chat/useThreadFindPositionReader.ts",
+          "docs/internals/thread-find.md",
+          "docs/user/keybindings.md",
+          "packages/contracts/src/orchestrationV2.ts",
+          "packages/shared/src/threadFindText.ts",
+          "packages/shared/src/threadSearch.test.ts",
+          "packages/shared/src/threadSearch.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration-v2/ThreadFind.test.ts",
+        "apps/server/src/orchestration-v2/ThreadFind.ts",
+        "apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+        "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+        "apps/web/src/components/chat/MessagesTimeline.tsx",
+        "apps/web/src/components/chat/ThreadFindBar.browser.test.tsx",
+        "apps/web/src/components/chat/ThreadFindBar.tsx",
+        "apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+        "apps/web/src/components/chat/TimelineWorkGroupRows.tsx",
+        "apps/web/src/components/chat/threadFindHighlights.browser.test.tsx",
+        "apps/web/src/components/chat/threadFindHighlights.ts",
+        "apps/web/src/components/chat/threadFindPosition.ts",
+        "apps/web/src/components/chat/timelineRowContext.ts",
+        "apps/web/src/components/chat/useThreadFind.ts",
+        "apps/web/src/components/chat/useThreadFindNavigation.ts",
+        "apps/web/src/components/chat/useThreadFindPositionReader.ts",
+        "docs/internals/thread-find.md",
+        "docs/user/keybindings.md",
+        "packages/contracts/src/orchestrationV2.ts",
+        "packages/shared/src/threadFindText.ts",
+        "packages/shared/src/threadSearch.test.ts",
+        "packages/shared/src/threadSearch.ts"
       ],
       "dependencies": [],
       "refs": {

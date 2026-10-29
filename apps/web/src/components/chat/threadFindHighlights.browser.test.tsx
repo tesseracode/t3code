@@ -20,4 +20,24 @@ describe("collectThreadFindRanges", () => {
       [2, "const"],
     ]);
   });
+
+  it("keeps activity identity and Unicode source bounds inside a grouped row", () => {
+    const container = row(
+      '<span data-thread-find-entry-id="tool"><span data-thread-find-text>ＦＯＯ ﬃ cafe\u0301</span></span>',
+    );
+    // Activity scopes sit below the outer virtualized group's row.
+    container
+      .querySelector("[data-timeline-row-id]")!
+      .firstElementChild!.removeAttribute("data-thread-find-text");
+    for (const [query, original] of [
+      ["foo", "ＦＯＯ"],
+      ["ffi", "ﬃ"],
+      ["café", "cafe\u0301"],
+    ]) {
+      const matches = collectThreadFindRanges(container, query!);
+      expect(
+        matches.map((match) => [match.rowId, match.occurrence, match.range.toString()]),
+      ).toEqual([["tool", 0, original]]);
+    }
+  });
 });

@@ -30,6 +30,7 @@ import {
   THREAD_HISTORY_PAGE_POLICY,
 } from "./threadHistoryPaging.ts";
 import { projectTurnItemForWire } from "./WireProjection.ts";
+import { findProjectedThreadItems } from "./ThreadFind.ts";
 
 const layerTest = Layer.mergeAll(EventStore.layer, ProjectionStore.layer, ProjectStore.layer).pipe(
   Layer.provideMerge(SqlitePersistence.layerMemory),
@@ -200,6 +201,145 @@ const setup = Effect.gen(function* () {
 });
 
 describe("V2 thread find", () => {
+  it.effect("navigates activity summaries and messages identically in SQLite and memory", () =>
+    Effect.gen(function* () {
+      const projection = yield* setup;
+      const items: OrchestrationV2TurnItem[] = [
+        item("prompt", 0, "Needle", "user_message"),
+        {
+          ...item("command", 1, ""),
+          type: "command_execution",
+          input: "printf 'ＮＥＥＤＬＥ needle'",
+          output: "hidden output",
+        },
+        {
+          ...item("thought", 2, ""),
+          type: "reasoning",
+          text: "Trace the needle",
+          streaming: false,
+        },
+        { ...item("notice", 3, ""), type: "system_notice", message: "Needle warning" },
+        item("plan", 4, "# Needle", "proposed_plan"),
+        item("reply", 5, "A **needle** answer"),
+        { ...item("setup", 6, ""), type: "command_execution", input: "Preparing workspace" },
+        { ...item("empty-thought", 7, ""), type: "reasoning", text: "", streaming: false },
+        {
+          ...item("question", 8, ""),
+          type: "user_input_request",
+          requestId: RuntimeRequestId.make("answered"),
+          questions: [],
+          questionAnswer: {
+            requestId: "answered",
+            questionTextById: { q: "Which result?" },
+            answers: { q: "needle" },
+            attachmentsByQuestionId: {},
+          },
+        },
+        item("async-answer:answered", 9, "needle", "user_message"),
+      ];
+      yield* putItems(items);
+      const projected = items.map((item, position) => ({
+        item,
+        position,
+        visibility: "local" as const,
+        sourceThreadId: threadId,
+        sourceItemId: item.id,
+      }));
+      const expected = [
+        "prompt",
+        "command",
+        "command",
+        "thought",
+        "notice",
+        "plan",
+        "reply",
+        "question",
+      ];
+      for (const [index, entryId] of expected.entries()) {
+        const input = { threadId, query: "needle", index, includeActivity: true };
+        const result = yield* projection.searchThread(input);
+        assert.equal(result.totalMatches, expected.length);
+        assert.equal(result.match?.entryId, entryId);
+        assert.deepEqual(result.match, findProjectedThreadItems(projected, input, 0).match);
+      }
+      const wrapped = yield* projection.searchThread({
+        threadId,
+        query: "needle",
+        includeActivity: true,
+        start: { entryId: "prompt", occurrence: 0 },
+        offset: -1,
+      });
+      assert.equal(wrapped.match?.entryId, "question");
+      for (const query of ["hidden output", "Preparing workspace", "Thought"]) {
+        const result = yield* projection.searchThread({ threadId, query, includeActivity: true });
+        assert.equal(result.totalMatches, 0);
+      }
+    }).pipe(Effect.provide(layerTest)),
+  );
+
+  it.effect("searches only renderable tool summaries, not hidden bodies or resource cards", () =>
+    Effect.gen(function* () {
+      const projection = yield* setup;
+      const items: OrchestrationV2TurnItem[] = [
+        {
+          ...item("read", 0, ""),
+          type: "dynamic_tool",
+          toolName: "Read",
+          input: { file_path: "/work/needle.ts" },
+          output: "body-only",
+        },
+        {
+          ...item("edit", 1, ""),
+          type: "file_change",
+          fileName: "needle.ts",
+          diffStr: "body-only",
+        },
+        {
+          ...item("web", 2, ""),
+          type: "web_search",
+          patterns: ["needle"],
+          results: [{ url: "https://example.com", snippet: "body-only" }],
+        },
+        {
+          ...item("large-input", 3, ""),
+          type: "dynamic_tool",
+          toolName: "Read",
+          input: { file_path: "hidden-needle.ts", content: "x".repeat(20_000) },
+        },
+        {
+          ...item("resource", 4, ""),
+          type: "dynamic_tool",
+          toolName: "html_render",
+          input: {},
+          output: { htmlRender: { attachmentId: "resource-1", title: "needle", height: 200 } },
+        },
+      ];
+      yield* putItems(items);
+      const legacy = yield* projection.searchThread({ threadId, query: "needle" });
+      assert.equal(legacy.totalMatches, 0);
+      assert.isUndefined(legacy.activityIncluded);
+      const result = yield* projection.searchThread({
+        threadId,
+        query: "needle",
+        includeActivity: true,
+      });
+      assert.equal(result.totalMatches, 3);
+      assert.isTrue(result.activityIncluded);
+      assert.deepEqual(
+        result.navigation?.map((entry) => entry.entryId),
+        ["read", "edit", "web"],
+      );
+      const hidden = yield* projection.searchThread({
+        threadId,
+        query: "body-only",
+        includeActivity: true,
+      });
+      assert.equal(hidden.totalMatches, 0);
+      const cachedLegacy = yield* projection.searchThread({ threadId, query: "needle" });
+      assert.equal(cachedLegacy.totalMatches, 0);
+    }).pipe(Effect.provide(layerTest)),
+  );
+
   it.effect("finishes one snapshot while later searches include newly inserted matches", () =>
     Effect.gen(function* () {
       const projection = yield* setup;
