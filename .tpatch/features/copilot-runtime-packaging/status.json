@@ -5,11 +5,11 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-24T19:06:30Z",
-  "updated_at": "2026-10-29T10:47:58Z",
-  "last_command": "record",
-  "notes": "Patch recorded",
+  "updated_at": "2026-10-29T11:08:28Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-10-29T11:09:11Z",
   "apply": {
-    "completed_at": "2026-10-29T10:46:02Z",
+    "completed_at": "2026-10-29T11:07:48Z",
     "base_commit": "75b2ad95056ea428008d551e2980f1ac389defaf",
     "has_patch": true
   },
@@ -41,12 +41,12 @@
     }
   ],
   "verify": {
-    "verified_at": "2026-10-29T08:07:49Z",
+    "verified_at": "2026-10-29T11:08:28Z",
     "passed": false,
-    "recipe_hash_at_verify": "9e92d236ac0aa87120915558ab8898b9dd5e5e541b9f0e4ec88ccc81a826441a",
-    "patch_hash_at_verify": "75c119643c905f5395411037b24a9f8d3cdc63c52ee67c6299a6d52511de90f5",
+    "recipe_hash_at_verify": "82238092ca0c7a35c5feda5369696ccea02acb8ffb3dccdfc803e2fce5429312",
+    "patch_hash_at_verify": "de85cac196b3adfd7f770f2f59193becad50dd40d071a2a54cd297a2113671e6",
     "parent_snapshot": {
-      "copilot-cli-provider": "blocked"
+      "copilot-cli-provider": "applied"
     }
   }
 }

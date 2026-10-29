@@ -1,8 +1,8 @@
 # Manual Validation
 
-**Status**: needs_review
-**Timestamp**: 2026-10-29T10:46:02Z
+**Status**: passed
+**Timestamp**: 2026-10-29T11:07:48Z
 
 ## Notes
 
-Real CI Windows failure proved ancestor node_modules contamination. TEMP/TMP/TMPDIR now point to C:\t3\tmp outside checkout; targeted format passed, actual second CI gate pending.
+Confirmed stock V1 import bypass by read-only source trace; regression failed before guard, then 12 focused tests passed. Desktop typecheck and precise lint pass. No app, Keychain, provider, server or CI run. Final root must recapture all 31 paths from 75b2ad95056ea428008d551e2980f1ac389defaf.

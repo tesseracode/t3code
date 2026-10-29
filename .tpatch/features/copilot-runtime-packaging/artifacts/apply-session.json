@@ -1,8 +1,9 @@
 {
   "slug": "copilot-runtime-packaging",
-  "completed_at": "2026-10-29T10:46:02Z",
-  "base_commit": "6748897368aa67ea6824a1c8f23e68583a654041",
+  "completed_at": "2026-10-29T11:07:48Z",
+  "base_commit": "f69617f5964758e48b8dbdb65ab96c36a1533aa0",
   "has_patch": true,
-  "validation_status": "needs_review",
-  "validation_notes": "Real CI Windows failure proved ancestor node_modules contamination. TEMP/TMP/TMPDIR now point to C:\\t3\\tmp outside checkout; targeted format passed, actual second CI gate pending."
+  "operator_notes": "Skip stock V1 Local Storage import for isolated previews before any filesystem probe; retain same-preview data and normal migration. Full root/native closure/CI TEMP retained.",
+  "validation_status": "passed",
+  "validation_notes": "Confirmed stock V1 import bypass by read-only source trace; regression failed before guard, then 12 focused tests passed. Desktop typecheck and precise lint pass. No app, Keychain, provider, server or CI run. Final root must recapture all 31 paths from 75b2ad95056ea428008d551e2980f1ac389defaf."
 }
