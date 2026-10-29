@@ -7,6 +7,35 @@ parallel client matcher. Baseline is `fed030d5cfba9b76789105d7f40933957d7b37cf`
 (upstream v0.1.4 `783581d461dc72cdd8f78fc8abb4ad536dfc4547` plus metadata only).
 Branch: `tpatch/session-search-v014`.
 
+### Metadata-only re-attestation
+
+The original source commit `78eec17f402cb3eaf73221672ec3e757912c6427`
+has a malformed landing attestation: a blank line separates the four Tpatch
+lines from the final Co-authored-by line, so Git parses only the latter as a
+trailer. The original commit and its failed-evidence history remain unchanged.
+
+The supported repair records the immutable original range from
+`fed030d5cfba9b76789105d7f40933957d7b37cf` to
+`78eec17f402cb3eaf73221672ec3e757912c6427`, with all 23 paths explicitly scoped.
+This does not capture the coordinator's later Foundation/Attention changes on
+shared paths. Record reports no canonical content change and creates no new
+numbered patch or generation. Canonical patch SHA-256 remains
+`e98b6ddf7a85432e3adb7ce5bb29ffc4cfae0a2d196c6239bd7d893955f20019`;
+recipe SHA-256 remains
+`317f5c18c9ea5ddbeaabb3a9813cbba243a365de8703c81d78fea341779f9c3f`.
+The original baseline preimages and recipe provenance remain unchanged.
+
+`tpatch land session-search --no-record` with the single-line subject
+`chore(tpatch): re-attest existing session-search materialization` emits its own
+contiguous five-trailer block. This is a new metadata attestation of the
+already-existing full-root materialization, not a new source implementation,
+source replay, history rewrite, resource capture or synthetic patch generation.
+Only the scoped implementation record, this review and feature status change.
+Final validation uses `git interpret-trailers --parse`, unchanged-tree/hash
+checks and `tpatch verify session-search --no-write`; no tests or apps are run.
+The coordinator's reported integrated checks are not rerun or relabeled as
+local validation here.
+
 The inherited canonical patch was byte-identical to the authoritative full root
 at `0e032347a81b2abda824df191f10b23155bc5b9c`: SHA-256
 `563e59e1794fb07b4c4f77046ead67b9e8045df0d198c5be7fd220ff30ab4d32`.
