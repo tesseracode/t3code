@@ -1,0 +1,1586 @@
+diff --git a/apps/server/src/orchestration-v2/ThreadFind.test.ts b/apps/server/src/orchestration-v2/ThreadFind.test.ts
+index 6793421a6..ce09e5788 100644
+--- a/apps/server/src/orchestration-v2/ThreadFind.test.ts
++++ b/apps/server/src/orchestration-v2/ThreadFind.test.ts
+@@ -200,6 +200,139 @@ const setup = Effect.gen(function* () {
+ });
+ 
+ describe("V2 thread find", () => {
++  it.effect("navigates activity summaries and messages in occurrence order", () =>
++    Effect.gen(function* () {
++      const projection = yield* setup;
++      const items: OrchestrationV2TurnItem[] = [
++        item("prompt", 0, "Needle", "user_message"),
++        {
++          ...item("command", 1, ""),
++          type: "command_execution",
++          input: "printf 'ＮＥＥＤＬＥ needle'",
++          output: "hidden output",
++        },
++        {
++          ...item("thought", 2, ""),
++          type: "reasoning",
++          text: "Trace the needle",
++          streaming: false,
++        },
++        { ...item("notice", 3, ""), type: "system_notice", message: "Needle warning" },
++        item("plan", 4, "# Needle", "proposed_plan"),
++        item("reply", 5, "A **needle** answer"),
++        { ...item("setup", 6, ""), type: "command_execution", input: "Preparing workspace" },
++        { ...item("empty-thought", 7, ""), type: "reasoning", text: "", streaming: false },
++        {
++          ...item("question", 8, ""),
++          type: "user_input_request",
++          requestId: RuntimeRequestId.make("answered"),
++          questions: [],
++          questionAnswer: {
++            requestId: "answered",
++            questionTextById: { q: "Which result?" },
++            answers: { q: "needle" },
++            attachmentsByQuestionId: {},
++          },
++        },
++        item("async-answer:answered", 9, "needle", "user_message"),
++      ];
++      yield* putItems(items);
++      const expected = [
++        "prompt",
++        "command",
++        "command",
++        "thought",
++        "notice",
++        "plan",
++        "reply",
++        "question",
++      ];
++      for (const [index, entryId] of expected.entries()) {
++        const input = { threadId, query: "needle", index, includeActivity: true };
++        const result = yield* projection.searchThread(input);
++        assert.equal(result.totalMatches, expected.length);
++        assert.equal(result.match?.entryId, entryId);
++        assert.equal(result.match?.occurrence, index === 2 ? 1 : 0);
++        assert.equal(result.activeIndex, index);
++      }
++      const wrapped = yield* projection.searchThread({
++        threadId,
++        query: "needle",
++        includeActivity: true,
++        start: { entryId: "prompt", occurrence: 0 },
++        offset: -1,
++      });
++      assert.equal(wrapped.match?.entryId, "question");
++      for (const query of ["hidden output", "Preparing workspace", "Thought"]) {
++        const result = yield* projection.searchThread({ threadId, query, includeActivity: true });
++        assert.equal(result.totalMatches, 0);
++      }
++    }).pipe(Effect.provide(layerTest)),
++  );
++
++  it.effect("searches only renderable tool summaries, not hidden bodies or resource cards", () =>
++    Effect.gen(function* () {
++      const projection = yield* setup;
++      const items: OrchestrationV2TurnItem[] = [
++        {
++          ...item("read", 0, ""),
++          type: "dynamic_tool",
++          toolName: "Read",
++          input: { file_path: "/work/needle.ts" },
++          output: "body-only",
++        },
++        {
++          ...item("edit", 1, ""),
++          type: "file_change",
++          fileName: "needle.ts",
++          diffStr: "body-only",
++        },
++        {
++          ...item("web", 2, ""),
++          type: "web_search",
++          patterns: ["needle"],
++          results: [{ url: "https://example.com", snippet: "body-only" }],
++        },
++        {
++          ...item("large-input", 3, ""),
++          type: "dynamic_tool",
++          toolName: "Read",
++          input: { file_path: "hidden-needle.ts", content: "x".repeat(20_000) },
++        },
++        {
++          ...item("resource", 4, ""),
++          type: "dynamic_tool",
++          toolName: "html_render",
++          input: {},
++          output: { htmlRender: { attachmentId: "resource-1", title: "needle", height: 200 } },
++        },
++      ];
++      yield* putItems(items);
++      const legacy = yield* projection.searchThread({ threadId, query: "needle" });
++      assert.equal(legacy.totalMatches, 0);
++      assert.isUndefined(legacy.activityIncluded);
++      const result = yield* projection.searchThread({
++        threadId,
++        query: "needle",
++        includeActivity: true,
++      });
++      assert.equal(result.totalMatches, 3);
++      assert.isTrue(result.activityIncluded);
++      assert.deepEqual(
++        result.navigation?.map((entry) => entry.entryId),
++        ["read", "edit", "web"],
++      );
++      const hidden = yield* projection.searchThread({
++        threadId,
++        query: "body-only",
++        includeActivity: true,
++      });
++      assert.equal(hidden.totalMatches, 0);
++      const cachedLegacy = yield* projection.searchThread({ threadId, query: "needle" });
++      assert.equal(cachedLegacy.totalMatches, 0);
++    }).pipe(Effect.provide(layerTest)),
++  );
++
+   it.effect("finishes one snapshot while later searches include newly inserted matches", () =>
+     Effect.gen(function* () {
+       const projection = yield* setup;
+diff --git a/apps/server/src/orchestration-v2/ThreadFind.ts b/apps/server/src/orchestration-v2/ThreadFind.ts
+index ead68680a..14c7526c9 100644
+--- a/apps/server/src/orchestration-v2/ThreadFind.ts
++++ b/apps/server/src/orchestration-v2/ThreadFind.ts
+@@ -7,7 +7,12 @@ import {
+   ThreadId,
+   TurnItemId,
+ } from "@t3tools/contracts";
+-import { searchableMessageSegments, searchablePlanSegments } from "@t3tools/shared/threadFindText";
++import {
++  searchableMessageSegments,
++  searchablePlanSegments,
++  threadFindActivityText,
++  THREAD_FIND_ACTIVITY_TYPES,
++} from "@t3tools/shared/threadFindText";
+ import { countThreadSearchOccurrences } from "@t3tools/shared/threadSearch";
+ import * as Cache from "effect/Cache";
+ import * as Data from "effect/Data";
+@@ -21,6 +26,7 @@ import {
+   ProjectionStoreThreadNotFoundError,
+   type ProjectionStoreV2Error,
+ } from "./ProjectionStore.ts";
++import { projectTurnItemForWire } from "./WireProjection.ts";
+ 
+ interface FindRow {
+   readonly position: number;
+@@ -40,7 +46,7 @@ interface FindDocument extends FindRow {
+ }
+ class TextKey extends Data.Class<{
+   text: string;
+-  role: "user" | "assistant" | "plan";
++  role: "user" | "assistant" | "plan" | "activity";
+   streaming: boolean;
+   hasContext: boolean;
+   cwd: string | undefined;
+@@ -58,9 +64,15 @@ function textKey(
+         ? item.markdown
+         : item.type === "user_message" || item.type === "assistant_message"
+           ? item.text
+-          : "",
++          : (threadFindActivityText(projectTurnItemForWire(item)) ?? ""),
+     role:
+-      item.type === "proposed_plan" ? "plan" : item.type === "user_message" ? "user" : "assistant",
++      item.type === "proposed_plan"
++        ? "plan"
++        : item.type === "user_message"
++          ? "user"
++          : item.type === "assistant_message"
++            ? "assistant"
++            : "activity",
+     streaming: item.type === "assistant_message" && item.streaming,
+     hasContext: item.type === "user_message" && item.context !== undefined,
+     cwd,
+@@ -69,6 +81,7 @@ function textKey(
+ }
+ 
+ function parseText(key: TextKey): readonly string[] {
++  if (key.role === "activity") return [key.text];
+   return key.role === "plan"
+     ? searchablePlanSegments(key.text, key.cwd)
+     : (searchableMessageSegments(
+@@ -133,6 +146,7 @@ function resultForSelection(
+   selected: ReturnType<typeof selectMatch>,
+   documents: readonly FindDocument[],
+   snapshotSequence: number,
++  includeActivity = false,
+ ): OrchestrationV2SearchThreadResult {
+   let startIndex = 0;
+   const entries = documents.flatMap(({ entryId, runId, count }) => {
+@@ -149,6 +163,7 @@ function resultForSelection(
+           (_, i) => entries[(selectedEntry + i - 8 + entries.length) % entries.length]!,
+         );
+   return {
++    ...(includeActivity ? { activityIncluded: true as const } : {}),
+     snapshotSequence,
+     totalMatches: selected.totalMatches,
+     activeIndex: selected.activeIndex,
+@@ -180,6 +195,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+         cwd: Schema.optional(Schema.String),
+         query: Schema.String,
+         skills: OrchestrationV2SearchThreadInput.fields.skills,
++        includeActivity: Schema.Boolean,
+       }),
+     ),
+   );
+@@ -206,8 +222,17 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+       entry_id: string;
+       item_type: OrchestrationV2TurnItem["type"];
+     }>`
+-      SELECT item.thread_id, item.turn_item_id, item.payload_json,
+-        COALESCE(json_extract(item.payload_json, '$.messageId'), item.turn_item_id) AS entry_id,
++      SELECT item.thread_id, item.turn_item_id,
++        CASE item.type
++          WHEN 'command_execution' THEN json_remove(item.payload_json, '$.output')
++          WHEN 'file_change' THEN json_remove(item.payload_json, '$.diffStr', '$.oldStr', '$.newStr')
++          WHEN 'file_search' THEN json_remove(item.payload_json, '$.results')
++          WHEN 'web_search' THEN json_remove(item.payload_json, '$.results')
++          ELSE item.payload_json
++        END AS payload_json,
++        CASE WHEN item.type IN ('user_message', 'assistant_message')
++          THEN json_extract(item.payload_json, '$.messageId')
++          ELSE item.turn_item_id END AS entry_id,
+         json_extract(item.payload_json, '$.type') AS item_type
+       FROM orchestration_v2_projection_turn_items AS item
+       JOIN json_each(${sources}) AS wanted
+@@ -289,23 +314,33 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+         cwd,
+         query: input.query,
+         skills: input.skills ?? [],
++        includeActivity: input.includeActivity === true,
+       });
+       const cached = scans.get(cacheKey);
+       if (cached && cached.sequence === (yield* readRevision(cached.sourceThreadIds))) {
+         const selected = selectMatch(cached.documents, input);
+         scans.delete(cacheKey);
+         scans.set(cacheKey, cached);
+-        return { result: resultForSelection(selected, cached.documents, cached.sequence) };
++        return {
++          result: resultForSelection(
++            selected,
++            cached.documents,
++            cached.sequence,
++            input.includeActivity,
++          ),
++        };
+       }
+       const index = yield* readIndex(threadId);
+       const sourceThreadIds = [...new Set([threadId, ...index.map((row) => row.sourceThreadId)])];
+       const sequence = yield* readRevision(sourceThreadIds);
+       const candidates = index
+         .map((row, position) => ({ ...row, position }))
+-        .filter((row) =>
+-          ["user_message", "assistant_message", "proposed_plan", "user_input_request"].includes(
+-            row.item.type,
+-          ),
++        .filter(
++          (row) =>
++            ["user_message", "assistant_message", "proposed_plan", "user_input_request"].includes(
++              row.item.type,
++            ) ||
++            (input.includeActivity === true && THREAD_FIND_ACTIVITY_TYPES.has(row.item.type)),
+         );
+       const payloads: FindPayload[] = [];
+       for (let start = 0; start < candidates.length; start += 128) {
+@@ -347,7 +382,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+         }
+         const rows = payloads.filter(
+           (row) =>
+-            row.type !== "user_input_request" &&
++            (row.type !== "user_input_request" || input.includeActivity === true) &&
+             !(row.type === "user_message" && foldedAnswers.has(row.entryId)),
+         );
+         const documents = new Map<number, FindDocument>();
+@@ -374,7 +409,12 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+             const oldest = scans.keys().next().value;
+             if (oldest !== undefined) scans.delete(oldest);
+           }
+-          return resultForSelection(selectMatch(ordered, input), ordered, sequence);
++          return resultForSelection(
++            selectMatch(ordered, input),
++            ordered,
++            sequence,
++            input.includeActivity,
++          );
+         });
+         if (input.index !== undefined || (input.offset ?? 0) !== 0)
+           return Stream.fromEffect(finish);
+@@ -393,6 +433,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+               : 0;
+           if (occurrence >= document.count) continue;
+           const first: OrchestrationV2SearchThreadResult = {
++            ...(input.includeActivity ? { activityIncluded: true as const } : {}),
+             complete: false,
+             snapshotSequence: sequence,
+             totalMatches: 1,
+diff --git a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
+index 2c7aa3327..5b4d8627d 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
++++ b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
+@@ -786,6 +786,112 @@ describe("MessagesTimeline attachments", () => {
+ });
+ 
+ describe("MessagesTimeline thread find", () => {
++  it("reveals and highlights matching members without devirtualizing other activity groups", async () => {
++    setup();
++    const fixture = makeStreamingTimelineFixture();
++    const source = fixture.visibleTurnItems[5]!;
++    const activities = Array.from({ length: 140 }, (_, index) => {
++      const id = TurnItemId.make(`find-tool-${index}`);
++      return {
++        ...source,
++        position: index,
++        sourceItemId: id,
++        item: {
++          ...source.item,
++          providerThreadId: source.item.providerThreadId ?? null,
++          providerTurnId: source.item.providerTurnId ?? null,
++          nativeItemRef: source.item.nativeItemRef ?? null,
++          id,
++          runId: null,
++          type: "command_execution" as const,
++          status: "completed" as const,
++          input:
++            index === 126
++              ? `${"printf 'earlier command'; ".repeat(120)}echo needle ${index}`
++              : `printf 'activity needle ${index}'`,
++          output: "not part of the summary",
++        },
++      };
++    });
++    const entries = deriveTimelineEntriesFromVisibleTurnItems({
++      visibleTurnItems: activities,
++      optimisticMessages: [],
++    });
++    const props = baseProps();
++    const timeline = (index: number) => (
++      <MessagesTimeline
++        {...props}
++        timelineEntries={[
++          ...entries,
++          message("Unchanged **needle** message", { role: "assistant" }, "separator"),
++          ...entries.slice(0, 2).map((entry, index) => {
++            if (entry.kind !== "work") throw new Error("Expected activity");
++            const id = `other-${index}`;
++            return { ...entry, id, entry: { ...entry.entry, id } };
++          }),
++        ]}
++        liveFollowEnabled={false}
++        findOpen
++        findExpanded
++        findActivity
++        findQuery="needle"
++        findNavigationId={index}
++        activeFindMatch={{ entryId: `find-tool-${index}`, runId: null, occurrence: 0 }}
++      />
++    );
++    await using screen = await renderElement(timeline(3));
++    const check = (index: number) => {
++      const active = CSS.highlights.get("t3-thread-find-active");
++      expect(active?.size).toBe(1);
++      const range = [...active!][0]!;
++      if (!(range instanceof Range)) throw new Error("Expected a text range");
++      expect(range.toString()).toBe("needle");
++      const row = range.startContainer.parentElement?.closest("[data-thread-find-entry-id]");
++      expect(row?.getAttribute("data-thread-find-entry-id")).toBe(`find-tool-${index}`);
++      const inner = row?.closest("[data-tool-group-scroll]");
++      if (!inner) throw new Error("Expected a virtualized activity group");
++      const rect = range.getBoundingClientRect();
++      expect(rect.height).toBeGreaterThan(0);
++      expect(rect.top).toBeGreaterThanOrEqual(inner.getBoundingClientRect().top);
++      expect(rect.bottom).toBeLessThanOrEqual(inner.getBoundingClientRect().bottom + 1);
++      const viewport = props.listRef.current!.getScrollableNode()!.getBoundingClientRect();
++      expect(rect.top).toBeGreaterThanOrEqual(viewport.top);
++      expect(rect.bottom).toBeLessThanOrEqual(viewport.bottom + 1);
++      expect(
++        screen.container.querySelectorAll("[data-v2-item-type=command_execution]").length,
++      ).toBeLessThan(80);
++    };
++    await vi.waitFor(() => check(3));
++    await screen.rerender(timeline(126));
++    await vi.waitFor(() => check(126));
++    const revealed = screen.container.querySelector('[data-thread-find-entry-id="find-tool-126"]');
++    expect(revealed?.querySelector("[data-thread-find-fold]")).toBeNull();
++    expect(screen.container.querySelectorAll("[data-tool-group-scroll]")).toHaveLength(1);
++    const messageMatches = collectThreadFindRanges(screen.container, "needle").filter(
++      (match) => match.rowId === "entry-separator",
++    );
++    expect(messageMatches.map((match) => match.range.toString())).toEqual(["needle"]);
++    await screen.rerender(
++      <MessagesTimeline
++        {...props}
++        timelineEntries={[
++          ...entries,
++          message("Unchanged needle message", { role: "assistant" }, "legacy"),
++        ]}
++        findExpanded
++        findQuery="needle"
++        activeFindMatch={{ entryId: "entry-legacy", runId: null, occurrence: 0 }}
++      />,
++    );
++    await vi.waitFor(() =>
++      expect(
++        collectThreadFindRanges(screen.container, "needle").map((match) => match.rowId),
++      ).toEqual(["entry-legacy"]),
++    );
++    await screen.rerender(<MessagesTimeline {...props} timelineEntries={entries} />);
++    expect(CSS.highlights.has("t3-thread-find-active")).toBe(false);
++  });
++
+   // Opening find is navigation; on a list already showing the thread the open
+   // action navigates, so the list itself releases follow only when it starts
+   // showing a thread whose find is already open.
+@@ -1088,6 +1194,29 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
+   await click(screen.button("Why am I being asked this?"));
+   await expect.element(page.getByText(/an ask rule in the agent's own settings/)).toBeVisible();
+   await click(screen.button("Why am I being asked this?"));
++  await screen.rerender(
++    ui({
++      findOpen: true,
++      findExpanded: true,
++      findActivity: true,
++      findQuery: "long-command",
++      activeFindMatch: { entryId: "approval-0", runId: fixture.runId, occurrence: 79 },
++    }),
++  );
++  await vi.waitFor(() => {
++    const active = CSS.highlights.get("t3-thread-find-active");
++    expect(active?.size).toBe(1);
++    const range = [...active!][0]!;
++    if (!(range instanceof Range)) throw new Error("Expected a text range");
++    expect(range.toString()).toBe("long-command");
++    expect(
++      range.startContainer.parentElement
++        ?.closest("[data-thread-find-entry-id]")
++        ?.getAttribute("data-thread-find-entry-id"),
++    ).toBe("approval-0");
++  });
++  await expect.element(screen.getByRole("button", { name: "Decline", exact: true })).toBeVisible();
++  await screen.rerender(ui());
+   await click(screen.buttons("More approval options")[1]!);
+   await expect.element(page.getByRole("menuitem", { name: "Always allow Safari" })).toBeVisible();
+   await page.getByRole("menuitem", { name: "Always allow Safari" }).click();
+diff --git a/apps/web/src/components/chat/MessagesTimeline.logic.ts b/apps/web/src/components/chat/MessagesTimeline.logic.ts
+index f4b409f90..051d585be 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.logic.ts
++++ b/apps/web/src/components/chat/MessagesTimeline.logic.ts
+@@ -1373,6 +1373,7 @@ export function deriveMessagesTimelineRows(input: {
+   expandedRunIds?: ReadonlySet<RunId>;
+   expandedAttemptIds?: ReadonlySet<RunAttemptId>;
+   expandedWorkGroupIds?: ReadonlySet<string>;
++  revealedEntryId?: string | null;
+   isWorking: boolean;
+   /** Native subagent work has no app run; runless entries form the live response. */
+   runlessWorkActive?: boolean;
+@@ -1543,7 +1544,9 @@ export function deriveMessagesTimelineRows(input: {
+             entry: (latestRunningToolEntry ?? latestVisibleToolEntry).entry,
+             groupedEntries: visibleActiveToolEntries.map((entry) => entry.entry),
+             groupId,
+-            expanded: input.expandedWorkGroupIds?.has(groupId) ?? false,
++            expanded:
++              (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
++              visibleActiveToolEntries.some((entry) => entry.id === input.revealedEntryId),
+             active: latestToolKeepsActivityLive,
+             ...(latestThoughtEntry ? { thought: latestThoughtEntry.entry } : {}),
+           };
+@@ -1817,14 +1820,18 @@ export function deriveMessagesTimelineRows(input: {
+         groupedEntries.push(nextEntry.entry);
+         cursor += 1;
+       }
+-      const visibleGroupedEntries = groupedEntries.filter((entry) =>
+-        workEntryIsVisibleInGroup(entry, workEntryIsInActiveRun(entry)),
++      const visibleGroupedEntries = groupedEntries.filter(
++        (entry) =>
++          entry.id === input.revealedEntryId ||
++          workEntryIsVisibleInGroup(entry, workEntryIsInActiveRun(entry)),
+       );
+       if (visibleGroupedEntries.length > 0) {
+         const activeInProgressToolEntries = visibleGroupedEntries.filter(workEntryIsInActiveRun);
+         if (activeInProgressToolEntries.length > 0) {
+           const groupId = workGroupId(timelineEntry.id);
+-          const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
++          const expanded =
++            (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
++            visibleGroupedEntries.some((entry) => entry.id === input.revealedEntryId);
+           const latestActiveToolEntry = activeInProgressToolEntries.at(-1)!;
+           nextRows.push({
+             kind: "work-live",
+@@ -1860,7 +1867,9 @@ export function deriveMessagesTimelineRows(input: {
+           });
+         } else {
+           const groupId = workGroupId(timelineEntry.id);
+-          const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
++          const expanded =
++            (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
++            visibleGroupedEntries.some((entry) => entry.id === input.revealedEntryId);
+           const summaryKind = toolGroupSummaryKind(visibleGroupedEntries);
+           const primarySourceEntry = visibleGroupedEntries.find(
+             (entry) => entry.toolSource !== undefined,
+@@ -2084,7 +2093,9 @@ export function deriveMessagesTimelineRows(input: {
+     const failedGroupAnchor = latestToolFailed ? activeWorkAnchor : undefined;
+     if (failedGroupAnchor) {
+       const groupId = workGroupId(failedGroupAnchor.id);
+-      const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
++      const expanded =
++        (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
++        visibleActiveToolEntries.some((entry) => entry.id === input.revealedEntryId);
+       nextRows.push({
+         kind: "thinking",
+         id: LIVE_ACTIVITY_ROW_ID,
+diff --git a/apps/web/src/components/chat/MessagesTimeline.tsx b/apps/web/src/components/chat/MessagesTimeline.tsx
+index a9cab1554..d50cd03d8 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.tsx
++++ b/apps/web/src/components/chat/MessagesTimeline.tsx
+@@ -299,6 +299,7 @@ interface MessagesTimelineProps {
+   topFadeEnabled?: boolean;
+   historyControls?: MessagesTimelineHistoryControls | undefined;
+   findExpanded?: boolean;
++  findActivity?: boolean;
+   findQuery?: string;
+   activeFindMatch?: ThreadFindMatch | null;
+   findNavigationId?: number;
+@@ -343,6 +344,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
+   timelineEntries,
+   findOpen = false,
+   findExpanded = false,
++  findActivity = false,
+   findQuery = "",
+   activeFindMatch = null,
+   findNavigationId = 0,
+@@ -673,6 +675,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
+     expandedRunIds: visibleExpandedRunIds,
+     expandedAttemptIds: visibleExpandedAttemptIds,
+     expandedWorkGroupIds,
++    revealedEntryId: findActive ? (activeFindMatch?.entryId ?? null) : null,
+     isWorking,
+     runlessWorkActive,
+     activeTurnStartedAt,
+@@ -1019,6 +1022,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
+     onRevertToTurnCount,
+     onRunShellCommand,
+     findActive,
++    findActivity: findActive && findActivity,
++    activeFindEntryId: findActive ? (activeFindMatch?.entryId ?? null) : null,
+     onImageExpand,
+     onFileOpen,
+     onUseArtifactTemplate,
+@@ -1185,7 +1190,14 @@ const ConversationTimeline = memo(function ConversationTimeline({
+     query: normalizedFindQuery,
+     match: activeFindMatch,
+     navigationId: findNavigationId,
+-    rowIndex: activeFindMatch ? rows.findIndex((row) => row.id === activeFindMatch.entryId) : -1,
++    rowIndex: activeFindMatch
++      ? rows.findIndex(
++          (row) =>
++            row.id === activeFindMatch.entryId ||
++            (row.kind === "work" &&
++              row.groupedEntries.some((entry) => entry.id === activeFindMatch.entryId)),
++        )
++      : -1,
+     listRef,
+     contentInsetEndAdjustment,
+   });
+diff --git a/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx b/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx
+new file mode 100644
+index 000000000..0c0343f0b
+--- /dev/null
++++ b/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx
+@@ -0,0 +1,53 @@
++import { useState } from "react";
++import { expect, it } from "vite-plus/test";
++import { userEvent } from "vite-plus/test/browser";
++import { render } from "../../../test/render";
++import { ThreadFindBar } from "./ThreadFindBar";
++import { stepThreadFindIndex } from "./threadFind";
++
++function Find() {
++  const [open, setOpen] = useState(true);
++  const [query, setQuery] = useState("needle");
++  const [index, setIndex] = useState(0);
++  return (
++    <>
++      <button onClick={() => setOpen(true)}>Reopen</button>
++      <ThreadFindBar
++        open={open}
++        query={query}
++        matchCount={query ? 3 : 0}
++        status={null}
++        activeIndex={index}
++        focusRequestId={0}
++        onRetry={() => {}}
++        onQueryChange={setQuery}
++        onNext={() => setIndex((previous) => stepThreadFindIndex(previous, 3, 1))}
++        onPrevious={() => setIndex((previous) => stepThreadFindIndex(previous, 3, -1))}
++        onClose={() => {
++          setOpen(false);
++          setQuery("");
++          setIndex(0);
++        }}
++      />
++    </>
++  );
++}
++
++it("navigates from the input, preserves native button Enter, and closes from a focused find control", async () => {
++  // The keyboard-only find bar does not use navigation.
++  await using screen = await render(<Find />, { router: false });
++  const input = screen.getByRole("searchbox", { name: "Find in thread" });
++  await expect.element(input).toHaveFocus();
++  await userEvent.keyboard("{Enter}");
++  await expect.element(screen.getByText("2/3")).toBeVisible();
++  await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
++  await expect.element(screen.getByText("1/3")).toBeVisible();
++  await userEvent.tab();
++  await expect.element(screen.getByRole("button", { name: "Previous match" })).toHaveFocus();
++  await userEvent.keyboard("{Enter}");
++  await expect.element(screen.getByText("3/3")).toBeVisible();
++  await userEvent.keyboard("{Escape}");
++  await expect.element(input).not.toBeInTheDocument();
++  await screen.getByRole("button", { name: "Reopen" }).click();
++  await expect.element(screen.getByRole("searchbox", { name: "Find in thread" })).toHaveValue("");
++});
+diff --git a/apps/web/src/components/chat/ThreadFindBar.tsx b/apps/web/src/components/chat/ThreadFindBar.tsx
+index 466cd929a..1b24ffe5c 100644
+--- a/apps/web/src/components/chat/ThreadFindBar.tsx
++++ b/apps/web/src/components/chat/ThreadFindBar.tsx
+@@ -62,6 +62,17 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
+   return (
+     <div
+       data-thread-find-bar
++      onKeyDown={(event) => {
++        if (
++          event.key !== "Escape" ||
++          event.nativeEvent.isComposing ||
++          event.nativeEvent.keyCode === 229
++        )
++          return;
++        event.preventDefault();
++        event.stopPropagation();
++        props.onClose();
++      }}
+       className="absolute top-3 right-3 z-40 w-[min(var(--thread-details-panel-width),calc(100%-1.5rem))] transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none"
+     >
+       <InputGroup
+@@ -70,6 +81,7 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
+         onContextMenu={(event) => event.stopPropagation()}
+         role="search"
+         aria-label="Find in thread"
++        aria-description="Search messages, proposed plans, and activity summaries."
+         aria-busy={props.status === "loading" || props.counting === true}
+         className="w-full"
+       >
+diff --git a/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx b/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
+index c425d560b..5c3e3d332 100644
+--- a/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
++++ b/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
+@@ -3,7 +3,7 @@ import {
+   fullAccessOverrideExplanation,
+ } from "@t3tools/client-runtime/state/thread-requests";
+ import { ShieldIcon } from "lucide-react";
+-import { memo, use } from "react";
++import { memo, use, type ReactNode } from "react";
+ import { type PendingApproval } from "../../session-logic";
+ import { InlineButton } from "../ui/button";
+ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+@@ -33,16 +33,23 @@ const APPROVAL_PRESENTATION = {
+ 
+ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalRow({
+   approval,
++  findEntryId,
++  findLabel,
+ }: {
+   approval: PendingApproval;
++  findEntryId?: string;
++  findLabel?: ReactNode;
+ }) {
+-  const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
++  const { respondingRequestIds, canOperateThread, onRespondToApproval, activeFindEntryId } =
++    use(TimelineRowCtx);
+   const presentation = APPROVAL_PRESENTATION[approval.requestKind];
+   const canRespond = approval.responseCapability === "live";
+   return (
+     <WorkLogRow
+       role="group"
+       aria-label={presentation.label}
++      data-thread-find-entry-id={findEntryId}
++      aria-current={findEntryId === activeFindEntryId ? true : undefined}
+       data-v2-item-type="approval_request"
+       wrapLabel
+       icon={
+@@ -54,14 +61,16 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
+         />
+       }
+       label={
+-        <code
+-          aria-label={presentation.detailLabel}
+-          className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+-          data-approval-detail="complete"
+-          tabIndex={0}
+-        >
+-          {approval.detail || presentation.label}
+-        </code>
++        findLabel ?? (
++          <code
++            aria-label={presentation.detailLabel}
++            className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
++            data-approval-detail="complete"
++            tabIndex={0}
++          >
++            {approval.detail || presentation.label}
++          </code>
++        )
+       }
+     >
+       <div className="ms-7.5 flex min-w-0 flex-col gap-1 pb-1 text-xs">
+diff --git a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
+index a8d5e3e68..6192cc99b 100644
+--- a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
++++ b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
+@@ -24,6 +24,8 @@ import {
+   turnItemNeedsDetailFetch,
+ } from "@t3tools/client-runtime/work-log/item-detail";
+ import { claudeSkillInvocation } from "@t3tools/shared/toolActivity";
++import { threadFindActivityText } from "@t3tools/shared/threadFindText";
++import { findRevealRef } from "./markdownFindContext";
+ import { memo, use, useState, type KeyboardEvent } from "react";
+ import {
+   workEntryDisplayIndicatesToolFailure,
+@@ -184,6 +186,22 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+       ? notificationChildThreadId(workEntry.projectedItem.item.source)
+       : undefined;
+   const groupView = use(WorkGroupViewCtx);
++  const [findRevealed, setFindRevealed] = useState(false);
++  const findText =
++    ctx.findActivity && workEntry.projectedItem
++      ? threadFindActivityText(workEntry.projectedItem.item)
++      : null;
++  const findLabel =
++    findText === null ? null : (
++      <span
++        data-thread-find-text
++        data-thread-find-fold={!findRevealed ? "" : undefined}
++        ref={findRevealRef(() => setFindRevealed(true))}
++        className={findRevealed ? "block whitespace-pre-wrap break-words" : "block truncate"}
++      >
++        {findText}
++      </span>
++    );
+   const [expanded, setExpanded] = useState(
+     () => groupView?.state.expandedEntries.has(workEntry.id) ?? false,
+   );
+@@ -203,7 +221,14 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+     failureItem?.type === "approval_request"
+       ? ctx.pendingApprovals.get(failureItem.requestId)
+       : undefined;
+-  if (pendingApproval) return <TimelinePendingApprovalRow approval={pendingApproval} />;
++  if (pendingApproval)
++    return (
++      <TimelinePendingApprovalRow
++        approval={pendingApproval}
++        findEntryId={workEntry.id}
++        findLabel={findLabel}
++      />
++    );
+   if (failureItem?.type === "error" && failureItem.status === "failed") {
+     const warning = failureItem.failure.class === "usage_limit";
+     const resetAt = failureItem.failure.resetAt;
+@@ -219,6 +244,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+         : null;
+     return (
+       <WorkLogRow
++        data-thread-find-entry-id={workEntry.id}
++        aria-current={ctx.activeFindEntryId === workEntry.id ? true : undefined}
+         data-v2-item-type="error"
+         data-v2-item-visibility={workEntry.projectedItem?.visibility}
+         wrapLabel
+@@ -231,7 +258,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+           <span
+             className={cn("text-sm font-medium", warning ? "text-warning" : "text-destructive")}
+           >
+-            {label}
++            {findLabel ?? label}
+           </span>
+         }
+         trailing={
+@@ -391,6 +418,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+ 
+   return (
+     <WorkLogRow
++      data-thread-find-entry-id={workEntry.id}
++      aria-current={ctx.activeFindEntryId === workEntry.id ? true : undefined}
++      wrapLabel={ctx.findActivity && findRevealed}
+       data-v2-item-type={workEntry.projectedItem?.item.type}
+       data-v2-item-visibility={workEntry.projectedItem?.visibility}
+       {...rowToggleProps}
+@@ -409,50 +439,56 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+         </span>
+       }
+       label={
+-        <div className="min-w-0 flex-1 overflow-hidden">
+-          <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
+-            <span
+-              className={cn(answerPreview ? "min-w-0" : "min-w-0 flex-1", "truncate", headingClass)}
+-            >
+-              {isReasoning && !expanded ? (
+-                <ChatMarkdown
+-                  inline
+-                  text={workEntry.detail ?? previewText}
+-                  cwd={ctx.markdownCwd}
+-                  parseRawHtml={false}
+-                  extraRemarkPlugins={[
+-                    [
+-                      remarkThoughtPreview,
+-                      workEntry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought",
+-                    ],
+-                  ]}
+-                />
+-              ) : threadLabel ? (
+-                <ThreadReadLabel
+-                  label={threadLabel}
+-                  environmentId={ctx.activeThreadEnvironmentId}
+-                  linked
+-                />
+-              ) : (
+-                previewText
+-              )}
+-            </span>
+-            {answerPreview ? (
++        findLabel ?? (
++          <div className="min-w-0 flex-1 overflow-hidden">
++            <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
+               <span
+                 className={cn(
+-                  "min-w-0 truncate",
+-                  !expanded &&
+-                    workEntry.questionAnswer &&
+-                    hasQuestionAnswer(workEntry.questionAnswer)
+-                    ? "text-foreground"
+-                    : "text-muted-foreground",
++                  answerPreview ? "min-w-0" : "min-w-0 flex-1",
++                  "truncate",
++                  headingClass,
+                 )}
+               >
+-                {answerPreview}
++                {isReasoning && !expanded ? (
++                  <ChatMarkdown
++                    inline
++                    text={workEntry.detail ?? previewText}
++                    cwd={ctx.markdownCwd}
++                    parseRawHtml={false}
++                    extraRemarkPlugins={[
++                      [
++                        remarkThoughtPreview,
++                        workEntry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought",
++                      ],
++                    ]}
++                  />
++                ) : threadLabel ? (
++                  <ThreadReadLabel
++                    label={threadLabel}
++                    environmentId={ctx.activeThreadEnvironmentId}
++                    linked
++                  />
++                ) : (
++                  previewText
++                )}
+               </span>
+-            ) : null}
+-          </p>
+-        </div>
++              {answerPreview ? (
++                <span
++                  className={cn(
++                    "min-w-0 truncate",
++                    !expanded &&
++                      workEntry.questionAnswer &&
++                      hasQuestionAnswer(workEntry.questionAnswer)
++                      ? "text-foreground"
++                      : "text-muted-foreground",
++                  )}
++                >
++                  {answerPreview}
++                </span>
++              ) : null}
++            </p>
++          </div>
++        )
+       }
+       trailing={
+         <>
+diff --git a/apps/web/src/components/chat/TimelineWorkGroupRows.tsx b/apps/web/src/components/chat/TimelineWorkGroupRows.tsx
+index a440b62a5..4a0a82138 100644
+--- a/apps/web/src/components/chat/TimelineWorkGroupRows.tsx
++++ b/apps/web/src/components/chat/TimelineWorkGroupRows.tsx
+@@ -67,20 +67,31 @@ export const WorkGroupSection = memo(function WorkGroupSection({
+   isExpandedToolGroup: boolean;
+   displayLabel?: string | undefined;
+ }) {
+-  const { workspaceRoot, routeThreadKey, onToggleWorkEntry, pendingApprovals } =
+-    use(TimelineRowCtx);
++  const {
++    workspaceRoot,
++    routeThreadKey,
++    onToggleWorkEntry,
++    pendingApprovals,
++    findActivity,
++    activeFindEntryId,
++  } = use(TimelineRowCtx);
+   const onToggleStandaloneEntry = (collapsed: boolean) =>
+     onToggleWorkEntry(disclosureAnchorKey, collapsed);
+   const nonEmptyEntries = groupedEntries.filter((entry) => {
+     const item = entry.projectedItem?.item;
+     return (
++      entry.id === activeFindEntryId ||
+       (item?.type === "approval_request" && pendingApprovals.has(item.requestId)) ||
+       workEntryIsVisibleInGroup(entry, isExpandedToolGroup)
+     );
+   });
+ 
+   if (nonEmptyEntries.length === 0) return null;
+-  if (isExpandedToolGroup && nonEmptyEntries.every((entry) => entry.itemType === "reasoning")) {
++  if (
++    !findActivity &&
++    isExpandedToolGroup &&
++    nonEmptyEntries.every((entry) => entry.itemType === "reasoning")
++  ) {
+     return <ReasoningTraceContent entries={nonEmptyEntries} />;
+   }
+   if (isExpandedToolGroup) {
+@@ -132,9 +143,16 @@ function ExpandedWorkGroupEntries({
+   entries: TimelineWorkEntry[];
+   workspaceRoot: string | undefined;
+ }) {
+-  const { workGroupViewState: viewState, onToggleWorkEntry } = use(TimelineRowCtx);
++  const {
++    workGroupViewState: viewState,
++    onToggleWorkEntry,
++    activeFindEntryId,
++  } = use(TimelineRowCtx);
++  const findIndex = entries.findIndex((entry) => entry.id === activeFindEntryId);
+   const [initialScrollIndex] = useState(() =>
+-    resolveWorkGroupScrollIndex(entries, viewState.scrollPositions.get(anchorKey)),
++    findIndex >= 0
++      ? { index: findIndex }
++      : resolveWorkGroupScrollIndex(entries, viewState.scrollPositions.get(anchorKey)),
+   );
+   const [restoringPosition, setRestoringPosition] = useState(initialScrollIndex !== undefined);
+   const listRef = useRef<LegendListRef>(null);
+@@ -148,6 +166,7 @@ function ExpandedWorkGroupEntries({
+       entries,
+       follow:
+         fades.viewportHeight > 0 &&
++        activeFindEntryId === null &&
+         shouldFollowWorkGroupAppend(appendState.entries, entries, fades.bottom ? Infinity : 0),
+     });
+   }
+@@ -230,6 +249,12 @@ function ExpandedWorkGroupEntries({
+   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads expanded row sizes from LegendList's measured state after layout
+   useLayoutEffect(updateExpandedContentHeight, [entries, updateExpandedContentHeight]);
+ 
++  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- positions the nested virtual list at the selected activity member
++  useLayoutEffect(() => {
++    if (findIndex < 0 || restoringPosition) return;
++    void listRef.current?.scrollToIndex({ index: findIndex, animated: false });
++  }, [findIndex, restoringPosition]);
++
+   return (
+     <WorkGroupViewCtx value={groupView}>
+       <WorkLogList>
+@@ -249,8 +274,10 @@ function ExpandedWorkGroupEntries({
+           maintainScrollAtEndThreshold={1 / Math.max(1, fades.viewportHeight)}
+           // Measure the restored row even when an intra-row offset puts its
+           // estimated bounds outside the list's small bootstrap render window.
+-          {...(restoringPosition && initialScrollIndex
+-            ? { alwaysRender: { indices: [initialScrollIndex.index] } }
++          {...(findIndex >= 0 || (restoringPosition && initialScrollIndex)
++            ? {
++                alwaysRender: { indices: [findIndex >= 0 ? findIndex : initialScrollIndex!.index] },
++              }
+             : {})}
+           maintainVisibleContentPosition
+           onLoad={handleLoad}
+diff --git a/apps/web/src/components/chat/threadFindHighlights.browser.test.tsx b/apps/web/src/components/chat/threadFindHighlights.browser.test.tsx
+index 53b5fb1cd..5ea31a42e 100644
+--- a/apps/web/src/components/chat/threadFindHighlights.browser.test.tsx
++++ b/apps/web/src/components/chat/threadFindHighlights.browser.test.tsx
+@@ -20,4 +20,24 @@ describe("collectThreadFindRanges", () => {
+       [2, "const"],
+     ]);
+   });
++
++  it("keeps activity identity and Unicode source bounds inside a grouped row", () => {
++    const container = row(
++      '<span data-thread-find-entry-id="tool"><span data-thread-find-text>ＦＯＯ ﬃ cafe\u0301</span></span>',
++    );
++    // Activity scopes sit below the outer virtualized group's row.
++    container
++      .querySelector("[data-timeline-row-id]")!
++      .firstElementChild!.removeAttribute("data-thread-find-text");
++    for (const [query, original] of [
++      ["foo", "ＦＯＯ"],
++      ["ffi", "ﬃ"],
++      ["café", "cafe\u0301"],
++    ]) {
++      const matches = collectThreadFindRanges(container, query!);
++      expect(
++        matches.map((match) => [match.rowId, match.occurrence, match.range.toString()]),
++      ).toEqual([["tool", 0, original]]);
++    }
++  });
+ });
+diff --git a/apps/web/src/components/chat/threadFindHighlights.ts b/apps/web/src/components/chat/threadFindHighlights.ts
+index 65d3b0bb6..5600c4dea 100644
+--- a/apps/web/src/components/chat/threadFindHighlights.ts
++++ b/apps/web/src/components/chat/threadFindHighlights.ts
+@@ -1,4 +1,4 @@
+-import { findThreadSearchOccurrences } from "@t3tools/shared/threadSearch";
++import { findThreadSearchRanges } from "@t3tools/shared/threadSearch";
+ import { useEffect, useEffectEvent, useRef } from "react";
+ import { THREAD_FIND_BLOCK_TAGS } from "@t3tools/shared/threadFindText";
+ 
+@@ -22,7 +22,9 @@ export function collectThreadFindRanges(container: HTMLElement, query: string):
+ 
+   for (const scope of container.querySelectorAll(THREAD_FIND_TEXT_SELECTOR)) {
+     if (scope.parentElement?.closest(THREAD_FIND_TEXT_SELECTOR)) continue;
+-    const rowId = scope.closest("[data-timeline-row-id]")?.getAttribute("data-timeline-row-id");
++    const row = scope.closest("[data-thread-find-entry-id], [data-timeline-row-id]");
++    const rowId =
++      row?.getAttribute("data-thread-find-entry-id") ?? row?.getAttribute("data-timeline-row-id");
+     if (!rowId) continue;
+ 
+     let text = "";
+@@ -30,16 +32,16 @@ export function collectThreadFindRanges(container: HTMLElement, query: string):
+     const flush = () => {
+       let startIndex = 0;
+       let endIndex = 0;
+-      for (const offset of findThreadSearchOccurrences(text, query)) {
++      for (const { start: offset, end: matchEnd } of findThreadSearchRanges(text, query)) {
+         while (startIndex < nodes.length && nodes[startIndex]!.end <= offset) startIndex++;
+         if (endIndex < startIndex) endIndex = startIndex;
+-        while (endIndex < nodes.length && nodes[endIndex]!.end < offset + query.length) endIndex++;
++        while (endIndex < nodes.length && nodes[endIndex]!.end < matchEnd) endIndex++;
+         const start = nodes[startIndex];
+         const end = nodes[endIndex];
+         if (!start || !end) continue;
+         const range = container.ownerDocument.createRange();
+         range.setStart(start.node, offset - start.start);
+-        range.setEnd(end.node, offset + query.length - end.start);
++        range.setEnd(end.node, matchEnd - end.start);
+         const occurrence = occurrenceByRowId.get(rowId) ?? 0;
+         ranges.push({ rowId, occurrence, range });
+         occurrenceByRowId.set(rowId, occurrence + 1);
+@@ -76,15 +78,14 @@ const FOLD_SELECTOR = "[hidden], [data-thread-find-fold]";
+ 
+ function foldsHiding(range: Range, container: HTMLElement): Element[] {
+   const folds: Element[] = [];
++  const rect = range.getBoundingClientRect();
+   for (
+     let fold = range.startContainer.parentElement?.closest(FOLD_SELECTOR);
+     fold && container.contains(fold);
+     fold = fold.parentElement?.closest(FOLD_SELECTOR)
+   ) {
+-    if (
+-      fold.hasAttribute("hidden") ||
+-      range.getBoundingClientRect().bottom > fold.getBoundingClientRect().bottom
+-    )
++    const foldRect = fold.getBoundingClientRect();
++    if (fold.hasAttribute("hidden") || rect.bottom > foldRect.bottom || rect.right > foldRect.right)
+       folds.push(fold);
+   }
+   return folds;
+@@ -193,6 +194,7 @@ export function useThreadFindHighlights(input: {
+         "data-timeline-row-id",
+         "data-thread-find-text",
+         "data-thread-find-ignore",
++        "data-thread-find-entry-id",
+       ],
+     });
+     // Revealing the first match can synchronously mount or recycle list rows.
+diff --git a/apps/web/src/components/chat/threadFindPosition.ts b/apps/web/src/components/chat/threadFindPosition.ts
+index 34241fc7e..83cc0522e 100644
+--- a/apps/web/src/components/chat/threadFindPosition.ts
++++ b/apps/web/src/components/chat/threadFindPosition.ts
+@@ -8,11 +8,16 @@ export function readThreadFindPosition(
+   contentInsetEndAdjustment: number,
+ ): ThreadFindStart | undefined {
+   const viewport = container.getBoundingClientRect();
+-  for (const row of container.querySelectorAll<HTMLElement>("[data-timeline-row-id]")) {
++  for (const row of container.querySelectorAll<HTMLElement>(
++    "[data-timeline-row-id], [data-thread-find-entry-id]",
++  )) {
++    if (row.querySelector("[data-thread-find-entry-id]")) continue;
+     const rect = row.getBoundingClientRect();
+     if (rect.bottom <= viewport.top || rect.top >= viewport.bottom - contentInsetEndAdjustment)
+       continue;
+-    const rowId = row.dataset.timelineRowId;
++    const group = row.closest("[data-tool-group-scroll]")?.getBoundingClientRect();
++    if (group && (rect.bottom <= group.top || rect.top >= group.bottom)) continue;
++    const rowId = row.dataset.threadFindEntryId ?? row.dataset.timelineRowId;
+     const entryId = rowId ? resolveEntry(rowId) : undefined;
+     if (!entryId) continue;
+     const matches = collectThreadFindRanges(row, query);
+diff --git a/apps/web/src/components/chat/timelineRowContext.ts b/apps/web/src/components/chat/timelineRowContext.ts
+index 6334ef53b..fcb4cc83d 100644
+--- a/apps/web/src/components/chat/timelineRowContext.ts
++++ b/apps/web/src/components/chat/timelineRowContext.ts
+@@ -66,6 +66,8 @@ export interface TimelineRowSharedState {
+   onAppFullscreenChange: (rowId: string, fullscreen: boolean) => void;
+   onRunShellCommand: ((command: string) => void) | undefined;
+   findActive: boolean;
++  findActivity: boolean;
++  activeFindEntryId: string | null;
+   onImageExpand: (preview: ExpandedImagePreview) => void;
+   displayThreadKey?: string;
+   onOpenToolDiff: ((target: ToolCallDiffTarget) => void) | undefined;
+diff --git a/apps/web/src/components/chat/useThreadFind.ts b/apps/web/src/components/chat/useThreadFind.ts
+index b88951e3b..dc4bbe39f 100644
+--- a/apps/web/src/components/chat/useThreadFind.ts
++++ b/apps/web/src/components/chat/useThreadFind.ts
+@@ -77,6 +77,7 @@ export function useThreadFind({
+   const nextTimeline: TimelineFields = {
+     findOpen: isOpen,
+     findExpanded,
++    findActivity: remote.data?.activityIncluded === true,
+     findQuery,
+     activeFindMatch:
+       entryId !== undefined && occurrence !== undefined
+@@ -230,6 +231,7 @@ export function useThreadFind({
+ export interface TimelineFields {
+   readonly findOpen: boolean;
+   readonly findExpanded: boolean;
++  readonly findActivity: boolean;
+   readonly findQuery: string;
+   readonly activeFindMatch: ThreadFindMatch | null;
+   readonly findNavigationId: number;
+@@ -241,6 +243,7 @@ function sameTimeline(a: TimelineFields, b: TimelineFields) {
+   return (
+     a.findOpen === b.findOpen &&
+     a.findExpanded === b.findExpanded &&
++    a.findActivity === b.findActivity &&
+     a.findQuery === b.findQuery &&
+     a.findNavigationId === b.findNavigationId &&
+     (aMatch === null || bMatch === null
+@@ -286,6 +289,7 @@ function useServerResults(
+           input: {
+             threadId,
+             query: debouncedQuery,
++            includeActivity: true,
+             ...(start ? { start } : {}),
+             ...(offset !== 0 ? { offset } : {}),
+             skills: skillLabels,
+diff --git a/apps/web/src/components/chat/useThreadFindNavigation.ts b/apps/web/src/components/chat/useThreadFindNavigation.ts
+index 054faa232..f7e0720e5 100644
+--- a/apps/web/src/components/chat/useThreadFindNavigation.ts
++++ b/apps/web/src/components/chat/useThreadFindNavigation.ts
+@@ -124,6 +124,17 @@ function revealThreadFindMatch(
+     return;
+   }
+ 
++  const groupScroller = range.startContainer.parentElement?.closest<HTMLElement>(
++    "[data-tool-group-scroll]",
++  );
++  if (groupScroller) {
++    const rect = range.getBoundingClientRect();
++    const viewport = groupScroller.getBoundingClientRect();
++    if (rect.top < viewport.top) groupScroller.scrollTop += rect.top - viewport.top - 8;
++    else if (rect.bottom > viewport.bottom)
++      groupScroller.scrollTop += rect.bottom - viewport.bottom + 8;
++  }
++
+   const codeScroller = range.startContainer.parentElement?.closest("pre");
+   if (codeScroller) {
+     const rect = range.getBoundingClientRect();
+diff --git a/apps/web/src/components/chat/useThreadFindPositionReader.ts b/apps/web/src/components/chat/useThreadFindPositionReader.ts
+index 79445a1af..e47a576fb 100644
+--- a/apps/web/src/components/chat/useThreadFindPositionReader.ts
++++ b/apps/web/src/components/chat/useThreadFindPositionReader.ts
+@@ -55,11 +55,25 @@ export function useThreadFindPositionReader({
+         timelineViewportElement,
+         query,
+         (rowId) => {
++          if (entryById.has(rowId)) return rowId;
+           const rowIndex = rows.findIndex((row) => row.id === rowId);
+           for (const row of rows.slice(Math.max(0, rowIndex))) {
+             if (row.kind !== "turn-fold" && row.kind !== "attempt-fold") {
++              if (row.kind === "work") return row.groupedEntries[0]?.id;
++              if (row.kind === "work-live") return row.groupedEntries[0]?.id;
++              if (row.kind === "work-toggle") {
++                const anchor = timelineEntries.find(
++                  (entry) => row.groupId === `work-group:${entry.id}`,
++                );
++                if (anchor) return anchor.id;
++              }
+               const entry = entryById.get(row.kind === "assistant-meta" ? row.message.id : row.id);
+-              if (entry && (entry.kind === "message" || entry.kind === "proposed-plan"))
++              if (
++                entry &&
++                (entry.kind === "message" ||
++                  entry.kind === "proposed-plan" ||
++                  entry.kind === "work")
++              )
+                 return entry.id;
+               continue;
+             }
+@@ -78,7 +92,10 @@ export function useThreadFindPositionReader({
+                 (row.kind !== "attempt-fold" || entry.attempt?.id === row.attemptId)
+               );
+             });
+-            if (entry && (entry.kind === "message" || entry.kind === "proposed-plan"))
++            if (
++              entry &&
++              (entry.kind === "message" || entry.kind === "proposed-plan" || entry.kind === "work")
++            )
+               return entry.id;
+           }
+           return undefined;
+diff --git a/docs/internals/thread-find.md b/docs/internals/thread-find.md
+new file mode 100644
+index 000000000..8e2fe8e12
+--- /dev/null
++++ b/docs/internals/thread-find.md
+@@ -0,0 +1,42 @@
++# Thread find
++
++Thread find uses the existing V2 projection search service and web
++`ThreadFindProvider`. It scans server history, emits the initial match before the
++final count, and retains bounded per-query navigation and parsed-text caches.
++Web and desktop share this path, including remote environments; no client
++timeline-wide occurrence index or separate search bar is maintained. Native
++mobile does not expose this keyboard-driven find surface.
++
++Activity search is negotiated by the optional `includeActivity` request field
++and `activityIncluded` response marker. An older client gets message/plan-only
++results even from a newer server; a newer client keeps activity out of its
++highlight scopes when an older server does not acknowledge the opt-in. The scan
++cache includes this flag so those two document sets cannot collide.
++
++Messages and plans use the shared rendered-text parser. Activity uses
++`threadFindActivityText` from `packages/shared/src/threadFindText.ts`, after the
++server's ordinary wire projection has bounded dynamic inputs. The timeline
++displays this same source summary while find is active and leaves its usual
++compact presentation intact otherwise. A summary is the document, not the
++activity inspector: command output, raw tool result bodies, diffs and resource
++card contents are deliberately excluded. SQL drops non-searchable command
++output, diffs and search-result bodies before decoding. Dynamic output is used
++only to identify HTML/MCP resource cards that do not render as activity.
++
++An activity match carries its item ID, not its tool group's synthetic row ID.
++The incremental row projector opens only the containing group. The outer list
++targets the group's detail row and its nested LegendList materializes and
++scrolls the selected member. `data-thread-find-entry-id` maps summary text back
++to that member without creating duplicate outer highlight scopes. Clipped
++summaries use the same `beforematch` reveal mechanism as folded markdown.
++Position readers also respect the nested list's viewport.
++
++NFKC matching shares one scanner between server counts and browser highlights.
++Compatibility forms and combining sequences map normalized offsets back to the
++original source range, including length-changing ligatures. ASCII counting
++does not allocate a source-offset map.
++
++Keep the provider below ChatView: query/count updates must not rerender the
++composer or unrelated panels. Keep both outer and nested virtualization,
++ordinary disclosure anchoring, and the existing scoped history/citation
++cancellation rather than introducing another positioning owner.
+diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md
+index 83989762c..63a1fc9eb 100644
+--- a/docs/user/keybindings.md
++++ b/docs/user/keybindings.md
+@@ -131,11 +131,20 @@ Combine keys with `!` for not, `&&` for and, `||` for or, and parentheses:
+ 
+ ## Find in the current thread
+ 
+-`chat.find` searches conversation messages and proposed plans in the active thread. Entering a
+-query searches the entire thread, including older messages. Thread search requires server support;
++`chat.find` searches conversation messages, proposed plans, and activity summaries in the active
++thread. Activity includes command text, reasoning, file and web searches, changed file names,
++questions and answers, task progress, and notices. While finding, activity shows its searchable
++source summary; selecting clipped text reveals it. Hidden tool inspector output, diffs, images,
++embedded apps, and lifecycle cards are not searched.
++
++Entering a query searches the entire thread, including older messages, and loads the matching
++history when needed. Matching ignores case and Unicode compatibility differences. Only the
++matching turn and activity group open, and large tool groups stay virtualized.
++Thread search requires server support;
+ update an older server to enable it. Select **Retry** if a search fails. It defaults to
+ `mod+f` outside terminals and previews. Press **Enter** or **Shift+Enter** to move between matches,
+ and **Escape** to close find.
++Servers without activity search support continue to search messages and proposed plans.
+ 
+ ## Precedence
+ 
+diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts
+index 498f81a0e..cecd9c004 100644
+--- a/packages/contracts/src/orchestrationV2.ts
++++ b/packages/contracts/src/orchestrationV2.ts
+@@ -3986,6 +3986,8 @@ export class OrchestrationGetWorkflowScriptError extends Schema.TaggedError<Orch
+ 
+ export const OrchestrationV2SearchThreadInput = Schema.Struct({
+   threadId: ThreadId,
++  /** Opt in only when the client can reveal and highlight activity item IDs. */
++  includeActivity: Schema.optionalKey(Schema.Boolean),
+   skills: Schema.optionalKey(
+     Schema.Array(
+       Schema.Struct({
+@@ -4009,6 +4011,8 @@ export const OrchestrationV2ThreadFindMatch = Schema.Struct({
+   occurrence: NonNegativeInt,
+ });
+ export const OrchestrationV2SearchThreadResult = Schema.Struct({
++  /** Absent on older servers; their clients must keep activity out of highlight scopes. */
++  activityIncluded: Schema.optionalKey(Schema.Literal(true)),
+   complete: Schema.optionalKey(Schema.Boolean),
+   snapshotSequence: NonNegativeInt,
+   totalMatches: NonNegativeInt,
+diff --git a/packages/shared/src/threadFindText.ts b/packages/shared/src/threadFindText.ts
+index a2e5b4dbb..876c7f1d7 100644
+--- a/packages/shared/src/threadFindText.ts
++++ b/packages/shared/src/threadFindText.ts
+@@ -23,7 +23,20 @@ import {
+ import { upgradeLegacyContextMessage } from "./composerContextLegacy.ts";
+ import { parseComposerContextHref } from "./composerContextReferences.ts";
+ import { assistantCitationLabel, parseAssistantCitationHref } from "./assistantCitations.ts";
+-import type { OrchestrationV2ConversationMessage } from "@t3tools/contracts";
++import {
++  ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE,
++  type OrchestrationV2ConversationMessage,
++  type OrchestrationV2TurnItem,
++} from "@t3tools/contracts";
++import {
++  dynamicToolTitle,
++  formatSearchToolLabel,
++  collectToolFilePaths,
++  formatReadToolLabel,
++  classifyToolActivity,
++} from "./toolActivity.ts";
++import { htmlRenderFromToolItem, mcpAppFromToolItem } from "./toolOutput.ts";
++import * as Predicate from "effect/Predicate";
+ import { proposedPlanTitle, stripDisplayedPlanMarkdown } from "./proposedPlanText.ts";
+ import { unified } from "unified";
+ import remarkParse from "remark-parse";
+@@ -228,3 +241,109 @@ export function searchableMessageSegments(
+     shouldPreserveAssistantLineBreaks(message.text),
+   );
+ }
++
++/**
++ * Activity's source summary, also displayed by the timeline while finding.
++ * Inspector bodies, external resources and lifecycle cards are not documents.
++ */
++export const THREAD_FIND_ACTIVITY_TYPES: ReadonlySet<OrchestrationV2TurnItem["type"]> = new Set([
++  "reasoning",
++  "command_execution",
++  "system_notice",
++  "file_search",
++  "web_search",
++  "file_change",
++  "dynamic_tool",
++  "todo_list",
++  "approval_request",
++  "error",
++  "thread_created",
++  "user_input_request",
++]);
++
++export function threadFindActivityText(item: OrchestrationV2TurnItem): string | null {
++  return activityText(item)?.replace(/\r?\n/g, " ") ?? null;
++}
++
++function answerText(value: unknown): string {
++  if (typeof value === "string") return value;
++  if (Array.isArray(value)) return value.map(answerText).filter(Boolean).join(", ");
++  return Predicate.isObject(value) ? answerText(value.answers) : "";
++}
++
++function activityText(item: OrchestrationV2TurnItem): string | null {
++  // These belong to the workspace setup card, not activity in the timeline.
++  if (
++    (item.type === "command_execution" && item.input === "Preparing workspace") ||
++    (item.type === "error" &&
++      item.status === "cancelled" &&
++      item.failure.code === ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE)
++  )
++    return null;
++  switch (item.type) {
++    case "reasoning":
++      return item.text.trim().replace(/\s+/g, " ") || null;
++    case "command_execution":
++      return item.input;
++    case "system_notice":
++      return item.message;
++    case "file_search":
++      return item.title?.trim() || formatSearchToolLabel(item) || "Searched files";
++    case "web_search":
++      return item.patterns?.join(", ") || item.title?.trim() || "Searched the web";
++    case "file_change":
++      return item.changes?.map((change) => change.path).join(", ") || item.fileName;
++    case "dynamic_tool": {
++      if (item.status === "completed" && (htmlRenderFromToolItem(item) || mcpAppFromToolItem(item)))
++        return null;
++      const title = dynamicToolTitle(item.toolName, item.input, item.title);
++      if (title) return title;
++      const action = classifyToolActivity({
++        itemType: "dynamic_tool_call",
++        data: { toolName: item.toolName ?? undefined, input: item.input },
++      });
++      if (action === "read") {
++        const paths = collectToolFilePaths({ input: item.input });
++        return formatReadToolLabel(paths[0] ?? "", Math.max(0, paths.length - 1));
++      }
++      if (action === "search") {
++        const label = formatSearchToolLabel({ input: item.input });
++        if (label) return label;
++      }
++      return item.title?.trim() || item.toolName || "Tool call";
++    }
++    case "todo_list": {
++      const done = item.steps.filter((step) => step.status === "completed").length;
++      const current =
++        item.steps.find((step) => step.status === "running") ??
++        item.steps.find((step) => step.status === "pending");
++      return `Tasks ${done}/${item.steps.length}${current ? ` · ${current.text}` : ""}`;
++    }
++    case "approval_request":
++      return item.prompt || item.title?.trim() || "Approval requested";
++    case "user_input_request": {
++      const answer = item.questionAnswer;
++      const question =
++        Object.values(answer?.questionTextById ?? {}).join(" · ") ||
++        item.questions.map((question) => question.question).join(" · ");
++      const response = answer
++        ? Object.values(answer.answers).map(answerText).filter(Boolean).join(" · ") ||
++          Object.values(answer.attachmentsByQuestionId)
++            .flat()
++            .map((attachment) => attachment.name)
++            .join(", ")
++        : "";
++      return (
++        [question, response].filter(Boolean).join(": ") ||
++        item.title?.trim() ||
++        (answer ? "Answered questions" : "Input requested")
++      );
++    }
++    case "error":
++      return item.failure.message || item.title?.trim() || "Provider error";
++    case "thread_created":
++      return "Created thread";
++    default:
++      return null;
++  }
++}
+diff --git a/packages/shared/src/threadSearch.test.ts b/packages/shared/src/threadSearch.test.ts
+index 83b87841c..fff2f7453 100644
+--- a/packages/shared/src/threadSearch.test.ts
++++ b/packages/shared/src/threadSearch.test.ts
+@@ -1,5 +1,9 @@
+ import { expect, it } from "vite-plus/test";
+-import { findThreadSearchOccurrences } from "./threadSearch.ts";
++import {
++  countThreadSearchOccurrences,
++  findThreadSearchOccurrences,
++  findThreadSearchRanges,
++} from "./threadSearch.ts";
+ 
+ it("finds non-overlapping occurrences without invalidating Unicode offsets", () => {
+   expect(findThreadSearchOccurrences("Deploy the Deployment", "deploy")).toEqual([0, 11]);
+@@ -12,3 +16,22 @@ it("matches both Greek sigma forms without changing source offsets", () => {
+   expect(findThreadSearchOccurrences("ΟΣ ος οσ", "ς")).toEqual([1, 4, 7]);
+   expect(findThreadSearchOccurrences("İ ΟΣ", "Σ")).toEqual([3]);
+ });
++
++it("normalizes compatibility text while preserving the original highlight bounds", () => {
++  const text = "ＦＯＯ ﬃ cafe\u0301 가";
++  for (const [query, original] of [
++    ["foo", "ＦＯＯ"],
++    ["ffi", "ﬃ"],
++    ["café", "cafe\u0301"],
++    ["가", "가"],
++  ]) {
++    const ranges = findThreadSearchRanges(text, query!);
++    expect(countThreadSearchOccurrences(text, query!)).toBe(1);
++    expect(ranges.map(({ start, end }) => text.slice(start, end))).toEqual([original]);
++  }
++  expect(findThreadSearchRanges("ffi", "ﬃ")).toEqual([{ start: 0, end: 3 }]);
++  expect(findThreadSearchRanges("İİ", "i")).toEqual([
++    { start: 0, end: 1 },
++    { start: 1, end: 2 },
++  ]);
++});
+diff --git a/packages/shared/src/threadSearch.ts b/packages/shared/src/threadSearch.ts
+index 5cca036d7..8487cb50f 100644
+--- a/packages/shared/src/threadSearch.ts
++++ b/packages/shared/src/threadSearch.ts
+@@ -1,20 +1,12 @@
+ function foldThreadSearchCase(text: string): string {
+-  const lowered = text.toLowerCase().replace(/ς/g, "σ");
+-  if (lowered.length === text.length) return lowered;
+-
+-  let folded = "";
+-  for (const character of text) {
+-    const loweredCharacter = character.toLowerCase().replace(/ς/g, "σ");
+-    folded += loweredCharacter.length === character.length ? loweredCharacter : character;
+-  }
+-  return folded;
++  return text.toLowerCase().replace(/ς/g, "σ");
+ }
+ 
+ function scanThreadSearchOccurrences(text: string, query: string, offsets?: number[]): number {
+   if (text.length === 0 || query.length === 0) return 0;
+ 
+-  const foldedText = foldThreadSearchCase(text);
+-  const foldedQuery = foldThreadSearchCase(query);
++  const foldedText = foldThreadSearchCase(text.normalize("NFKC"));
++  const foldedQuery = foldThreadSearchCase(query.normalize("NFKC"));
+   let count = 0;
+   let cursor = 0;
+ 
+@@ -33,7 +25,45 @@ export function countThreadSearchOccurrences(text: string, query: string): numbe
+ }
+ 
+ export function findThreadSearchOccurrences(text: string, query: string): number[] {
++  return findThreadSearchRanges(text, query).map((range) => range.start);
++}
++
++/** Map compatibility expansions and combining sequences back to the original DOM text. */
++export function findThreadSearchRanges(
++  text: string,
++  query: string,
++): { start: number; end: number }[] {
+   const offsets: number[] = [];
+   scanThreadSearchOccurrences(text, query, offsets);
+-  return offsets;
++  const queryLength = foldThreadSearchCase(query.normalize("NFKC")).length;
++  if (text.normalize("NFKC") === text && foldThreadSearchCase(text).length === text.length)
++    return offsets.map((start) => ({ start, end: start + queryLength }));
++  const starts: number[] = [];
++  const ends: number[] = [];
++  const segments: { normalized: string; start: number; end: number }[] = [];
++  for (const match of text.matchAll(/\P{M}\p{M}*|\p{M}+/gu)) {
++    const segment = match[0];
++    const normalized = segment.normalize("NFKC");
++    const previous = segments.at(-1);
++    // Hangul starters compose across combining-class-zero boundaries, including
++    // compatibility Jamo. Other combining sequences are already grouped above.
++    const boundary = (previous?.normalized.at(-1) ?? "") + (normalized[0] ?? "");
++    if (previous && boundary.normalize("NFKC") !== boundary) {
++      previous.normalized = (previous.normalized + normalized).normalize("NFKC");
++      previous.end = match.index + segment.length;
++    } else {
++      segments.push({ normalized, start: match.index, end: match.index + segment.length });
++    }
++  }
++  for (const { normalized, start, end } of segments) {
++    const length = foldThreadSearchCase(normalized).length;
++    for (let i = 0; i < length; i++) {
++      starts.push(start);
++      ends.push(end);
++    }
++  }
++  return offsets.map((offset) => ({
++    start: starts[offset]!,
++    end: ends[offset + queryLength - 1]!,
++  }));
+ }

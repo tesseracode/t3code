@@ -3,7 +3,7 @@ import {
   fullAccessOverrideExplanation,
 } from "@t3tools/client-runtime/state/thread-requests";
 import { ShieldIcon } from "lucide-react";
-import { memo, use } from "react";
+import { memo, use, type ReactNode } from "react";
 import { type PendingApproval } from "../../session-logic";
 import { InlineButton } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -33,16 +33,23 @@ const APPROVAL_PRESENTATION = {
 
 export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalRow({
   approval,
+  findEntryId,
+  findLabel,
 }: {
   approval: PendingApproval;
+  findEntryId?: string;
+  findLabel?: ReactNode;
 }) {
-  const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
+  const { respondingRequestIds, canOperateThread, onRespondToApproval, activeFindEntryId } =
+    use(TimelineRowCtx);
   const presentation = APPROVAL_PRESENTATION[approval.requestKind];
   const canRespond = approval.responseCapability === "live";
   return (
     <WorkLogRow
       role="group"
       aria-label={presentation.label}
+      data-thread-find-entry-id={findEntryId}
+      aria-current={findEntryId === activeFindEntryId ? true : undefined}
       data-v2-item-type="approval_request"
       wrapLabel
       icon={
@@ -54,14 +61,16 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
         />
       }
       label={
-        <code
-          aria-label={presentation.detailLabel}
-          className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
-          data-approval-detail="complete"
-          tabIndex={0}
-        >
-          {approval.detail || presentation.label}
-        </code>
+        findLabel ?? (
+          <code
+            aria-label={presentation.detailLabel}
+            className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+            data-approval-detail="complete"
+            tabIndex={0}
+          >
+            {approval.detail || presentation.label}
+          </code>
+        )
       }
     >
       <div className="ms-7.5 flex min-w-0 flex-col gap-1 pb-1 text-xs">

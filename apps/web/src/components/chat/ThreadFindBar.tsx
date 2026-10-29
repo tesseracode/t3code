@@ -62,6 +62,17 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
   return (
     <div
       data-thread-find-bar
+      onKeyDown={(event) => {
+        if (
+          event.key !== "Escape" ||
+          event.nativeEvent.isComposing ||
+          event.nativeEvent.keyCode === 229
+        )
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+        props.onClose();
+      }}
       className="absolute top-3 right-3 z-40 w-[min(var(--thread-details-panel-width),calc(100%-1.5rem))] transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none"
     >
       <InputGroup
@@ -70,6 +81,7 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
         onContextMenu={(event) => event.stopPropagation()}
         role="search"
         aria-label="Find in thread"
+        aria-description="Search messages, proposed plans, and activity summaries."
         aria-busy={props.status === "loading" || props.counting === true}
         className="w-full"
       >

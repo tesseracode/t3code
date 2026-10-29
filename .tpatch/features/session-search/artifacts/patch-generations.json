@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "session-search",
-  "current_generation": 10,
+  "current_generation": 11,
   "generations": [
     {
       "generation": 1,
@@ -433,7 +433,7 @@
       "git_patch_id": "61bcf2025467d54a565ddbac7e4dc8b3f227b101",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "888114af033aa6326ae4e7dc51b9249b87a372d8bbc76a46609d77eb0602388f",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "8cbf4544f7b94acc91a545a78a5e1fa74426aeb0",
       "upper": {
@@ -477,6 +477,70 @@
         "apps/web/src/components/chat/MessagesTimeline.tsx",
         "apps/web/src/components/chat/ThreadFindBar.browser.test.tsx",
         "apps/web/src/components/chat/ThreadFindBar.tsx",
+        "apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+        "apps/web/src/components/chat/TimelineWorkGroupRows.tsx",
+        "apps/web/src/components/chat/threadFindHighlights.browser.test.tsx",
+        "apps/web/src/components/chat/threadFindHighlights.ts",
+        "apps/web/src/components/chat/threadFindPosition.ts",
+        "apps/web/src/components/chat/timelineRowContext.ts",
+        "apps/web/src/components/chat/useThreadFind.ts",
+        "apps/web/src/components/chat/useThreadFindNavigation.ts",
+        "apps/web/src/components/chat/useThreadFindPositionReader.ts",
+        "docs/internals/thread-find.md",
+        "docs/user/keybindings.md",
+        "packages/contracts/src/orchestrationV2.ts",
+        "packages/shared/src/threadFindText.ts",
+        "packages/shared/src/threadSearch.test.ts",
+        "packages/shared/src/threadSearch.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 11,
+      "generation_id": "pg_b03a657c573c",
+      "kind": "amend-refresh",
+      "patch_sha256": "e98b6ddf7a85432e3adb7ce5bb29ffc4cfae0a2d196c6239bd7d893955f20019",
+      "git_patch_id": "81b95f5f368036de4ef076dab7d537ee4063b0e5",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "5af95ca68cb59a1cb0c223b7188235c0cc7feee6368b59398b8c5730af52e9c6",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/015-record.patch",
+      "base_commit": "fed030d5cfba9b76789105d7f40933957d7b37cf",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "apps/server/src/orchestration-v2/ThreadFind.test.ts",
+          "apps/server/src/orchestration-v2/ThreadFind.ts",
+          "apps/web/src/components/chat",
+          "docs/internals/thread-find.md",
+          "docs/user/keybindings.md",
+          "packages/contracts/src/orchestrationV2.ts",
+          "packages/shared/src/threadFindText.ts",
+          "packages/shared/src/threadSearch.test.ts",
+          "packages/shared/src/threadSearch.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration-v2/ThreadFind.test.ts",
+        "apps/server/src/orchestration-v2/ThreadFind.ts",
+        "apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+        "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+        "apps/web/src/components/chat/MessagesTimeline.tsx",
+        "apps/web/src/components/chat/ThreadFindBar.browser.test.tsx",
+        "apps/web/src/components/chat/ThreadFindBar.tsx",
+        "apps/web/src/components/chat/TimelinePendingApprovalRow.tsx",
         "apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
         "apps/web/src/components/chat/TimelineWorkGroupRows.tsx",
         "apps/web/src/components/chat/threadFindHighlights.browser.test.tsx",

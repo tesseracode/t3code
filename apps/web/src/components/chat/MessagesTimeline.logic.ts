@@ -1373,6 +1373,7 @@ export function deriveMessagesTimelineRows(input: {
   expandedRunIds?: ReadonlySet<RunId>;
   expandedAttemptIds?: ReadonlySet<RunAttemptId>;
   expandedWorkGroupIds?: ReadonlySet<string>;
+  revealedEntryId?: string | null;
   isWorking: boolean;
   /** Native subagent work has no app run; runless entries form the live response. */
   runlessWorkActive?: boolean;
@@ -1543,7 +1544,9 @@ export function deriveMessagesTimelineRows(input: {
             entry: (latestRunningToolEntry ?? latestVisibleToolEntry).entry,
             groupedEntries: visibleActiveToolEntries.map((entry) => entry.entry),
             groupId,
-            expanded: input.expandedWorkGroupIds?.has(groupId) ?? false,
+            expanded:
+              (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
+              visibleActiveToolEntries.some((entry) => entry.id === input.revealedEntryId),
             active: latestToolKeepsActivityLive,
             ...(latestThoughtEntry ? { thought: latestThoughtEntry.entry } : {}),
           };
@@ -1817,14 +1820,18 @@ export function deriveMessagesTimelineRows(input: {
         groupedEntries.push(nextEntry.entry);
         cursor += 1;
       }
-      const visibleGroupedEntries = groupedEntries.filter((entry) =>
-        workEntryIsVisibleInGroup(entry, workEntryIsInActiveRun(entry)),
+      const visibleGroupedEntries = groupedEntries.filter(
+        (entry) =>
+          entry.id === input.revealedEntryId ||
+          workEntryIsVisibleInGroup(entry, workEntryIsInActiveRun(entry)),
       );
       if (visibleGroupedEntries.length > 0) {
         const activeInProgressToolEntries = visibleGroupedEntries.filter(workEntryIsInActiveRun);
         if (activeInProgressToolEntries.length > 0) {
           const groupId = workGroupId(timelineEntry.id);
-          const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
+          const expanded =
+            (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
+            visibleGroupedEntries.some((entry) => entry.id === input.revealedEntryId);
           const latestActiveToolEntry = activeInProgressToolEntries.at(-1)!;
           nextRows.push({
             kind: "work-live",
@@ -1860,7 +1867,9 @@ export function deriveMessagesTimelineRows(input: {
           });
         } else {
           const groupId = workGroupId(timelineEntry.id);
-          const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
+          const expanded =
+            (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
+            visibleGroupedEntries.some((entry) => entry.id === input.revealedEntryId);
           const summaryKind = toolGroupSummaryKind(visibleGroupedEntries);
           const primarySourceEntry = visibleGroupedEntries.find(
             (entry) => entry.toolSource !== undefined,
@@ -2084,7 +2093,9 @@ export function deriveMessagesTimelineRows(input: {
     const failedGroupAnchor = latestToolFailed ? activeWorkAnchor : undefined;
     if (failedGroupAnchor) {
       const groupId = workGroupId(failedGroupAnchor.id);
-      const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
+      const expanded =
+        (input.expandedWorkGroupIds?.has(groupId) ?? false) ||
+        visibleActiveToolEntries.some((entry) => entry.id === input.revealedEntryId);
       nextRows.push({
         kind: "thinking",
         id: LIVE_ACTIVITY_ROW_ID,

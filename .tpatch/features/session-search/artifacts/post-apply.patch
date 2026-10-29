@@ -1,20 +1,12 @@
 diff --git a/apps/server/src/orchestration-v2/ThreadFind.test.ts b/apps/server/src/orchestration-v2/ThreadFind.test.ts
-index 6793421a6..0a1b2a3c6 100644
+index 6793421a6..ce09e5788 100644
 --- a/apps/server/src/orchestration-v2/ThreadFind.test.ts
 +++ b/apps/server/src/orchestration-v2/ThreadFind.test.ts
-@@ -30,6 +30,7 @@ import {
-   THREAD_HISTORY_PAGE_POLICY,
- } from "./threadHistoryPaging.ts";
- import { projectTurnItemForWire } from "./WireProjection.ts";
-+import { findProjectedThreadItems } from "./ThreadFind.ts";
- 
- const layerTest = Layer.mergeAll(EventStore.layer, ProjectionStore.layer, ProjectStore.layer).pipe(
-   Layer.provideMerge(SqlitePersistence.layerMemory),
-@@ -200,6 +201,145 @@ const setup = Effect.gen(function* () {
+@@ -200,6 +200,139 @@ const setup = Effect.gen(function* () {
  });
  
  describe("V2 thread find", () => {
-+  it.effect("navigates activity summaries and messages identically in SQLite and memory", () =>
++  it.effect("navigates activity summaries and messages in occurrence order", () =>
 +    Effect.gen(function* () {
 +      const projection = yield* setup;
 +      const items: OrchestrationV2TurnItem[] = [
@@ -51,13 +43,6 @@ index 6793421a6..0a1b2a3c6 100644
 +        item("async-answer:answered", 9, "needle", "user_message"),
 +      ];
 +      yield* putItems(items);
-+      const projected = items.map((item, position) => ({
-+        item,
-+        position,
-+        visibility: "local" as const,
-+        sourceThreadId: threadId,
-+        sourceItemId: item.id,
-+      }));
 +      const expected = [
 +        "prompt",
 +        "command",
@@ -73,7 +58,8 @@ index 6793421a6..0a1b2a3c6 100644
 +        const result = yield* projection.searchThread(input);
 +        assert.equal(result.totalMatches, expected.length);
 +        assert.equal(result.match?.entryId, entryId);
-+        assert.deepEqual(result.match, findProjectedThreadItems(projected, input, 0).match);
++        assert.equal(result.match?.occurrence, index === 2 ? 1 : 0);
++        assert.equal(result.activeIndex, index);
 +      }
 +      const wrapped = yield* projection.searchThread({
 +        threadId,
@@ -157,7 +143,7 @@ index 6793421a6..0a1b2a3c6 100644
      Effect.gen(function* () {
        const projection = yield* setup;
 diff --git a/apps/server/src/orchestration-v2/ThreadFind.ts b/apps/server/src/orchestration-v2/ThreadFind.ts
-index a59d56766..2c2305880 100644
+index ead68680a..14c7526c9 100644
 --- a/apps/server/src/orchestration-v2/ThreadFind.ts
 +++ b/apps/server/src/orchestration-v2/ThreadFind.ts
 @@ -7,7 +7,12 @@ import {
@@ -217,50 +203,7 @@ index a59d56766..2c2305880 100644
    return key.role === "plan"
      ? searchablePlanSegments(key.text, key.cwd)
      : (searchableMessageSegments(
-@@ -83,7 +96,10 @@ function parseText(key: TextKey): readonly string[] {
-       ) ?? []);
- }
- 
--function searchableRows(items: readonly OrchestrationV2ProjectedTurnItem[]) {
-+function searchableRows(
-+  items: readonly OrchestrationV2ProjectedTurnItem[],
-+  includeActivity: boolean,
-+) {
-   const foldedAnswers = new Set(
-     items.flatMap(({ item }) =>
-       item.type === "user_input_request" && item.questionAnswer
-@@ -93,7 +109,8 @@ function searchableRows(items: readonly OrchestrationV2ProjectedTurnItem[]) {
-   );
-   return items.filter(
-     ({ item }) =>
--      ["user_message", "assistant_message", "proposed_plan"].includes(item.type) &&
-+      (["user_message", "assistant_message", "proposed_plan"].includes(item.type) ||
-+        (includeActivity && threadFindActivityText(item) !== null)) &&
-       !(item.type === "user_message" && foldedAnswers.has(item.messageId)),
-   );
- }
-@@ -151,20 +168,26 @@ export function findProjectedThreadItems(
-   snapshotSequence: number,
-   cwd?: string,
- ): OrchestrationV2SearchThreadResult {
--  const rows = searchableRows(items);
-+  const rows = searchableRows(items, input.includeActivity === true);
-   const docs = rows.map((row) =>
-     documentFor(
-       row,
-       countSegments(parseText(textKey(row.item, cwd, input.skills ?? [])), input.query),
-     ),
-   );
--  return resultForSelection(selectMatch(docs, input), docs, snapshotSequence);
-+  return resultForSelection(
-+    selectMatch(docs, input),
-+    docs,
-+    snapshotSequence,
-+    input.includeActivity,
-+  );
- }
- 
- function resultForSelection(
+@@ -133,6 +146,7 @@ function resultForSelection(
    selected: ReturnType<typeof selectMatch>,
    documents: readonly FindDocument[],
    snapshotSequence: number,
@@ -268,7 +211,7 @@ index a59d56766..2c2305880 100644
  ): OrchestrationV2SearchThreadResult {
    let startIndex = 0;
    const entries = documents.flatMap(({ entryId, runId, count }) => {
-@@ -181,6 +204,7 @@ function resultForSelection(
+@@ -149,6 +163,7 @@ function resultForSelection(
            (_, i) => entries[(selectedEntry + i - 8 + entries.length) % entries.length]!,
          );
    return {
@@ -276,7 +219,7 @@ index a59d56766..2c2305880 100644
      snapshotSequence,
      totalMatches: selected.totalMatches,
      activeIndex: selected.activeIndex,
-@@ -212,6 +236,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+@@ -180,6 +195,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
          cwd: Schema.optional(Schema.String),
          query: Schema.String,
          skills: OrchestrationV2SearchThreadInput.fields.skills,
@@ -284,7 +227,7 @@ index a59d56766..2c2305880 100644
        }),
      ),
    );
-@@ -238,8 +263,17 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+@@ -206,8 +222,17 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
        entry_id: string;
        item_type: OrchestrationV2TurnItem["type"];
      }>`
@@ -304,7 +247,7 @@ index a59d56766..2c2305880 100644
          json_extract(item.payload_json, '$.type') AS item_type
        FROM orchestration_v2_projection_turn_items AS item
        JOIN json_each(${sources}) AS wanted
-@@ -321,23 +355,33 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+@@ -289,23 +314,33 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
          cwd,
          query: input.query,
          skills: input.skills ?? [],
@@ -343,7 +286,7 @@ index a59d56766..2c2305880 100644
          );
        const payloads: FindPayload[] = [];
        for (let start = 0; start < candidates.length; start += 128) {
-@@ -379,7 +423,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+@@ -347,7 +382,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
          }
          const rows = payloads.filter(
            (row) =>
@@ -352,7 +295,7 @@ index a59d56766..2c2305880 100644
              !(row.type === "user_message" && foldedAnswers.has(row.entryId)),
          );
          const documents = new Map<number, FindDocument>();
-@@ -406,7 +450,12 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+@@ -374,7 +409,12 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
              const oldest = scans.keys().next().value;
              if (oldest !== undefined) scans.delete(oldest);
            }
@@ -366,7 +309,7 @@ index a59d56766..2c2305880 100644
          });
          if (input.index !== undefined || (input.offset ?? 0) !== 0)
            return Stream.fromEffect(finish);
-@@ -425,6 +474,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
+@@ -393,6 +433,7 @@ export const makeThreadFind = Effect.fn("makeThreadFind")(function* (
                : 0;
            if (occurrence >= document.count) continue;
            const first: OrchestrationV2SearchThreadResult = {
@@ -375,18 +318,10 @@ index a59d56766..2c2305880 100644
              snapshotSequence: sequence,
              totalMatches: 1,
 diff --git a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
-index 6ea5ea565..ee7d58b52 100644
+index 2c7aa3327..5b4d8627d 100644
 --- a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
 +++ b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
-@@ -8,6 +8,7 @@ import {
-   RunId,
-   ScheduledTaskId,
-   ThreadId,
-+  TurnItemId,
- } from "@t3tools/contracts";
- import type { LegendListRef } from "@legendapp/list/react";
- import { createRef, Profiler, StrictMode, type ComponentProps, type ReactElement } from "react";
-@@ -782,6 +783,112 @@ describe("MessagesTimeline attachments", () => {
+@@ -786,6 +786,112 @@ describe("MessagesTimeline attachments", () => {
  });
  
  describe("MessagesTimeline thread find", () => {
@@ -499,11 +434,41 @@ index 6ea5ea565..ee7d58b52 100644
    // Opening find is navigation; on a list already showing the thread the open
    // action navigates, so the list itself releases follow only when it starts
    // showing a thread whose find is already open.
+@@ -1088,6 +1194,29 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
+   await click(screen.button("Why am I being asked this?"));
+   await expect.element(page.getByText(/an ask rule in the agent's own settings/)).toBeVisible();
+   await click(screen.button("Why am I being asked this?"));
++  await screen.rerender(
++    ui({
++      findOpen: true,
++      findExpanded: true,
++      findActivity: true,
++      findQuery: "long-command",
++      activeFindMatch: { entryId: "approval-0", runId: fixture.runId, occurrence: 79 },
++    }),
++  );
++  await vi.waitFor(() => {
++    const active = CSS.highlights.get("t3-thread-find-active");
++    expect(active?.size).toBe(1);
++    const range = [...active!][0]!;
++    if (!(range instanceof Range)) throw new Error("Expected a text range");
++    expect(range.toString()).toBe("long-command");
++    expect(
++      range.startContainer.parentElement
++        ?.closest("[data-thread-find-entry-id]")
++        ?.getAttribute("data-thread-find-entry-id"),
++    ).toBe("approval-0");
++  });
++  await expect.element(screen.getByRole("button", { name: "Decline", exact: true })).toBeVisible();
++  await screen.rerender(ui());
+   await click(screen.buttons("More approval options")[1]!);
+   await expect.element(page.getByRole("menuitem", { name: "Always allow Safari" })).toBeVisible();
+   await page.getByRole("menuitem", { name: "Always allow Safari" }).click();
 diff --git a/apps/web/src/components/chat/MessagesTimeline.logic.ts b/apps/web/src/components/chat/MessagesTimeline.logic.ts
-index 3780d6b05..7e6caac93 100644
+index f4b409f90..051d585be 100644
 --- a/apps/web/src/components/chat/MessagesTimeline.logic.ts
 +++ b/apps/web/src/components/chat/MessagesTimeline.logic.ts
-@@ -1386,6 +1386,7 @@ export function deriveMessagesTimelineRows(input: {
+@@ -1373,6 +1373,7 @@ export function deriveMessagesTimelineRows(input: {
    expandedRunIds?: ReadonlySet<RunId>;
    expandedAttemptIds?: ReadonlySet<RunAttemptId>;
    expandedWorkGroupIds?: ReadonlySet<string>;
@@ -511,7 +476,7 @@ index 3780d6b05..7e6caac93 100644
    isWorking: boolean;
    /** Native subagent work has no app run; runless entries form the live response. */
    runlessWorkActive?: boolean;
-@@ -1539,7 +1540,9 @@ export function deriveMessagesTimelineRows(input: {
+@@ -1543,7 +1544,9 @@ export function deriveMessagesTimelineRows(input: {
              entry: (latestRunningToolEntry ?? latestVisibleToolEntry).entry,
              groupedEntries: visibleActiveToolEntries.map((entry) => entry.entry),
              groupId,
@@ -522,7 +487,7 @@ index 3780d6b05..7e6caac93 100644
              active: latestToolKeepsActivityLive,
              ...(latestThoughtEntry ? { thought: latestThoughtEntry.entry } : {}),
            };
-@@ -1796,14 +1799,18 @@ export function deriveMessagesTimelineRows(input: {
+@@ -1817,14 +1820,18 @@ export function deriveMessagesTimelineRows(input: {
          groupedEntries.push(nextEntry.entry);
          cursor += 1;
        }
@@ -544,7 +509,7 @@ index 3780d6b05..7e6caac93 100644
            const latestActiveToolEntry = activeInProgressToolEntries.at(-1)!;
            nextRows.push({
              kind: "work-live",
-@@ -1839,7 +1846,9 @@ export function deriveMessagesTimelineRows(input: {
+@@ -1860,7 +1867,9 @@ export function deriveMessagesTimelineRows(input: {
            });
          } else {
            const groupId = workGroupId(timelineEntry.id);
@@ -555,7 +520,7 @@ index 3780d6b05..7e6caac93 100644
            const summaryKind = toolGroupSummaryKind(visibleGroupedEntries);
            const primarySourceEntry = visibleGroupedEntries.find(
              (entry) => entry.toolSource !== undefined,
-@@ -2076,7 +2085,9 @@ export function deriveMessagesTimelineRows(input: {
+@@ -2084,7 +2093,9 @@ export function deriveMessagesTimelineRows(input: {
      const failedGroupAnchor = latestToolFailed ? activeWorkAnchor : undefined;
      if (failedGroupAnchor) {
        const groupId = workGroupId(failedGroupAnchor.id);
@@ -567,10 +532,10 @@ index 3780d6b05..7e6caac93 100644
          kind: "thinking",
          id: LIVE_ACTIVITY_ROW_ID,
 diff --git a/apps/web/src/components/chat/MessagesTimeline.tsx b/apps/web/src/components/chat/MessagesTimeline.tsx
-index e9b21061c..75cf5232f 100644
+index a9cab1554..d50cd03d8 100644
 --- a/apps/web/src/components/chat/MessagesTimeline.tsx
 +++ b/apps/web/src/components/chat/MessagesTimeline.tsx
-@@ -289,6 +289,7 @@ interface MessagesTimelineProps {
+@@ -299,6 +299,7 @@ interface MessagesTimelineProps {
    topFadeEnabled?: boolean;
    historyControls?: MessagesTimelineHistoryControls | undefined;
    findExpanded?: boolean;
@@ -578,7 +543,7 @@ index e9b21061c..75cf5232f 100644
    findQuery?: string;
    activeFindMatch?: ThreadFindMatch | null;
    findNavigationId?: number;
-@@ -329,6 +330,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
+@@ -343,6 +344,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
    timelineEntries,
    findOpen = false,
    findExpanded = false,
@@ -586,7 +551,7 @@ index e9b21061c..75cf5232f 100644
    findQuery = "",
    activeFindMatch = null,
    findNavigationId = 0,
-@@ -663,6 +665,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
+@@ -673,6 +675,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
      expandedRunIds: visibleExpandedRunIds,
      expandedAttemptIds: visibleExpandedAttemptIds,
      expandedWorkGroupIds,
@@ -594,7 +559,7 @@ index e9b21061c..75cf5232f 100644
      isWorking,
      runlessWorkActive,
      activeTurnStartedAt,
-@@ -1022,6 +1025,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
+@@ -1019,6 +1022,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
      onRevertToTurnCount,
      onRunShellCommand,
      findActive,
@@ -621,10 +586,10 @@ index e9b21061c..75cf5232f 100644
    });
 diff --git a/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx b/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx
 new file mode 100644
-index 000000000..377b2a9b3
+index 000000000..0c0343f0b
 --- /dev/null
 +++ b/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,53 @@
 +import { useState } from "react";
 +import { expect, it } from "vite-plus/test";
 +import { userEvent } from "vite-plus/test/browser";
@@ -661,6 +626,7 @@ index 000000000..377b2a9b3
 +}
 +
 +it("navigates from the input, preserves native button Enter, and closes from a focused find control", async () => {
++  // The keyboard-only find bar does not use navigation.
 +  await using screen = await render(<Find />, { router: false });
 +  const input = screen.getByRole("searchbox", { name: "Find in thread" });
 +  await expect.element(input).toHaveFocus();
@@ -678,10 +644,10 @@ index 000000000..377b2a9b3
 +  await expect.element(screen.getByRole("searchbox", { name: "Find in thread" })).toHaveValue("");
 +});
 diff --git a/apps/web/src/components/chat/ThreadFindBar.tsx b/apps/web/src/components/chat/ThreadFindBar.tsx
-index aca1d6ca0..1f8149546 100644
+index 466cd929a..1b24ffe5c 100644
 --- a/apps/web/src/components/chat/ThreadFindBar.tsx
 +++ b/apps/web/src/components/chat/ThreadFindBar.tsx
-@@ -61,6 +61,17 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
+@@ -62,6 +62,17 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
    return (
      <div
        data-thread-find-bar
@@ -699,7 +665,7 @@ index aca1d6ca0..1f8149546 100644
        className="absolute top-3 right-3 z-40 w-[min(var(--thread-details-panel-width),calc(100%-1.5rem))] transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none"
      >
        <InputGroup
-@@ -69,6 +80,7 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
+@@ -70,6 +81,7 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
          onContextMenu={(event) => event.stopPropagation()}
          role="search"
          aria-label="Find in thread"
@@ -707,11 +673,74 @@ index aca1d6ca0..1f8149546 100644
          aria-busy={props.status === "loading" || props.counting === true}
          className="w-full"
        >
+diff --git a/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx b/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
+index c425d560b..5c3e3d332 100644
+--- a/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
++++ b/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
+@@ -3,7 +3,7 @@ import {
+   fullAccessOverrideExplanation,
+ } from "@t3tools/client-runtime/state/thread-requests";
+ import { ShieldIcon } from "lucide-react";
+-import { memo, use } from "react";
++import { memo, use, type ReactNode } from "react";
+ import { type PendingApproval } from "../../session-logic";
+ import { InlineButton } from "../ui/button";
+ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+@@ -33,16 +33,23 @@ const APPROVAL_PRESENTATION = {
+ 
+ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalRow({
+   approval,
++  findEntryId,
++  findLabel,
+ }: {
+   approval: PendingApproval;
++  findEntryId?: string;
++  findLabel?: ReactNode;
+ }) {
+-  const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
++  const { respondingRequestIds, canOperateThread, onRespondToApproval, activeFindEntryId } =
++    use(TimelineRowCtx);
+   const presentation = APPROVAL_PRESENTATION[approval.requestKind];
+   const canRespond = approval.responseCapability === "live";
+   return (
+     <WorkLogRow
+       role="group"
+       aria-label={presentation.label}
++      data-thread-find-entry-id={findEntryId}
++      aria-current={findEntryId === activeFindEntryId ? true : undefined}
+       data-v2-item-type="approval_request"
+       wrapLabel
+       icon={
+@@ -54,14 +61,16 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
+         />
+       }
+       label={
+-        <code
+-          aria-label={presentation.detailLabel}
+-          className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+-          data-approval-detail="complete"
+-          tabIndex={0}
+-        >
+-          {approval.detail || presentation.label}
+-        </code>
++        findLabel ?? (
++          <code
++            aria-label={presentation.detailLabel}
++            className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
++            data-approval-detail="complete"
++            tabIndex={0}
++          >
++            {approval.detail || presentation.label}
++          </code>
++        )
+       }
+     >
+       <div className="ms-7.5 flex min-w-0 flex-col gap-1 pb-1 text-xs">
 diff --git a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
-index 76daf03c1..cf30dae6e 100644
+index a8d5e3e68..6192cc99b 100644
 --- a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
 +++ b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
-@@ -22,6 +22,8 @@ import {
+@@ -24,6 +24,8 @@ import {
    turnItemNeedsDetailFetch,
  } from "@t3tools/client-runtime/work-log/item-detail";
  import { claudeSkillInvocation } from "@t3tools/shared/toolActivity";
@@ -720,7 +749,7 @@ index 76daf03c1..cf30dae6e 100644
  import { memo, use, useState, type KeyboardEvent } from "react";
  import {
    workEntryDisplayIndicatesToolFailure,
-@@ -183,6 +185,22 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+@@ -184,6 +186,22 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
        ? notificationChildThreadId(workEntry.projectedItem.item.source)
        : undefined;
    const groupView = use(WorkGroupViewCtx);
@@ -743,7 +772,23 @@ index 76daf03c1..cf30dae6e 100644
    const [expanded, setExpanded] = useState(
      () => groupView?.state.expandedEntries.has(workEntry.id) ?? false,
    );
-@@ -213,6 +231,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+@@ -203,7 +221,14 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+     failureItem?.type === "approval_request"
+       ? ctx.pendingApprovals.get(failureItem.requestId)
+       : undefined;
+-  if (pendingApproval) return <TimelinePendingApprovalRow approval={pendingApproval} />;
++  if (pendingApproval)
++    return (
++      <TimelinePendingApprovalRow
++        approval={pendingApproval}
++        findEntryId={workEntry.id}
++        findLabel={findLabel}
++      />
++    );
+   if (failureItem?.type === "error" && failureItem.status === "failed") {
+     const warning = failureItem.failure.class === "usage_limit";
+     const resetAt = failureItem.failure.resetAt;
+@@ -219,6 +244,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
          : null;
      return (
        <WorkLogRow
@@ -752,7 +797,7 @@ index 76daf03c1..cf30dae6e 100644
          data-v2-item-type="error"
          data-v2-item-visibility={workEntry.projectedItem?.visibility}
          wrapLabel
-@@ -225,7 +245,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+@@ -231,7 +258,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
            <span
              className={cn("text-sm font-medium", warning ? "text-warning" : "text-destructive")}
            >
@@ -761,7 +806,7 @@ index 76daf03c1..cf30dae6e 100644
            </span>
          }
          trailing={
-@@ -385,6 +405,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+@@ -391,6 +418,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
  
    return (
      <WorkLogRow
@@ -771,7 +816,7 @@ index 76daf03c1..cf30dae6e 100644
        data-v2-item-type={workEntry.projectedItem?.item.type}
        data-v2-item-visibility={workEntry.projectedItem?.visibility}
        {...rowToggleProps}
-@@ -403,50 +426,56 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+@@ -409,50 +439,56 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
          </span>
        }
        label={
@@ -868,24 +913,33 @@ index 76daf03c1..cf30dae6e 100644
        trailing={
          <>
 diff --git a/apps/web/src/components/chat/TimelineWorkGroupRows.tsx b/apps/web/src/components/chat/TimelineWorkGroupRows.tsx
-index c122caa96..536138ff8 100644
+index a440b62a5..4a0a82138 100644
 --- a/apps/web/src/components/chat/TimelineWorkGroupRows.tsx
 +++ b/apps/web/src/components/chat/TimelineWorkGroupRows.tsx
-@@ -71,15 +71,21 @@ export const WorkGroupSection = memo(function WorkGroupSection({
+@@ -67,20 +67,31 @@ export const WorkGroupSection = memo(function WorkGroupSection({
    isExpandedToolGroup: boolean;
    displayLabel?: string | undefined;
  }) {
--  const { workspaceRoot, routeThreadKey, onToggleWorkEntry } = use(TimelineRowCtx);
-+  const { workspaceRoot, routeThreadKey, onToggleWorkEntry, findActivity, activeFindEntryId } =
-+    use(TimelineRowCtx);
+-  const { workspaceRoot, routeThreadKey, onToggleWorkEntry, pendingApprovals } =
+-    use(TimelineRowCtx);
++  const {
++    workspaceRoot,
++    routeThreadKey,
++    onToggleWorkEntry,
++    pendingApprovals,
++    findActivity,
++    activeFindEntryId,
++  } = use(TimelineRowCtx);
    const onToggleStandaloneEntry = (collapsed: boolean) =>
      onToggleWorkEntry(disclosureAnchorKey, collapsed);
--  const nonEmptyEntries = groupedEntries.filter((entry) =>
--    workEntryIsVisibleInGroup(entry, isExpandedToolGroup),
-+  const nonEmptyEntries = groupedEntries.filter(
-+    (entry) =>
-+      entry.id === activeFindEntryId || workEntryIsVisibleInGroup(entry, isExpandedToolGroup),
-   );
+   const nonEmptyEntries = groupedEntries.filter((entry) => {
+     const item = entry.projectedItem?.item;
+     return (
++      entry.id === activeFindEntryId ||
+       (item?.type === "approval_request" && pendingApprovals.has(item.requestId)) ||
+       workEntryIsVisibleInGroup(entry, isExpandedToolGroup)
+     );
+   });
  
    if (nonEmptyEntries.length === 0) return null;
 -  if (isExpandedToolGroup && nonEmptyEntries.every((entry) => entry.itemType === "reasoning")) {
@@ -897,7 +951,7 @@ index c122caa96..536138ff8 100644
      return <ReasoningTraceContent entries={nonEmptyEntries} />;
    }
    if (isExpandedToolGroup) {
-@@ -131,9 +137,16 @@ function ExpandedWorkGroupEntries({
+@@ -132,9 +143,16 @@ function ExpandedWorkGroupEntries({
    entries: TimelineWorkEntry[];
    workspaceRoot: string | undefined;
  }) {
@@ -916,7 +970,7 @@ index c122caa96..536138ff8 100644
    );
    const [restoringPosition, setRestoringPosition] = useState(initialScrollIndex !== undefined);
    const listRef = useRef<LegendListRef>(null);
-@@ -147,6 +160,7 @@ function ExpandedWorkGroupEntries({
+@@ -148,6 +166,7 @@ function ExpandedWorkGroupEntries({
        entries,
        follow:
          fades.viewportHeight > 0 &&
@@ -924,10 +978,11 @@ index c122caa96..536138ff8 100644
          shouldFollowWorkGroupAppend(appendState.entries, entries, fades.bottom ? Infinity : 0),
      });
    }
-@@ -227,6 +241,11 @@ function ExpandedWorkGroupEntries({
- 
+@@ -230,6 +249,12 @@ function ExpandedWorkGroupEntries({
+   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads expanded row sizes from LegendList's measured state after layout
    useLayoutEffect(updateExpandedContentHeight, [entries, updateExpandedContentHeight]);
  
++  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- positions the nested virtual list at the selected activity member
 +  useLayoutEffect(() => {
 +    if (findIndex < 0 || restoringPosition) return;
 +    void listRef.current?.scrollToIndex({ index: findIndex, animated: false });
@@ -936,7 +991,7 @@ index c122caa96..536138ff8 100644
    return (
      <WorkGroupViewCtx value={groupView}>
        <WorkLogList>
-@@ -246,8 +265,10 @@ function ExpandedWorkGroupEntries({
+@@ -249,8 +274,10 @@ function ExpandedWorkGroupEntries({
            maintainScrollAtEndThreshold={1 / Math.max(1, fades.viewportHeight)}
            // Measure the restored row even when an intra-row offset puts its
            // estimated bounds outside the list's small bootstrap render window.
@@ -979,7 +1034,7 @@ index 53b5fb1cd..5ea31a42e 100644
 +  });
  });
 diff --git a/apps/web/src/components/chat/threadFindHighlights.ts b/apps/web/src/components/chat/threadFindHighlights.ts
-index 55d0647c9..445517c48 100644
+index 65d3b0bb6..5600c4dea 100644
 --- a/apps/web/src/components/chat/threadFindHighlights.ts
 +++ b/apps/web/src/components/chat/threadFindHighlights.ts
 @@ -1,4 +1,4 @@
@@ -1038,7 +1093,7 @@ index 55d0647c9..445517c48 100644
        folds.push(fold);
    }
    return folds;
-@@ -192,6 +193,7 @@ export function useThreadFindHighlights(input: {
+@@ -193,6 +194,7 @@ export function useThreadFindHighlights(input: {
          "data-timeline-row-id",
          "data-thread-find-text",
          "data-thread-find-ignore",
@@ -1070,10 +1125,10 @@ index 34241fc7e..83cc0522e 100644
      if (!entryId) continue;
      const matches = collectThreadFindRanges(row, query);
 diff --git a/apps/web/src/components/chat/timelineRowContext.ts b/apps/web/src/components/chat/timelineRowContext.ts
-index 0b20a001a..ed18a83e7 100644
+index 6334ef53b..fcb4cc83d 100644
 --- a/apps/web/src/components/chat/timelineRowContext.ts
 +++ b/apps/web/src/components/chat/timelineRowContext.ts
-@@ -54,6 +54,8 @@ export interface TimelineRowSharedState {
+@@ -66,6 +66,8 @@ export interface TimelineRowSharedState {
    onAppFullscreenChange: (rowId: string, fullscreen: boolean) => void;
    onRunShellCommand: ((command: string) => void) | undefined;
    findActive: boolean;
@@ -1081,9 +1136,9 @@ index 0b20a001a..ed18a83e7 100644
 +  activeFindEntryId: string | null;
    onImageExpand: (preview: ExpandedImagePreview) => void;
    displayThreadKey?: string;
-   /** Unset where there is no diff to open, so the timeline shows no "Open diff" button. */
+   onOpenToolDiff: ((target: ToolCallDiffTarget) => void) | undefined;
 diff --git a/apps/web/src/components/chat/useThreadFind.ts b/apps/web/src/components/chat/useThreadFind.ts
-index bc66217cd..b10330f41 100644
+index b88951e3b..dc4bbe39f 100644
 --- a/apps/web/src/components/chat/useThreadFind.ts
 +++ b/apps/web/src/components/chat/useThreadFind.ts
 @@ -77,6 +77,7 @@ export function useThreadFind({
@@ -1094,7 +1149,7 @@ index bc66217cd..b10330f41 100644
      findQuery,
      activeFindMatch:
        entryId !== undefined && occurrence !== undefined
-@@ -227,6 +228,7 @@ export function useThreadFind({
+@@ -230,6 +231,7 @@ export function useThreadFind({
  export interface TimelineFields {
    readonly findOpen: boolean;
    readonly findExpanded: boolean;
@@ -1102,7 +1157,7 @@ index bc66217cd..b10330f41 100644
    readonly findQuery: string;
    readonly activeFindMatch: ThreadFindMatch | null;
    readonly findNavigationId: number;
-@@ -238,6 +240,7 @@ function sameTimeline(a: TimelineFields, b: TimelineFields) {
+@@ -241,6 +243,7 @@ function sameTimeline(a: TimelineFields, b: TimelineFields) {
    return (
      a.findOpen === b.findOpen &&
      a.findExpanded === b.findExpanded &&
@@ -1110,7 +1165,7 @@ index bc66217cd..b10330f41 100644
      a.findQuery === b.findQuery &&
      a.findNavigationId === b.findNavigationId &&
      (aMatch === null || bMatch === null
-@@ -283,6 +286,7 @@ function useServerResults(
+@@ -286,6 +289,7 @@ function useServerResults(
            input: {
              threadId,
              query: debouncedQuery,
@@ -1119,7 +1174,7 @@ index bc66217cd..b10330f41 100644
              ...(offset !== 0 ? { offset } : {}),
              skills: skillLabels,
 diff --git a/apps/web/src/components/chat/useThreadFindNavigation.ts b/apps/web/src/components/chat/useThreadFindNavigation.ts
-index 4bedf88b0..4e775dee9 100644
+index 054faa232..f7e0720e5 100644
 --- a/apps/web/src/components/chat/useThreadFindNavigation.ts
 +++ b/apps/web/src/components/chat/useThreadFindNavigation.ts
 @@ -124,6 +124,17 @@ function revealThreadFindMatch(
@@ -1141,10 +1196,10 @@ index 4bedf88b0..4e775dee9 100644
    if (codeScroller) {
      const rect = range.getBoundingClientRect();
 diff --git a/apps/web/src/components/chat/useThreadFindPositionReader.ts b/apps/web/src/components/chat/useThreadFindPositionReader.ts
-index 6568db9d0..bb867bb86 100644
+index 79445a1af..e47a576fb 100644
 --- a/apps/web/src/components/chat/useThreadFindPositionReader.ts
 +++ b/apps/web/src/components/chat/useThreadFindPositionReader.ts
-@@ -54,11 +54,25 @@ export function useThreadFindPositionReader({
+@@ -55,11 +55,25 @@ export function useThreadFindPositionReader({
          timelineViewportElement,
          query,
          (rowId) => {
@@ -1171,7 +1226,7 @@ index 6568db9d0..bb867bb86 100644
                  return entry.id;
                continue;
              }
-@@ -77,7 +91,10 @@ export function useThreadFindPositionReader({
+@@ -78,7 +92,10 @@ export function useThreadFindPositionReader({
                  (row.kind !== "attempt-fold" || entry.attempt?.id === row.attemptId)
                );
              });
@@ -1232,10 +1287,10 @@ index 000000000..8e2fe8e12
 +ordinary disclosure anchoring, and the existing scoped history/citation
 +cancellation rather than introducing another positioning owner.
 diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md
-index f30e832b3..74a963dab 100644
+index 83989762c..63a1fc9eb 100644
 --- a/docs/user/keybindings.md
 +++ b/docs/user/keybindings.md
-@@ -129,11 +129,20 @@ Combine keys with `!` for not, `&&` for and, `||` for or, and parentheses:
+@@ -131,11 +131,20 @@ Combine keys with `!` for not, `&&` for and, `||` for or, and parentheses:
  
  ## Find in the current thread
  
@@ -1259,10 +1314,10 @@ index f30e832b3..74a963dab 100644
  ## Precedence
  
 diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts
-index f4e830397..1c67b81ca 100644
+index 498f81a0e..cecd9c004 100644
 --- a/packages/contracts/src/orchestrationV2.ts
 +++ b/packages/contracts/src/orchestrationV2.ts
-@@ -3836,6 +3836,8 @@ export class OrchestrationGetWorkflowScriptError extends Schema.TaggedError<Orch
+@@ -3986,6 +3986,8 @@ export class OrchestrationGetWorkflowScriptError extends Schema.TaggedError<Orch
  
  export const OrchestrationV2SearchThreadInput = Schema.Struct({
    threadId: ThreadId,
@@ -1271,7 +1326,7 @@ index f4e830397..1c67b81ca 100644
    skills: Schema.optionalKey(
      Schema.Array(
        Schema.Struct({
-@@ -3859,6 +3861,8 @@ export const OrchestrationV2ThreadFindMatch = Schema.Struct({
+@@ -4009,6 +4011,8 @@ export const OrchestrationV2ThreadFindMatch = Schema.Struct({
    occurrence: NonNegativeInt,
  });
  export const OrchestrationV2SearchThreadResult = Schema.Struct({
