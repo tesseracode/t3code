@@ -1,0 +1,11 @@
+{
+  "feature": "tpatch-local-capture-ignore",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": ".gitignore",
+      "search": ".plans/\ndist-electron/",
+      "replace": ".plans/\n.tpatch/local/\ndist-electron/"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "slug": "wsl-runtime-fixture-newlines",
+  "completed_at": "2026-09-10T22:38:38Z",
+  "base_commit": "9ac52707e2756db13d92246e606c74fd7474b34d",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Seven focused files passed (179 assertions, 14 host skips); desktop typecheck/lint and Ubuntu newline-output proof passed."
+}

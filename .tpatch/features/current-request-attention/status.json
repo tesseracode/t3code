@@ -1,0 +1,25 @@
+{
+  "id": "current-request-attention",
+  "slug": "current-request-attention",
+  "title": "Implement ATT-01/#3: persist mutable current approval/input attention from canonical orchestration events alongside the unchanged immutable audit. Provide opaque request-scoped identity, revisions, bounded reason codes, independent replay cursor and atomic projection updates; support restart/rebuild/deletion without phantom requests. No RPC, UI, notifications, client cursors or failure/disconnect heuristics.",
+  "state": "rejected",
+  "compatibility": "unknown",
+  "requested_at": "2026-09-27T09:05:58Z",
+  "updated_at": "2026-09-27T09:28:00Z",
+  "last_command": "reject",
+  "apply": {},
+  "reconcile": {},
+  "rejection": {
+    "reason": "superseded",
+    "note": "Maintainer explicitly approved ATT-01 ownership in the existing phase1-foundation maintenance root; retain this unimplemented request as history instead of a second overlapping active root.",
+    "actor": "jdbencardinop@unal.edu.co",
+    "evidence": [
+      {
+        "path": ".tpatch/features/phase1-foundation/spec.md",
+        "sha256": "5902691a3321107a8d2e13cbc80766e3997ebadf2ffb217e611463d1c1cb8271"
+      }
+    ],
+    "rejected_at": "2026-09-27T09:28:00Z",
+    "prior_state": "requested"
+  }
+}

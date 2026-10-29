@@ -1,0 +1,26 @@
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 3b830720f..33eba38e1 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -46,10 +46,6 @@ overrides:
+   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-arm64': '-'
+   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-x64': '-'
+   '@github/copilot-sdk@1.0.8>@github/copilot': 1.0.75
+-  '@github/copilot-sdk@1.0.8>koffi': 3.3.1
+-  '@github/copilot-sdk@1.0.8>vscode-jsonrpc': 8.2.1
+-  '@github/copilot-sdk@1.0.8>zod': 4.4.3
+-  '@github/copilot@1.0.75>detect-libc': 2.1.2
+   '@clerk/backend': 3.18.1
+   '@clerk/clerk-js': 6.32.1
+   '@clerk/clerk-js>@base-org/account': '-'
+@@ -86,6 +82,10 @@ overrides:
+   tailwindcss: 4.3.3
+   vite: npm:@voidzero-dev/vite-plus-core@0.3.0
+   yaml: ^2.9.0
++  '@github/copilot-sdk@1.0.8>koffi': 3.3.1
++  '@github/copilot-sdk@1.0.8>vscode-jsonrpc': 8.2.1
++  '@github/copilot-sdk@1.0.8>zod': 4.4.3
++  '@github/copilot@1.0.75>detect-libc': 2.1.2
+ 
+ packageExtensionsChecksum: sha256-k/dT9NFDl5hihRPaoFKeY11hzyutMFs5psfZLFiKJic=
+ 

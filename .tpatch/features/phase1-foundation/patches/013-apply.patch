@@ -1,0 +1,318 @@
+diff --git a/packages/client-runtime/src/state/attention.test.ts b/packages/client-runtime/src/state/attention.test.ts
+index 9dc2c60da..97bb69888 100644
+--- a/packages/client-runtime/src/state/attention.test.ts
++++ b/packages/client-runtime/src/state/attention.test.ts
+@@ -529,6 +529,12 @@ describe("registry-owned attention subscriptions", () => {
+         expect(aggregateAttention(stillPartial).complete).toBe(false);
+         yield* Queue.offer(b.messages, { ...checkpoint(B), type: "sync-complete" });
+         const live = yield* h.awaitStatus(B, "live");
++        expect([
++          ...HashMap.keys(live.environments.get(A)?.notificationCandidates ?? HashMap.empty()),
++        ]).toEqual([change(item("c"), 2).key]);
++        expect(
++          HashMap.size(live.environments.get(B)?.notificationCandidates ?? HashMap.empty()),
++        ).toBe(0);
+         expect(aggregateAttention(live)).toMatchObject({
+           complete: true,
+           itemCount: 4,
+diff --git a/packages/client-runtime/src/state/attention.ts b/packages/client-runtime/src/state/attention.ts
+index 5a288f9d5..56ad95b8f 100644
+--- a/packages/client-runtime/src/state/attention.ts
++++ b/packages/client-runtime/src/state/attention.ts
+@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
+ import * as Equal from "effect/Equal";
+ import * as Exit from "effect/Exit";
+ import * as Fiber from "effect/Fiber";
++import * as HashMap from "effect/HashMap";
+ import * as Option from "effect/Option";
+ import * as Stream from "effect/Stream";
+ import * as SubscriptionRef from "effect/SubscriptionRef";
+@@ -19,6 +20,7 @@ import { EnvironmentRegistry } from "../connection/registry.ts";
+ import { EnvironmentSupervisor, retryDelayMs } from "../connection/supervisor.ts";
+ import { EnvironmentRpcSubscriptionObserver, isRpcClientError } from "../rpc/client.ts";
+ import type { RpcSession } from "../rpc/session.ts";
++import { projectAttentionNotifications } from "./attentionNotifications.ts";
+ import {
+   aggregateAttention,
+   emptyEnvironmentAttention,
+@@ -59,6 +61,7 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
+               ? "stale"
+               : "loading",
+         reason: current.status === "unauthorized" ? "unauthorized" : reason,
++        notificationCandidates: HashMap.empty(),
+       }));
+     const ownsSession = Effect.fn(function* (session: RpcSession) {
+       const active = yield* SubscriptionRef.get(supervisor.session);
+@@ -77,6 +80,7 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
+         ...current,
+         status: current.hasSnapshot ? "syncing" : "loading",
+         reason: null,
++        notificationCandidates: HashMap.empty(),
+       }));
+       const config = yield* Effect.exit(session.initialConfig);
+       if (!(yield* ownsSession(session))) return;
+@@ -136,6 +140,7 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
+                 terminal = true;
+                 return;
+               }
++              const before = sync;
+               sync = reduceAttentionStream(sync, message);
+               if (sync.status === "reset-required") {
+                 retry = message.type === "reset-required" && message.reason !== "message-too-large";
+@@ -144,6 +149,7 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
+                   ...current,
+                   status: retry ? (current.hasSnapshot ? "stale" : "loading") : "error",
+                   reason: sync.reason,
++                  notificationCandidates: HashMap.empty(),
+                 }));
+                 yield* Effect.logWarning("Attention stream requires resynchronization.", {
+                   environmentId,
+@@ -151,17 +157,24 @@ export const makeEnvironmentAttentionState = Effect.fn("makeEnvironmentAttention
+                   retry,
+                 });
+               } else if (sync.status === "live") {
+-                yield* SubscriptionRef.set(state, {
++                yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
+                   status: "live",
+                   hasSnapshot: true,
+                   entries: sync.entries,
+                   reason: null,
+-                });
++                  notificationCandidates: projectAttentionNotifications(
++                    current.notificationCandidates ?? HashMap.empty(),
++                    before,
++                    sync,
++                    message,
++                  ),
++                }));
+               } else if (message.type === "begin") {
+                 yield* SubscriptionRef.update(state, (current): EnvironmentAttentionState => ({
+                   ...current,
+                   status: current.hasSnapshot ? "syncing" : "loading",
+                   reason: null,
++                  notificationCandidates: HashMap.empty(),
+                 }));
+               }
+             }),
+diff --git a/packages/client-runtime/src/state/attentionNotifications.test.ts b/packages/client-runtime/src/state/attentionNotifications.test.ts
+new file mode 100644
+index 000000000..f3d0ea5cd
+--- /dev/null
++++ b/packages/client-runtime/src/state/attentionNotifications.test.ts
+@@ -0,0 +1,156 @@
++import { describe, expect, it } from "vite-plus/test";
++import {
++  ApprovalRequestId,
++  AttentionDeliveryCursor,
++  AttentionId,
++  AttentionPageToken,
++  EnvironmentId,
++  EventId,
++  ProjectId,
++  ThreadId,
++  TurnId,
++  type AttentionChange,
++  type AttentionStreamMessage,
++} from "@t3tools/contracts";
++import * as HashMap from "effect/HashMap";
++import { emptyAttentionSync, reduceAttentionStream } from "../attentionSync.ts";
++import { projectAttentionNotifications } from "./attentionNotifications.ts";
++
++const checkpoint = (position: number) => ({
++  environmentId: EnvironmentId.make("env"),
++  generation: "generation",
++  position,
++  cursor: AttentionDeliveryCursor.make(`cursor-${position}`),
++});
++const item = (id = "a", revision = 1, version = revision): AttentionChange => ({
++  key: `item:${id.repeat(64)}`,
++  version,
++  entity: {
++    type: "item",
++    value: {
++      attentionId: AttentionId.make(id.repeat(64)),
++      projectId: ProjectId.make("project"),
++      threadId: ThreadId.make("thread"),
++      turnId: null,
++      requestId: ApprovalRequestId.make(id),
++      kind: "approval",
++      status: "open",
++      reasonCode: "approval_requested",
++      revision,
++      sourceEventId: EventId.make(`event-${version}`),
++      sourceSequence: version,
++      openedAt: "2026-09-28T00:00:00Z",
++      updatedAt: "2026-09-28T00:00:00Z",
++      resolvedAt: null,
++    },
++  },
++});
++const summary = (
++  version: number,
++  phase: "running" | "completed",
++  turn = "turn",
++): AttentionChange => ({
++  key: "summary:thread",
++  version,
++  entity: {
++    type: "summary",
++    value: {
++      threadId: ThreadId.make("thread"),
++      projectId: ProjectId.make("project"),
++      turnId: TurnId.make(turn),
++      phase,
++      revision: version,
++      approvalCount: 0,
++      inputCount: 0,
++      failureCount: 0,
++      disconnectCount: 0,
++      countsOverflowed: false,
++      sourceEventId: EventId.make(`event-${version}`),
++      sourceSequence: version,
++      updatedAt: "2026-09-28T00:00:00Z",
++    },
++  },
++});
++function harness() {
++  let state = emptyAttentionSync();
++  let notifications = HashMap.empty<string, AttentionChange>();
++  const send = (message: AttentionStreamMessage) => {
++    const before = state;
++    state = reduceAttentionStream(state, message);
++    notifications = projectAttentionNotifications(notifications, before, state, message);
++  };
++  const delta = (position: number, changes: AttentionChange[], notificationEligible = true) =>
++    send({
++      ...checkpoint(position),
++      type: "delta",
++      after: state.cursor ?? checkpoint(0).cursor,
++      notificationEligible,
++      changes,
++    });
++  const bootstrap = (entries: AttentionChange[] = [], position = 0) => {
++    send({ ...checkpoint(position), type: "begin", mode: "snapshot" });
++    send({
++      ...checkpoint(position),
++      type: "page",
++      pageToken: AttentionPageToken.make("page"),
++      previousPageToken: null,
++      entries,
++    });
++    send({ ...checkpoint(position), type: "sync-complete" });
++  };
++  return { send, delta, bootstrap, candidates: () => [...HashMap.values(notifications)] };
++}
++describe("attention notification eligibility", () => {
++  it("does not notify snapshots, replay or rebuild but retains independent post-live candidates across batching", () => {
++    const h = harness();
++    h.bootstrap([item("a"), summary(1, "completed")], 1);
++    expect(h.candidates()).toEqual([]);
++    h.delta(2, [item("b", 1, 2)]);
++    h.delta(3, [item("c", 1, 3)]);
++    h.delta(4, []);
++    expect(
++      h
++        .candidates()
++        .map((row) => row.key)
++        .sort(),
++    ).toEqual([item("b").key, item("c").key]);
++    h.send({ ...checkpoint(4), type: "begin", mode: "resume" });
++    h.delta(5, [item("d", 1, 5)], false);
++    h.send({ ...checkpoint(5), type: "sync-complete" });
++    expect(h.candidates()).toEqual([]);
++    h.send({ type: "reset-required", reason: "rebuilding" });
++    h.bootstrap([item("f", 1, 6)], 6);
++    expect(h.candidates()).toEqual([]);
++  });
++  it("removes resolved/deleted candidates and consumes only accepted material revisions", () => {
++    const h = harness();
++    h.bootstrap();
++    h.delta(1, [item()]);
++    h.delta(2, [item("a", 2, 2)]);
++    expect(h.candidates()).toEqual([item("a", 2, 2)]);
++    h.send({
++      ...checkpoint(2),
++      type: "delta",
++      after: checkpoint(1).cursor,
++      notificationEligible: true,
++      changes: [item()],
++    });
++    expect(h.candidates()).toEqual([item("a", 2, 2)]);
++    h.delta(3, [{ key: item().key, version: 3, entity: null }]);
++    expect(h.candidates()).toEqual([]);
++    h.delta(4, [item("b", 1, 4)], false);
++    expect(h.candidates()).toEqual([]);
++  });
++  it("notifies a completion transition once, never subsequent same-turn revisions or a replayed completion", () => {
++    const h = harness();
++    h.bootstrap([summary(1, "completed")], 1);
++    h.delta(2, [summary(2, "completed")]);
++    expect(h.candidates()).toEqual([]);
++    h.delta(3, [summary(3, "running", "next")]);
++    h.delta(4, [summary(4, "completed", "next")]);
++    h.delta(5, [summary(5, "completed", "next")]);
++    expect(h.candidates()).toEqual([summary(4, "completed", "next")]);
++    h.delta(6, [summary(6, "running", "third")]);
++    expect(h.candidates()).toEqual([]);
++  });
++});
+diff --git a/packages/client-runtime/src/state/attentionNotifications.ts b/packages/client-runtime/src/state/attentionNotifications.ts
+new file mode 100644
+index 000000000..3e5624314
+--- /dev/null
++++ b/packages/client-runtime/src/state/attentionNotifications.ts
+@@ -0,0 +1,42 @@
++import type { AttentionChange, AttentionStreamMessage } from "@t3tools/contracts";
++import * as HashMap from "effect/HashMap";
++import * as Option from "effect/Option";
++import type { AttentionSyncState } from "../attentionSync.ts";
++
++/** Retains eligible current entities across consumer batching, not an event backlog. */
++export function projectAttentionNotifications(
++  candidates: HashMap.HashMap<string, AttentionChange>,
++  before: AttentionSyncState,
++  after: AttentionSyncState,
++  message: AttentionStreamMessage,
++) {
++  if (after.status !== "live" || message.type === "sync-complete")
++    return HashMap.empty<string, AttentionChange>();
++  if (message.type !== "delta" || message.position <= before.position) return candidates;
++  let next = candidates;
++  for (const change of message.changes) {
++    const old = HashMap.get(before.entries, change.key);
++    if (Option.isSome(old) && old.value.version >= change.version) continue;
++    const entity = change.entity;
++    if (
++      !message.notificationEligible ||
++      entity === null ||
++      (entity.type === "item" ? entity.value.status !== "open" : entity.value.phase !== "completed")
++    ) {
++      next = HashMap.remove(next, change.key);
++      continue;
++    }
++    if (entity.type === "summary") {
++      const previous = Option.getOrNull(old)?.entity;
++      if (entity.value.turnId === null) continue;
++      if (
++        previous?.type === "summary" &&
++        previous.value.phase === "completed" &&
++        previous.value.turnId === entity.value.turnId
++      )
++        continue;
++    }
++    next = HashMap.set(next, change.key, change);
++  }
++  return next;
++}
+diff --git a/packages/client-runtime/src/state/attentionProjection.ts b/packages/client-runtime/src/state/attentionProjection.ts
+index 547d35ecf..b7bcefbd0 100644
+--- a/packages/client-runtime/src/state/attentionProjection.ts
++++ b/packages/client-runtime/src/state/attentionProjection.ts
+@@ -24,6 +24,7 @@ export interface EnvironmentAttentionState {
+   readonly hasSnapshot: boolean;
+   readonly entries: HashMap.HashMap<string, AttentionChange>;
+   readonly reason: string | null;
++  readonly notificationCandidates?: HashMap.HashMap<string, AttentionChange>;
+ }
+ 
+ export const emptyEnvironmentAttention = (): EnvironmentAttentionState => ({

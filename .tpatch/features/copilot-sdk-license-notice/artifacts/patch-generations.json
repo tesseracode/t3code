@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "feature": "copilot-sdk-license-notice",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_379b4aedf45e",
+      "kind": "record",
+      "patch_sha256": "46e75584a8fdb990f06df1009831e51ce191b92283ee34f86182ffe368627589",
+      "git_patch_id": "0ed17f58f1f57a6a73c0961466bffa661021e9c0",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "a9b559a44ef9ae987aa756d9d9ec90c038d8ed4c23f712986d0fdd72524689b5",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "48ad137732f1850c9736b87f08c94f430a4bcd2c",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "third-party-licenses.config.json"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "third-party-licenses.config.json"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 13,
+          "parent_patch_sha256": "0dcdce60954b58a5947da226696102b97faeb0d6d8dc9f1cf814b77596ff9b16",
+          "parent_recipe_sha256": "97814b0dab001d4711a4f4c578cf4575727f6e13dfa6da864101feaee124d236"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

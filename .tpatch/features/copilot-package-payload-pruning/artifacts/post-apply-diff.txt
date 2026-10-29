@@ -1,0 +1,7 @@
+ .../copilot-package-payload-pruning/analysis.md    | 28 ++++++++---
+ .../artifacts/apply-session.json                   |  9 ++--
+ .../artifacts/post-apply-diff.txt                  |  9 ++--
+ .../copilot-package-payload-pruning/exploration.md | 58 +++++++++++++++++-----
+ .../copilot-package-payload-pruning/spec.md        | 36 ++++++++++----
+ .../copilot-package-payload-pruning/status.json    | 20 +++++---
+ 6 files changed, 117 insertions(+), 43 deletions(-)

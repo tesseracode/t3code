@@ -1,0 +1,72 @@
+{
+  "id": "phase1-foundation",
+  "slug": "phase1-foundation",
+  "title": "Consolidate the completed Phase 1 local-first foundation into one upstream-maintenance root. Capture the durable thread attention audit, read-only TWS v1.2.14 adapter, opaque environment-scoped TWS bindings, and GitHub Issue/Azure Boards contracts as one integrated patch on the verified Phase 0 base. Preserve granular child features as audit history but supersede them, and fold the five Copilot child records already provided by the verified Copilot root. Do not add UI, RPC, relay, push, TWS mutation, hosting provider implementations, or target-platform claims.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-09-03T10:11:24Z",
+  "updated_at": "2026-10-03T13:58:33Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-10-03T03:56:28Z",
+  "apply": {
+    "completed_at": "2026-10-01T15:02:05Z",
+    "base_commit": "e63a807291df4cbbf57673bfebb6963f3b79c54d",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    },
+    {
+      "slug": "durable-thread-attention-ledger",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "tws-readonly-cli-adapter",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "hosting-work-item-contracts",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "tws-identity-bindings",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-plan-compaction",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-skill-discovery",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-text-generation",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-tool-detail",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-turn-timing",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "session-search",
+      "kind": "soft"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-10-03T13:58:29Z",
+    "passed": true,
+    "recipe_hash_at_verify": "ae7d0124443ab08e32855eaf7bf1602619396caa94a5f507114e02d03323301d",
+    "patch_hash_at_verify": "cb31a341adaebd840624b8d1d04d4b64f21bd74b949211ea74263d6a9c215db5",
+    "parent_snapshot": {
+      "copilot-cli-provider": "applied"
+    }
+  }
+}
