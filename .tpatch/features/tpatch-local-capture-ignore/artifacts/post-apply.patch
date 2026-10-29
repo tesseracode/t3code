@@ -1,5 +1,5 @@
 diff --git a/.gitignore b/.gitignore
-index b33f3469c..5f683a1d9 100644
+index b6b793e02..601a11642 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -16,6 +16,7 @@ build/

@@ -1,8 +1,8 @@
 {
   "slug": "tpatch-local-capture-ignore",
-  "completed_at": "2026-10-29T08:41:16Z",
-  "base_commit": "2cad5d72dc615996325bc1204d3e034e094795b7",
+  "completed_at": "2026-10-29T16:32:13Z",
+  "base_commit": "fed030d5cfba9b76789105d7f40933957d7b37cf",
   "has_patch": true,
-  "validation_status": "passed",
-  "validation_notes": "git check-ignore .tpatch/local/capture/verification.json passed; current upstream ignore rules preserved."
+  "validation_status": "needs_review",
+  "validation_notes": "Source and mode inspected; integrated checks follow all root replays."
 }

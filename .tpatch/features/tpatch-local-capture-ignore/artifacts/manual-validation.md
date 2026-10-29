@@ -1,8 +1,8 @@
 # Manual Validation
 
-**Status**: passed
-**Timestamp**: 2026-10-29T08:41:16Z
+**Status**: needs_review
+**Timestamp**: 2026-10-29T16:32:13Z
 
 ## Notes
 
-git check-ignore .tpatch/local/capture/verification.json passed; current upstream ignore rules preserved.
+Source and mode inspected; integrated checks follow all root replays.

@@ -1,48 +1,41 @@
 {
   "slug": "tpatch-local-capture-ignore",
   "title": "Record the already-shipped .tpatch/local/ ignore rule so a clean same-base replay includes the local-only private capture exclusion. This is historical intent adoption, not a new product behavior.",
-  "outcome": "blocked",
-  "phase": "phase-4-forward-apply-conflicts",
-  "upstream_ref": "v0.1.3",
-  "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
+  "outcome": "reapplied",
+  "phase": "phase-4-forward-apply-strict",
+  "upstream_ref": "v0.1.4",
+  "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
   "notes": [
-    "Operation-level: 0 present, 0 applicable, 1 conflicts",
-    "3-way merge would leave conflict markers in 1 file(s) — manual resolution required (re-run with --resolve to attempt provider-assisted resolution)",
-    "git: Applied patch to '.gitignore' with conflicts.\nU .gitignore"
-  ],
-  "conflicts": [
-    ".gitignore"
+    "Patch applies cleanly (strict) — safe to auto-apply"
   ],
   "evidence": [
     {
       "schema_version": 1,
       "feature_slug": "tpatch-local-capture-ignore",
-      "attempt_id": "re_e10426969060",
-      "upstream_ref": "v0.1.3",
-      "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
-      "base_commit": "23e896ef9b1fa38d68443c2bf5ad330f19d9cacb",
-      "raw_reconcile_verdict": "blocked",
+      "attempt_id": "re_01a42d716ea2",
+      "upstream_ref": "v0.1.4",
+      "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+      "base_commit": "2cad5d72dc615996325bc1204d3e034e094795b7",
+      "raw_reconcile_verdict": "reapplied",
       "phase": "phase-4",
       "evidence_kind": "forward-apply",
-      "confidence": "low",
-      "matched_paths": [
-        ".gitignore"
-      ],
+      "confidence": "medium",
+      "matched_paths": [],
       "matched_operations": [],
       "match_origin": "unknown",
       "upstream_commit_refs": [],
       "pre_reconcile_presence": "not-checked",
       "requires_confirmation": true,
-      "reason_code": "phase-4-forward-apply-conflicts"
+      "reason_code": "phase-4-forward-apply-strict"
     },
     {
       "schema_version": 1,
       "feature_slug": "tpatch-local-capture-ignore",
-      "attempt_id": "re_f20209209777",
-      "upstream_ref": "v0.1.3",
-      "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
-      "base_commit": "23e896ef9b1fa38d68443c2bf5ad330f19d9cacb",
-      "raw_reconcile_verdict": "blocked",
+      "attempt_id": "re_6059a8511b53",
+      "upstream_ref": "v0.1.4",
+      "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+      "base_commit": "2cad5d72dc615996325bc1204d3e034e094795b7",
+      "raw_reconcile_verdict": "reapplied",
       "phase": "phase-3.5",
       "evidence_kind": "file-novelty",
       "confidence": "medium",
@@ -55,57 +48,6 @@
       "pre_reconcile_presence": "present",
       "requires_confirmation": true,
       "reason_code": "modifies-existing-files"
-    },
-    {
-      "schema_version": 1,
-      "feature_slug": "tpatch-local-capture-ignore",
-      "attempt_id": "re_198d63d4045c",
-      "upstream_ref": "v0.1.3",
-      "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
-      "base_commit": "23e896ef9b1fa38d68443c2bf5ad330f19d9cacb",
-      "raw_reconcile_verdict": "blocked",
-      "phase": "phase-3.5",
-      "evidence_kind": "hunk-overlap",
-      "confidence": "high",
-      "matched_paths": [
-        ".gitignore"
-      ],
-      "matched_operations": [
-        "nearby-window=3",
-        ".gitignore:old:27,6-new:27,7:edit-overlap:nearby=1"
-      ],
-      "match_origin": "unknown",
-      "upstream_commit_refs": [],
-      "pre_reconcile_presence": "present",
-      "requires_confirmation": false,
-      "reason_code": "edit-overlap"
-    },
-    {
-      "schema_version": 1,
-      "feature_slug": "tpatch-local-capture-ignore",
-      "attempt_id": "re_f35a13e45668",
-      "upstream_ref": "v0.1.3",
-      "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
-      "base_commit": "23e896ef9b1fa38d68443c2bf5ad330f19d9cacb",
-      "raw_reconcile_verdict": "blocked",
-      "phase": "phase-4",
-      "evidence_kind": "blocked-classification",
-      "confidence": "medium",
-      "matched_paths": [],
-      "matched_operations": [
-        "primary=edit-overlap",
-        "recommended_action=human-or-provider-resolution"
-      ],
-      "match_origin": "unknown",
-      "upstream_commit_refs": [],
-      "pre_reconcile_presence": "not-checked",
-      "requires_confirmation": false,
-      "reason_code": "edit-overlap"
     }
-  ],
-  "blocked_category": "edit-overlap",
-  "recommended_action": "human-or-provider-resolution",
-  "blocked_evidence": [
-    "hunk-overlap edit-overlap nearby-window=3 .gitignore:old:27,6-new:27,7:edit-overlap:nearby=1"
   ]
 }
