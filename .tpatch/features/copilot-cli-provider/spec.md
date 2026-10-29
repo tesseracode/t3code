@@ -31,6 +31,10 @@
    acknowledgement. V2 owns answer resolution and delivery metadata; the adapter does not replace
    it with stale snapshots. Approval options never advertise unsupported persistence, and identical
    plans remain valid in later turns. Unsupported rollback is a typed, explicit error.
+   Ownership transfers before waiting for a receipt: root idle, teardown, and snapshots cannot
+   republish answered requests as pending/cancelled or overwrite their answer/delivery metadata,
+   including after false/error receipts. Identical in-flight replies share the native attempt;
+   conflicting replies remain refused.
 7. Assistant, reasoning, tool, native tool-backed commands, hook, task/subagent,
    automatic compaction/truncation, skill, MCP, and context-usage events map to current
    `ProviderAdapterV2Event` contracts. Event processing is
