@@ -4,5 +4,17 @@
   "attempt": "Recapture the unchanged full 28-file child patch from its historical base after integrating the parent correction",
   "result": "verification refused",
   "reason": "The latest canonical parent is not present at the child's historical verification baseline.",
-  "resolution": "Use supported unapply/reapply to establish a genuine forward-applicable anchor containing the corrected parent. Do not invent a successful historical baseline or rewrite generation manifests."
+  "resolution": "Supported unapply/reapply established a genuine corrected-parent anchor, but the CLI verifier still selects the older historical anchor. Do not invent successful verifier output or rewrite generation manifests.",
+  "newChildLanding": "964529c024c2d79944cc7219590bcad38aa40a1d",
+  "actualNewBase": "19785c67a95d6281213f07d78186d70a7ce1f44c",
+  "remainingToolLimitation": "tpatch verify chooses historical base 75bfc26/replay anchor 55fd4d7 despite recognizing the exact new landing and its new base trailer.",
+  "additionalAttempts": [
+    "Verify the corrected Foundation first: passed; child still refused.",
+    "Supported explicit feature patch fixup: refused because unchanged source captured zero bytes."
+  ],
+  "independentGitProof": {
+    "correctedParentReverseCheckAtActualNewBase": "passed",
+    "childForwardCheckAtActualNewBase": "passed",
+    "combinedTreeAgainstNewLandingOutsideAdministrativeMetadata": "zero residual paths"
+  }
 }

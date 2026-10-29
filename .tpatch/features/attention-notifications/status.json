@@ -5,8 +5,8 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-09-30T06:30:05Z",
-  "updated_at": "2026-10-29T09:27:23Z",
-  "last_command": "record",
+  "updated_at": "2026-10-29T09:33:00Z",
+  "last_command": "verify",
   "notes": "landed at 2026-10-29T09:27:26Z",
   "apply": {
     "completed_at": "2026-10-29T09:27:22Z",
@@ -23,5 +23,14 @@
       "slug": "attention-inbox",
       "kind": "supersedes"
     }
-  ]
+  ],
+  "verify": {
+    "verified_at": "2026-10-29T09:32:55Z",
+    "passed": false,
+    "recipe_hash_at_verify": "4bafcb6da971ef3c89ad72ed13f24fb8d4e9fc580906352d470237f9ab7fc806",
+    "patch_hash_at_verify": "93dc0cb5694033539a6cdd0019615ccbfc4d40518b96042d04b0271e78f18630",
+    "parent_snapshot": {
+      "phase1-foundation": "applied"
+    }
+  }
 }
