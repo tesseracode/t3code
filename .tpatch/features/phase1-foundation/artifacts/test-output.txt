@@ -1,4 +1,4 @@
-# Test run — 2026-10-29T08:37:48Z
+# Test run — 2026-10-29T09:16:09Z
 # Command: PATH=/Users/jdbencardinop/.nvm/versions/node/v26.12.1/bin:$PATH node_modules/.bin/vp test run apps/server/src/orchestration-v2/FoundationProjection.test.ts apps/server/src/persistence/ForkMigrations.test.ts packages/contracts/src/attention.test.ts packages/client-runtime/src/state/attentionNotifications.test.ts
 # Directory: /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-foundation
 
@@ -8,7 +8,7 @@ note: You are running `vp test` as a Vite+ built-in command. If you meant to run
 
 
  Test Files  4 passed (4)
-      Tests  31 passed (31)
-   Start at  01:37:44
-   Duration  4.45s (transform 60%, tests 17%, import 13%, setup 10%)
+      Tests  39 passed (39)
+   Start at  02:16:03
+   Duration  5.63s (transform 55%, tests 16%, setup 16%, import 14%)
 

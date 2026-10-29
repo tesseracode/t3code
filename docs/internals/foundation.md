@@ -15,6 +15,13 @@ explicit root-node run ownership; requests without known node run ownership
 keep a null value, and unattributed root lifecycle events create no live item.
 The immutable audit and canonical source events retain their original
 source/native-turn identities; this mapping does not rewrite historical IDs.
+Only authoritative V2 run termination closes callbacks and terminally fences
+run-scoped attention. A root provider turn completing, failing or stopping does
+not terminate its owning run: goal continuation and retries can start another
+root native turn within that same run. Those native lifecycle events remain in
+the immutable canonical event history. Provider liveness can recover a live
+run's disconnect, but cannot reopen a terminated run; an accepted run retry or
+running transition is authoritative recovery.
 A response intent is not confirmation:
 live responses record pending delivery, then a worker receipt confirms or
 records a failed delivery. Canonical provider resolution and turn termination
