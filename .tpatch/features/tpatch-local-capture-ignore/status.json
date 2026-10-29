@@ -2,15 +2,15 @@
   "id": "tpatch-local-capture-ignore",
   "slug": "tpatch-local-capture-ignore",
   "title": "Record the already-shipped .tpatch/local/ ignore rule so a clean same-base replay includes the local-only private capture exclusion. This is historical intent adoption, not a new product behavior.",
-  "state": "unapplied",
+  "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-10-29T07:20:20Z",
-  "updated_at": "2026-10-29T07:21:29Z",
-  "last_command": "feature unapply",
-  "notes": "Patch removed from working tree; audit: artifacts/unapply/ua_5293b338757d/unapply-session.json",
+  "updated_at": "2026-10-29T07:21:50Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-29T07:21:50Z",
   "apply": {
-    "completed_at": "2026-10-29T07:20:53Z",
-    "base_commit": "719a76ca1dbf5490f1aa33ffb9966301e02be9a9",
+    "completed_at": "2026-10-29T07:21:50Z",
+    "base_commit": "23e896ef9b1fa38d68443c2bf5ad330f19d9cacb",
     "has_patch": true
   },
   "reconcile": {}
