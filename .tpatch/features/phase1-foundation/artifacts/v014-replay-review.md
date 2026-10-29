@@ -224,3 +224,21 @@ vp test run packages/client-runtime/src/attentionSync.test.ts packages/client-ru
 ```
 
 After integration: affected-package `vp run typecheck`, scoped format/lint, and one integrated web/desktop settings + multi-environment attention pass; mobile shared-state/type surface verification only, no push claim. Use repository commands in the integrated target, never repo-wide checks.
+
+## Generated lifecycle metadata inspection
+
+The final independent-root AND sequential combined Git-index replay proof is preserved at `../../attention-notifications/artifacts/v014-exact-replay-proof.json`. Both roots reproduce their landed `apps`/`packages`/`docs` trees exactly from genuine baselines, with recipe content/preimage checks. This is byte/replay evidence, not a runtime test or a platform waiver.
+
+Inspected actual apply-session/manual-validation needs_review, actual-base status and failed verify hashes, staged-index record provenance, complete recipe/preimages, natural generation/dependency capture and canonical/audit patch equality. CLI record appends one generation and clears only the previous generation's moving canonical_patch alias; all previous generation payloads and audit patches remain. No hand-authored generation manifest. post-apply-diff.txt and record.md Change Summary are the installed apply-done unstaged-only summary (metadata, not product); they are preserved, NOT represented as complete source capture. The authoritative post-apply.patch, staged-index file count and exact byte proof are complete.
+
+- `.tpatch/features/phase1-foundation/artifacts/apply-recipe.json` — landed SHA-256 `4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e`.
+- `.tpatch/features/phase1-foundation/artifacts/apply-session.json` — landed SHA-256 `516e20844a58978407237ee03385b45efc3a6e1b3e70d7975f047e3b0d1b47d6`.
+- `.tpatch/features/phase1-foundation/artifacts/manual-validation.md` — landed SHA-256 `c24f4792048ecc66ca94765b5de47e70d107bfcccac5f7da77e83b8d697167d6`.
+- `.tpatch/features/phase1-foundation/artifacts/patch-generations.json` — landed SHA-256 `f58ea84137bcc53e102355d1fe5d355ca426ed5f4f1ab1d107db8717cf54265e`.
+- `.tpatch/features/phase1-foundation/artifacts/post-apply-diff.txt` — landed SHA-256 `b06c5c29a13b356d6f1631e1c9fec6cee66a58ffcc558080d8b263f57b1dbff4`.
+- `.tpatch/features/phase1-foundation/artifacts/post-apply.patch` — landed SHA-256 `0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c`.
+- `.tpatch/features/phase1-foundation/artifacts/v014-recipe-provenance.json` — landed SHA-256 `9a267271921e226bc5304c5589aaff46189989c9100843931420d488d73bd87b`.
+- `.tpatch/features/phase1-foundation/artifacts/v014-reconcile-refusal.txt` — landed SHA-256 `28e71a82f71d3b8e8fb3a3c3314f361e74f4e5d157315433eb56dae61a2ce064`.
+- `.tpatch/features/phase1-foundation/patches/026-record.patch` — landed SHA-256 `0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c`.
+- `.tpatch/features/phase1-foundation/record.md` — landed SHA-256 `9cc9743af4a2ce9f6abfee47bab96255ea3cbb42669001d84eed0cb9f0cd837c`.
+- `.tpatch/features/phase1-foundation/status.json` — landed SHA-256 `b9dcfda0318631ba159eafcf49c8ebbf61833c819ec662a1efcb92f92b7000c3`.
