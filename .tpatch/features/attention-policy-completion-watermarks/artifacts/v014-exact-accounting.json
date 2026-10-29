@@ -1,0 +1,18 @@
+{
+  "kind": "post-landing exact source and owned-branch sequential patch proof, not integrated helper qualification",
+  "executed_at": "2026-10-29T17:37:26.050338+00:00",
+  "landing_commit": "05d111ff2c736aec3a08eeed2140636b117fc0c0",
+  "base_commit": "ee5c462a9d408f38ac2c7495ec91dfcc617b1ac1",
+  "patch_sha256": "c93803f59c055124c2c58954dea3b2a92891d891a7e12e65c5c235cdf40b1369",
+  "recipe_sha256": "751a98b9b03c47a5b8a404a06025ce14663c4fdb3c91f30eb81f767067c3e0bd",
+  "complete_paths": [
+    "apps/web/src/components/ThreadNotificationCoordinator.logic.ts",
+    "apps/web/src/components/ThreadNotificationCoordinator.tsx",
+    "apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+    "docs/internals/attention-notifications.md"
+  ],
+  "all_recipe_content_and_genuine_preimages_exact": true,
+  "full_original_foundation_attention_canonicals_preserved": true,
+  "sequential_compat_then_watermarks_product_tree_equal": true,
+  "replay_tree": "f84a4be9342dd997c47f9fbd11b5f83cca2a919a"
+}

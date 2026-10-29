@@ -38,3 +38,7 @@ Actual transcripts are preserved in v014-validation-transcript.txt and v014-stru
 ## Later integrated gates / grouping boundary
 
 Primary will rerun the integrated helper after merging both cohesive fix roots; the independent reviewer will recheck. No reviewer result or platform qualification is invented here. Workspace/repository grouping and tag inference remain separate assessment work; this renderer watermark fix introduces none.
+
+## Post-landing confirmation
+
+`tpatch land --no-record` succeeded as `05d111ff2c736aec3a08eeed2140636b117fc0c0`. All four source paths and hashes re-inspected after landing. Complete committed product diff equals the canonical patch exactly; all recipe targets and real baseline preimages match. Sequential compatibility then watermark patch replay reproduces the owned branch product tree. Full prior canonical roots remain untouched; see `v014-exact-accounting.json`.
