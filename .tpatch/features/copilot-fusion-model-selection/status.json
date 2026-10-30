@@ -1,0 +1,18 @@
+{
+  "id": "copilot-fusion-model-selection",
+  "slug": "copilot-fusion-model-selection",
+  "title": "Support and qualify Copilot Fusion model selection and effort tiers through the native Copilot SDK.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-30T18:38:28Z",
+  "updated_at": "2026-10-30T18:38:28Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    }
+  ]
+}
