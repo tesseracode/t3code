@@ -1,8 +1,10 @@
 # Tpatch retrospective: v0.1.3 and v0.1.4
 
-Source reconciliation and the demonstrated local qualification paths are complete.
-Receiving-host Windows/WSL/Ubuntu, physical-phone installation, OS notification
-delivery and production promotion remain separate gates.
+The original sections record the October 29 source reconciliation and local
+qualification closeout. Receiving-host Windows/WSL/Ubuntu, physical phones,
+OS notification delivery and production promotion were separate gates.
+The dated follow-up below records later results without retroactively changing
+what the original evidence proved.
 
 ## Scope and reproducible identity
 
@@ -14,7 +16,7 @@ delivery and production promotion remain separate gates.
 | Immutable v0.1.4 base | `783581d461dc72cdd8f78fc8abb4ad536dfc4547` |
 | Built and locally qualified candidate | `16d428db823f17c18ec16a79e1ec12ae4ba795c1` |
 | Candidate version | `0.1.4-preview.20261029.1` |
-| Final strict replay | Eleven roots, tree `226936033452d479986dff3779db6584e39a4342`, zero residual source or file modes outside administrative `.tpatch/` |
+| October 29 strict replay | Eleven roots, tree `226936033452d479986dff3779db6584e39a4342`, zero residual source or file modes outside administrative `.tpatch/` |
 | Executed tpatch | 0.16.0 |
 | Latest release observed | 0.17.0; notes inspected, binary not installed or executed |
 
@@ -170,8 +172,9 @@ notification policy and maintenance checks have different change boundaries.
 The two natural future folds are Foundation compatibility into Foundation and
 completion watermarks into attention policy. Keep their evidence/history and
 capture complete corrected parents when performing that consolidation. The
-current eleven-root candidate is already exact; no zero-byte anchor repair,
-unrelated mega-patch or unreviewed consolidation was forced into this release.
+eleven-root candidate was already exact at the local closeout; no zero-byte
+anchor repair, unrelated mega-patch or unreviewed consolidation was forced into
+this release.
 The broader Foundation root can later be assessed for attention/TWS/work-item
 separation if actual repeated conflict evidence justifies the extra boundaries.
 
@@ -194,11 +197,115 @@ Local evidence includes:
 - Linux/Windows build-only CI passed on the first attempt for this approved
   batch, with three attempts remaining per target.
 
-Windows/WSL/Ubuntu receiving-host behavior, physical phones, physical iOS release,
-old Intel Mac compatibility, real OS notification/push delivery, full off-screen
-long-plan behavior and cross-machine peer delegation remain unqualified or
-deferred. No PR, main promotion, release tag, live upgrade, computer use or OS
+At that closeout, Windows/WSL/Ubuntu receiving-host behavior, physical phones,
+physical iOS release, old Intel Mac compatibility, real OS notification/push
+delivery, full off-screen long-plan behavior and cross-machine peer delegation
+remained unqualified or deferred. No PR, main promotion, release tag, live upgrade, computer use or OS
 security bypass occurred.
+
+## October 30 receiving-host follow-up
+
+The [receiving-host report](https://github.com/tesseracode/t3code/issues/1#issuecomment-6523484823)
+records qualification and owned-test cleanup through 12:58 UTC, including exact
+focused commands, failures and review boundaries. A separate read-only
+post-recovery observer was still pending its 14:30 closeout.
+
+The tested application remains source
+`16d428db823f17c18ec16a79e1ec12ae4ba795c1`. Two independently reviewed roots
+were added without changing runtime source:
+
+- `windows-preview-zip-artifact`: optional ZIP workflow output, with NSIS still
+  the default. No ZIP build was dispatched or qualified. Both Windows hosts
+  instead verified and extracted the existing installer payload without
+  executing the installer.
+- `linux-runtime-libatomic-prerequisite`: documents the Linux loader dependency
+  and the distinction between pristine and dependency-installed qualification.
+  It does not install packages or alter runtime behavior.
+
+The [thirteen-root replay](../features/linux-runtime-libatomic-prerequisite/artifacts/exact-replay.json)
+exactly reproduces tree `194f437791ac3accb8dd0542fbe75b5378bc52b2` at target
+`be4a0ae86808cbba5d23663a1e5d4fbe15493892`, including tracked file modes outside
+administrative `.tpatch`. The documentation child's verifier still encounters
+the known parent-footprint limitation; no all-green tpatch result is claimed.
+No additional CI attempt or replacement native build was needed.
+
+| Receiving-host evidence | Result and limits |
+| --- | --- |
+| Both Windows hosts | Independently reviewed native startup, real Copilot tool approvals and reversible client-only operation against independent same-machine V2 backends. Primary also proved a cold native continuation and Ctrl+Enter at 600 CSS pixels. Not production catalog or every cross-machine route. |
+| First Ubuntu | Packaged native runtime and one supervised no-tools marker, 19 assertions, with limited independent review. A temporary cross-machine forward failed and was cleaned without repair. |
+| Dedicated WSL | Pristine image blocked on `libatomic.so.1`; explicitly dependency-installed variant independently supported for cold/warm startup, identity/cache reuse, both/WSL-only/both reversals and cleanup. Nine images reviewed; no provider turn. |
+| WSL mode recovery | Same reviewer inspected three additional images and runtime evidence: one `rg` execute-bit fault, normal product-managed cache recovery, repaired `rg --version`, all 27 tracked guest processes exited and originals preserved at phase snapshots. Not in-place repair, a separate fresh native public-version response or continuous preservation. |
+| Second Ubuntu | Independently supported runtime/data/ownership subgates, including cold project/identity persistence and complete backend/monitor drain. Initial overall auth-cleanup assertion remains failed; corrected inactive-record closeout is not full PASS. |
+| Physical Android follow-up | Independently reviewed in-place update, pairing, retained environments after cold restart and fresh live data. Initial list freshness remains unresolved and explicitly non-blocking. |
+
+Four logical paid product-test turns were reported, not a billing or SDK-call
+count. Windows viewport resizing was not substituted for the unqualified
+Appearance Chat width preference gate.
+
+A real shipped WSL database snapshot also passed a limited offline import:
+one thread, five user/assistant messages and all thirteen auth rows retained;
+source bytes unchanged and no extra imports on reopening. This is not native
+session/tool-history or credential-usability proof. The focused synthetic
+cutover fixture still failed the canonical migration-ledger guard; the guard
+was not weakened to hide that failure.
+
+### Preservation incident, not an uninterrupted-success claim
+
+At 10:27 UTC the primary original Windows and managed-WSL owners were found
+absent without an authorized production stop. The exact exit time and cause
+remain unknown. Bounded logs, events and helper inspection did not establish
+a crash, clean shutdown or responsible actor.
+
+Mutations were frozen and private pre-start evidence retained. One unchanged
+original-version launch at 10:53 UTC restored both owners, versions and saved
+identities, verified by 10:58 UTC. Passive authenticated shell-snapshot evidence
+proved protected application access; the other Windows host independently
+corroborated public route recovery, not its encrypted catalog or chat rendering.
+The original global process census remained incomplete for identified,
+longstanding OS/session services; a scoped restoration exception was not
+reused as a backup-consistency claim.
+
+Subsequent test cleanup verified actual Windows job membership and separately
+observed the detached Linux resource monitor exiting. Original owners and
+routes were preserved before and after each stage. The controlled Linux
+interruption's backend exit 130 and outer-wrapper exit 1 were retained, not
+relabeled exit 0. All owned receiving-host test runtimes were stopped; private
+profiles, journals and the test-only cache backup were retained.
+
+No complete production-profile backup, application restore rehearsal,
+encrypted-catalog rehearsal or live migration was completed. V1/V2 client
+incompatibility and managed-SSH automatic bootstrap remain explicit rollout
+constraints. Windows and its managed WSL runtime are one upgrade/rollback
+boundary. No PR, main promotion, release tag or computer-use experiment occurred.
+
+### What this adds to the retrospective
+
+Tpatch again preserved intent ownership and exact composition, but did not
+provide runtime isolation, discover the loader prerequisite or prove recovery.
+The parent-baseline limitation recurred with another legitimate child.
+
+Several obstacles were harness assumptions, not product or tpatch defects:
+extractor-created directory modes, requiring archived file UID to equal the
+root test shell, comparing timestamps across APIs with different precision,
+and treating total historical auth rows as active sessions. On the second
+Ubuntu host, the first startup grant and two CLI-issued sessions were genuinely
+revoked; an untargeted second startup grant expired without revocation. A later
+overstrict guard prevented even invoking the offline cleanup. The failures
+remain visible, with no product defect or successful-revocation fiction.
+
+Likewise, the inspected WSL implementation invalidates and restages a damaged
+cache. Requiring in-place chmod or unchanged inodes would have tested the wrong
+contract; matching sampled inode values alone could not prove cache reuse.
+Startup-auth readiness also cannot be inferred merely from public HTTP readiness.
+
+The earlier comparison still stands: better evidence and durable intent, with
+recurring metadata overhead. There is no measured tpatch speedup or cost
+advantage, and no cause assigned to the original-owner exit. The existing
+cohesive future folds remain reasonable; unrelated consolidation or parent
+recapture solely to silence verification was not performed.
+
+Receiving-host execution and independent reviews used GPT-6 Astra and
+GPT-6.1 Sol in GitHub Copilot CLI, within the reported scopes.
 
 Implementation and integrated verification: GPT-6 Astra in GitHub Copilot CLI.
 Specialized implementation, research and independent review: GPT-6.1 Sol in
