@@ -1,0 +1,23 @@
+{
+  "feature": "linux-runtime-libatomic-prerequisite",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "docs/user/install.md",
+      "search": "### Intel Macs\n",
+      "replace": "### Linux runtime libraries\n\nThe prebuilt Linux server includes Node.js but still uses operating-system\nshared libraries. Some minimal installations, including WSL distributions,\ndo not include `libatomic.so.1`.\n\nIf startup reports that this library is missing, Debian and Ubuntu provide it\nin `libatomic1`. Run these commands on the affected Linux machine or inside\nits selected WSL distribution, not on the Windows host:\n\n```bash\nsudo apt-get update\nsudo apt-get install libatomic1\n```\n\nThen retry startup. Other Linux distributions use their own package manager\nand package names for this library.\n\n### Intel Macs\n"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "docs/user/install.md",
+      "search": "server runtime there automatically; the first launch after an app update can\ntake longer.\n",
+      "replace": "server runtime there automatically; the first launch after an app update can\ntake longer. Minimal distributions may also need the\n[Linux runtime library](#linux-runtime-libraries) described above.\n"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "docs/operations/fork-native-preview.md",
+      "search": "## Build\n",
+      "replace": "## Linux and WSL runtime prerequisites\n\nA bundled Node runtime is not a fully static Linux executable. Minimal images\ncan lack `libatomic.so.1`; Debian/Ubuntu provide it in `libatomic1`. Follow the\n[user installation guidance](../user/install.md#linux-runtime-libraries) only\ninside the explicitly owned test distro or an approved target environment.\nDo not install it into an unrelated live distro to make a test pass.\n\nQualify the actual target image, not just a build runner with compiler libraries\nalready installed. Preserve a missing-library failure as pristine-image evidence,\nrecord the exact packages/versions subsequently installed, and label the resulting\nchecks as a dependency-installed variant. Installing a prerequisite does not by\nitself prove managed startup, cache repair, native provider execution or migration.\n\n## Build\n"
+    }
+  ]
+}

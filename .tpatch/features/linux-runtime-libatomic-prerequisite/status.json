@@ -1,0 +1,32 @@
+{
+  "id": "linux-runtime-libatomic-prerequisite",
+  "slug": "linux-runtime-libatomic-prerequisite",
+  "title": "Document the libatomic.so.1 operating-system prerequisite exposed by the verified Ubuntu 24.04 WSL image. Explain the standard Ubuntu/Debian libatomic1 package, selected-environment scope, and distinct pristine versus dependency-installed qualification. Do not change binaries, install packages automatically, or claim the pristine image passed.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-30T10:07:22Z",
+  "updated_at": "2026-10-30T10:12:41Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-30T10:12:41Z",
+  "apply": {
+    "completed_at": "2026-10-30T10:08:23Z",
+    "base_commit": "4a5ad9255cefc6cecee050f576e584e618aed71e",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-runtime-packaging",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-10-30T10:08:23Z",
+    "passed": false,
+    "recipe_hash_at_verify": "542cea73b4a7d07d175d720625845dec50a318a6571238bf491cb5a095b359a8",
+    "patch_hash_at_verify": "23a17244dee8af51e9eb9f6a5704688c08352fa83b70a8704deb486fe22b30a6",
+    "parent_snapshot": {
+      "copilot-runtime-packaging": "applied"
+    }
+  }
+}

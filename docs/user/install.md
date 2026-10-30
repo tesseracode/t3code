@@ -45,6 +45,24 @@ for an independent server.
 To try T3 Code once without installing it, run `npx t3@latest` instead (needs
 Node.js for `npx`).
 
+### Linux runtime libraries
+
+The prebuilt Linux server includes Node.js but still uses operating-system
+shared libraries. Some minimal installations, including WSL distributions,
+do not include `libatomic.so.1`.
+
+If startup reports that this library is missing, Debian and Ubuntu provide it
+in `libatomic1`. Run these commands on the affected Linux machine or inside
+its selected WSL distribution, not on the Windows host:
+
+```bash
+sudo apt-get update
+sudo apt-get install libatomic1
+```
+
+Then retry startup. Other Linux distributions use their own package manager
+and package names for this library.
+
 ### Intel Macs
 
 There is no `t3` executable for Intel Macs (the desktop app is available). To
@@ -114,7 +132,8 @@ from npm, it stays as it is.
 Choose a WSL distro in **Settings → Sharing & access** to run agents and projects
 there. Install the provider CLIs inside that distro. T3 Code installs its own
 server runtime there automatically; the first launch after an app update can
-take longer.
+take longer. Minimal distributions may also need the
+[Linux runtime library](#linux-runtime-libraries) described above.
 
 ### Open a project from a terminal
 

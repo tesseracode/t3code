@@ -38,6 +38,20 @@ argument re-quoting. They read the Linux account database, not an inherited
 `HOME`. A failed probe stops isolated startup rather than using the ordinary
 profile; its transport/exit details are logged.
 
+## Linux and WSL runtime prerequisites
+
+A bundled Node runtime is not a fully static Linux executable. Minimal images
+can lack `libatomic.so.1`; Debian/Ubuntu provide it in `libatomic1`. Follow the
+[user installation guidance](../user/install.md#linux-runtime-libraries) only
+inside the explicitly owned test distro or an approved target environment.
+Do not install it into an unrelated live distro to make a test pass.
+
+Qualify the actual target image, not just a build runner with compiler libraries
+already installed. Preserve a missing-library failure as pristine-image evidence,
+record the exact packages/versions subsequently installed, and label the resulting
+checks as a dependency-installed variant. Installing a prerequisite does not by
+itself prove managed startup, cache repair, native provider execution or migration.
+
 ## Build
 
 Use the repository's Node **26.12.1** and pnpm **12.14.0**, with the existing

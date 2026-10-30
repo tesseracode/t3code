@@ -1,0 +1,64 @@
+diff --git a/docs/operations/fork-native-preview.md b/docs/operations/fork-native-preview.md
+index 3f4afb7aa..46792c1a3 100644
+--- a/docs/operations/fork-native-preview.md
++++ b/docs/operations/fork-native-preview.md
+@@ -38,6 +38,20 @@ argument re-quoting. They read the Linux account database, not an inherited
+ `HOME`. A failed probe stops isolated startup rather than using the ordinary
+ profile; its transport/exit details are logged.
+ 
++## Linux and WSL runtime prerequisites
++
++A bundled Node runtime is not a fully static Linux executable. Minimal images
++can lack `libatomic.so.1`; Debian/Ubuntu provide it in `libatomic1`. Follow the
++[user installation guidance](../user/install.md#linux-runtime-libraries) only
++inside the explicitly owned test distro or an approved target environment.
++Do not install it into an unrelated live distro to make a test pass.
++
++Qualify the actual target image, not just a build runner with compiler libraries
++already installed. Preserve a missing-library failure as pristine-image evidence,
++record the exact packages/versions subsequently installed, and label the resulting
++checks as a dependency-installed variant. Installing a prerequisite does not by
++itself prove managed startup, cache repair, native provider execution or migration.
++
+ ## Build
+ 
+ Use the repository's Node **26.12.1** and pnpm **12.14.0**, with the existing
+diff --git a/docs/user/install.md b/docs/user/install.md
+index 1e1693d0b..64477eb12 100644
+--- a/docs/user/install.md
++++ b/docs/user/install.md
+@@ -45,6 +45,24 @@ for an independent server.
+ To try T3 Code once without installing it, run `npx t3@latest` instead (needs
+ Node.js for `npx`).
+ 
++### Linux runtime libraries
++
++The prebuilt Linux server includes Node.js but still uses operating-system
++shared libraries. Some minimal installations, including WSL distributions,
++do not include `libatomic.so.1`.
++
++If startup reports that this library is missing, Debian and Ubuntu provide it
++in `libatomic1`. Run these commands on the affected Linux machine or inside
++its selected WSL distribution, not on the Windows host:
++
++```bash
++sudo apt-get update
++sudo apt-get install libatomic1
++```
++
++Then retry startup. Other Linux distributions use their own package manager
++and package names for this library.
++
+ ### Intel Macs
+ 
+ There is no `t3` executable for Intel Macs (the desktop app is available). To
+@@ -114,7 +132,8 @@ from npm, it stays as it is.
+ Choose a WSL distro in **Settings → Sharing & access** to run agents and projects
+ there. Install the provider CLIs inside that distro. T3 Code installs its own
+ server runtime there automatically; the first launch after an app update can
+-take longer.
++take longer. Minimal distributions may also need the
++[Linux runtime library](#linux-runtime-libraries) described above.
+ 
+ ### Open a project from a terminal
+ 

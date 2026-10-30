@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "feature": "linux-runtime-libatomic-prerequisite",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_9a627daa7a8f",
+      "kind": "record",
+      "patch_sha256": "23a17244dee8af51e9eb9f6a5704688c08352fa83b70a8704deb486fe22b30a6",
+      "git_patch_id": "406c2821a0895102dacd32c829a10fa72a704886",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "542cea73b4a7d07d175d720625845dec50a318a6571238bf491cb5a095b359a8",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "4a5ad9255cefc6cecee050f576e584e618aed71e",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/operations/fork-native-preview.md",
+        "docs/user/install.md"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-runtime-packaging",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 15,
+          "parent_patch_sha256": "009ecb7d9a722e78ec8d271043c07ef6184a1ddbf9d16cb61223e74f7c81e860",
+          "parent_recipe_sha256": "51b9a9efa32b33a41e4f420f31935f9aa9ed122c18b789b89c59805deb203e6d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}
