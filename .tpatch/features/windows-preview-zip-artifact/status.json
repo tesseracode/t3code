@@ -1,0 +1,31 @@
+{
+  "id": "windows-preview-zip-artifact",
+  "slug": "windows-preview-zip-artifact",
+  "title": "Offer an explicit ZIP target in the build-only fork preview workflow so Windows validation can launch a complete side-by-side payload without running the existing fork NSIS installer. Keep NSIS as the default, preserve provenance and runtime gates, and publish no release.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-30T06:57:02Z",
+  "updated_at": "2026-10-30T07:00:18Z",
+  "last_command": "record",
+  "notes": "landed at 2026-10-30T07:00:18Z",
+  "apply": {
+    "base_commit": "63b22001d98b2a77c222f962a409975f4504768e",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-runtime-packaging",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-10-30T06:58:25Z",
+    "passed": true,
+    "recipe_hash_at_verify": "b323d9c09174f026b0a5a780264c27a1d24793ca826259e8f7ec3a42c4a5c8bc",
+    "patch_hash_at_verify": "3935397e093aa88b0361399991329857942a3bad8aa9e52d3ed33c62bde061a1",
+    "parent_snapshot": {
+      "copilot-runtime-packaging": "applied"
+    }
+  }
+}

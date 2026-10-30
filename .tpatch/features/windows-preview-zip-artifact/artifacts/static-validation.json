@@ -1,0 +1,33 @@
+{
+  "scope": "Workflow-only delivery-format change; no product runtime code change.",
+  "checks": [
+    {
+      "command": "vp fmt --check .github/workflows/fork-native-preview.yml",
+      "result": "passed"
+    },
+    {
+      "command": "Parse workflow with the existing yaml dependency and inspect retained NSIS default",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "tpatch prepare windows-preview-zip-artifact --check",
+      "result": "ready; manual provenance and absent optional sidecar disclosed"
+    },
+    {
+      "command": "tpatch verify windows-preview-zip-artifact",
+      "result": "passed against current baseline 63b22001d98b2a77c222f962a409975f4504768e; expected later-touch warning for the explicit packaging parent"
+    }
+  ],
+  "independentReview": {
+    "model": "GPT-6.1 Sol",
+    "harness": "GitHub Copilot CLI code-review agent",
+    "result": "No significant issues found in the reviewed changes.",
+    "boundary": "Static review only; ZIP build and runtime qualification remain unverified."
+  },
+  "ciBuild": "Not yet dispatched at this checkpoint.",
+  "qualification": "No receiving-host or live migration pass is implied."
+}
