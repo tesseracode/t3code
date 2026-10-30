@@ -207,8 +207,12 @@ security bypass occurred.
 
 The [receiving-host report](https://github.com/tesseracode/t3code/issues/1#issuecomment-6523484823)
 records qualification and owned-test cleanup through 12:58 UTC, including exact
-focused commands, failures and review boundaries. A separate read-only
-post-recovery observer was still pending its 14:30 closeout.
+focused commands, failures and review boundaries. The separate read-only
+post-recovery observer was stopped at 14:30 UTC with its actual exit verified:
+all 178 completed samples from 11:32:12 to 14:29:13 UTC passed the sampled
+Windows owner and public Windows/WSL version/identity checks, with starts at
+least sixty seconds apart. This is not continuous uptime, native WSL ownership,
+protected-data or rendering proof; the original exit cause remains unknown.
 
 The tested application remains source
 `16d428db823f17c18ec16a79e1ec12ae4ba795c1`. Two independently reviewed roots
