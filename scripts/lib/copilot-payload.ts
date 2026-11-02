@@ -9,23 +9,18 @@ import * as Schema from "effect/Schema";
 import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
 
 export const COPILOT_PAYLOAD_VERSIONS = {
-  sdk: "1.0.8",
-  runtime: "1.0.75",
+  sdk: "1.0.28",
+  runtime: "1.0.28",
   koffi: "3.3.1",
   jsonrpc: "8.2.1",
   zod: "4.4.3",
-  detectLibc: "2.1.2",
 } as const;
 
 export const COPILOT_DEPENDENCY_OVERRIDES = {
-  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`]:
-    COPILOT_PAYLOAD_VERSIONS.runtime,
   [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>koffi`]: COPILOT_PAYLOAD_VERSIONS.koffi,
   [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>vscode-jsonrpc`]:
     COPILOT_PAYLOAD_VERSIONS.jsonrpc,
   [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>zod`]: COPILOT_PAYLOAD_VERSIONS.zod,
-  [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>detect-libc`]:
-    COPILOT_PAYLOAD_VERSIONS.detectLibc,
 };
 
 const PackageManifest = Schema.Struct({
@@ -34,15 +29,6 @@ const PackageManifest = Schema.Struct({
 });
 const decodeManifest = Schema.decodeUnknownEffect(Schema.fromJsonString(PackageManifest));
 const NATIVE_FILE = /\.(?:node|dll|exe|dylib|so(?:\.\d+)*)$/u;
-const GENERIC_CLIPBOARD_TARGETS = [
-  "darwin-arm64",
-  "darwin-x64",
-  "linux-arm64-gnu",
-  "linux-x64-gnu",
-  "win32-arm64-msvc",
-  "win32-x64-msvc",
-] as const;
-const INTERACTIVE_DIRECTORIES = ["foundry-local-sdk", "pvrecorder", "webview"] as const;
 
 export class CopilotPayloadError extends Schema.TaggedError<CopilotPayloadError>()(
   "CopilotPayloadError",
@@ -71,45 +57,30 @@ function resolvePackageEntry(loader: ReturnType<typeof NodeModule.createRequire>
 function targetLayout(platform: BuildPlatform, arch: "x64" | "arm64") {
   const os = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
   const target = `${os}-${arch}`;
-  const suffix = os === "win32" ? "-msvc" : os === "linux" ? "-gnu" : "";
   const extension = os === "win32" ? ".exe" : "";
   const required = [
-    `copilot${extension}`,
-    `prebuilds/${target}/cli-native.node`,
+    `prebuilds/${target}/copilot-runtime${extension}`,
     `prebuilds/${target}/runtime.node`,
     `ripgrep/bin/${target}/rg${extension}`,
     `tgrep/bin/${target}/tgrep${extension}`,
-    `clipboard/node_modules/@teddyzhu/clipboard-${target}${suffix}/clipboard.${target}${suffix}.node`,
+    ...(os === "darwin" || os === "win32" ? [`prebuilds/${target}/msal-node-runtime.node`] : []),
+    ...(os === "darwin"
+      ? [
+          `prebuilds/${target}/libmsalruntime_${arch}.dylib`,
+          `prebuilds/${target}/libOneAuthInterop.dylib`,
+        ]
+      : []),
     ...(os === "win32"
       ? [
-          `builtin-plugins/computer-use/0.1.71/${target}/computer-use-mcp.exe`,
-          `builtin-plugins/computer-use/0.1.71/${target}/CopilotComputerUse.exe`,
+          `prebuilds/${target}/dpapi.node`,
+          `prebuilds/${target}/msalruntime${arch === "arm64" ? "_arm64" : ""}.dll`,
+          `prebuilds/${target}/OneAuthInterop.dll`,
+          "plugins/computer-use/computer-use-mcp.exe",
+          "plugins/computer-use/CopilotComputerUse.exe",
         ]
       : []),
   ];
-  const removed: string[] = GENERIC_CLIPBOARD_TARGETS.map(
-    (name) => `clipboard/node_modules/@teddyzhu/clipboard/clipboard.${name}.node`,
-  );
-  if (!(os === "darwin" && arch === "x64")) {
-    removed.push(
-      `foundry-local-sdk/node_modules/foundry-local-sdk/prebuilds/${target}/foundry_local_napi.node`,
-    );
-  }
-  if (!(os === "linux" && arch === "arm64")) {
-    const recorderTarget =
-      os === "win32"
-        ? `windows/${arch === "x64" ? "amd64" : "arm64"}`
-        : os === "darwin"
-          ? `mac/${arch === "x64" ? "x86_64" : "arm64"}`
-          : "linux/x86_64";
-    removed.push(
-      `pvrecorder/node_modules/@picovoice/pvrecorder-node/lib/${recorderTarget}/pv_recorder.node`,
-    );
-  }
-  const webviewSuffix = os === "darwin" ? "" : suffix;
-  removed.push(
-    `webview/node_modules/@webviewjs/webview-${target}${webviewSuffix}/webview.${target}${webviewSuffix}.node`,
-  );
+  const removed: string[] = [];
   const foreignSearchTarget =
     os === "darwin" && arch === "x64"
       ? "darwin-arm64"
@@ -206,16 +177,10 @@ export const resolveCopilotDependencyClosure = Effect.fn("resolveCopilotDependen
       "@github/copilot-sdk",
       COPILOT_PAYLOAD_VERSIONS.sdk,
     );
-    const runtime = yield* resolvePackage(
-      sdk.loader,
-      "@github/copilot",
-      COPILOT_PAYLOAD_VERSIONS.runtime,
-    );
     const koffi = yield* resolvePackage(sdk.loader, "koffi", COPILOT_PAYLOAD_VERSIONS.koffi);
     yield* resolvePackage(sdk.loader, "vscode-jsonrpc", COPILOT_PAYLOAD_VERSIONS.jsonrpc);
     yield* resolvePackage(sdk.loader, "zod", COPILOT_PAYLOAD_VERSIONS.zod);
-    yield* resolvePackage(runtime.loader, "detect-libc", COPILOT_PAYLOAD_VERSIONS.detectLibc);
-    return { fs, path, root, contained, realInside, resolvePackage, failure, sdk, runtime, koffi };
+    return { fs, path, root, contained, realInside, resolvePackage, failure, sdk, koffi };
   },
 );
 
@@ -234,8 +199,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
   }) {
     const closure = yield* resolveCopilotDependencyClosure(input);
     if (closure === null) return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> };
-    const { fs, path, root, contained, realInside, resolvePackage, failure, runtime, koffi } =
-      closure;
+    const { fs, path, root, contained, realInside, resolvePackage, failure, sdk, koffi } = closure;
     if (input.arch === "universal" && input.platform !== "mac") {
       return yield* failure("universal Copilot payloads are supported only on macOS");
     }
@@ -245,7 +209,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
     const removals = new Set<string>();
     const removedNativeFiles: string[] = [];
     const isNative = (file: string) =>
-      NATIVE_FILE.test(file) || ["copilot", "rg", "tgrep"].includes(path.basename(file));
+      NATIVE_FILE.test(file) || ["copilot-runtime", "rg", "tgrep"].includes(path.basename(file));
     const nativeFiles = Effect.fn("copilotPayload.nativeFiles")(function* (packageRoot: string) {
       const pending = [packageRoot];
       const files: string[] = [];
@@ -272,8 +236,8 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
     });
     for (const layout of layouts) {
       const platform = yield* resolvePackage(
-        runtime.loader,
-        `@github/copilot-${layout.target}`,
+        sdk.loader,
+        `@github/copilot-sdk-${layout.target}`,
         COPILOT_PAYLOAD_VERSIONS.runtime,
       );
       const actual = yield* nativeFiles(platform.directory);
@@ -291,22 +255,10 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
           `unreviewed ${layout.target} layout; missing [${missing.join(", ")}], unexpected [${unexpected.join(", ")}], removable ${candidates.length}/${layout.removed.length}`,
         );
       }
-      for (const file of [
-        "sdk/index.js",
-        "clipboard/index.js",
-        "clipboard/node_modules/@teddyzhu/clipboard/index.js",
-      ]) {
-        yield* requireFile(path.join(platform.directory, file));
-      }
       for (const file of candidates) {
         removedNativeFiles.push(
           path.relative(root, path.join(platform.directory, file)).split(path.sep).join("/"),
         );
-        if (file.startsWith("clipboard/")) removals.add(path.join(platform.directory, file));
-      }
-      for (const directory of INTERACTIVE_DIRECTORIES) {
-        const candidate = path.join(platform.directory, directory);
-        if (yield* fs.exists(candidate)) removals.add(candidate);
       }
       if (layout.foreignSearchTarget) {
         for (const tool of ["ripgrep", "tgrep"]) {
@@ -343,7 +295,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
       for (const arch of ["arm64", "x64"]) {
         if (layouts.some((layout) => layout.target === `${os}-${arch}`)) continue;
         const packages = [
-          { name: `@github/copilot-${os}-${arch}`, loader: runtime.loader },
+          { name: `@github/copilot-sdk-${os}-${arch}`, loader: sdk.loader },
           ...(os === "linuxmusl"
             ? []
             : [{ name: `@koromix/koffi-${os}-${arch}`, loader: koffi.loader }]),

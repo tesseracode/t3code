@@ -1592,12 +1592,12 @@ export function createStageWorkspaceConfig(input: {
   // glibc target below. Exclude musl only in generated glibc stages, not source.
   const stageOverrides =
     platform === "linux" &&
-    overrides?.[`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`] !== undefined
+    overrides?.[`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>koffi`] !== undefined
       ? {
           ...overrides,
-          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-x64`]:
+          [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot-sdk-linuxmusl-x64`]:
             "-",
-          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-arm64`]:
+          [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot-sdk-linuxmusl-arm64`]:
             "-",
         }
       : overrides;

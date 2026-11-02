@@ -1,0 +1,90 @@
+{
+  "feature": "copilot-sdk-runtime-upgrade",
+  "scope": "isolated worktree; not deployed",
+  "verdict": "local-regressions-and-macos-arm64-noauth-startup-pass; rollout-needs-review",
+  "versions": {
+    "sdk": "1.0.28",
+    "nativeRuntimeReported": "1.0.105",
+    "protocolReported": 3,
+    "koffi": "3.3.1",
+    "vscodeJsonrpc": "8.2.1",
+    "zod": "4.4.3",
+    "node": "24.19.0"
+  },
+  "checks": [
+    {
+      "command": "vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/driver.test.ts packages/provider-copilot/src/server/textGeneration.test.ts scripts/lib/copilot-payload.test.ts packages/shared/src/copilotRuntime.test.ts scripts/lib/cli-external-packages.test.ts scripts/build-desktop-artifact.test.ts",
+      "result": "passed through tpatch test --command: 8 files, 123 tests on final code"
+    },
+    {
+      "command": "vp test run packages/shared/src/copilotRuntime.test.ts scripts/lib/copilot-payload.test.ts scripts/lib/cli-external-packages.test.ts",
+      "result": "passed: 3 files, 47 tests after the final changes"
+    },
+    {
+      "command": "vp run typecheck",
+      "cwd": "packages/provider-copilot",
+      "result": "passed"
+    },
+    {
+      "command": "vp run typecheck",
+      "cwd": "packages/shared",
+      "result": "passed"
+    },
+    {
+      "command": "tsc --noEmit -p scripts/tsconfig.json",
+      "result": "passed: scripts scope"
+    },
+    {
+      "command": "vp lint packages/provider-copilot/src/server/client.ts packages/provider-copilot/src/server/adapter.ts packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/tools.ts scripts/lib/copilot-payload.ts scripts/lib/copilot-payload.test.ts scripts/lib/cli-external-packages.test.ts scripts/build-desktop-artifact.ts scripts/build-desktop-artifact.test.ts packages/shared/src/copilotRuntime.ts packages/shared/src/copilotRuntime.test.ts",
+      "result": "passed; final changed closure/test files rechecked"
+    },
+    {
+      "method": "Targeted vp fmt on changed TypeScript/manifests, followed by final whitespace checks",
+      "result": "passed"
+    },
+    {
+      "command": "vp pack",
+      "cwd": "apps/server",
+      "result": "passed: final isolated server bundle built after the mode-receipt change"
+    },
+    {
+      "method": "createRequire rooted at apps/server/dist followed by require('@github/copilot-sdk')",
+      "result": "passed without user-created source-server SDK symlink; persistent regression test added"
+    },
+    {
+      "method": "SDK start/getStatus/stop/forceStop with explicit staged native wrapper, useLoggedInUser=false and disposable empty HOME/COPILOT_HOME",
+      "result": "passed twice: worktree dependencies and production-only dependency stage; runtime 1.0.105, protocol 3; no session or model inference created"
+    },
+    {
+      "method": "pruneCopilotSdkServerPayload against real production-only darwin-arm64 dependency stage",
+      "result": "passed after preserving the actual MSAL/OneAuth companion libraries; zero native files removed on arm64"
+    },
+    {
+      "method": "SHA-512 integrity verification and native-member inspection of published darwin-x64, win32-x64, win32-arm64, linux-x64 and linux-arm64 archives",
+      "result": "passed layout inspection only; no target execution claim"
+    }
+  ],
+  "remainingGates": [
+    "Authenticated account-specific Auto/Fusion catalog discovery",
+    "Real native session create/resume and CLI continuity, including store rollback safety",
+    "Real permission/input delivery and cancellation against the upgraded runtime",
+    "Packaged Electron and standalone target execution on Mac x64, Windows and WSL/Linux",
+    "Actual Fusion event delivery, model attribution and client history presentation"
+  ],
+  "replayRepair": {
+    "result": "SDK verification passes against provider and superseding packaging root before SDK landing",
+    "packagingRoot": "copilot-runtime-packaging-replay",
+    "historicalRoot": "copilot-runtime-packaging",
+    "baseline": "ba951f958e8cd3cb6582f7902171f573621407a7",
+    "anchor": "81304b7e5be0c234ef9261602395185b72bc731b",
+    "method": "Explicit reconstructed baseline plus native supersession; original commits and generations retained; both prerequisites remain hard",
+    "tpatchRelease": "v0.17.0 inspected; no replay-anchor or cross-base repair support"
+  },
+  "constraints": {
+    "paidInference": false,
+    "productionProfileChanged": false,
+    "deployedAppChanged": false,
+    "providerDefaultsChanged": false,
+    "historicalMigrationCleanup": false
+  }
+}

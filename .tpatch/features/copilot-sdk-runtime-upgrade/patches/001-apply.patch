@@ -1,0 +1,1138 @@
+diff --git a/apps/server/package.json b/apps/server/package.json
+index a9296dbf3..6c297092f 100644
+--- a/apps/server/package.json
++++ b/apps/server/package.json
+@@ -38,6 +38,7 @@
+     "@effect/platform-node": "catalog:",
+     "@effect/platform-node-shared": "catalog:",
+     "@ff-labs/fff-node": "0.11.0",
++    "@github/copilot-sdk": "1.0.28",
+     "@muse-code/sdk": "1.4.6",
+     "@napi-rs/keyring": "^1.3.0",
+     "@t3tools/provider-acp": "workspace:*",
+diff --git a/packages/provider-copilot/package.json b/packages/provider-copilot/package.json
+index 82babd6eb..32618ad8a 100644
+--- a/packages/provider-copilot/package.json
++++ b/packages/provider-copilot/package.json
+@@ -13,7 +13,7 @@
+     "test": "vp test run --config ../../vite.config.ts --dir ."
+   },
+   "dependencies": {
+-    "@github/copilot-sdk": "1.0.8",
++    "@github/copilot-sdk": "1.0.28",
+     "@t3tools/contracts": "workspace:*",
+     "@t3tools/provider-core": "workspace:*",
+     "@t3tools/shared": "workspace:*",
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index 13be8e74a..43ddd0b79 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -104,7 +104,7 @@ function fakeSdk() {
+     getEvents: async () => [],
+     setModel: async () => {},
+     rpc: {
+-      mode: { set: async () => {} },
++      mode: { set: async () => ({ status: "success", modelChanged: false, modeApplied: true }) },
+       plan: {
+         read: async () => ({
+           exists: true,
+@@ -561,6 +561,24 @@ describe("native Copilot V2", () => {
+     ),
+   );
+ 
++  it.effect("refuses to send when the runtime rejects or defers the interaction mode", () =>
++    provide(
++      Effect.gen(function* () {
++        for (const result of [
++          { status: "success", modelChanged: false, modeApplied: false },
++          { status: "pending", modelChanged: false, deferImplementation: true },
++        ]) {
++          const fake = fakeSdk();
++          fake.session.rpc.mode.set = async () => result;
++          const { start } = yield* setup(fake);
++          const outcome = yield* start().pipe(Effect.exit);
++          assert.isTrue(Exit.isFailure(outcome));
++          assert.equal(fake.sent.length, 0);
++        }
++      }),
++    ),
++  );
++
+   it.effect("refuses forced replacement instead of reusing the existing native conversation", () =>
+     provide(
+       Effect.gen(function* () {
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+index 9f05143ee..4db6536f4 100644
+--- a/packages/provider-copilot/src/server/adapter.ts
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -1343,11 +1343,17 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             effort ? { reasoningEffort: effort } : {},
+           ),
+         );
+-        yield* sdk("set mode", () =>
++        const modeResult = yield* sdk("set mode", () =>
+           native!.rpc.mode.set({
+             mode: turnInput.runtimePolicy.interactionMode === "plan" ? "plan" : "interactive",
+           }),
+         );
++        if (modeResult.modeApplied === false || modeResult.deferImplementation === true) {
++          return yield* new ProviderAdapter.ProviderAdapterProtocolError({
++            driver: COPILOT_DRIVER,
++            detail: "Copilot did not apply the requested interaction mode.",
++          });
++        }
+         yield* drain();
+         const now = yield* DateTime.now;
+         const providerTurn: OrchestrationV2ProviderTurn = {
+diff --git a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts
+index 88326753d..16dc73802 100644
+--- a/packages/provider-copilot/src/server/client.ts
++++ b/packages/provider-copilot/src/server/client.ts
+@@ -49,11 +49,23 @@ export function bundledCliPath(runtime: HostRuntime): string | undefined {
+     ? ["linux", "linuxmusl"]
+     : [runtime.platform]) {
+     try {
+-      const path = runtime.resolve(`@github/copilot-${platform}-${runtime.architecture}`);
++      const target = `${platform}-${runtime.architecture}`;
++      const manifest = runtime.resolve(`@github/copilot-sdk-${target}/package.json`);
++      const paths = runtime.platform === "win32" ? NodePath.win32 : NodePath.posix;
++      const path = paths.join(
++        paths.dirname(manifest),
++        "prebuilds",
++        target,
++        runtime.platform === "win32" ? "copilot-runtime.exe" : "copilot-runtime",
++      );
+       const executable = runtime.electron
+         ? path.replace(/([\\/][^\\/]+\.asar)(?=[\\/])/u, "$1.unpacked")
+         : path;
+-      if (runtime.exists(executable)) return executable;
++      if (
++        runtime.exists(executable) &&
++        runtime.exists(paths.join(paths.dirname(executable), "runtime.node"))
++      )
++        return executable;
+     } catch {
+       /* The Linux libc variant may not be installed. */
+     }
+diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
+index 2f9b7e99d..bde8595cc 100644
+--- a/packages/provider-copilot/src/server/status.test.ts
++++ b/packages/provider-copilot/src/server/status.test.ts
+@@ -102,10 +102,11 @@ describe("Copilot discovery and account isolation", () => {
+         electron: true,
+         platform: "win32",
+         architecture: "x64",
+-        resolve: () => "C:\\T3\\app.asar\\node_modules\\@github\\copilot-win32-x64\\copilot.exe",
++        resolve: () =>
++          "C:\\T3\\app.asar\\node_modules\\@github\\copilot-sdk-win32-x64\\package.json",
+         exists: (path) => path.includes("app.asar.unpacked"),
+       }),
+-      "C:\\T3\\app.asar.unpacked\\node_modules\\@github\\copilot-win32-x64\\copilot.exe",
++      "C:\\T3\\app.asar.unpacked\\node_modules\\@github\\copilot-sdk-win32-x64\\prebuilds\\win32-x64\\copilot-runtime.exe",
+     );
+     assert.equal(
+       bundledCliPath({
+@@ -115,11 +116,21 @@ describe("Copilot discovery and account isolation", () => {
+         architecture: "arm64",
+         resolve: (name) => {
+           if (!name.includes("linuxmusl")) throw new Error("not installed");
+-          return "/native/copilot";
++          return "/native/package.json";
+         },
+         exists: () => true,
+       }),
+-      "/native/copilot",
++      "/native/prebuilds/linuxmusl-arm64/copilot-runtime",
++    );
++    assert.throws(() =>
++      bundledCliPath({
++        packaged: true,
++        electron: false,
++        platform: "darwin",
++        architecture: "arm64",
++        resolve: () => "/native/package.json",
++        exists: (path) => !path.endsWith("runtime.node"),
++      }),
+     );
+   });
+ 
+diff --git a/packages/provider-copilot/src/server/tools.ts b/packages/provider-copilot/src/server/tools.ts
+index de6f9c681..ffbde988b 100644
+--- a/packages/provider-copilot/src/server/tools.ts
++++ b/packages/provider-copilot/src/server/tools.ts
+@@ -26,8 +26,10 @@ export function boundedToolJson(value: unknown): string {
+ }
+ 
+ function argument(data: ToolStart, keys: ReadonlyArray<string>): string | undefined {
++  const args = data.arguments;
++  if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
+   for (const key of keys) {
+-    const value = data.arguments?.[key];
++    const value = args[key];
+     if (typeof value === "string" && value.trim()) return value.slice(0, 8_000);
+   }
+   return undefined;
+diff --git a/packages/shared/src/copilotRuntime.test.ts b/packages/shared/src/copilotRuntime.test.ts
+index ab7f6a773..073d85eb1 100644
+--- a/packages/shared/src/copilotRuntime.test.ts
++++ b/packages/shared/src/copilotRuntime.test.ts
+@@ -18,7 +18,7 @@ afterEach(() => {
+ const uname = NodeChildProcess.spawnSync("uname", ["-m"], { encoding: "utf8" });
+ const arch = ["arm64", "aarch64"].includes(uname.stdout?.trim()) ? "arm64" : "x64";
+ 
+-function fixture(withCopilot = true) {
++function fixture(withCopilot = true, legacy = false) {
+   const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-copilot-modes-"));
+   roots.push(root);
+   const write = (relative: string, source = "{}") => {
+@@ -28,10 +28,14 @@ function fixture(withCopilot = true) {
+     return file;
+   };
+   if (withCopilot) {
+-    for (const name of ["copilot", "copilot-sdk", `copilot-linux-${arch}`]) {
++    for (const name of legacy
++      ? ["copilot", "copilot-sdk", `copilot-linux-${arch}`]
++      : ["copilot-sdk", `copilot-sdk-linux-${arch}`]) {
+       write(`node_modules/@github/${name}/package.json`);
+     }
+-    for (const [index, relative] of copilotLinuxExecutableMembers(arch).entries()) {
++    if (!legacy)
++      write(`node_modules/@github/copilot-sdk-linux-${arch}/prebuilds/linux-${arch}/runtime.node`);
++    for (const [index, relative] of copilotLinuxExecutableMembers(arch, legacy).entries()) {
+       write(relative, `#!/bin/sh\nprintf '${["copilot", "rg", "tgrep"][index]}\\n'\n`);
+     }
+   }
+@@ -51,14 +55,26 @@ function fixture(withCopilot = true) {
+ 
+ describe("Copilot Linux archive members", () => {
+   const archiveMembers = (arch: "x64" | "arm64") => [
+-    ...["copilot", "copilot-sdk", `copilot-linux-${arch}`].map(
++    ...["copilot-sdk", `copilot-sdk-linux-${arch}`].map(
+       (name) => `node_modules/@github/${name}/package.json`,
+     ),
+     ...copilotLinuxExecutableMembers(arch),
++    `node_modules/@github/copilot-sdk-linux-${arch}/prebuilds/linux-${arch}/runtime.node`,
+   ];
+   it.each(["x64", "arm64"] as const)("accepts a complete %s payload", (arch) => {
+     const members = archiveMembers(arch);
+     expect(validateCopilotLinuxArchiveMembers(members, arch)).toBeNull();
++    expect(
++      validateCopilotLinuxArchiveMembers(
++        [
++          ...["copilot", "copilot-sdk", `copilot-linux-${arch}`].map(
++            (name) => `node_modules/@github/${name}/package.json`,
++          ),
++          ...copilotLinuxExecutableMembers(arch, true),
++        ],
++        arch,
++      ),
++    ).toBeNull();
+     expect(validateCopilotLinuxArchiveMembers([], arch)).toBeNull();
+   });
+   it.each(["x64", "arm64"] as const)(
+@@ -70,7 +86,7 @@ describe("Copilot Linux archive members", () => {
+         members.slice(0, -1),
+         [...members, members.at(-1)!],
+         [...members, "node_modules/@github/copilot-win32-x64/copilot.exe"],
+-        [...members, `node_modules/@github/copilot-linux-${arch}/ripgrep/bin/linux-wrong/rg`],
++        [...members, `node_modules/@github/copilot-sdk-linux-${arch}/ripgrep/bin/linux-wrong/rg`],
+       ])
+         expect(validateCopilotLinuxArchiveMembers(broken, arch)).not.toBeNull();
+     },
+@@ -80,18 +96,21 @@ describe("Copilot Linux archive members", () => {
+ describe.skipIf(uname.status !== 0 || NodeOS.type() === "Windows_NT")(
+   "production Copilot mode functions (executed)",
+   () => {
+-    it("normalizes all three commands and preserves explicit newline fixture output", () => {
+-      const stage = fixture();
++    it.each([false, true])("normalizes commands without losing legacy=%s support", (legacy) => {
++      const stage = fixture(true, legacy);
+       expect(stage.run('copilot_executable_payload_ready "$1"').status).not.toBe(0);
+       const result = stage.run(
+-        'normalize_copilot_executable_modes "$1"\n"$copilot_package_dir/copilot"\n"$copilot_package_dir/ripgrep/bin/$copilot_target/rg"\n"$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"',
++        'normalize_copilot_executable_modes "$1"\n"$copilot_executable"\n"$copilot_package_dir/ripgrep/bin/$copilot_target/rg"\n"$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"',
+       );
+       expect(result.status, result.stderr).toBe(0);
+       expect(result.stdout).toBe("copilot\nrg\ntgrep\n");
+-      for (const file of copilotLinuxExecutableMembers(arch)) {
++      for (const file of copilotLinuxExecutableMembers(arch, legacy)) {
+         expect(NodeFS.statSync(NodePath.join(stage.root, file)).mode & 0o777).toBe(0o755);
+       }
+-      NodeFS.chmodSync(NodePath.join(stage.root, copilotLinuxExecutableMembers(arch)[1]!), 0o644);
++      NodeFS.chmodSync(
++        NodePath.join(stage.root, copilotLinuxExecutableMembers(arch, legacy)[1]!),
++        0o644,
++      );
+       expect(stage.run('copilot_executable_payload_ready "$1"').status).not.toBe(0);
+       expect(stage.run('normalize_copilot_executable_modes "$1"').status).toBe(0);
+     });
+diff --git a/packages/shared/src/copilotRuntime.ts b/packages/shared/src/copilotRuntime.ts
+index e19c44f78..08bce8794 100644
+--- a/packages/shared/src/copilotRuntime.ts
++++ b/packages/shared/src/copilotRuntime.ts
+@@ -1,7 +1,10 @@
+-export function copilotLinuxExecutableMembers(arch: "x64" | "arm64"): ReadonlyArray<string> {
+-  const root = `node_modules/@github/copilot-linux-${arch}`;
++export function copilotLinuxExecutableMembers(
++  arch: "x64" | "arm64",
++  legacy = false,
++): ReadonlyArray<string> {
++  const root = `node_modules/@github/copilot-${legacy ? "" : "sdk-"}linux-${arch}`;
+   return [
+-    `${root}/copilot`,
++    legacy ? `${root}/copilot` : `${root}/prebuilds/linux-${arch}/copilot-runtime`,
+     `${root}/ripgrep/bin/linux-${arch}/rg`,
+     `${root}/tgrep/bin/linux-${arch}/tgrep`,
+   ];
+@@ -21,24 +24,32 @@ export function validateCopilotLinuxArchiveMembers(
+     }),
+   );
+   if (packages.size === 0) return null;
+-  const expected = new Set(["copilot", "copilot-sdk", `copilot-linux-${arch}`]);
++  const legacy = packages.has("copilot");
++  const expected = new Set(
++    legacy
++      ? ["copilot", "copilot-sdk", `copilot-linux-${arch}`]
++      : ["copilot-sdk", `copilot-sdk-linux-${arch}`],
++  );
+   if (packages.size !== expected.size || [...packages].some((name) => !expected.has(name))) {
+     return "Copilot archive must contain its SDK, runtime and exactly one matching Linux platform package.";
+   }
+   const required = [
+     ...[...expected].map((name) => `${prefix}${name}/package.json`),
+-    ...copilotLinuxExecutableMembers(arch),
++    ...copilotLinuxExecutableMembers(arch, legacy),
++    ...(!legacy ? [`${prefix}copilot-sdk-linux-${arch}/prebuilds/linux-${arch}/runtime.node`] : []),
+   ];
+   if (required.some((file) => members.filter((member) => member === file).length !== 1)) {
+     return "Copilot archive has missing or duplicate runtime manifests or commands.";
+   }
+-  const platformRoot = `${prefix}copilot-linux-${arch}/`;
++  const platformRoot = `${prefix}copilot-${legacy ? "" : "sdk-"}linux-${arch}/`;
+   const commands = members.filter(
+     (member) =>
+       member.startsWith(platformRoot) &&
+-      /\/(?:copilot(?:\.exe)?|(?:ripgrep|tgrep)\/bin\/[^/]+\/(?:rg|tgrep)(?:\.exe)?)$/.test(member),
++      /\/(?:copilot(?:\.exe)?|prebuilds\/[^/]+\/copilot-runtime(?:\.exe)?|(?:ripgrep|tgrep)\/bin\/[^/]+\/(?:rg|tgrep)(?:\.exe)?)$/.test(
++        member,
++      ),
+   );
+-  const expectedCommands = new Set(copilotLinuxExecutableMembers(arch));
++  const expectedCommands = new Set(copilotLinuxExecutableMembers(arch, legacy));
+   if (commands.length !== 3 || commands.some((member) => !expectedCommands.has(member))) {
+     return "Copilot archive contains unexpected platform commands.";
+   }
+@@ -57,7 +68,7 @@ export function buildCopilotExecutableReadinessScript(): string {
+     "copilot_payload_layout() {",
+     '  [ -d "$1/node_modules" ] && [ ! -L "$1/node_modules" ] || return 1',
+     '  [ -d "$1/node_modules/@github" ] && [ ! -L "$1/node_modules/@github" ] || return 1',
+-    '  for candidate in "$1/node_modules/@github/copilot" "$1/node_modules/@github/copilot-sdk"; do',
++    '  for candidate in "$1/node_modules/@github/copilot-sdk"; do',
+     '    [ -d "$candidate" ] && [ ! -L "$candidate" ] && [ -f "$candidate/package.json" ] && [ ! -L "$candidate/package.json" ] || return 1',
+     "  done",
+     "  copilot_package_count=0",
+@@ -67,6 +78,8 @@ export function buildCopilotExecutableReadinessScript(): string {
+     "      */copilot-sdk) continue ;;",
+     "      */copilot-linux-x64) copilot_target=linux-x64 ;;",
+     "      */copilot-linux-arm64) copilot_target=linux-arm64 ;;",
++    "      */copilot-sdk-linux-x64) copilot_target=linux-x64 ;;",
++    "      */copilot-sdk-linux-arm64) copilot_target=linux-arm64 ;;",
+     "      *) return 1 ;;",
+     "    esac",
+     '    [ -d "$candidate" ] && [ ! -L "$candidate" ] || return 1',
+@@ -74,6 +87,18 @@ export function buildCopilotExecutableReadinessScript(): string {
+     "    copilot_package_count=$((copilot_package_count + 1))",
+     "  done",
+     '  [ "$copilot_package_count" -eq 1 ] || return 1',
++    '  case "$copilot_package_dir" in',
++    "    */copilot-sdk-linux-*)",
++    '      [ ! -e "$1/node_modules/@github/copilot" ] && [ ! -L "$1/node_modules/@github/copilot" ] || return 1',
++    '      copilot_executable="$copilot_package_dir/prebuilds/$copilot_target/copilot-runtime"',
++    '      for directory in "$copilot_package_dir/prebuilds" "$copilot_package_dir/prebuilds/$copilot_target"; do',
++    '        [ -d "$directory" ] && [ ! -L "$directory" ] || return 1',
++    "      done",
++    '      [ -f "$copilot_package_dir/prebuilds/$copilot_target/runtime.node" ] && [ ! -L "$copilot_package_dir/prebuilds/$copilot_target/runtime.node" ] || return 1 ;;',
++    "    *)",
++    '      [ -d "$1/node_modules/@github/copilot" ] && [ ! -L "$1/node_modules/@github/copilot" ] && [ -f "$1/node_modules/@github/copilot/package.json" ] && [ ! -L "$1/node_modules/@github/copilot/package.json" ] || return 1',
++    '      copilot_executable="$copilot_package_dir/copilot" ;;',
++    "  esac",
+     '  case "$(uname -m)" in',
+     '    x86_64|amd64) [ "$copilot_target" = linux-x64 ] || return 1 ;;',
+     '    aarch64|arm64) [ "$copilot_target" = linux-arm64 ] || return 1 ;;',
+@@ -86,7 +111,7 @@ export function buildCopilotExecutableReadinessScript(): string {
+     '  for command_dir in "$copilot_package_dir"/ripgrep/bin/* "$copilot_package_dir"/tgrep/bin/*; do',
+     '    [ "${command_dir##*/}" = "$copilot_target" ] || return 1',
+     "  done",
+-    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
++    '  for executable in "$copilot_executable" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
+     '    [ -f "$executable" ] && [ ! -L "$executable" ] || return 1',
+     "  done",
+     "}",
+@@ -96,7 +121,7 @@ export function buildCopilotExecutableReadinessScript(): string {
+     "    printf 'Linux Copilot payload has a missing, ambiguous, or incompatible layout\\n' >&2",
+     "    return 1",
+     "  fi",
+-    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
++    '  for executable in "$copilot_executable" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
+     '    if [ ! -x "$executable" ]; then',
+     "      printf 'Linux Copilot command is not executable: %s\\n' \"$executable\" >&2",
+     "      return 1",
+@@ -109,7 +134,7 @@ export function buildCopilotExecutableReadinessScript(): string {
+     "    printf 'Linux Copilot payload has a missing, ambiguous, or incompatible layout\\n' >&2",
+     "    return 1",
+     "  fi",
+-    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
++    '  for executable in "$copilot_executable" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
+     '    if ! chmod 0755 "$executable"; then',
+     "      printf 'Could not make Linux Copilot command executable: %s\\n' \"$executable\" >&2",
+     "      return 1",
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 139cb3295..94a2efff8 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -265,11 +265,9 @@ catalogs:
+       version: 11.0.5
+ 
+ overrides:
+-  '@github/copilot-sdk@1.0.8>@github/copilot': 1.0.75
+-  '@github/copilot-sdk@1.0.8>koffi': 3.3.1
+-  '@github/copilot-sdk@1.0.8>vscode-jsonrpc': 8.2.1
+-  '@github/copilot-sdk@1.0.8>zod': 4.4.3
+-  '@github/copilot@1.0.75>detect-libc': 2.1.2
++  '@github/copilot-sdk@1.0.28>koffi': 3.3.1
++  '@github/copilot-sdk@1.0.28>vscode-jsonrpc': 8.2.1
++  '@github/copilot-sdk@1.0.28>zod': 4.4.3
+   react-native-image-viewing: 0.2.2
+   mdast-util-math: 3.0.0
+   micromark-extension-llm-math: 3.1.0
+@@ -842,6 +840,9 @@ importers:
+       '@ff-labs/fff-node':
+         specifier: 0.11.0
+         version: 0.11.0(patch_hash=cc71fcec015f4d39bc96ae2e2bf6b0ca678124c722c66a7841efce9d34b5983c)
++      '@github/copilot-sdk':
++        specifier: 1.0.28
++        version: 1.0.28
+       '@muse-code/sdk':
+         specifier: 1.4.6
+         version: 1.4.6(patch_hash=7b495b607fc5d76b444c7c4d58821e839726a30e6f3c53564f0d59f2d5b42101)(@types/node@24.12.4)
+@@ -1632,8 +1633,8 @@ importers:
+   packages/provider-copilot:
+     dependencies:
+       '@github/copilot-sdk':
+-        specifier: 1.0.8
+-        version: 1.0.8
++        specifier: 1.0.28
++        version: 1.0.28
+       '@t3tools/contracts':
+         specifier: workspace:*
+         version: link:../contracts
+@@ -4350,65 +4351,53 @@ packages:
+   '@fontsource-variable/inter@5.3.0':
+     resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
+ 
+-  '@github/copilot-darwin-arm64@1.0.75':
+-    resolution: {integrity: sha512-avt2ganQwtycGkqz9z8JpARoEz2Fzi02O+WitbB8I8iF3jfvEGpQ8k3z9oSCPAAO0rIMBeSl05xEUUV5RJwfRA==}
++  '@github/copilot-sdk-darwin-arm64@1.0.28':
++    resolution: {integrity: sha512-R15W4SUS12DyGiWEX/hxsSWTtvyo+Cxrn4SAbU0NeB1kBb+IzkvKmc85gOefh7QzuRZnSn2Wnch7oOmfoYMuPQ==}
+     cpu: [arm64]
+     os: [darwin]
+-    hasBin: true
+ 
+-  '@github/copilot-darwin-x64@1.0.75':
+-    resolution: {integrity: sha512-eyM5cz83d9h05m6cnnG7tIHR4lSHHXUnxXeQm4rU3nGB1uwHWOa1TH9B4uAaW3zKQgkCkNgm+IlcPJ7geM0KBg==}
++  '@github/copilot-sdk-darwin-x64@1.0.28':
++    resolution: {integrity: sha512-b4haZ9J0G1BDg2gtNHW8yAEyddulrUZkGcnP7Dm7Ue1uNiO35qAqS+Q5jdadYj+cwhlBnNqXscO5l19tpaPyrw==}
+     cpu: [x64]
+     os: [darwin]
+-    hasBin: true
+ 
+-  '@github/copilot-linux-arm64@1.0.75':
+-    resolution: {integrity: sha512-PuGjPCy+z7DrD0rkcXQRBzoA8lVxD1WC6UeZxkZaIb9asueE798eqHHMV169zYiA3gsiSegIKu5J/aUeWwhpuQ==}
++  '@github/copilot-sdk-linux-arm64@1.0.28':
++    resolution: {integrity: sha512-41G/pQajhEz6rCeUSDOooFPrKSpgE8aOetH0y4a3zIJNKybr+1QfJJkia9O49LQpzQBAgn0AkEF/h6qrYdUnQQ==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [glibc]
+-    hasBin: true
+ 
+-  '@github/copilot-linux-x64@1.0.75':
+-    resolution: {integrity: sha512-aGDtUrNyj/ubqLfXOomL4XYZR//1Cs4tDGe7r/464e3Nw4WlNxWPjBbNyOCcUPUMbPHXck6TyxjEvBwwlKCK5w==}
++  '@github/copilot-sdk-linux-x64@1.0.28':
++    resolution: {integrity: sha512-yAsoTZfP//a1oirpdXc4oIX1m69ePP4ef3Yasmm3iT+hM7mpQLTxWWaDD6C2vuIJk1tPZLK0jndFVoFYr/d7yw==}
+     cpu: [x64]
+     os: [linux]
+     libc: [glibc]
+-    hasBin: true
+ 
+-  '@github/copilot-linuxmusl-arm64@1.0.75':
+-    resolution: {integrity: sha512-4cbjjR/laL+4a0VjMkzjIsprRUxiAHAefWVTppFitKiqNxfgyRuOhfSUPUA5TVxPwfyYXknsxeYSNRL8zu9YDA==}
++  '@github/copilot-sdk-linuxmusl-arm64@1.0.28':
++    resolution: {integrity: sha512-ixerQJEpCDhsFKM/ct6JVUepczY+aISb9oygq4BWAoC1cxutsA3hIRY28UGH5yOGlCinw7Ig6MEoLA0pyEK+CQ==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [musl]
+-    hasBin: true
+ 
+-  '@github/copilot-linuxmusl-x64@1.0.75':
+-    resolution: {integrity: sha512-I4oFPNOULMGxWghGCG/VkiT0a62UiL4XGKSlp6X0rVD9xyoYyiLGlsBmTumrooPbzEvgKICYWIz8PCZjrZTyhA==}
++  '@github/copilot-sdk-linuxmusl-x64@1.0.28':
++    resolution: {integrity: sha512-8vFhwdmy8mYswNBqkWqbuaKG833DbnZRctk7WL5cw5UjXqipEMMt6XKeadmdZihwLwPiDoZnG5ymmCslaFbpoA==}
+     cpu: [x64]
+     os: [linux]
+     libc: [musl]
+-    hasBin: true
+-
+-  '@github/copilot-sdk@1.0.8':
+-    resolution: {integrity: sha512-dbahVsyt2aX8qqtOOtmYNe40MnvzSvOSHYFFgoFK7gHZSTNz9QgOht8b1sCCJlcXaFAn/w+5qNc7CwWoCjpQ0g==}
+-    engines: {node: ^20.19.0 || >=22.12.0}
+ 
+-  '@github/copilot-win32-arm64@1.0.75':
+-    resolution: {integrity: sha512-wlLDuor+Qm1H43VwZNi03QI4H9FSyZoQzE/YHpGhUay7sKA+4cDJF8ZZNGrtYkyPskfH5HCdNygUn7EEt6lRyQ==}
++  '@github/copilot-sdk-win32-arm64@1.0.28':
++    resolution: {integrity: sha512-jG18fJN20P5fm8pWkpvKcFzH8XupSj8cPo0ZULFJkmYDnV4UcMceGAJrIA8L/iNFu9vabfIP3cmOmWDPNyMP+A==}
+     cpu: [arm64]
+     os: [win32]
+-    hasBin: true
+ 
+-  '@github/copilot-win32-x64@1.0.75':
+-    resolution: {integrity: sha512-TKISaaILkgcOi7ThaTnln1XoasbUIx+HKSb+pf678RvGucIfLohQyLceuq+rTykoynX54KQ0pf9TEUbMVkUNAA==}
++  '@github/copilot-sdk-win32-x64@1.0.28':
++    resolution: {integrity: sha512-pzlzyuBHcF3TrgBue0w9cypmZ+1BpCKL1VdVO98SlXqOhOBJ2aHXAY42gI0ZVbZuCfkv4T+EUHAriyv0PJIidw==}
+     cpu: [x64]
+     os: [win32]
+-    hasBin: true
+ 
+-  '@github/copilot@1.0.75':
+-    resolution: {integrity: sha512-rn7ZQmhydCZ9XRdG6V78QEhXIdYlChlUvOVAtyJ6KHJGt2O9/71si7PCt84amfmg0N7IXBT2UGRYF4GQDQBt+g==}
+-    hasBin: true
++  '@github/copilot-sdk@1.0.28':
++    resolution: {integrity: sha512-FCbSH9R0j9Wg2BYRAdurw2rncmXV9YTwdUzL75W561uqm3grSXwcJnYjCpc1nlDCa84lJriFC634Luigg4yqOg==}
++    engines: {node: ^20.19.0 || >=22.12.0}
+ 
+   '@hono/node-server@1.19.17':
+     resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
+@@ -14632,49 +14621,44 @@ snapshots:
+ 
+   '@fontsource-variable/inter@5.3.0': {}
+ 
+-  '@github/copilot-darwin-arm64@1.0.75':
++  '@github/copilot-sdk-darwin-arm64@1.0.28':
+     optional: true
+ 
+-  '@github/copilot-darwin-x64@1.0.75':
++  '@github/copilot-sdk-darwin-x64@1.0.28':
+     optional: true
+ 
+-  '@github/copilot-linux-arm64@1.0.75':
++  '@github/copilot-sdk-linux-arm64@1.0.28':
+     optional: true
+ 
+-  '@github/copilot-linux-x64@1.0.75':
++  '@github/copilot-sdk-linux-x64@1.0.28':
+     optional: true
+ 
+-  '@github/copilot-linuxmusl-arm64@1.0.75':
++  '@github/copilot-sdk-linuxmusl-arm64@1.0.28':
+     optional: true
+ 
+-  '@github/copilot-linuxmusl-x64@1.0.75':
++  '@github/copilot-sdk-linuxmusl-x64@1.0.28':
+     optional: true
+ 
+-  '@github/copilot-sdk@1.0.8':
+-    dependencies:
+-      '@github/copilot': 1.0.75
+-      koffi: 3.3.1
+-      vscode-jsonrpc: 8.2.1
+-      zod: 4.4.3
+-
+-  '@github/copilot-win32-arm64@1.0.75':
++  '@github/copilot-sdk-win32-arm64@1.0.28':
+     optional: true
+ 
+-  '@github/copilot-win32-x64@1.0.75':
++  '@github/copilot-sdk-win32-x64@1.0.28':
+     optional: true
+ 
+-  '@github/copilot@1.0.75':
++  '@github/copilot-sdk@1.0.28':
+     dependencies:
+-      detect-libc: 2.1.2
++      koffi: 3.3.1
++      vscode-jsonrpc: 8.2.1
++      zod: 4.4.3
+     optionalDependencies:
+-      '@github/copilot-darwin-arm64': 1.0.75
+-      '@github/copilot-darwin-x64': 1.0.75
+-      '@github/copilot-linux-arm64': 1.0.75
+-      '@github/copilot-linux-x64': 1.0.75
+-      '@github/copilot-linuxmusl-arm64': 1.0.75
+-      '@github/copilot-linuxmusl-x64': 1.0.75
+-      '@github/copilot-win32-arm64': 1.0.75
+-      '@github/copilot-win32-x64': 1.0.75
++      '@github/copilot-sdk-darwin-arm64': 1.0.28
++      '@github/copilot-sdk-darwin-x64': 1.0.28
++      '@github/copilot-sdk-linux-arm64': 1.0.28
++      '@github/copilot-sdk-linux-x64': 1.0.28
++      '@github/copilot-sdk-linuxmusl-arm64': 1.0.28
++      '@github/copilot-sdk-linuxmusl-x64': 1.0.28
++      '@github/copilot-sdk-win32-arm64': 1.0.28
++      '@github/copilot-sdk-win32-x64': 1.0.28
+ 
+   '@hono/node-server@1.19.17(hono@4.13.7)':
+     dependencies:
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index fda1054c5..3874d9650 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -230,11 +230,9 @@ minimumReleaseAgeExclude:
+   - agent-device@0.21.32
+ 
+ overrides:
+-  "@github/copilot-sdk@1.0.8>@github/copilot": 1.0.75
+-  "@github/copilot-sdk@1.0.8>koffi": 3.3.1
+-  "@github/copilot-sdk@1.0.8>vscode-jsonrpc": 8.2.1
+-  "@github/copilot-sdk@1.0.8>zod": 4.4.3
+-  "@github/copilot@1.0.75>detect-libc": 2.1.2
++  "@github/copilot-sdk@1.0.28>koffi": 3.3.1
++  "@github/copilot-sdk@1.0.28>vscode-jsonrpc": 8.2.1
++  "@github/copilot-sdk@1.0.28>zod": 4.4.3
+   # Pin every patched package, including transitive dependencies, so lockfile-free
+   # release installs cannot drift past the patch. Update these with patchedDependencies.
+   react-native-image-viewing: 0.2.2
+diff --git a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts
+index 6e2db0273..5522a7206 100644
+--- a/scripts/build-desktop-artifact.test.ts
++++ b/scripts/build-desktop-artifact.test.ts
+@@ -342,7 +342,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+             assert.equal(staged.overrides?.[selector], version, selector);
+           }
+           for (const cpu of ["x64", "arm64"]) {
+-            const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${cpu}`;
++            const selector = `@github/copilot-sdk@1.0.28>@github/copilot-sdk-linuxmusl-${cpu}`;
+             assert.equal(staged.overrides?.[selector], platform === "linux" ? "-" : undefined);
+             assert.isUndefined(workspace.overrides[selector]);
+           }
+diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
+index f22db588a..8235f1ea6 100644
+--- a/scripts/build-desktop-artifact.ts
++++ b/scripts/build-desktop-artifact.ts
+@@ -1592,12 +1592,12 @@ export function createStageWorkspaceConfig(input: {
+   // glibc target below. Exclude musl only in generated glibc stages, not source.
+   const stageOverrides =
+     platform === "linux" &&
+-    overrides?.[`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`] !== undefined
++    overrides?.[`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>koffi`] !== undefined
+       ? {
+           ...overrides,
+-          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-x64`]:
++          [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot-sdk-linuxmusl-x64`]:
+             "-",
+-          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-arm64`]:
++          [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot-sdk-linuxmusl-arm64`]:
+             "-",
+         }
+       : overrides;
+diff --git a/scripts/lib/cli-external-packages.test.ts b/scripts/lib/cli-external-packages.test.ts
+index 78ee200bb..c59efe5e0 100644
+--- a/scripts/lib/cli-external-packages.test.ts
++++ b/scripts/lib/cli-external-packages.test.ts
+@@ -1,4 +1,5 @@
+ import * as NodeURL from "node:url";
++import * as NodeModule from "node:module";
+ 
+ import * as NodeServices from "@effect/platform-node/NodeServices";
+ import { assert, describe, it } from "@effect/vitest";
+@@ -30,6 +31,14 @@ type PackageManifest = typeof PackageManifest.Type;
+ const decodeManifest = Schema.decodeUnknownSync(Schema.fromJsonString(PackageManifest));
+ 
+ describe("shouldBundleCliDependency", () => {
++  it("loads the Copilot SDK from the emitted server directory without a provider-local resolver", () => {
++    const require = NodeModule.createRequire(
++      new URL("../../apps/server/dist/bin.mjs", import.meta.url),
++    );
++    const sdk = require("@github/copilot-sdk") as { CopilotClient: unknown };
++    assert.isFunction(sdk.CopilotClient);
++  });
++
+   it("leaves native addons and their dlopen wrappers external", () => {
+     for (const id of [
+       "node-pty",
+@@ -42,6 +51,7 @@ describe("shouldBundleCliDependency", () => {
+       "@github/copilot-sdk",
+       "@github/copilot",
+       "@github/copilot-win32-x64",
++      "@github/copilot-sdk-win32-x64",
+       "koffi",
+       "@koromix/koffi-linux-x64",
+       "vscode-jsonrpc/node",
+diff --git a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts
+index 220751e54..7e0302439 100644
+--- a/scripts/lib/copilot-payload.test.ts
++++ b/scripts/lib/copilot-payload.test.ts
+@@ -14,7 +14,7 @@ import {
+ } from "./copilot-payload.ts";
+ 
+ const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+-const dependencies = { "@github/copilot-sdk": "1.0.8" };
++const dependencies = { "@github/copilot-sdk": "1.0.28" };
+ const targets = [
+   {
+     platform: "win",
+@@ -22,7 +22,7 @@ const targets = [
+     target: "win32-x64",
+     suffix: "-msvc",
+     recorder: "windows/amd64",
+-    removed: 9,
++    removed: 0,
+   },
+   {
+     platform: "win",
+@@ -31,7 +31,7 @@ const targets = [
+     suffix: "-msvc",
+     recorder: "windows/arm64",
+     foreign: "win32-x64",
+-    removed: 11,
++    removed: 2,
+   },
+   {
+     platform: "linux",
+@@ -39,7 +39,7 @@ const targets = [
+     target: "linux-x64",
+     suffix: "-gnu",
+     recorder: "linux/x86_64",
+-    removed: 10,
++    removed: 1,
+   },
+   {
+     platform: "linux",
+@@ -47,7 +47,7 @@ const targets = [
+     target: "linux-arm64",
+     suffix: "-gnu",
+     foreign: "linux-x64",
+-    removed: 11,
++    removed: 3,
+   },
+   {
+     platform: "mac",
+@@ -55,7 +55,7 @@ const targets = [
+     target: "darwin-arm64",
+     suffix: "",
+     recorder: "mac/arm64",
+-    removed: 9,
++    removed: 0,
+   },
+   {
+     platform: "mac",
+@@ -64,7 +64,7 @@ const targets = [
+     suffix: "",
+     recorder: "mac/x86_64",
+     foreign: "darwin-arm64",
+-    removed: 10,
++    removed: 2,
+   },
+ ] as const;
+ 
+@@ -86,12 +86,10 @@ const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
+   });
+   yield* write("package.json", encodeJson({ name: "stage", private: true, dependencies }));
+   for (const [name, version] of [
+-    ["@github/copilot-sdk", "1.0.8"],
+-    ["@github/copilot", "1.0.75"],
++    ["@github/copilot-sdk", "1.0.28"],
+     ["koffi", "3.3.1"],
+     ["vscode-jsonrpc", "8.2.1"],
+     ["zod", "4.4.3"],
+-    ["detect-libc", "2.1.2"],
+   ]) {
+     yield* write(
+       `node_modules/${name}/package.json`,
+@@ -104,66 +102,40 @@ const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
+   for (const target of targets.filter(
+     (target) => target.platform === platform && (arch === "universal" || target.arch === arch),
+   )) {
+-    const root = `node_modules/@github/copilot-${target.target}`;
++    const root = `node_modules/@github/copilot-sdk-${target.target}`;
+     const exe = platform === "win" ? ".exe" : "";
+     yield* write(
+       `${root}/package.json`,
+       encodeJson({
+-        name: `@github/copilot-${target.target}`,
+-        version: "1.0.75",
+-        main: `copilot${exe}`,
++        name: `@github/copilot-sdk-${target.target}`,
++        version: "1.0.28",
+       }),
+     );
+     for (const file of [
+-      `copilot${exe}`,
+-      `prebuilds/${target.target}/cli-native.node`,
++      `prebuilds/${target.target}/copilot-runtime${exe}`,
+       `prebuilds/${target.target}/runtime.node`,
+       `ripgrep/bin/${target.target}/rg${exe}`,
+       `tgrep/bin/${target.target}/tgrep${exe}`,
+-      `clipboard/node_modules/@teddyzhu/clipboard-${target.target}${target.suffix}/clipboard.${target.target}${target.suffix}.node`,
+-      "sdk/index.js",
+-      "clipboard/index.js",
+-      "clipboard/node_modules/@teddyzhu/clipboard/index.js",
++      ...(platform === "mac" || platform === "win"
++        ? [`prebuilds/${target.target}/msal-node-runtime.node`]
++        : []),
++      ...(platform === "mac"
++        ? [
++            `prebuilds/${target.target}/libmsalruntime_${target.arch}.dylib`,
++            `prebuilds/${target.target}/libOneAuthInterop.dylib`,
++          ]
++        : []),
+       ...(platform === "win"
+         ? [
+-            `builtin-plugins/computer-use/0.1.71/${target.target}/computer-use-mcp.exe`,
+-            `builtin-plugins/computer-use/0.1.71/${target.target}/CopilotComputerUse.exe`,
++            `prebuilds/${target.target}/dpapi.node`,
++            `prebuilds/${target.target}/msalruntime${target.arch === "arm64" ? "_arm64" : ""}.dll`,
++            `prebuilds/${target.target}/OneAuthInterop.dll`,
++            "plugins/computer-use/computer-use-mcp.exe",
++            "plugins/computer-use/CopilotComputerUse.exe",
+           ]
+         : []),
+     ])
+       retained.push(yield* write(`${root}/${file}`));
+-    for (const clipboard of [
+-      "darwin-arm64",
+-      "darwin-x64",
+-      "linux-arm64-gnu",
+-      "linux-x64-gnu",
+-      "win32-arm64-msvc",
+-      "win32-x64-msvc",
+-    ]) {
+-      removed.push(
+-        yield* write(
+-          `${root}/clipboard/node_modules/@teddyzhu/clipboard/clipboard.${clipboard}.node`,
+-        ),
+-      );
+-    }
+-    if (!(platform === "mac" && target.arch === "x64")) {
+-      removed.push(
+-        yield* write(
+-          `${root}/foundry-local-sdk/node_modules/foundry-local-sdk/prebuilds/${target.target}/foundry_local_napi.node`,
+-        ),
+-      );
+-    }
+-    if ("recorder" in target)
+-      removed.push(
+-        yield* write(
+-          `${root}/pvrecorder/node_modules/@picovoice/pvrecorder-node/lib/${target.recorder}/pv_recorder.node`,
+-        ),
+-      );
+-    removed.push(
+-      yield* write(
+-        `${root}/webview/node_modules/@webviewjs/webview-${target.target}${target.suffix}/webview.${target.target}${target.suffix}.node`,
+-      ),
+-    );
+     if ("foreign" in target) {
+       removed.push(yield* write(`${root}/ripgrep/bin/${target.foreign}/rg${exe}`));
+       removed.push(yield* write(`${root}/tgrep/bin/${target.foreign}/tgrep${exe}`));
+@@ -215,7 +187,6 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+     ["koffi", "3.3.1", "@github/copilot-sdk"],
+     ["vscode-jsonrpc", "8.2.1", "@github/copilot-sdk"],
+     ["zod", "4.4.3", "@github/copilot-sdk"],
+-    ["detect-libc", "2.1.2", "@github/copilot"],
+   ] as const)(
+     "refuses missing or owner-local drift in %s, despite a correct root copy",
+     ([name, version, owner]) =>
+@@ -327,7 +298,7 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+           arch: "universal",
+           dependencies,
+         });
+-        assert.lengthOf(result.removedNativeFiles, 19);
++        assert.lengthOf(result.removedNativeFiles, 2);
+         for (const file of stage.retained) assert.isTrue(yield* fs.exists(file));
+       }),
+     ),
+@@ -351,7 +322,6 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+   );
+   it.effect.each([
+     "sdk-version",
+-    "runtime-version",
+     "platform-version",
+     "koffi-version",
+     "missing-required",
+@@ -360,7 +330,7 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+     "foreign-package",
+     "foreign-koffi",
+     "missing-sdk",
+-    "missing-clipboard-loader",
++    "missing-runtime-library",
+   ] as const)("refuses %s before deleting any remaining files", (fault) =>
+     Effect.scoped(
+       Effect.gen(function* () {
+@@ -373,19 +343,12 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+               encodeJson({ name: "@github/copilot-sdk", version: "1.0.9", main: "index.js" }),
+             );
+             break;
+-          case "runtime-version":
+-            yield* stage.write(
+-              "node_modules/@github/copilot/package.json",
+-              encodeJson({ name: "@github/copilot", version: "1.0.76" }),
+-            );
+-            break;
+           case "platform-version":
+             yield* stage.write(
+-              "node_modules/@github/copilot-win32-x64/package.json",
++              "node_modules/@github/copilot-sdk-win32-x64/package.json",
+               encodeJson({
+-                name: "@github/copilot-win32-x64",
+-                version: "1.0.76",
+-                main: "copilot.exe",
++                name: "@github/copilot-sdk-win32-x64",
++                version: "99.0.0",
+               }),
+             );
+             break;
+@@ -399,21 +362,21 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+             yield* fs.remove(stage.retained[0]!);
+             break;
+           case "unexpected-native":
+-            yield* stage.write("node_modules/@github/copilot-win32-x64/unreviewed.node");
++            yield* stage.write("node_modules/@github/copilot-sdk-win32-x64/unreviewed.node");
+             break;
+           case "partial-prune":
+-            yield* fs.remove(stage.removed[0]!);
++            yield* stage.write(
++              "node_modules/@github/copilot-sdk-win32-x64/ripgrep/bin/win32-arm64/rg.exe",
++            );
+             break;
+           case "foreign-package":
+             yield* stage.write(
+-              "node_modules/@github/copilot-linux-x64/package.json",
++              "node_modules/@github/copilot-sdk-linux-x64/package.json",
+               encodeJson({
+-                name: "@github/copilot-linux-x64",
+-                version: "1.0.75",
+-                main: "copilot",
++                name: "@github/copilot-sdk-linux-x64",
++                version: "1.0.28",
+               }),
+             );
+-            yield* stage.write("node_modules/@github/copilot-linux-x64/copilot");
+             break;
+           case "missing-sdk":
+             yield* fs.remove(`${stage.stageDir}/node_modules/@github/copilot-sdk/package.json`);
+@@ -425,9 +388,9 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+             );
+             yield* stage.write("node_modules/@koromix/koffi-linux-x64/linux_x64/koffi.node");
+             break;
+-          case "missing-clipboard-loader":
++          case "missing-runtime-library":
+             yield* fs.remove(
+-              `${stage.stageDir}/node_modules/@github/copilot-win32-x64/clipboard/node_modules/@teddyzhu/clipboard/index.js`,
++              `${stage.stageDir}/node_modules/@github/copilot-sdk-win32-x64/prebuilds/win32-x64/runtime.node`,
+             );
+             break;
+         }
+@@ -446,7 +409,9 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+       Effect.gen(function* () {
+         const fs = yield* FileSystem.FileSystem;
+         const stage = yield* makeStage("mac", "universal");
+-        yield* fs.remove(`${stage.stageDir}/node_modules/@github/copilot-darwin-x64/copilot`);
++        yield* fs.remove(
++          `${stage.stageDir}/node_modules/@github/copilot-sdk-darwin-x64/prebuilds/darwin-x64/copilot-runtime`,
++        );
+         const error = yield* Effect.flip(
+           pruneCopilotSdkServerPayload({
+             ...stage,
+@@ -473,7 +438,7 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+           yield* fs.writeFileString(outsideFile, "untouched");
+           yield* fs.symlink(
+             outsideFile,
+-            path.join(stage.stageDir, "node_modules/@github/copilot-win32-x64/escape.node"),
++            path.join(stage.stageDir, "node_modules/@github/copilot-sdk-win32-x64/escape.node"),
+           );
+           const error = yield* Effect.flip(
+             pruneCopilotSdkServerPayload({ ...stage, platform: "win", arch: "x64", dependencies }),
+diff --git a/scripts/lib/copilot-payload.ts b/scripts/lib/copilot-payload.ts
+index a6b2426bb..0e9df2f21 100644
+--- a/scripts/lib/copilot-payload.ts
++++ b/scripts/lib/copilot-payload.ts
+@@ -9,23 +9,18 @@ import * as Schema from "effect/Schema";
+ import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
+ 
+ export const COPILOT_PAYLOAD_VERSIONS = {
+-  sdk: "1.0.8",
+-  runtime: "1.0.75",
++  sdk: "1.0.28",
++  runtime: "1.0.28",
+   koffi: "3.3.1",
+   jsonrpc: "8.2.1",
+   zod: "4.4.3",
+-  detectLibc: "2.1.2",
+ } as const;
+ 
+ export const COPILOT_DEPENDENCY_OVERRIDES = {
+-  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`]:
+-    COPILOT_PAYLOAD_VERSIONS.runtime,
+   [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>koffi`]: COPILOT_PAYLOAD_VERSIONS.koffi,
+   [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>vscode-jsonrpc`]:
+     COPILOT_PAYLOAD_VERSIONS.jsonrpc,
+   [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>zod`]: COPILOT_PAYLOAD_VERSIONS.zod,
+-  [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>detect-libc`]:
+-    COPILOT_PAYLOAD_VERSIONS.detectLibc,
+ };
+ 
+ const PackageManifest = Schema.Struct({
+@@ -34,15 +29,6 @@ const PackageManifest = Schema.Struct({
+ });
+ const decodeManifest = Schema.decodeUnknownEffect(Schema.fromJsonString(PackageManifest));
+ const NATIVE_FILE = /\.(?:node|dll|exe|dylib|so(?:\.\d+)*)$/u;
+-const GENERIC_CLIPBOARD_TARGETS = [
+-  "darwin-arm64",
+-  "darwin-x64",
+-  "linux-arm64-gnu",
+-  "linux-x64-gnu",
+-  "win32-arm64-msvc",
+-  "win32-x64-msvc",
+-] as const;
+-const INTERACTIVE_DIRECTORIES = ["foundry-local-sdk", "pvrecorder", "webview"] as const;
+ 
+ export class CopilotPayloadError extends Schema.TaggedError<CopilotPayloadError>()(
+   "CopilotPayloadError",
+@@ -71,45 +57,30 @@ function resolvePackageEntry(loader: ReturnType<typeof NodeModule.createRequire>
+ function targetLayout(platform: BuildPlatform, arch: "x64" | "arm64") {
+   const os = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
+   const target = `${os}-${arch}`;
+-  const suffix = os === "win32" ? "-msvc" : os === "linux" ? "-gnu" : "";
+   const extension = os === "win32" ? ".exe" : "";
+   const required = [
+-    `copilot${extension}`,
+-    `prebuilds/${target}/cli-native.node`,
++    `prebuilds/${target}/copilot-runtime${extension}`,
+     `prebuilds/${target}/runtime.node`,
+     `ripgrep/bin/${target}/rg${extension}`,
+     `tgrep/bin/${target}/tgrep${extension}`,
+-    `clipboard/node_modules/@teddyzhu/clipboard-${target}${suffix}/clipboard.${target}${suffix}.node`,
++    ...(os === "darwin" || os === "win32" ? [`prebuilds/${target}/msal-node-runtime.node`] : []),
++    ...(os === "darwin"
++      ? [
++          `prebuilds/${target}/libmsalruntime_${arch}.dylib`,
++          `prebuilds/${target}/libOneAuthInterop.dylib`,
++        ]
++      : []),
+     ...(os === "win32"
+       ? [
+-          `builtin-plugins/computer-use/0.1.71/${target}/computer-use-mcp.exe`,
+-          `builtin-plugins/computer-use/0.1.71/${target}/CopilotComputerUse.exe`,
++          `prebuilds/${target}/dpapi.node`,
++          `prebuilds/${target}/msalruntime${arch === "arm64" ? "_arm64" : ""}.dll`,
++          `prebuilds/${target}/OneAuthInterop.dll`,
++          "plugins/computer-use/computer-use-mcp.exe",
++          "plugins/computer-use/CopilotComputerUse.exe",
+         ]
+       : []),
+   ];
+-  const removed: string[] = GENERIC_CLIPBOARD_TARGETS.map(
+-    (name) => `clipboard/node_modules/@teddyzhu/clipboard/clipboard.${name}.node`,
+-  );
+-  if (!(os === "darwin" && arch === "x64")) {
+-    removed.push(
+-      `foundry-local-sdk/node_modules/foundry-local-sdk/prebuilds/${target}/foundry_local_napi.node`,
+-    );
+-  }
+-  if (!(os === "linux" && arch === "arm64")) {
+-    const recorderTarget =
+-      os === "win32"
+-        ? `windows/${arch === "x64" ? "amd64" : "arm64"}`
+-        : os === "darwin"
+-          ? `mac/${arch === "x64" ? "x86_64" : "arm64"}`
+-          : "linux/x86_64";
+-    removed.push(
+-      `pvrecorder/node_modules/@picovoice/pvrecorder-node/lib/${recorderTarget}/pv_recorder.node`,
+-    );
+-  }
+-  const webviewSuffix = os === "darwin" ? "" : suffix;
+-  removed.push(
+-    `webview/node_modules/@webviewjs/webview-${target}${webviewSuffix}/webview.${target}${webviewSuffix}.node`,
+-  );
++  const removed: string[] = [];
+   const foreignSearchTarget =
+     os === "darwin" && arch === "x64"
+       ? "darwin-arm64"
+@@ -206,16 +177,10 @@ export const resolveCopilotDependencyClosure = Effect.fn("resolveCopilotDependen
+       "@github/copilot-sdk",
+       COPILOT_PAYLOAD_VERSIONS.sdk,
+     );
+-    const runtime = yield* resolvePackage(
+-      sdk.loader,
+-      "@github/copilot",
+-      COPILOT_PAYLOAD_VERSIONS.runtime,
+-    );
+     const koffi = yield* resolvePackage(sdk.loader, "koffi", COPILOT_PAYLOAD_VERSIONS.koffi);
+     yield* resolvePackage(sdk.loader, "vscode-jsonrpc", COPILOT_PAYLOAD_VERSIONS.jsonrpc);
+     yield* resolvePackage(sdk.loader, "zod", COPILOT_PAYLOAD_VERSIONS.zod);
+-    yield* resolvePackage(runtime.loader, "detect-libc", COPILOT_PAYLOAD_VERSIONS.detectLibc);
+-    return { fs, path, root, contained, realInside, resolvePackage, failure, sdk, runtime, koffi };
++    return { fs, path, root, contained, realInside, resolvePackage, failure, sdk, koffi };
+   },
+ );
+ 
+@@ -234,8 +199,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
+   }) {
+     const closure = yield* resolveCopilotDependencyClosure(input);
+     if (closure === null) return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> };
+-    const { fs, path, root, contained, realInside, resolvePackage, failure, runtime, koffi } =
+-      closure;
++    const { fs, path, root, contained, realInside, resolvePackage, failure, sdk, koffi } = closure;
+     if (input.arch === "universal" && input.platform !== "mac") {
+       return yield* failure("universal Copilot payloads are supported only on macOS");
+     }
+@@ -245,7 +209,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
+     const removals = new Set<string>();
+     const removedNativeFiles: string[] = [];
+     const isNative = (file: string) =>
+-      NATIVE_FILE.test(file) || ["copilot", "rg", "tgrep"].includes(path.basename(file));
++      NATIVE_FILE.test(file) || ["copilot-runtime", "rg", "tgrep"].includes(path.basename(file));
+     const nativeFiles = Effect.fn("copilotPayload.nativeFiles")(function* (packageRoot: string) {
+       const pending = [packageRoot];
+       const files: string[] = [];
+@@ -272,8 +236,8 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
+     });
+     for (const layout of layouts) {
+       const platform = yield* resolvePackage(
+-        runtime.loader,
+-        `@github/copilot-${layout.target}`,
++        sdk.loader,
++        `@github/copilot-sdk-${layout.target}`,
+         COPILOT_PAYLOAD_VERSIONS.runtime,
+       );
+       const actual = yield* nativeFiles(platform.directory);
+@@ -291,22 +255,10 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
+           `unreviewed ${layout.target} layout; missing [${missing.join(", ")}], unexpected [${unexpected.join(", ")}], removable ${candidates.length}/${layout.removed.length}`,
+         );
+       }
+-      for (const file of [
+-        "sdk/index.js",
+-        "clipboard/index.js",
+-        "clipboard/node_modules/@teddyzhu/clipboard/index.js",
+-      ]) {
+-        yield* requireFile(path.join(platform.directory, file));
+-      }
+       for (const file of candidates) {
+         removedNativeFiles.push(
+           path.relative(root, path.join(platform.directory, file)).split(path.sep).join("/"),
+         );
+-        if (file.startsWith("clipboard/")) removals.add(path.join(platform.directory, file));
+-      }
+-      for (const directory of INTERACTIVE_DIRECTORIES) {
+-        const candidate = path.join(platform.directory, directory);
+-        if (yield* fs.exists(candidate)) removals.add(candidate);
+       }
+       if (layout.foreignSearchTarget) {
+         for (const tool of ["ripgrep", "tgrep"]) {
+@@ -343,7 +295,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
+       for (const arch of ["arm64", "x64"]) {
+         if (layouts.some((layout) => layout.target === `${os}-${arch}`)) continue;
+         const packages = [
+-          { name: `@github/copilot-${os}-${arch}`, loader: runtime.loader },
++          { name: `@github/copilot-sdk-${os}-${arch}`, loader: sdk.loader },
+           ...(os === "linuxmusl"
+             ? []
+             : [{ name: `@koromix/koffi-${os}-${arch}`, loader: koffi.loader }]),

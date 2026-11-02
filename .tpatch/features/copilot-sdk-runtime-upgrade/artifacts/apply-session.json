@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-sdk-runtime-upgrade",
+  "completed_at": "2026-11-01T04:39:12Z",
+  "base_commit": "a043de31d500054e1be2d1907c09e088ad0b74de",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "tpatch test — command: ./node_modules/.bin/vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/driver.test.ts packages/provider-copilot/src/server/textGeneration.test.ts scripts/lib/copilot-payload.test.ts packages/shared/src/copilotRuntime.test.ts scripts/lib/cli-external-packages.test.ts scripts/build-desktop-artifact.test.ts"
+}

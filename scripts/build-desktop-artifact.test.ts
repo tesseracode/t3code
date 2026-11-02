@@ -342,7 +342,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
             assert.equal(staged.overrides?.[selector], version, selector);
           }
           for (const cpu of ["x64", "arm64"]) {
-            const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${cpu}`;
+            const selector = `@github/copilot-sdk@1.0.28>@github/copilot-sdk-linuxmusl-${cpu}`;
             assert.equal(staged.overrides?.[selector], platform === "linux" ? "-" : undefined);
             assert.isUndefined(workspace.overrides[selector]);
           }

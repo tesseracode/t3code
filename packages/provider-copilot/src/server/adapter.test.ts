@@ -104,7 +104,7 @@ function fakeSdk() {
     getEvents: async () => [],
     setModel: async () => {},
     rpc: {
-      mode: { set: async () => {} },
+      mode: { set: async () => ({ status: "success", modelChanged: false, modeApplied: true }) },
       plan: {
         read: async () => ({
           exists: true,
@@ -557,6 +557,24 @@ describe("native Copilot V2", () => {
         assert.equal(fake.disconnected, 1);
         assert.equal(fake.sent.length, 0);
         assert.isFalse(fake.continuePendingWork ?? true);
+      }),
+    ),
+  );
+
+  it.effect("refuses to send when the runtime rejects or defers the interaction mode", () =>
+    provide(
+      Effect.gen(function* () {
+        for (const result of [
+          { status: "success", modelChanged: false, modeApplied: false },
+          { status: "pending", modelChanged: false, deferImplementation: true },
+        ]) {
+          const fake = fakeSdk();
+          fake.session.rpc.mode.set = async () => result;
+          const { start } = yield* setup(fake);
+          const outcome = yield* start().pipe(Effect.exit);
+          assert.isTrue(Exit.isFailure(outcome));
+          assert.equal(fake.sent.length, 0);
+        }
       }),
     ),
   );

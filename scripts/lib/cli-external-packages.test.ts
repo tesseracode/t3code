@@ -1,4 +1,5 @@
 import * as NodeURL from "node:url";
+import * as NodeModule from "node:module";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
@@ -30,6 +31,14 @@ type PackageManifest = typeof PackageManifest.Type;
 const decodeManifest = Schema.decodeUnknownSync(Schema.fromJsonString(PackageManifest));
 
 describe("shouldBundleCliDependency", () => {
+  it("loads the Copilot SDK from the emitted server directory without a provider-local resolver", () => {
+    const require = NodeModule.createRequire(
+      new URL("../../apps/server/dist/bin.mjs", import.meta.url),
+    );
+    const sdk = require("@github/copilot-sdk") as { CopilotClient: unknown };
+    assert.isFunction(sdk.CopilotClient);
+  });
+
   it("leaves native addons and their dlopen wrappers external", () => {
     for (const id of [
       "node-pty",
@@ -42,6 +51,7 @@ describe("shouldBundleCliDependency", () => {
       "@github/copilot-sdk",
       "@github/copilot",
       "@github/copilot-win32-x64",
+      "@github/copilot-sdk-win32-x64",
       "koffi",
       "@koromix/koffi-linux-x64",
       "vscode-jsonrpc/node",

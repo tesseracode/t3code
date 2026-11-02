@@ -49,11 +49,23 @@ export function bundledCliPath(runtime: HostRuntime): string | undefined {
     ? ["linux", "linuxmusl"]
     : [runtime.platform]) {
     try {
-      const path = runtime.resolve(`@github/copilot-${platform}-${runtime.architecture}`);
+      const target = `${platform}-${runtime.architecture}`;
+      const manifest = runtime.resolve(`@github/copilot-sdk-${target}/package.json`);
+      const paths = runtime.platform === "win32" ? NodePath.win32 : NodePath.posix;
+      const path = paths.join(
+        paths.dirname(manifest),
+        "prebuilds",
+        target,
+        runtime.platform === "win32" ? "copilot-runtime.exe" : "copilot-runtime",
+      );
       const executable = runtime.electron
         ? path.replace(/([\\/][^\\/]+\.asar)(?=[\\/])/u, "$1.unpacked")
         : path;
-      if (runtime.exists(executable)) return executable;
+      if (
+        runtime.exists(executable) &&
+        runtime.exists(paths.join(paths.dirname(executable), "runtime.node"))
+      )
+        return executable;
     } catch {
       /* The Linux libc variant may not be installed. */
     }
