@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "feature": "copilot-sdk-v1-license-notices",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_6e55a01e4c94",
+      "kind": "record",
+      "patch_sha256": "65933499a1fe2a21bed526161e9333733a571ef59a61db46490c51a1212a9cb2",
+      "git_patch_id": "f4b60812a520ac1198e572bac7a5c807f8732e97",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "836ff890573b5b981b810b63b278914201a399a931212fc641ff282c3d2ba3c5",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "8a3e34631cca72fcf79327c5c625077ba71800ae",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "scripts/lib/third-party-licenses.test.ts",
+          "third-party-licenses.config.json"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "scripts/lib/third-party-licenses.test.ts",
+        "third-party-licenses.config.json"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-sdk-license-notice",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "d6be21044ffda12ef416021400bfc83a1c1dc6aa0f2f832c772e8e21e56d9a56",
+          "parent_recipe_sha256": "a9b559a44ef9ae987aa756d9d9ec90c038d8ed4c23f712986d0fdd72524689b5"
+        },
+        {
+          "slug": "copilot-sdk-runtime-upgrade",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+          "parent_recipe_sha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}
