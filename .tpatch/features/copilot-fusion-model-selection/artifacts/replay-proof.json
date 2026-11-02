@@ -1,0 +1,33 @@
+{
+  "feature": "copilot-fusion-model-selection",
+  "sourceLanding": "e1873c13a6eae780aa739160ad253bc49d866fd8",
+  "nativeVerify": {
+    "passed": false,
+    "blockedParent": "copilot-cli-provider",
+    "reason": "The fixed historical-anchor closure demands the provider's earlier postimage at the post-SDK baseline, although the hard SDK prerequisite intentionally changes that provider source.",
+    "upstreamBehavior": "tpatch v0.16.0 arbitrateClosure checks every landed ancestor against the same anchorTreeish; v0.17.0 does not add cross-base support.",
+    "dependenciesWeakened": false,
+    "historicalEvidenceRewritten": false
+  },
+  "manualCanonicalReplay": {
+    "passed": true,
+    "method": "Isolated Git index: reverse Fusion, SDK, packaging replay root and provider; forward-check and apply provider, packaging, SDK and Fusion in hard-dependency order; compare the resulting complete tree to the source landing.",
+    "baselineKind": "Reconstructed source baseline; unrelated source and tpatch metadata held fixed. This is not a historical Git replay anchor.",
+    "baselineTree": "8af549d3db5a7230edd9022ced2bcd88eee4b30d",
+    "providerTree": "db550a924ab89453610ff8aa43636cf92f7d37e2",
+    "packagingTree": "b4c87f258a19f6e90d4da54d3f2e5edc6f337035",
+    "sdkTree": "3ed6cebca02ba2a6fb774c84110b48d8e66f039a",
+    "finalTree": "4af0c061b60a4befc034ce1e3fa81360fa626392",
+    "patchSha256": {
+      "copilot-cli-provider": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+      "copilot-runtime-packaging-replay": "097951c0d3a4fc2cb3948e24ea0f4b9d6890d665866f83f6b5317ac030e0d7ce",
+      "copilot-sdk-runtime-upgrade": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+      "copilot-fusion-model-selection": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb"
+    },
+    "fusionRecipeSha256": "a9f07a134e711fc1edf0c793f3aadf9739e90de32f69031776b5981c0cc24550",
+    "fusionRecipePostimagesMatch": 32,
+    "legacyFusionWritesWithoutPreimageHash": 32,
+    "recipeCaveat": "The native regenerated recipe uses legacy write-file operations. Parent recipes remain tied to their own historical snapshots, not this composed baseline; the provider's whole-file client-runtime manifest would overwrite unrelated later exports here. Compose authoritative patches, not historical whole-file recipes, across bases. No parent recipe was changed or executed."
+  },
+  "interpretation": "The source patches compose correctly and the Fusion recipe matches its capture boundary. This manual proof does not convert the failed native tpatch verification into a pass."
+}

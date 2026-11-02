@@ -5,8 +5,8 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-10-30T18:38:28Z",
-  "updated_at": "2026-11-02T18:46:38Z",
-  "last_command": "record",
+  "updated_at": "2026-11-02T18:47:25Z",
+  "last_command": "verify",
   "notes": "landed at 2026-11-02T18:47:20Z",
   "apply": {
     "completed_at": "2026-11-02T18:46:26Z",
@@ -23,5 +23,15 @@
       "slug": "copilot-sdk-runtime-upgrade",
       "kind": "hard"
     }
-  ]
+  ],
+  "verify": {
+    "verified_at": "2026-11-02T18:47:21Z",
+    "passed": false,
+    "recipe_hash_at_verify": "a9f07a134e711fc1edf0c793f3aadf9739e90de32f69031776b5981c0cc24550",
+    "patch_hash_at_verify": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
+    "parent_snapshot": {
+      "copilot-cli-provider": "applied",
+      "copilot-sdk-runtime-upgrade": "applied"
+    }
+  }
 }

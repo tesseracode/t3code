@@ -121,3 +121,25 @@ eligibility, vendor-policy compatibility, real Fusion event completeness, model
 switch confirmation timing and old-client protocol compatibility remain gates.
 The next lifecycle step can prepare the recipe, but the SDK/platform qualification
 and those unresolved evidence gates must not be relabeled as passed.
+
+## Integrated offline implementation and replay boundary
+
+The implementation landed with unchanged hard provider and SDK dependencies.
+Focused deterministic coverage and scoped types pass; no authenticated account,
+vendor inference, browser or device was used.
+
+Native Fusion verification exposes a further tpatch limitation: its topological
+closure checks every landed ancestor's canonical postimage at the same post-SDK
+anchor. SDK changes intentionally replace parts of the provider's old postimage,
+so verification refuses before testing the Fusion recipe. Removing the direct
+provider edge would not fix this: the SDK's transitive hard closure includes it.
+No dependency was weakened and no landing or generation was rewritten.
+
+An isolated-index reverse/forward composition proves provider, packaging replay,
+SDK and Fusion canonical patches reconstruct the exact source landing. All 32
+Fusion recipe contents match that boundary. Historical parent whole-file recipes
+are snapshot-specific and are not safe substitutes for canonical patch composition
+on the reconstructed baseline; the provider manifest recipe would remove unrelated
+later exports. The generated Fusion recipe also retains the tool's legacy unhashed
+write operations. `artifacts/replay-proof.json` records these limits and hashes.
+This is explicit manual evidence, not a native verification pass or rollout approval.

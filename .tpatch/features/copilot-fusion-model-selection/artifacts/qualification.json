@@ -1,6 +1,11 @@
 {
   "feature": "copilot-fusion-model-selection",
   "verdict": "offline-implementation-only; rollout-blocked",
+  "offlineEvidence": {
+    "focusedRegressions": "290 passed in 19 files, recorded by tpatch test",
+    "types": "Scoped contracts, shared, client-runtime, Copilot provider, server, web and mobile checks passed.",
+    "replay": "Complete ordered canonical-patch composition and all 32 Fusion recipe postimages pass; native tpatch closure verification remains blocked. See replay-proof.json."
+  },
   "approval": "Maintainer explicitly approved offline implementation while unavailable SDK target/account gates remain blockers.",
   "implementation": {
     "discovery": "Typed global and destination-session RPC catalogs; opaque account IDs, visibility and disabled reasons; explicit defaults unchanged.",
@@ -12,6 +17,7 @@
     "connections": "Existing environment-scoped contracts and timeline path; no client origins, separate event bus or new storage table."
   },
   "remainingGates": [
+    "Native tpatch overlapping-parent closure verification; current failure is preserved, not relabeled as passing",
     "SDK native packaged execution on Mac x64, Windows and WSL/Linux",
     "Authenticated account-specific Auto/Fusion catalog and vendor-policy eligibility",
     "Separately approved real Fusion single/cascade/critique execution, callbacks and native replay",
