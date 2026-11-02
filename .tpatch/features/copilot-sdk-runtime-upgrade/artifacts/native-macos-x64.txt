@@ -1,0 +1,10 @@
+{"step":"startup","platform":"darwin","arch":"x64","node":"v24.15.0","status":{"version":"1.0.105","protocolVersion":3}}
+{"step":"create-no-inference","result":"created"}
+{"step":"local-fixture-turn","requests":1}
+{"step":"save-and-cold-resume","transcriptRetained":true}
+{"step":"native-permission","permissionRequests":1,"toolCompleted":true}
+{"step":"native-user-input","inputRequests":1}
+{"step":"cancel-active-inference","result":"acknowledged during loopback inference"}
+{"result":"passed","scope":"offline-native-sdk-only","packagedApplicationQualified":false,"authenticatedFusionQualified":false}
+v24.15.0
+be1bcc2395754230f8c52011662b0cded33958c3364fc583b26bc5038861570f  qualify-native.mjs

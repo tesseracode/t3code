@@ -1,7 +1,7 @@
 {
   "feature": "copilot-sdk-runtime-upgrade",
   "scope": "isolated worktree; not deployed",
-  "verdict": "local-regressions-and-offline-native-macos-arm64-session-callbacks-pass; rollout-blocked",
+  "verdict": "offline-native-macos-arm64-and-x64-pass; client-fixture-presentation-pass; rollout-blocked",
   "versions": {
     "sdk": "1.0.28",
     "nativeRuntimeReported": "1.0.105",
@@ -75,19 +75,49 @@
     {
       "method": "Hold a received loopback inference request until native session.abort acknowledges cancellation",
       "result": "passed active native cancellation without sleeps or real inference"
+    },
+    {
+      "method": "Portable qualify-native.mjs executed on actual macOS arm64 and Intel x64",
+      "result": "Both passed startup, fixture conversation, save/cold resume, deferred permission receipt and inert shell completion, user input and active cancellation.",
+      "scriptSha256": "be1bcc2395754230f8c52011662b0cded33958c3364fc583b26bc5038861570f",
+      "arm64": { "node": "24.19.0", "receipt": "native-macos-arm64.jsonl" },
+      "x64": { "os": "macOS 15.7.7", "node": "24.15.0", "receipt": "native-macos-x64.txt" },
+      "scope": "Native SDK only; neither a packaged application nor authenticated Fusion execution."
+    },
+    {
+      "method": "Approved account discovery using both existing identities and separate disposable native homes",
+      "result": "Both authenticated; runtime 1.0.105 returned 20 model IDs including auto, but no catalog.auto. No routing tier was invented and no vendor inference was sent.",
+      "receipts": [
+        "../../copilot-fusion-model-selection/artifacts/account-catalog-default.jsonl",
+        "../../copilot-fusion-model-selection/artifacts/account-catalog-personal.jsonl"
+      ]
+    },
+    {
+      "method": "Approved isolated web and Android projection-fixture presentation",
+      "result": "Routing, observed duration, unknown start, fallback/final model and telemetry-gap details displayed. Web reload and Android process restart retained the seeded history.",
+      "scope": "Synthetic persisted projection items, not real provider Fusion delivery. See Fusion client-presentation.json."
+    },
+    {
+      "method": "Unsigned isolated Mac x64 desktop build preflight",
+      "result": "Blocked before building: Homebrew Rust 1.97.1 lacks the x86_64-apple-darwin standard-library target on the arm64 build host.",
+      "scope": "No packaged artifact was produced or executed; native Intel SDK success does not satisfy this gate."
+    },
+    {
+      "method": "Strict SDK 1.0.28 license manifest generation",
+      "result": "Restored by the separate copilot-sdk-v1-license-notices leaf with exact package/version overrides. All 28 focused license tests passed and actual Metro startup/bundling succeeded without bypassing validation."
     }
   ],
   "remainingGates": [
-    "Authenticated account-specific Auto/Fusion catalog discovery",
+    "Account/runtime eligibility advertising enabled Auto/Fusion routing tiers; discovery completed but neither identity advertises catalog.auto",
     "Authenticated-account session/CLI continuity and native-store rollback safety beyond disposable offline fixture coverage",
-    "Packaged Electron and standalone target execution on Mac x64, Windows and WSL/Linux",
+    "Packaged Electron and standalone target execution, including Mac x64, Windows and WSL/Linux; current Mac arm64 evidence is SDK/payload-only",
     "Actual authenticated Fusion event delivery, model attribution and callback behavior",
-    "Integrated real-client history presentation; browser/device use has not been approved"
+    "Native tpatch verification of overlapping hard-parent postimages; manual composition is not a native pass"
   ],
   "offlineImplementationApproval": "Maintainer explicitly approved proceeding with offline Fusion implementation while all unavailable target/account gates continue to block rollout.",
   "unavailableTargets": {
-    "macosX64": "Intel emulation unavailable on this host",
-    "windowsLinux": "No runnable target; Docker daemon unavailable"
+    "macosX64": "Actual Intel Mac reached over authorized SSH and native SDK execution passed; packaged execution remains unqualified. Local cross-build preflight lacks the x64 Rust standard library.",
+    "windowsLinux": "No direct target access established; portable harness is committed for the maintainer's Windows/WSL/Ubuntu agents."
   },
   "replayRepair": {
     "result": "SDK verification passes against provider and superseding packaging root before SDK landing",

@@ -1,12 +1,30 @@
 {
   "feature": "copilot-fusion-model-selection",
-  "verdict": "offline-implementation-only; rollout-blocked",
+  "verdict": "implementation-and-web-android-fixture-presentation-pass; real-fusion-and-rollout-blocked",
   "offlineEvidence": {
     "focusedRegressions": "290 passed in 19 files, recorded by tpatch test",
     "types": "Scoped contracts, shared, client-runtime, Copilot provider, server, web and mobile checks passed.",
     "replay": "Complete ordered canonical-patch composition and all 32 Fusion recipe postimages pass; native tpatch closure verification remains blocked. See replay-proof.json."
   },
   "approval": "Maintainer explicitly approved offline implementation while unavailable SDK target/account gates remain blockers.",
+  "followupApproval": "Maintainer subsequently approved account discovery, bounded harmless Fusion prompts, isolated browser/device use, and Intel Mac access. Approval is not evidence that an unavailable gate passed.",
+  "accountDiscovery": {
+    "authenticatedIdentities": 2,
+    "runtime": "1.0.105",
+    "protocol": 3,
+    "modelCountPerIdentity": 20,
+    "autoModelIdPresent": true,
+    "routingCatalogAdvertised": false,
+    "result": "No catalog.auto in either response; no real turn attempted. An auto model ID alone does not establish Fusion eligibility.",
+    "receipts": ["account-catalog-default.jsonl", "account-catalog-personal.jsonl"]
+  },
+  "clientPresentation": {
+    "result": "Web and Android persisted projection-fixture presentation passed, including reload/process restart.",
+    "receipt": "client-presentation.json",
+    "scope": "Synthetic routing/model/timing notices; not vendor inference or account-advertised Fusion selection.",
+    "ios": "Compatible development app installed and launched, but semantic AXe automation is blocked by its obsolete SimulatorKit.framework path. Android was used as the representative native client.",
+    "desktop": "Shares the exercised web presentation; packaged Electron execution remains unqualified."
+  },
   "implementation": {
     "discovery": "Typed global and destination-session RPC catalogs; opaque account IDs, visibility and disabled reasons; explicit defaults unchanged.",
     "selection": "Create/resume capi.autoTier and per-turn setModel options; authoritative getCurrent snapshots distinguish requested/effective/pending/activating/failure.",
@@ -18,16 +36,16 @@
   },
   "remainingGates": [
     "Native tpatch overlapping-parent closure verification; current failure is preserved, not relabeled as passing",
-    "SDK native packaged execution on Mac x64, Windows and WSL/Linux",
-    "Authenticated account-specific Auto/Fusion catalog and vendor-policy eligibility",
-    "Separately approved real Fusion single/cascade/critique execution, callbacks and native replay",
-    "Authorized integrated browser/device presentation pass"
+    "SDK packaged execution on Mac x64, Windows and WSL/Linux; bare native SDK fixtures passed on both Mac architectures",
+    "Account/runtime advertisement of enabled Auto/Fusion tiers and vendor-policy eligibility",
+    "Approved but unavailable real Fusion single/cascade/critique execution, callbacks and native replay",
+    "Real account-advertised Fusion selection in destination sessions; fixture history presentation does not qualify this path"
   ],
   "constraints": {
     "realAccountExecution": false,
     "vendorInference": false,
     "deployed": false,
-    "browserOrComputerUse": false,
+    "browserOrComputerUse": true,
     "providerDefaultsChanged": false
   }
 }

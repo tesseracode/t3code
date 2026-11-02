@@ -1,0 +1,22 @@
+{
+  "feature": "copilot-sdk-v1-license-notices",
+  "sourceLanding": "1ac0398c61b6124415d7c450856e5b6afe2d6a7c",
+  "verdict": "strict-notice-generation-restored; native-parent-overlap-verification-blocked",
+  "cause": "SDK 1.0.28 and its native npm packages declare MIT but omit packaged notice files. The historical exact 1.0.8 override does not cover the upgrade, and repository fallback only reads physical notices.",
+  "fix": "Nine exact package/version overrides using the public SDK v1.0.28 MIT license. The old 1.0.8 override remains unchanged.",
+  "licenseSource": "https://github.com/github/copilot-sdk/blob/fa108e71ee3025663e0dac20f2a071055d3a6b14/LICENSE",
+  "copyright": "Copyright GitHub, Inc.",
+  "checks": [
+    "28 focused license-generator tests passed, including nine regressions exercising the real overrides and generated attribution.",
+    "Targeted lint and scripts typecheck passed.",
+    "Actual strict Metro startup and Android bundling succeeded without suppressing license validation.",
+    "Six ordered canonical patches reconstruct the exact source landing; both leaf recipe postimages match. See replay-proof.json.",
+    "Postlanding native verify recognizes the exact four-trailer landing and current materialization, but exits 2 on the overlapping provider ancestor. See native-verify-landed.json."
+  ],
+  "historicalEvidence": "native-verify.json is the original prelanding refusal and remains unchanged. Historical license/provider/packaging generations and all hard edges are retained.",
+  "limitations": [
+    "Manual composition is not native tpatch verification.",
+    "The composition baseline is derived by reversing canonical patches at this snapshot; it is not a historical upstream anchor or a promise about arbitrary future upstream changes.",
+    "Parent canonical patches are composed, not stale whole-file parent recipes. Future replay requires fresh conflict review and composition evidence."
+  ]
+}
