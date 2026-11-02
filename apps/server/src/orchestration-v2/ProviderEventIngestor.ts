@@ -649,18 +649,63 @@ export const layer: Layer.Layer<
                   nodeId: input.event.message.nodeId,
                 }),
               ];
-            case "turn_item.updated":
+            case "turn_item.updated": {
+              let item = input.event.turnItem;
+              if (item.type === "system_notice" && item.modelExecution) {
+                const previous = yield* projections.getTurnItem({
+                  threadId: item.threadId,
+                  itemId: item.id,
+                });
+                if (
+                  previous?.type === "system_notice" &&
+                  previous.modelExecution &&
+                  previous.modelExecution.nativeSessionId === item.modelExecution.nativeSessionId
+                ) {
+                  const oldExecution = previous.modelExecution;
+                  const execution = item.modelExecution;
+                  const completed = (Boolean(oldExecution.endedAt) && !execution.endedAt) ||
+                    (oldExecution.kind === "phase" && oldExecution.status === "unknown" &&
+                      previous.status !== "running" && execution.status === "running");
+                  const observed =
+                    oldExecution.startSource === "observed" && execution.startSource !== "observed";
+                  item = {
+                    ...(completed ? previous : item),
+                    runId: previous.runId ?? item.runId,
+                    nodeId: previous.nodeId ?? item.nodeId,
+                    providerTurnId: previous.providerTurnId ?? item.providerTurnId,
+                    ordinal: previous.runId ? previous.ordinal : item.ordinal,
+                    ...(observed ? { startedAt: previous.startedAt } : {}),
+                    modelExecution: {
+                      ...(completed ? oldExecution : execution),
+                      ...(observed
+                        ? { startedAt: oldExecution.startedAt, startSource: "observed" as const }
+                        : {}),
+                      gaps: (completed ? oldExecution.gaps : execution.gaps).filter(
+                        (gap) =>
+                          !(
+                            (previous.runId ?? item.runId) &&
+                            gap === "Native execution could not be associated with a T3 run."
+                          ) &&
+                          !(
+                            observed &&
+                            gap ===
+                              "Phase start was not observed; its start time is only an estimate."
+                          ),
+                      ),
+                    },
+                  };
+                }
+              }
               return [
                 yield* makeDomainEvent(input, {
                   type: "turn-item.updated",
-                  threadId: input.event.turnItem.threadId,
-                  payload: boundFileChangeForStorage(
-                    stripUnservedToolOutputImageBytes(input.event.turnItem),
-                  ),
-                  runId: input.event.turnItem.runId,
-                  nodeId: input.event.turnItem.nodeId,
+                  threadId: item.threadId,
+                  payload: boundFileChangeForStorage(stripUnservedToolOutputImageBytes(item)),
+                  runId: item.runId,
+                  nodeId: item.nodeId,
                 }),
               ];
+            }
             case "runtime_request.updated":
               return [
                 yield* makeDomainEvent(input, {

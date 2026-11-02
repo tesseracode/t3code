@@ -1549,6 +1549,55 @@ const OrchestrationV2LinkRequestFields = {
   failure: Schema.optional(Schema.String),
 } as const;
 
+const ModelExecutionText = Schema.String.check(Schema.isMaxLength(512));
+
+export const OrchestrationV2ModelExecution = Schema.Struct({
+  version: Schema.Literal(1),
+  kind: Schema.Literals(["selection", "route", "phase", "gap"]),
+  nativeSessionId: ModelExecutionText,
+  nativeTurnId: Schema.optional(ModelExecutionText),
+  fusionId: Schema.optional(ModelExecutionText),
+  phaseId: Schema.optional(ModelExecutionText),
+  phaseKind: Schema.optional(ModelExecutionText),
+  conversationScope: Schema.optional(ModelExecutionText),
+  degradedToPhaseId: Schema.optional(ModelExecutionText),
+  eventId: ModelExecutionText,
+  sourceTimestamp: ModelExecutionText,
+  receivedAt: ModelExecutionText,
+  status: ModelExecutionText,
+  model: Schema.optional(ModelExecutionText),
+  role: Schema.optional(ModelExecutionText),
+  pattern: Schema.optional(ModelExecutionText),
+  syntheticModel: Schema.optional(ModelExecutionText),
+  requestedModel: Schema.optional(ModelExecutionText),
+  requestedPreference: Schema.optional(ModelExecutionText),
+  effectivePreference: Schema.optional(ModelExecutionText),
+  pendingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
+  activatingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
+  startSource: Schema.Literals(["observed", "estimated", "unknown"]),
+  startedAt: Schema.optional(ModelExecutionText),
+  endedAt: Schema.optional(ModelExecutionText),
+  durationMs: Schema.optional(NonNegativeInt),
+  fallbackModel: Schema.optional(ModelExecutionText),
+  finalSourceModel: Schema.optional(ModelExecutionText),
+  finalSourcePhaseId: Schema.optional(ModelExecutionText),
+  reason: Schema.optional(ModelExecutionText),
+  contractVersion: Schema.optional(NonNegativeInt),
+  awaitingBackgroundWork: Schema.optional(Schema.Boolean),
+  endedWithBackgroundWork: Schema.optional(Schema.Boolean),
+  plannedModels: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        model: ModelExecutionText,
+        role: ModelExecutionText,
+        phaseId: Schema.optional(ModelExecutionText),
+      }),
+    ).check(Schema.isMaxLength(64)),
+  ),
+  gaps: Schema.Array(ModelExecutionText).check(Schema.isMaxLength(16)),
+});
+export type OrchestrationV2ModelExecution = typeof OrchestrationV2ModelExecution.Type;
+
 export const OrchestrationV2TurnItem = Schema.Union([
   Schema.Struct({
     ...OrchestrationV2TurnItemBaseFields,
@@ -1677,6 +1726,7 @@ export const OrchestrationV2TurnItem = Schema.Union([
     ...OrchestrationV2TurnItemBaseFields,
     type: Schema.Literal("system_notice"),
     message: Schema.String,
+    modelExecution: Schema.optional(OrchestrationV2ModelExecution),
   }),
   Schema.Struct({
     ...OrchestrationV2TurnItemBaseFields,
@@ -2501,6 +2551,7 @@ export const OrchestrationV2TurnItemJson = Schema.Union([
     ...OrchestrationV2TurnItemJsonBaseFields,
     type: Schema.Literal("system_notice"),
     message: Schema.String,
+    modelExecution: Schema.optional(OrchestrationV2ModelExecution),
   }),
   Schema.Struct({
     ...OrchestrationV2TurnItemJsonBaseFields,

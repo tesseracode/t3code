@@ -871,6 +871,134 @@ layer("ProviderEventIngestorV2", (it) => {
     }),
   );
 
+  it.effect(
+    "persists native model history without losing run ownership or observed starts on cold replay",
+    () =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.now;
+        const eventSink = yield* EventSink.EventSinkV2;
+        const projections = yield* ProjectionStore.ProjectionStoreV2;
+        const ingestor = yield* ProviderEventIngestor.ProviderEventIngestorV2;
+        const ids = yield* IdAllocator.IdAllocatorV2;
+        const thread = yield* threadCreatedEvent(now);
+        yield* eventSink.write({ events: [thread] });
+        const providerSessionId = yield* ids.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId: thread.threadId,
+        });
+        const providerThreadId = ids.derive.providerThread({
+          driver: CODEX_DRIVER,
+          nativeThreadId: "native-model-history",
+        });
+        const providerTurnId = ids.derive.providerTurn({
+          driver: CODEX_DRIVER,
+          nativeTurnId: "native-model-turn",
+        });
+        const runId = RunId.make("model-history-original");
+        const nodeId = NodeId.make("model-history-node");
+        const observed = DateTime.makeUnsafe("2026-10-29T00:00:00Z");
+        const item = {
+          id: TurnItemId.make("native-session:fusion:primary"),
+          threadId: thread.threadId,
+          runId,
+          nodeId,
+          providerThreadId,
+          providerTurnId,
+          nativeItemRef: null,
+          parentItemId: null,
+          ordinal: 7,
+          type: "system_notice",
+          title: "Model execution",
+          message: "Model phase succeeded",
+          status: "completed",
+          startedAt: observed,
+          completedAt: now,
+          updatedAt: now,
+          modelExecution: {
+            version: 1,
+            kind: "phase",
+            nativeSessionId: "native-session",
+            fusionId: "fusion",
+            phaseId: "primary",
+            eventId: "completed",
+            sourceTimestamp: "2026-10-29T00:00:02Z",
+            receivedAt: "2026-10-29T00:00:03Z",
+            model: "same-model",
+            role: "primary",
+            status: "succeeded",
+            startSource: "observed",
+            startedAt: "2026-10-29T00:00:00Z",
+            endedAt: "2026-10-29T00:00:02Z",
+            durationMs: 2000,
+            gaps: [],
+          },
+        } satisfies OrchestrationV2TurnItem;
+        const ingest = (turnItem: OrchestrationV2TurnItem) =>
+          ingestor.ingestNormalized({
+            providerSessionId,
+            providerInstanceId: modelSelection.instanceId,
+            threadId: thread.threadId,
+            runId: RunId.make("model-history-current"),
+            event: { type: "turn_item.updated", driver: CODEX_DRIVER, turnItem },
+          });
+        yield* ingest(item);
+        const original = yield* projections.getTurnItem({
+          threadId: thread.threadId,
+          itemId: item.id,
+        });
+        const replay = {
+          ...item,
+          runId: null,
+          nodeId: null,
+          providerTurnId: null,
+          ordinal: 99,
+          startedAt: DateTime.makeUnsafe("2026-10-29T00:00:01Z"),
+          modelExecution: {
+            ...item.modelExecution,
+            startSource: "estimated" as const,
+            startedAt: "2026-10-29T00:00:01Z",
+            gaps: [
+              "Phase start was not observed; its start time is only an estimate.",
+              "Native execution could not be associated with a T3 run.",
+            ],
+          },
+        };
+        const identity: ProviderEventRouteIdentity = {
+          threadId: thread.threadId,
+          runId: RunId.make("model-history-current"),
+          attemptId: RunAttemptId.make("model-history-attempt"),
+          providerThreadId,
+        };
+        const [accepted] = routeProviderEvent(
+          { type: "turn_item.updated", driver: CODEX_DRIVER, turnItem: replay },
+          identity,
+          makeProviderEventRoutingState({ identity, providerTurnId: null }),
+        );
+        assert.isTrue(accepted);
+        yield* ingest(replay);
+        yield* ingest(replay);
+        const stored = yield* projections.getTurnItem({
+          threadId: thread.threadId,
+          itemId: item.id,
+        });
+        assert.equal(stored?.runId, runId);
+        assert.equal(stored?.nodeId, nodeId);
+        assert.equal(stored?.providerTurnId, providerTurnId);
+        assert.equal(stored?.ordinal, original?.ordinal);
+        assert.equal(stored?.type, "system_notice");
+        if (stored?.type !== "system_notice") return assert.fail("Expected stored model history.");
+        assert.equal(stored.modelExecution?.startSource, "observed");
+        assert.deepEqual(stored.modelExecution?.gaps, []);
+        assert.equal(stored.modelExecution?.startedAt, "2026-10-29T00:00:00Z");
+        assert.equal(
+          (yield* projections.getThreadProjection(thread.threadId)).turnItems.filter(
+            (candidate) => candidate.id === item.id,
+          ).length,
+          1,
+        );
+      }),
+  );
+
   it.effect("persists a completed run's late background terminal exactly once", () =>
     Effect.gen(function* () {
       const now = yield* DateTime.now;

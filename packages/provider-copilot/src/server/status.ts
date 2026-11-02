@@ -1,4 +1,4 @@
-import type { CopilotClient, ModelInfo, SkillsLoadedSkill } from "@github/copilot-sdk";
+import type { CopilotClient, SkillsLoadedSkill } from "@github/copilot-sdk";
 import type { ServerProviderSkill } from "@t3tools/contracts";
 import { createModelCapabilities } from "@t3tools/shared/model";
 import * as DateTime from "effect/DateTime";
@@ -11,6 +11,7 @@ import {
 } from "@t3tools/provider-core/server/snapshotProbe";
 import type { CopilotSettings } from "../settings.ts";
 import { createClient, resolveClientConfiguration } from "./client.ts";
+import { routingDescriptor, type AutoCatalog, type ModelCatalog } from "./routing.ts";
 
 const presentation = {
   displayName: "GitHub Copilot",
@@ -20,42 +21,71 @@ const presentation = {
 };
 const emptyCapabilities = createModelCapabilities({ optionDescriptors: [] });
 
-export function modelsFromSdk(models: ReadonlyArray<ModelInfo>, settings: CopilotSettings) {
+export function modelsFromSdk(
+  models: ReadonlyArray<ModelCatalog["models"][number]>,
+  settings: CopilotSettings,
+  auto?: AutoCatalog,
+) {
   const seen = new Set<string>();
   return providerModelsFromSettings(
-    models.flatMap((model) => {
-      const slug = model.id.trim();
-      if (!slug || !model.name.trim() || seen.has(slug) || model.policy?.state === "disabled")
-        return [];
-      seen.add(slug);
-      const efforts = model.supportedReasoningEfforts ?? [];
-      return [
-        {
-          slug,
-          name: model.name,
-          isCustom: false,
-          ...(seen.size === 1 ? { isDefault: true } : {}),
-          capabilities: createModelCapabilities({
-            optionDescriptors: efforts.length
-              ? [
-                  buildSelectOptionDescriptor({
-                    id: "reasoningEffort",
-                    label: "Reasoning",
-                    options: efforts.map((effort) => ({
-                      value: effort,
-                      label:
-                        effort === "xhigh"
-                          ? "Extra High"
-                          : effort[0]!.toUpperCase() + effort.slice(1),
-                      isDefault: effort === model.defaultReasoningEffort,
-                    })),
-                  }),
-                ]
-              : [],
-          }),
-        },
-      ];
-    }),
+    models
+      .flatMap((model) => {
+        const slug = model.id.trim();
+        if (
+          !slug ||
+          !model.name.trim() ||
+          seen.has(slug) ||
+          model.policy?.state === "disabled" ||
+          (slug === "auto" && !auto)
+        )
+          return [];
+        seen.add(slug);
+        const efforts = model.supportedReasoningEfforts ?? [];
+        const routing = slug === "auto" && auto ? routingDescriptor(auto) : undefined;
+        return [
+          {
+            slug,
+            name: model.name,
+            isCustom: false,
+            ...(seen.size === 1 ? { isDefault: true } : {}),
+            capabilities: createModelCapabilities({
+              optionDescriptors: [
+                ...(routing ? [routing] : []),
+                ...(efforts.length
+                  ? [
+                      buildSelectOptionDescriptor({
+                        id: "reasoningEffort",
+                        label: "Reasoning",
+                        options: efforts.map((effort) => ({
+                          value: effort,
+                          label:
+                            effort === "xhigh"
+                              ? "Extra High"
+                              : effort[0]!.toUpperCase() + effort.slice(1),
+                          isDefault: effort === model.defaultReasoningEffort,
+                        })),
+                      }),
+                    ]
+                  : []),
+              ],
+            }),
+          },
+        ];
+      })
+      .concat(
+        auto && !seen.has("auto") && !models.some((model) => model.id.trim() === "auto")
+          ? [
+              {
+                slug: "auto",
+                name: "Auto routing",
+                isCustom: false,
+                capabilities: createModelCapabilities({
+                  optionDescriptors: [routingDescriptor(auto)],
+                }),
+              },
+            ]
+          : [],
+      ),
     settings.customModels,
     emptyCapabilities,
   );
@@ -106,8 +136,8 @@ export const pendingSnapshot = (settings: CopilotSettings) =>
 
 export type StatusClient = Pick<
   CopilotClient,
-  "start" | "stop" | "forceStop" | "getStatus" | "getAuthStatus" | "listModels"
->;
+  "start" | "stop" | "forceStop" | "getStatus" | "getAuthStatus"
+> & { readonly rpc: { readonly models: Pick<CopilotClient["rpc"]["models"], "list"> } };
 
 export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
   settings: CopilotSettings,
@@ -150,8 +180,8 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
         await client.start();
         started = true;
         const [status, auth] = await Promise.all([client.getStatus(), client.getAuthStatus()]);
-        const models = auth.isAuthenticated ? await client.listModels() : [];
-        return { status, auth, models };
+        const catalog = auth.isAuthenticated ? await client.rpc.models.list({}) : { models: [] };
+        return { status, auth, catalog };
       });
     }),
   ).pipe(Effect.timeoutOption(30_000), Effect.result);
@@ -175,12 +205,12 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
       },
     });
   }
-  const { status, auth, models } = result.success.value;
+  const { status, auth, catalog } = result.success.value;
   return buildServerProvider({
     presentation,
     enabled: true,
     checkedAt,
-    models: modelsFromSdk(models, settings),
+    models: modelsFromSdk(catalog.models, settings, catalog.auto),
     probe: {
       installed: true,
       version: status.version,
@@ -190,7 +220,12 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
         : { status: "unauthenticated" },
       ...(!auth.isAuthenticated
         ? { message: "Sign in with `copilot login` in this provider's account environment." }
-        : {}),
+        : !catalog.auto
+          ? {
+              message:
+                "This account/runtime does not advertise Auto or Fusion routing. Explicit models remain available.",
+            }
+          : {}),
     },
   });
 });

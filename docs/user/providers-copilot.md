@@ -7,6 +7,12 @@ not the ACP registry or a separately billed hosted model service.
 Sign in on that environment with `copilot login`, then refresh provider status.
 Models and reasoning options come from your account's available catalog.
 
+When your account advertises **Auto routing**, its **Routing** option includes the eligible
+preferences, including Fusion. Disabled preferences show their account-specific reason.
+Requests can remain pending before they take effect; the activity log distinguishes requested,
+effective, and activating routing and shows reported model phases and timing. See
+[Activity log](activity-log.md). Explicit-model selection and defaults are unchanged.
+
 The default runtime uses the bundled Copilot executable. **Binary path** can
 override it. **COPILOT_HOME path** selects the account's configuration and native
 session directory; separate provider instances can use separate directories.

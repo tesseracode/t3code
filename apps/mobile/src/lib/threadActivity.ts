@@ -4,6 +4,10 @@ import type {
   ThreadUserInputQuestion,
 } from "@t3tools/client-runtime/state/thread-requests";
 import { turnItemIsWorkspacePreparation } from "@t3tools/client-runtime/state/turn-item-presentation";
+import {
+  modelExecutionDetail,
+  modelExecutionSummary,
+} from "@t3tools/client-runtime/work-log/model-execution";
 import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
 import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
 import { isLiveSubagentTurnItem } from "@t3tools/client-runtime/state/subagentRuntime";
@@ -653,7 +657,8 @@ function itemSummary(
   toolPresentation: T3McpToolPresentation | null = null,
 ): string {
   if (item.type === "notification") return item.summary;
-  if (item.type === "system_notice") return item.message;
+  if (item.type === "system_notice")
+    return item.modelExecution ? modelExecutionSummary(item.modelExecution) : item.message;
   if (item.type === "compaction") return contextCompactionLabel(item);
   const title =
     (item.type === "dynamic_tool"
@@ -743,8 +748,9 @@ function itemPreview(item: OrchestrationV2TurnItem): string | null {
         : `${item.files.length} changed files`;
     case "run_interrupt_request":
     case "run_interrupt_result":
-    case "system_notice":
       return item.message || null;
+    case "system_notice":
+      return item.modelExecution ? null : item.message || null;
     case "error":
       return item.failure.message;
     case "compaction":
@@ -849,6 +855,9 @@ export function formatItemFullDetail(
   row: OrchestrationV2ProjectedTurnItem,
   item: OrchestrationV2TurnItem,
 ): string {
+  if (item.type === "system_notice" && item.modelExecution) {
+    return modelExecutionDetail(item.modelExecution, item.message);
+  }
   return JSON.stringify(
     {
       visibility: row.visibility,

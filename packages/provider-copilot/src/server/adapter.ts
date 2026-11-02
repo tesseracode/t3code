@@ -24,6 +24,7 @@ import {
   type OrchestrationV2ProviderTurn,
   type OrchestrationV2RuntimeRequest,
   type OrchestrationV2TurnItem,
+  OrchestrationV2ModelExecution,
   type ProviderInstanceId,
   type OrchestrationV2Subagent,
   type ServerProviderSkill,
@@ -32,6 +33,7 @@ import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as Queue from "effect/Queue";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
@@ -51,8 +53,17 @@ import { capabilities } from "./capabilities.ts";
 import { createClient, resolveClientConfiguration } from "./client.ts";
 import { skillsFromSdk } from "./status.ts";
 import { nativeToolItem } from "./tools.ts";
+import { autoTierForSelection } from "./routing.ts";
+import {
+  fusionExecutionKey,
+  normalizeFusionExecution,
+  MAX_EXECUTION_ITEMS,
+  MAX_REPLAY_EXECUTION_EVENTS,
+  ROOT_PHASE_GAP,
+} from "./fusion.ts";
 
 export const COPILOT_DRIVER = ProviderDriverKind.make("githubCopilot");
+const decodeModelExecution = Schema.decodeEffect(OrchestrationV2ModelExecution);
 const ref = (nativeId: string) => ({
   driver: COPILOT_DRIVER,
   nativeId,
@@ -70,6 +81,7 @@ export type SessionHandle = Pick<
 > & {
   readonly rpc: {
     readonly mode: Pick<Rpc["mode"], "set">;
+    readonly model: Pick<Rpc["model"], "list" | "getCurrent">;
     readonly plan: Pick<Rpc["plan"], "read">;
     readonly skills: Pick<Rpc["skills"], "list">;
     readonly tasks: Pick<Rpc["tasks"], "list" | "cancel">;
@@ -77,6 +89,7 @@ export type SessionHandle = Pick<
   };
 };
 export type ClientHandle = Pick<CopilotClient, "start" | "stop" | "forceStop"> & {
+  readonly rpc: { readonly models: Pick<CopilotClient["rpc"]["models"], "list"> };
   readonly createSession: (config: SessionConfig) => Promise<SessionHandle>;
   readonly resumeSession: (id: string, config: ResumeSessionConfig) => Promise<SessionHandle>;
 };
@@ -214,6 +227,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       const tasks = new Map<string, Task>();
       const subagents = new Map<string, OrchestrationV2Subagent>();
       const taskOwners = new Map<string, ActiveTurn>();
+      const executionItems = new Map<
+        string,
+        Extract<OrchestrationV2TurnItem, { type: "system_notice" }>
+      >();
+      const fusionOwners = new Map<string, ActiveTurn>();
+      const nativeTurnOwners = new Map<string, ActiveTurn>();
+      let replayExecutionEvents: ReadonlyArray<SessionEvent> = [];
+      let omittedReplayEvents = 0;
       const emit = (event: ProviderAdapter.ProviderAdapterV2Event) =>
         Queue.offer(events, event).pipe(Effect.asVoid);
       const sdk = <A>(operation: string, request: () => Promise<A>, timeoutMs = 10_000) =>
@@ -364,11 +385,219 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       const putItem = (turn: ActiveTurn, key: string, item: OrchestrationV2TurnItem) =>
         Effect.sync(() => {
           turn.items.set(key, item);
+          if (item.type === "system_notice" && item.modelExecution) executionItems.set(key, item);
         }).pipe(
           Effect.andThen(
             emit({ type: "turn_item.updated", driver: COPILOT_DRIVER, turnItem: item }),
           ),
         );
+      const putExecution = Effect.fnUntraced(function* (
+        key: string,
+        execution: OrchestrationV2ModelExecution,
+        owner?: ActiveTurn,
+      ) {
+        if (!native || !providerThread) return;
+        execution = yield* decodeModelExecution({
+          ...execution,
+          gaps: [...new Set(execution.gaps)].slice(0, 16),
+        }).pipe(
+          Effect.mapError(
+            (cause) =>
+              new ProviderAdapter.ProviderAdapterProtocolError({
+                driver: COPILOT_DRIVER,
+                detail: "Copilot execution metadata exceeded the supported contract.",
+                cause,
+              }),
+          ),
+        );
+        const previous = executionItems.get(key);
+        const now = DateTime.makeUnsafe(execution.receivedAt);
+        const source = DateTime.makeUnsafe(execution.sourceTimestamp);
+        const running = execution.kind === "phase" && execution.status === "running";
+        const item: Extract<OrchestrationV2TurnItem, { type: "system_notice" }> = {
+          ...(previous ?? {
+            id: TurnItemId.make(
+              `${input.instanceId}:${open.threadId}:copilot:${native.sessionId}:execution:${key}`,
+            ),
+            threadId: open.threadId,
+            runId: owner?.input.runId ?? null,
+            nodeId: owner?.input.rootNodeId ?? null,
+            providerThreadId: providerThread.id,
+            providerTurnId: owner?.providerTurn.id ?? null,
+            parentItemId: null,
+            ordinal: owner ? owner.nextOrdinal++ : executionItems.size + 1,
+            title: execution.kind === "selection" ? "Routing selection" : "Model execution",
+          }),
+          type: "system_notice",
+          runId: previous?.runId ?? owner?.input.runId ?? null,
+          nodeId: previous?.nodeId ?? owner?.input.rootNodeId ?? null,
+          providerTurnId: previous?.providerTurnId ?? owner?.providerTurn.id ?? null,
+          nativeItemRef: ref(key),
+          status:
+            execution.status === "unknown" && previous
+              ? previous.status
+              : running
+                ? "running"
+                : execution.status === "cancelled"
+                  ? "interrupted"
+                  : ["failed", "activation-failed", "routing-failed"].includes(execution.status)
+                    ? "failed"
+                    : "completed",
+          startedAt: execution.startedAt ? DateTime.makeUnsafe(execution.startedAt) : source,
+          completedAt:
+            execution.status === "unknown" && previous
+              ? previous.completedAt
+              : running
+                ? null
+                : source,
+          updatedAt: now,
+          message:
+            execution.kind === "phase"
+              ? `${execution.model ?? "Unknown model"} · ${execution.role ?? "phase"} · ${execution.status}`
+              : `${execution.kind === "selection" ? "Routing selection" : "Model routing"} · ${execution.status}${execution.reason ? ` · ${execution.reason}` : ""}`,
+          modelExecution: { ...execution, gaps: [...new Set(execution.gaps)].slice(0, 16) },
+        };
+        executionItems.set(key, item);
+        if (executionItems.size > MAX_REPLAY_EXECUTION_EVENTS)
+          executionItems.delete(executionItems.keys().next().value!);
+        if (owner) owner.items.set(key, item);
+        yield* emit({ type: "turn_item.updated", driver: COPILOT_DRIVER, turnItem: item });
+      });
+      const refreshSelection = Effect.fnUntraced(function* (
+        selection: ModelSelection,
+        owner?: ActiveTurn,
+        failure?: { readonly reason: string; readonly timestamp: string; readonly id: string },
+      ) {
+        if (!native) return;
+        const current = yield* sdk("read current routing state", () =>
+          native!.rpc.model.getCurrent(),
+        );
+        const now = DateTime.formatIso(yield* DateTime.now);
+        const requested = getModelSelectionStringOptionValue(selection, "autoTier");
+        const execution: OrchestrationV2ModelExecution = {
+          version: 1,
+          kind: "selection",
+          nativeSessionId: native.sessionId,
+          eventId: failure?.id ?? `${owner?.providerTurn.id ?? "current"}:selection`,
+          sourceTimestamp: failure?.timestamp ?? now,
+          receivedAt: now,
+          status: failure
+            ? "activation-failed"
+            : current.pendingAutoTier !== undefined || current.activatingAutoTier !== undefined
+              ? "pending"
+              : current.modelId !== selection.model
+                ? current.modelId
+                  ? "different-model"
+                  : "unknown"
+                : selection.model === "auto" && !current.autoTier
+                  ? "preference-unknown"
+                  : "effective",
+          requestedModel: selection.model,
+          ...(current.modelId ? { model: current.modelId } : {}),
+          ...(requested ? { requestedPreference: requested } : {}),
+          ...(current.autoTier ? { effectivePreference: current.autoTier } : {}),
+          ...(current.pendingAutoTier !== undefined
+            ? { pendingPreference: current.pendingAutoTier }
+            : {}),
+          ...(current.activatingAutoTier !== undefined
+            ? { activatingPreference: current.activatingAutoTier }
+            : {}),
+          ...(failure ? { reason: failure.reason.slice(0, 512) } : {}),
+          startSource: "unknown",
+          gaps: [],
+        };
+        yield* updateThread({
+          nativeMetadata: { ...providerThread?.nativeMetadata, modelSelection: selection },
+        });
+        if (selection.model === "auto" || failure)
+          yield* putExecution(`selection:${owner?.providerTurn.id ?? "current"}`, execution, owner);
+      });
+      const recordFusion = Effect.fnUntraced(function* (event: SessionEvent, replay = false) {
+        const key = fusionExecutionKey(event);
+        if (!key || !native) return;
+        const now = DateTime.formatIso(yield* DateTime.now);
+        const execution = normalizeFusionExecution(
+          event,
+          native.sessionId,
+          now,
+          executionItems.get(key)?.modelExecution,
+        );
+        if (!execution) return;
+        let owner = execution.fusionId ? fusionOwners.get(execution.fusionId) : undefined;
+        if (!owner && !replay && !event.agentId && execution.nativeTurnId) {
+          owner = nativeTurnOwners.get(execution.nativeTurnId);
+          if (
+            owner?.providerTurn.startedAt &&
+            Date.parse(event.timestamp) < DateTime.toEpochMillis(owner.providerTurn.startedAt)
+          )
+            owner = undefined;
+          if (owner && execution.fusionId && execution.kind === "route") {
+            fusionOwners.set(execution.fusionId, owner);
+            if (fusionOwners.size > MAX_EXECUTION_ITEMS)
+              fusionOwners.delete(fusionOwners.keys().next().value!);
+          }
+          if (owner && execution.fusionId) {
+            for (const [phaseKey, item] of executionItems) {
+              if (item.runId === null && item.modelExecution?.fusionId === execution.fusionId)
+                yield* putExecution(
+                  phaseKey,
+                  {
+                    ...item.modelExecution,
+                    gaps: item.modelExecution.gaps.filter(
+                      (gap) => gap !== "Native execution could not be associated with a T3 run.",
+                    ),
+                  },
+                  owner,
+                );
+            }
+          }
+        }
+        if (
+          owner &&
+          !owner.items.has(key) &&
+          [...owner.items.values()].filter(
+            (item) => item.type === "system_notice" && item.modelExecution,
+          ).length >=
+            MAX_EXECUTION_ITEMS - 1
+        ) {
+          yield* putExecution(
+            `execution-limit:${owner.providerTurn.id}`,
+            {
+              ...execution,
+              kind: "gap",
+              status: "incomplete",
+              gaps: [
+                "Execution history exceeded the per-turn limit; additional phase facts were omitted.",
+              ],
+            },
+            owner,
+          );
+          return;
+        }
+        yield* putExecution(
+          key,
+          {
+            ...execution,
+            ...(owner
+              ? {
+                  requestedModel: owner.input.modelSelection.model,
+                  ...(getModelSelectionStringOptionValue(owner.input.modelSelection, "autoTier")
+                    ? {
+                        requestedPreference: getModelSelectionStringOptionValue(
+                          owner.input.modelSelection,
+                          "autoTier",
+                        ),
+                      }
+                    : {}),
+                }
+              : {}),
+            gaps: owner
+              ? execution.gaps
+              : [...execution.gaps, "Native execution could not be associated with a T3 run."],
+          },
+          owner,
+        );
+      });
       const terminal = Effect.fnUntraced(function* (turn: ActiveTurn, failure?: unknown) {
         if (turn.finished || (!failure && !turn.accepted)) return;
         turn.finished = true;
@@ -393,6 +622,15 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             completedAt: now,
             updatedAt: now,
             ...("streaming" in item ? { streaming: false } : {}),
+            ...(item.type === "system_notice" && item.modelExecution?.kind === "phase"
+              ? {
+                  modelExecution: {
+                    ...item.modelExecution,
+                    status: "unknown",
+                    gaps: [...item.modelExecution.gaps, ROOT_PHASE_GAP],
+                  },
+                }
+              : {}),
           });
         }
         for (const [id, message] of messages) {
@@ -684,6 +922,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             }).pipe(Effect.catch((cause) => (active ? terminal(active, cause) : Effect.void)));
           return;
         }
+        if (fusionExecutionKey(event)) {
+          yield* recordFusion(event);
+          return;
+        }
         // Child events never advance or complete the root's user-turn lifecycle.
         if (event.agentId) {
           if (
@@ -701,6 +943,57 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         }
         const turn = active;
         switch (event.type) {
+          case "assistant.turn_start":
+            if (
+              turn?.providerTurn.startedAt &&
+              Date.parse(event.timestamp) >= DateTime.toEpochMillis(turn.providerTurn.startedAt)
+            ) {
+              nativeTurnOwners.set(event.data.turnId, turn);
+              if (nativeTurnOwners.size > MAX_EXECUTION_ITEMS)
+                nativeTurnOwners.delete(nativeTurnOwners.keys().next().value!);
+              for (const item of executionItems.values()) {
+                const execution = item.modelExecution;
+                if (
+                  execution?.fusionId &&
+                  execution.nativeTurnId === event.data.turnId &&
+                  !item.runId &&
+                  Date.parse(execution.sourceTimestamp) >=
+                    DateTime.toEpochMillis(turn.providerTurn.startedAt)
+                )
+                  fusionOwners.set(execution.fusionId, turn);
+              }
+              for (const [key, item] of executionItems) {
+                if (
+                  !item.runId &&
+                  item.modelExecution?.fusionId &&
+                  fusionOwners.get(item.modelExecution.fusionId) === turn
+                )
+                  yield* putExecution(
+                    key,
+                    {
+                      ...item.modelExecution,
+                      gaps: item.modelExecution.gaps.filter(
+                        (gap) => gap !== "Native execution could not be associated with a T3 run.",
+                      ),
+                    },
+                    turn,
+                  );
+              }
+            }
+            return;
+          case "session.model_change":
+          case "session.auto_tier_switch_failed":
+            if (native && providerThread)
+              yield* refreshSelection(
+                turn?.input.modelSelection ??
+                  providerThread.nativeMetadata?.modelSelection ??
+                  open.modelSelection,
+                turn,
+                event.type === "session.auto_tier_switch_failed"
+                  ? { reason: event.data.reason, timestamp: event.timestamp, id: event.id }
+                  : undefined,
+              );
+            return;
           case "session.skills_loaded":
             options.onSkills?.(cwd, skillsFromSdk(event.data.skills));
             return;
@@ -1165,11 +1458,23 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
           const previous = ensure.existingProviderThread;
           const nativeId = previous?.nativeThreadRef?.nativeId ?? open.initialNativeThreadId;
           const mcp = yield* mcpSessions.read(open.threadId);
+          const autoTier =
+            ensure.modelSelection.model === "auto"
+              ? yield* sdk("validate routing selection", async () =>
+                  autoTierForSelection(
+                    ensure.modelSelection,
+                    (await client.rpc.models.list({})).auto,
+                  ),
+                )
+              : yield* sdk("validate model selection", async () =>
+                  autoTierForSelection(ensure.modelSelection),
+                );
           const sessionConfig: SessionConfig = {
             clientName: "t3-code",
             workingDirectory: cwd,
             configDirectory: config.effectiveHome,
             model: ensure.modelSelection.model,
+            ...(autoTier ? { capi: { autoTier } } : {}),
             ...(reasoningEffort(ensure.modelSelection)
               ? { reasoningEffort: reasoningEffort(ensure.modelSelection)! }
               : {}),
@@ -1248,6 +1553,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
               Effect.result,
             );
             if (transcript._tag === "Success") {
+              const executionEvents = transcript.success.filter((event) =>
+                fusionExecutionKey(event),
+              );
+              omittedReplayEvents = Math.max(
+                0,
+                executionEvents.length - MAX_REPLAY_EXECUTION_EVENTS,
+              );
+              replayExecutionEvents = executionEvents.slice(-MAX_REPLAY_EXECUTION_EVENTS);
               for (const event of transcript.success) {
                 if (
                   event.agentId ||
@@ -1306,6 +1619,30 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             driver: COPILOT_DRIVER,
             providerThread: createdThread,
           });
+          for (const event of replayExecutionEvents) {
+            yield* recordFusion(event, true);
+            seen.add(event.id);
+          }
+          replayExecutionEvents = [];
+          if (omittedReplayEvents) {
+            const timestamp = DateTime.formatIso(yield* DateTime.now);
+            yield* putExecution("native-replay-gap", {
+              version: 1,
+              kind: "gap",
+              nativeSessionId: native.sessionId,
+              eventId: "native-replay-limit",
+              sourceTimestamp: timestamp,
+              receivedAt: timestamp,
+              status: "incomplete",
+              startSource: "unknown",
+              gaps: [
+                `${omittedReplayEvents} older native execution events were omitted from bounded replay; previously persisted T3 history is retained.`,
+              ],
+            });
+            omittedReplayEvents = 0;
+          }
+          if (ensure.modelSelection.model === "auto")
+            yield* refreshSelection(ensure.modelSelection);
           const skills = yield* sdk("list skills", () => native!.rpc.skills.list()).pipe(
             Effect.result,
           );
@@ -1337,11 +1674,22 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             reason: "previous_turn_active",
           });
         const effort = reasoningEffort(turnInput.modelSelection);
+        const autoTier =
+          turnInput.modelSelection.model === "auto"
+            ? yield* sdk("validate routing selection", async () =>
+                autoTierForSelection(
+                  turnInput.modelSelection,
+                  (await native!.rpc.model.list()).auto,
+                ),
+              )
+            : yield* sdk("validate model selection", async () =>
+                autoTierForSelection(turnInput.modelSelection),
+              );
         yield* sdk("set model", () =>
-          native!.setModel(
-            turnInput.modelSelection.model,
-            effort ? { reasoningEffort: effort } : {},
-          ),
+          native!.setModel(turnInput.modelSelection.model, {
+            ...(effort ? { reasoningEffort: effort } : {}),
+            ...(autoTier ? { autoTier } : {}),
+          }),
         );
         const modeResult = yield* sdk("set mode", () =>
           native!.rpc.mode.set({
@@ -1392,8 +1740,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
           status: "active",
           firstRunOrdinal: providerThread.firstRunOrdinal ?? turnInput.runOrdinal,
           lastRunOrdinal: turnInput.runOrdinal,
-          nativeMetadata: { modelSelection: turnInput.modelSelection },
+          nativeMetadata: {
+            ...providerThread.nativeMetadata,
+            modelSelection: turnInput.modelSelection,
+          },
         });
+        if (turnInput.modelSelection.model === "auto")
+          yield* refreshSelection(turnInput.modelSelection, turn);
         const userText = yield* providerMessageTextWithAttachmentPaths({
           text: turnInput.message.text,
           attachments: turnInput.message.attachments,

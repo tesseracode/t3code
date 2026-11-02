@@ -1093,6 +1093,7 @@ function ThreadSettingsChoiceContent(props: {
             id: choice.mode,
             label: choice.label,
             description: choice.description,
+            disabled: false,
             selected: choice.mode === session.runtimeMode,
             onPress: () => {
               void Haptics.selectionAsync();
@@ -1106,7 +1107,14 @@ function ThreadSettingsChoiceContent(props: {
             rows: selectableChoices(activeDescriptor).map((choice) => ({
               id: choice.id,
               label: choice.label,
-              description: choice.description,
+              description:
+                [
+                  choice.description,
+                  choice.disabledReason ? `Unavailable: ${choice.disabledReason}` : undefined,
+                ]
+                  .filter(Boolean)
+                  .join("\n") || undefined,
+              disabled: choice.disabledReason !== undefined,
               selected:
                 choice.id ===
                 (session.promptTraits.ultrathinkPromptControlled &&
@@ -1118,6 +1126,7 @@ function ThreadSettingsChoiceContent(props: {
                       session.reportedModelSelection,
                     )),
               onPress: () => {
+                if (choice.disabledReason !== undefined) return;
                 void Haptics.selectionAsync();
                 if (
                   session.promptTraits.ultrathinkInBodyText &&
@@ -1161,6 +1170,7 @@ function ThreadSettingsChoiceContent(props: {
           <ChoiceRow
             key={row.id}
             description={row.description}
+            disabled={row.disabled}
             isLast={index === submenuContent.rows.length - 1}
             label={row.label}
             selected={row.selected}

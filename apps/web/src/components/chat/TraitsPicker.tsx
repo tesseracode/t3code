@@ -23,6 +23,7 @@ import {
   getProviderOptionDescriptors,
   isClaudeUltrathinkPrompt,
   normalizeModelSlug,
+  providerOptionChoicesInCycleOrder,
 } from "@t3tools/shared/model";
 import { memo, type ReactNode, useRef } from "react";
 import { GaugeIcon, ZapIcon } from "lucide-react";
@@ -271,15 +272,14 @@ export function getReasoningTraitStep(input: {
           { instanceId: input.instanceId, model: input.model, options: input.modelOptions ?? [] },
           input.reportedModelSelection,
         );
-  const ordered = input.direction > 0 ? descriptor.options : descriptor.options.toReversed();
-  const position =
-    [current, getDescriptorStringValue(descriptor)]
-      .map((value) => ordered.findIndex((option) => option.id === value))
-      .find((index) => index >= 0) ?? -1;
-  for (const option of [
-    ...ordered.slice(position + 1),
-    ...ordered.slice(0, Math.max(position, 0)),
-  ]) {
+  const cycleCurrent = descriptor.options.some((option) => option.id === current)
+    ? current
+    : getDescriptorStringValue(descriptor);
+  for (const option of providerOptionChoicesInCycleOrder(
+    descriptor,
+    cycleCurrent,
+    input.direction,
+  )) {
     const change = getTraitSelectChange(selected, descriptor, input.prompt, option.id);
     if (!change) return null;
     if ("modelOptions" in change) {
@@ -457,7 +457,10 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                     value={option.id}
                     hideIndicator
                     closeOnClick
-                    disabled={ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id}
+                    disabled={
+                      option.disabledReason !== undefined ||
+                      (ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id)
+                    }
                   >
                     <span className="flex w-full min-w-0 flex-col">
                       <span className="flex min-w-0 items-center gap-1">
@@ -467,6 +470,11 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                       {option.description ? (
                         <span className="max-w-56 text-pretty text-muted-foreground/80 text-xs">
                           {option.description}
+                        </span>
+                      ) : null}
+                      {option.disabledReason ? (
+                        <span className="max-w-56 text-pretty text-muted-foreground text-xs">
+                          Unavailable: {option.disabledReason}
                         </span>
                       ) : null}
                     </span>

@@ -81,7 +81,11 @@ export function getTraitSelectChange(
   prompt: string,
   value: string,
 ) {
-  if (!value) return null;
+  if (
+    !value ||
+    !descriptor.options.some((option) => option.id === value && option.disabledReason === undefined)
+  )
+    return null;
   if (descriptor.promptInjectedValues?.includes(value)) {
     return {
       prompt:

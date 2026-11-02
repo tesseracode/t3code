@@ -85,5 +85,25 @@ describe("prompt-controlled reasoning", () => {
         "ultrathink",
       ),
     ).toEqual({ prompt: "/review" });
+    const unavailableDescriptor = {
+      ...effortDescriptor,
+      options: effortDescriptor.options.map((option) => ({
+        ...option,
+        disabledReason: "Unavailable for this session",
+      })),
+    };
+    for (const value of ["low", "ultrathink", "removed-tier"]) {
+      expect(
+        getTraitSelectChange(
+          {
+            ...getPromptControlledTraits([unavailableDescriptor], ""),
+            descriptors: [unavailableDescriptor],
+          },
+          unavailableDescriptor,
+          "",
+          value,
+        ),
+      ).toBeNull();
+    }
   });
 });

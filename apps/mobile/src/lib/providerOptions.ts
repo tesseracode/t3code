@@ -33,7 +33,9 @@ export function applyProviderOptionSelection(
     (descriptor.type === "boolean" && typeof change.value !== "boolean") ||
     (descriptor.type === "select" &&
       (typeof change.value !== "string" ||
-        !descriptor.options.some((option) => option.id === change.value)))
+        !descriptor.options.some(
+          (option) => option.id === change.value && option.disabledReason === undefined,
+        )))
   ) {
     return null;
   }

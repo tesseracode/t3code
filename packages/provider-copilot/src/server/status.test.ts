@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 import { CopilotSettings } from "../settings.ts";
 import { checkStatus, modelsFromSdk, skillsFromSdk } from "./status.ts";
 import { bundledCliPath, resolveClientConfiguration } from "./client.ts";
+import type { AutoCatalog } from "./routing.ts";
 
 const decode = Schema.decodeSync(CopilotSettings);
 const model = (id: string, extra: Partial<ModelInfo> = {}): ModelInfo => ({
@@ -31,6 +32,32 @@ const skill = (
 });
 
 describe("Copilot discovery and account isolation", () => {
+  it("adds advertised Auto routing without replacing explicit-model defaults", () => {
+    const auto: AutoCatalog = {
+      defaultTier: "opaque-tier",
+      tiers: [
+        {
+          id: "opaque-tier",
+          displayName: "Fusion",
+          description: "Account supplied",
+          type: "fusion",
+          status: { enabled: true },
+        },
+      ],
+    };
+    const result = modelsFromSdk([model("explicit")], decode({}), auto);
+    assert.deepEqual(
+      result.map((entry) => entry.slug),
+      ["explicit", "auto"],
+    );
+    assert.isTrue(result[0]?.isDefault);
+    assert.isUndefined(result[1]?.isDefault);
+    assert.equal(result[1]?.capabilities?.optionDescriptors?.[0]?.id, "autoTier");
+    assert.deepEqual(
+      modelsFromSdk([model("explicit")], decode({})).map((entry) => entry.slug),
+      ["explicit"],
+    );
+  });
   it("keeps project/native skills in workspace results, including pathless built-ins", () => {
     const skills = skillsFromSdk([
       skill("project-skill", "project"),
@@ -150,7 +177,7 @@ describe("Copilot discovery and account isolation", () => {
           forceStop: async () => {},
           getStatus: async () => ({ version: "1.0.75", protocolVersion: 1 }),
           getAuthStatus: async () => ({ isAuthenticated: true, login: "octocat" }),
-          listModels: async () => [model("gpt")],
+          rpc: { models: { list: async () => ({ models: [model("gpt")] }) } },
         }),
       );
       assert.equal(result.status, "ready");
@@ -180,7 +207,7 @@ describe("Copilot discovery and account isolation", () => {
               return { version: "1.0.75", protocolVersion: 1 };
             },
             getAuthStatus: async () => ({ isAuthenticated: true }),
-            listModels: async () => [],
+            rpc: { models: { list: async () => ({ models: [] }) } },
           }));
           assert.equal(snapshot.status, "error");
           assert.equal(forced, 1);

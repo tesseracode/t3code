@@ -1,0 +1,14 @@
+# Test run — 2026-11-02T18:46:26Z
+# Command: vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/fusion.test.ts packages/provider-copilot/src/server/routing.test.ts packages/provider-copilot/src/server/driver.test.ts packages/provider-copilot/src/server/textGeneration.test.ts scripts/lib/copilot-payload.test.ts packages/shared/src/copilotRuntime.test.ts scripts/lib/cli-external-packages.test.ts scripts/build-desktop-artifact.test.ts packages/shared/src/model.test.ts packages/contracts/src/orchestrationV2.test.ts packages/client-runtime/src/work-log/modelExecution.test.ts packages/client-runtime/src/work-log/itemDetail.test.ts apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts apps/mobile/src/features/threads/thread-settings-options.test.ts apps/mobile/src/lib/threadActivity.test.ts apps/web/src/session-logic.test.ts apps/web/src/session-logic.runtime-diagnostics.test.ts
+# Directory: /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-copilot-fusion-request
+
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-copilot-fusion-request
+
+
+ Test Files  19 passed (19)
+      Tests  290 passed (290)
+   Start at  10:46:19
+   Duration  6.81s (transform 59%, import 19%, setup 12%, tests 10%)
+

@@ -33,8 +33,75 @@ const decodeOrchestrationV2ProviderThread = Schema.decodeUnknownSync(Orchestrati
 const decodeOrchestrationV2ProviderCapabilities = Schema.decodeUnknownSync(
   OrchestrationV2ProviderCapabilities,
 );
+const decodeRuntimeTurnItem = Schema.decodeUnknownSync(OrchestrationV2TurnItem);
+const turnItemWireCodec = Schema.toCodecJson(OrchestrationV2TurnItem);
+const encodeWireTurnItem = Schema.encodeSync(turnItemWireCodec);
+const decodeWireTurnItem = Schema.decodeUnknownSync(turnItemWireCodec);
+const decodeLegacyNotice = Schema.decodeUnknownSync(
+  Schema.Struct({
+    type: Schema.Literal("system_notice"),
+    message: Schema.String,
+  }),
+);
 
 describe("orchestration V2 contracts", () => {
+  it("round-trips optional model execution metadata through runtime and JSON notices without breaking old histories", () => {
+    const notice = {
+      id: "model-notice",
+      type: "system_notice",
+      threadId: "thread-1",
+      runId: null,
+      nodeId: null,
+      providerThreadId: null,
+      providerTurnId: null,
+      nativeItemRef: null,
+      parentItemId: null,
+      ordinal: 1,
+      status: "completed",
+      title: "Model execution",
+      startedAt: null,
+      completedAt: null,
+      updatedAt: now,
+      message: "Model phase succeeded",
+    };
+    const modelExecution = {
+      version: 1,
+      kind: "phase",
+      nativeSessionId: "session",
+      phaseId: "primary",
+      eventId: "event",
+      sourceTimestamp: DateTime.formatIso(now),
+      receivedAt: DateTime.formatIso(now),
+      status: "succeeded",
+      model: "model",
+      startSource: "estimated",
+      durationMs: 2000,
+      gaps: ["Transient start was not observed."],
+    };
+    const legacy = decodeRuntimeTurnItem(notice);
+    expect(legacy.type).toBe("system_notice");
+    const runtime = decodeRuntimeTurnItem({ ...notice, modelExecution });
+    const wire = encodeWireTurnItem(runtime);
+    const json = decodeOrchestrationV2TurnItemJson(wire);
+    expect(json.type).toBe("system_notice");
+    if (json.type !== "system_notice") throw new Error("Expected system notice.");
+    expect(json.modelExecution).toEqual(modelExecution);
+    const restored = decodeWireTurnItem(wire);
+    expect(restored).toEqual(runtime);
+    expect(decodeLegacyNotice(wire)).toEqual({ type: "system_notice", message: notice.message });
+    expect(() =>
+      decodeRuntimeTurnItem({
+        ...notice,
+        modelExecution: { ...modelExecution, model: "x".repeat(513) },
+      }),
+    ).toThrow();
+    expect(() =>
+      decodeRuntimeTurnItem({
+        ...notice,
+        modelExecution: { ...modelExecution, gaps: Array.from({ length: 17 }, () => "gap") },
+      }),
+    ).toThrow();
+  });
   it("decodes thread event types from a newer server as skippable items", () => {
     const decodeWireItems = Schema.decodeUnknownSync(
       Schema.toCodecJson(Schema.Array(OrchestrationV2RpcSchemas.subscribeThread.output)),

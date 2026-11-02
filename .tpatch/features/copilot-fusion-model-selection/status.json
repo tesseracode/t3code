@@ -2,13 +2,17 @@
   "id": "copilot-fusion-model-selection",
   "slug": "copilot-fusion-model-selection",
   "title": "Support and qualify Copilot Fusion model selection and effort tiers through the native Copilot SDK.",
-  "state": "defined",
+  "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-10-30T18:38:28Z",
-  "updated_at": "2026-11-02T08:15:18Z",
-  "last_command": "explore",
-  "notes": "Phase advanced manually (--manual); artifact authored at exploration.md",
-  "apply": {},
+  "updated_at": "2026-11-02T18:46:38Z",
+  "last_command": "record",
+  "notes": "landed at 2026-11-02T18:47:20Z",
+  "apply": {
+    "completed_at": "2026-11-02T18:46:26Z",
+    "base_commit": "d82592306068663ae4665d4500894030fe647dae",
+    "has_patch": true
+  },
   "reconcile": {},
   "depends_on": [
     {

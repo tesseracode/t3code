@@ -136,21 +136,52 @@ function resolveDescriptorChoiceValue(
 ): string | undefined {
   const trimmed = trimOrNull(raw);
   if (!trimmed) {
-    return descriptor.currentValue ?? descriptor.options.find((option) => option.isDefault)?.id;
+    return (
+      descriptor.currentValue ??
+      descriptor.options.find((option) => option.isDefault && option.disabledReason === undefined)
+        ?.id
+    );
   }
   if (descriptor.options.length === 0) {
+    return trimmed;
+  }
+  if (descriptor.id === "autoTier") {
+    return trimmed;
+  }
+  if (
+    descriptor.options.some(
+      (option) => option.id === trimmed && option.disabledReason !== undefined,
+    )
+  ) {
     return trimmed;
   }
   if (
     descriptor.promptInjectedValues?.includes(trimmed) &&
     descriptor.options.some((option) => option.id === trimmed)
   ) {
-    return descriptor.options.find((option) => option.isDefault)?.id;
+    return descriptor.options.find(
+      (option) => option.isDefault && option.disabledReason === undefined,
+    )?.id;
   }
   if (descriptor.options.some((option) => option.id === trimmed)) {
     return trimmed;
   }
-  return descriptor.currentValue ?? descriptor.options.find((option) => option.isDefault)?.id;
+  return (
+    descriptor.currentValue ??
+    descriptor.options.find((option) => option.isDefault && option.disabledReason === undefined)?.id
+  );
+}
+
+export function providerOptionChoicesInCycleOrder(
+  descriptor: Extract<ProviderOptionDescriptor, { type: "select" }>,
+  current: string | null | undefined,
+  direction: 1 | -1,
+) {
+  const ordered = direction > 0 ? descriptor.options : [...descriptor.options].reverse();
+  const position = ordered.findIndex((option) => option.id === current);
+  return [...ordered.slice(position + 1), ...ordered.slice(0, Math.max(position, 0))].filter(
+    (option) => option.disabledReason === undefined,
+  );
 }
 
 function cloneDescriptor(descriptor: ProviderOptionDescriptor): ProviderOptionDescriptor {
@@ -257,7 +288,9 @@ export function getProviderOptionCurrentValue(
   if (descriptor.currentValue) {
     return descriptor.currentValue;
   }
-  return descriptor.options.find((option) => option.isDefault)?.id;
+  return descriptor.options.find(
+    (option) => option.isDefault && option.disabledReason === undefined,
+  )?.id;
 }
 
 export function getProviderOptionCurrentLabel(

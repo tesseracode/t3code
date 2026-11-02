@@ -22,6 +22,7 @@ import {
 import {
   turnItemHasDetail,
   turnItemNeedsDetailFetch,
+  turnItemOutputText,
 } from "@t3tools/client-runtime/work-log/item-detail";
 import { claudeSkillInvocation } from "@t3tools/shared/toolActivity";
 import { threadFindActivityText } from "@t3tools/shared/threadFindText";
@@ -325,11 +326,13 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? claudeSkillInvocation(payload.toolName, payload.input)
       : undefined;
   const plainOutput =
-    toolGroupAction(workEntry) === "read"
-      ? workEntryReadOutput(workEntry, workspaceRoot)
-      : skill
-        ? (skill.args ?? null)
-        : undefined;
+    payload?.type === "system_notice" && payload.modelExecution
+      ? turnItemOutputText(payload)
+      : toolGroupAction(workEntry) === "read"
+        ? workEntryReadOutput(workEntry, workspaceRoot)
+        : skill
+          ? (skill.args ?? null)
+          : undefined;
   const viewedImage =
     viewedImagePath && threadRef
       ? resolveViewedImageAsset(viewedImagePath, {

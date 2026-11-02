@@ -1,6 +1,7 @@
 import type { AssetResource, OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { toolOutputImageBlocks, toolOutputImages } from "@t3tools/shared/toolOutput";
 import * as DateTime from "effect/DateTime";
+import { modelExecutionDetail } from "./modelExecution.ts";
 
 const MAX_TEXT_BLOCK_DEPTH = 4;
 
@@ -159,6 +160,8 @@ function commandOutputText(output: string): string {
 
 export function turnItemOutputText(item: OrchestrationV2TurnItem): string | null {
   switch (item.type) {
+    case "system_notice":
+      return item.modelExecution ? modelExecutionDetail(item.modelExecution, item.message) : null;
     case "command_execution":
       return item.output?.trim() ? commandOutputText(item.output) || null : null;
     case "dynamic_tool":
@@ -238,7 +241,7 @@ export function turnItemHasDetail(item: OrchestrationV2TurnItem): boolean {
     case "notification":
       return Boolean(item.detail?.trim());
     case "system_notice":
-      return item.message.trim().length > 0;
+      return item.modelExecution !== undefined || item.message.trim().length > 0;
     case "error":
       return item.failure.message.trim().length > 0;
     case "proposed_plan":

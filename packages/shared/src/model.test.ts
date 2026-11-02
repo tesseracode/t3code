@@ -8,7 +8,9 @@ import {
   createModelCapabilities,
   createModelSelection,
   getProviderOptionCurrentLabel,
+  getProviderOptionCurrentValue,
   getProviderOptionDescriptors,
+  providerOptionChoicesInCycleOrder,
   readCustomModelEntries,
   modelSelectionsEqual,
 } from "./model.ts";
@@ -34,6 +36,67 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
 });
 
 describe("descriptor helpers", () => {
+  it("preserves an opaque saved routing request that the destination no longer advertises", () => {
+    const descriptors = getProviderOptionDescriptors({
+      caps: createModelCapabilities({
+        optionDescriptors: [
+          {
+            id: "autoTier",
+            label: "Routing",
+            type: "select",
+            currentValue: "standard",
+            options: [{ id: "standard", label: "Standard", isDefault: true }],
+          },
+        ],
+      }),
+      selections: [{ id: "autoTier", value: "former-account:opaque" }],
+    });
+    expect(
+      buildExplicitProviderOptionSelectionsFromDescriptors(descriptors, [
+        { id: "autoTier", value: "former-account:opaque" },
+      ]),
+    ).toEqual([{ id: "autoTier", value: "former-account:opaque" }]);
+  });
+  it("skips unavailable choices for defaults and navigation but preserves explicit unavailable requests", () => {
+    const descriptor = {
+      id: "routing",
+      label: "Routing",
+      type: "select" as const,
+      options: [
+        { id: "premium", label: "Premium", isDefault: true, disabledReason: "Not supported" },
+        { id: "standard", label: "Standard" },
+        { id: "economy", label: "Economy" },
+      ],
+    };
+    expect(getProviderOptionCurrentValue(descriptor)).toBeUndefined();
+    expect(
+      providerOptionChoicesInCycleOrder(descriptor, "standard", 1).map(({ id }) => id),
+    ).toEqual(["economy"]);
+    expect(
+      providerOptionChoicesInCycleOrder(descriptor, "economy", -1).map(({ id }) => id),
+    ).toEqual(["standard"]);
+    const descriptors = getProviderOptionDescriptors({
+      caps: createModelCapabilities({ optionDescriptors: [descriptor] }),
+      selections: [{ id: "routing", value: "premium" }],
+    });
+    expect(getProviderOptionCurrentLabel(descriptors[0])).toBe("Premium");
+    expect(
+      buildExplicitProviderOptionSelectionsFromDescriptors(descriptors, [
+        { id: "routing", value: "premium" },
+      ]),
+    ).toEqual([{ id: "routing", value: "premium" }]);
+    expect(
+      providerOptionChoicesInCycleOrder(
+        {
+          ...descriptor,
+          options: descriptor.options.slice(0, 1),
+        },
+        "premium",
+        1,
+      ),
+    ).toEqual([]);
+  });
+
   it("builds dispatch options only from explicit selections", () => {
     const descriptors = getProviderOptionDescriptors({
       caps: codexCaps,

@@ -16,6 +16,7 @@ import {
   RunId,
   ThreadId,
   type OrchestrationV2AppThread,
+  type ModelSelection,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -29,6 +30,7 @@ import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import { CopilotSettings } from "../settings.ts";
 import { makeAdapter, type ClientHandle, type SessionHandle } from "./adapter.ts";
+import type { ModelCatalog } from "./routing.ts";
 
 const threadId = ThreadId.make("copilot-test");
 const instanceId = ProviderInstanceId.make("githubCopilot");
@@ -78,13 +80,24 @@ function fakeSdk() {
   > = [];
   let permissionResponse = async (): Promise<{ success: boolean }> => ({ success: true });
   let background: Awaited<ReturnType<SessionHandle["rpc"]["tasks"]["list"]>> = { tasks: [] };
+  let catalog: ModelCatalog = { models: [] };
+  let current: Awaited<ReturnType<SessionHandle["rpc"]["model"]["getCurrent"]>> = {
+    modelId: "gpt-4.1",
+  };
+  const modelChanges: Array<{ model: string; options: Parameters<SessionHandle["setModel"]>[1] }> =
+    [];
   const sent: MessageOptions[] = [];
-  const emit = (type: SessionEvent["type"], data: unknown = {}, agentId?: string) => {
+  const emit = (
+    type: SessionEvent["type"],
+    data: unknown = {},
+    agentId?: string,
+    timestamp = "2026-10-29T00:00:00Z",
+  ) => {
     config?.onEvent?.({
       type,
       data,
       id: `native-event-${++serial}`,
-      timestamp: "2026-10-29T00:00:00Z",
+      timestamp,
       parentId: null,
       ...(agentId ? { agentId } : {}),
     } as SessionEvent);
@@ -102,8 +115,14 @@ function fakeSdk() {
       disconnected++;
     },
     getEvents: async () => [],
-    setModel: async () => {},
+    setModel: async (model, options) => {
+      modelChanges.push({ model, options });
+    },
     rpc: {
+      model: {
+        list: async () => ({ list: [], ...(catalog.auto ? { auto: catalog.auto } : {}) }),
+        getCurrent: async () => current,
+      },
       mode: { set: async () => ({ status: "success", modelChanged: false, modeApplied: true }) },
       plan: {
         read: async () => ({
@@ -127,6 +146,7 @@ function fakeSdk() {
     },
   };
   const client: ClientHandle = {
+    rpc: { models: { list: async () => catalog } },
     start: async () => {},
     stop: async () => {
       stopped++;
@@ -151,6 +171,13 @@ function fakeSdk() {
     session,
     sent,
     emit,
+    modelChanges,
+    setCatalog: (value: ModelCatalog) => {
+      catalog = value;
+    },
+    setCurrent: (value: typeof current) => {
+      current = value;
+    },
     get config() {
       return config!;
     },
@@ -179,6 +206,25 @@ function fakeSdk() {
   };
 }
 type Fake = ReturnType<typeof fakeSdk>;
+const durablePhase = (phaseId: string): SessionEvent => ({
+  type: "assistant.fusion_phase_completed",
+  id: `durable-${phaseId}`,
+  timestamp: "2026-10-29T00:00:02Z",
+  parentId: null,
+  data: {
+    fusionId: "fusion-1",
+    phaseId,
+    model: "model",
+    role: "primary",
+    phaseKind: "primary",
+    conversationScope: "root",
+    durationMs: 2000,
+    status: "succeeded",
+    content: "PRIVATE",
+    verdict: null,
+    usage: { inputTokens: 10, outputTokens: 5, cachedTokens: 0, requestCount: 1, totalNanoAiu: 0 },
+  },
+});
 
 function promiseGate() {
   let resolve!: () => void;
@@ -188,15 +234,20 @@ function promiseGate() {
   return { promise, resolve };
 }
 
-const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: string) {
+const setup = Effect.fnUntraced(function* (
+  fake: Fake,
+  initialNativeThreadId?: string,
+  initialSelection: ModelSelection = selection,
+  runtimeSessionId = sessionId,
+) {
   const adapter = yield* makeAdapter(
     { instanceId, settings, environment: { HOME: "/test-account" } },
     { clientFactory: () => fake.client },
   );
   const runtime = yield* adapter.openSession({
     threadId,
-    providerSessionId: sessionId,
-    modelSelection: selection,
+    providerSessionId: runtimeSessionId,
+    modelSelection: initialSelection,
     runtimePolicy: policy,
     ...(initialNativeThreadId ? { initialNativeThreadId } : {}),
   });
@@ -220,17 +271,17 @@ const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: s
   });
   const thread = yield* runtime.ensureThread({
     threadId,
-    modelSelection: selection,
+    modelSelection: initialSelection,
     runtimePolicy: policy,
   });
-  const start = Effect.fnUntraced(function* (ordinal = 1) {
+  const start = Effect.fnUntraced(function* (ordinal = 1, turnSelection = initialSelection) {
     const now = yield* DateTime.now;
     const appThread: OrchestrationV2AppThread = {
       id: threadId,
       projectId: ProjectId.make("project"),
       title: "Test",
       providerInstanceId: instanceId,
-      modelSelection: selection,
+      modelSelection: turnSelection,
       runtimeMode: policy.runtimeMode,
       interactionMode: "default",
       branch: null,
@@ -264,7 +315,7 @@ const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: s
         createdBy: "user",
         creationSource: "web",
       },
-      modelSelection: selection,
+      modelSelection: turnSelection,
       runtimePolicy: policy,
     });
   });
@@ -280,6 +331,325 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   );
 
 describe("native Copilot V2", () => {
+  it.effect(
+    "bounds live phase records and exposes an overflow gap instead of silently losing telemetry",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const { start, emitted, takeEvent } = yield* setup(fake);
+          yield* start();
+          fake.emit("assistant.turn_start", { turnId: "0" });
+          fake.emit("session.fusion_resolved", {
+            fusionId: "fusion-1",
+            turnId: "0",
+            contractVersion: 1,
+            pattern: "single",
+            primaryModel: "model",
+            fallbackModel: "model",
+            syntheticModel: "auto",
+          });
+          for (let index = 0; index < 130; index++)
+            fake.emit("assistant.fusion_phase_started", {
+              fusionId: "fusion-1",
+              phaseId: `phase-${index}`,
+              model: "model",
+              role: "primary",
+              pattern: "single",
+            });
+          yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution?.kind === "gap" &&
+              event.turnItem.modelExecution.phaseId === "phase-129",
+          );
+          const items = new Map(
+            emitted.flatMap((event) =>
+              event.type === "turn_item.updated"
+                ? [[event.turnItem.id, event.turnItem] as const]
+                : [],
+            ),
+          );
+          assert.equal(items.size, 128);
+          assert.isTrue(
+            [...items.values()].some(
+              (item) =>
+                item.type === "system_notice" &&
+                item.modelExecution?.gaps.some((gap) => gap.includes("per-turn limit")),
+            ),
+          );
+        }),
+      ),
+  );
+
+  it.effect(
+    "bounds cold replay and exposes omitted native history without deleting persisted records",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          fake.session.getEvents = async () =>
+            Array.from({ length: 513 }, (_, index) => durablePhase(`phase-${index}`));
+          const { emitted, takeEvent } = yield* setup(fake, "native-copilot");
+          yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution?.kind === "gap",
+          );
+          const phases = emitted.filter(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution?.kind === "phase",
+          );
+          assert.equal(phases.length, 512);
+          assert.isTrue(
+            emitted.some(
+              (event) =>
+                event.type === "turn_item.updated" &&
+                event.turnItem.type === "system_notice" &&
+                event.turnItem.modelExecution?.gaps.some((gap) => gap.startsWith("1 older native")),
+            ),
+          );
+        }),
+      ),
+  );
+  it.effect(
+    "preserves opaque create/resume routing and distinguishes pending, applied and failed activation",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const auto = {
+            defaultTier: "standard",
+            tiers: ["standard", "fuse@2026:opaque"].map((id) => ({
+              id,
+              displayName: id,
+              description: "",
+              type: "auto",
+              status: { enabled: true },
+            })),
+          };
+          const autoSelection: ModelSelection = {
+            instanceId,
+            model: "auto",
+            options: [{ id: "autoTier", value: "fuse@2026:opaque" }],
+          };
+          for (const resumed of [undefined, "native-copilot"]) {
+            const fake = fakeSdk();
+            fake.setCatalog({ models: [], auto });
+            fake.setCurrent({
+              modelId: "auto",
+              autoTier: "standard",
+              pendingAutoTier: "fuse@2026:opaque",
+            });
+            const { start, drain, emitted, takeEvent } = yield* setup(fake, resumed, autoSelection);
+            assert.deepEqual(fake.config.capi, { autoTier: "fuse@2026:opaque" });
+            yield* start();
+            assert.deepEqual(fake.modelChanges[0], {
+              model: "auto",
+              options: { autoTier: "fuse@2026:opaque" },
+            });
+            const pending = yield* takeEvent(
+              (event) =>
+                event.type === "turn_item.updated" &&
+                event.turnItem.runId === RunId.make("run-1") &&
+                event.turnItem.type === "system_notice" &&
+                event.turnItem.modelExecution?.status === "pending",
+            );
+            assert.equal(pending.type, "turn_item.updated");
+            if (pending.type !== "turn_item.updated" || pending.turnItem.type !== "system_notice")
+              return assert.fail("Expected persisted routing state.");
+            assert.equal(pending.turnItem.modelExecution?.effectivePreference, "standard");
+            assert.equal(pending.turnItem.modelExecution?.requestedPreference, "fuse@2026:opaque");
+            fake.setCurrent({ modelId: "auto", autoTier: "fuse@2026:opaque" });
+            fake.emit("session.model_change", {});
+            yield* takeEvent(
+              (event) =>
+                event.type === "turn_item.updated" &&
+                event.turnItem.type === "system_notice" &&
+                event.turnItem.modelExecution?.status === "effective",
+            );
+            fake.setCurrent({ modelId: "auto", autoTier: "standard" });
+            fake.emit("session.auto_tier_switch_failed", {
+              requestedAutoTier: "fuse@2026:opaque",
+              effectiveAutoTier: "standard",
+              reason: "policy-changed",
+            });
+            yield* takeEvent(
+              (event) =>
+                event.type === "turn_item.updated" &&
+                event.turnItem.type === "system_notice" &&
+                event.turnItem.modelExecution?.status === "activation-failed",
+            );
+            const states = emitted.flatMap((event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution
+                ? [event.turnItem.modelExecution]
+                : [],
+            );
+            assert.isTrue(
+              states.some(
+                (state) =>
+                  state.status === "effective" && state.effectivePreference === "fuse@2026:opaque",
+              ),
+            );
+            assert.isTrue(
+              states.some(
+                (state) =>
+                  state.status === "activation-failed" && state.effectivePreference === "standard",
+              ),
+            );
+            fake.emit("session.idle");
+            yield* drain();
+            yield* start(2, selection);
+            assert.equal(fake.modelChanges.at(-1)?.model, "gpt-4.1");
+            assert.deepEqual(fake.modelChanges.at(-1)?.options, {});
+          }
+        }),
+      ),
+  );
+
+  it.effect(
+    "keeps phase identity and late ownership without finishing the root or counting aggregate usage",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const { start, drain, emitted, takeEvent } = yield* setup(fake);
+          yield* start();
+          fake.emit("assistant.turn_start", { turnId: "0" });
+          fake.emit("session.fusion_resolved", {
+            fusionId: "fusion-1",
+            turnId: "0",
+            contractVersion: 1,
+            pattern: "critique",
+            primaryModel: "same-model",
+            secondaryModel: "same-model",
+            fallbackModel: "fallback",
+            syntheticModel: "auto",
+          });
+          for (const phaseId of ["draft", "critic"])
+            fake.emit("assistant.fusion_phase_started", {
+              fusionId: "fusion-1",
+              phaseId,
+              model: "same-model",
+              role: phaseId,
+              pattern: "critique",
+            });
+          fake.emit("assistant.fusion_phase_completed", {
+            fusionId: "fusion-1",
+            phaseId: "critic",
+            model: "same-model",
+            role: "critic",
+            durationMs: 2000,
+            status: "completed",
+            content: "PRIVATE CRITIC",
+            usage: { inputTokens: 500 },
+          });
+          fake.emit("session.fusion_completed", {
+            fusionId: "fusion-1",
+            turnId: "0",
+            pattern: "critique",
+            durationMs: 2000,
+            outcome: "completed",
+            finalSourceModel: "same-model",
+            finalSourcePhaseId: "draft",
+            awaitingBackgroundWork: true,
+            syntheticModel: "auto",
+            inputTokens: 1000,
+          });
+          assert.equal((yield* drain()).providerTurns[0]?.status, "running");
+          assert.isUndefined((yield* drain()).providerTurns[0]?.tokenUsage);
+          fake.emit("assistant.usage", { inputTokens: 10, outputTokens: 5 });
+          assert.equal((yield* drain()).providerTurns[0]?.tokenUsage?.usedTokens, 15);
+          fake.emit("session.idle");
+          assert.equal((yield* drain()).providerTurns[0]?.status, "completed");
+          yield* start(2);
+          fake.emit("assistant.fusion_phase_completed", {
+            fusionId: "fusion-1",
+            phaseId: "draft",
+            model: "same-model",
+            role: "draft",
+            durationMs: 2500,
+            status: "completed",
+            content: "PRIVATE DRAFT",
+          });
+          fake.emit("assistant.fusion_phase_failed", {
+            fusionId: "unknown-fusion",
+            phaseId: "late",
+            model: "same-model",
+            role: "critic",
+            durationMs: 100,
+            status: "failed",
+            reason: "cancelled",
+            errorMessage: "PRIVATE ERROR",
+          });
+          yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution?.fusionId === "unknown-fusion",
+          );
+          const items = new Map(
+            emitted.flatMap((event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution
+                ? [[event.turnItem.id, event.turnItem] as const]
+                : [],
+            ),
+          );
+          const phases = [...items.values()].filter(
+            (item) => item.modelExecution?.kind === "phase",
+          );
+          assert.equal(phases.length, 3);
+          assert.isTrue(
+            phases
+              .filter((item) => item.modelExecution?.fusionId === "fusion-1")
+              .every((item) => item.runId === RunId.make("run-1")),
+          );
+          assert.equal(
+            phases.find((item) => item.modelExecution?.fusionId === "unknown-fusion")?.runId,
+            null,
+          );
+          assert.notInclude(JSON.stringify([...items.values()]), "PRIVATE");
+        }),
+      ),
+  );
+
+  it.effect(
+    "imports cold native execution history with stable IDs and honest missing associations",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const ids: string[] = [];
+          for (let restart = 0; restart < 2; restart++) {
+            const fake = fakeSdk();
+            fake.session.getEvents = async () => [durablePhase("primary")];
+            const { takeEvent } = yield* setup(
+              fake,
+              "native-copilot",
+              selection,
+              ProviderSessionId.make(`restart-${restart}`),
+            );
+            const imported = yield* takeEvent((event) => event.type === "turn_item.updated");
+            if (imported.type !== "turn_item.updated" || imported.turnItem.type !== "system_notice")
+              return assert.fail("Expected imported execution history.");
+            ids.push(imported.turnItem.id);
+            assert.equal(imported.turnItem.runId, null);
+            assert.equal(imported.turnItem.modelExecution?.startSource, "estimated");
+            assert.include(
+              imported.turnItem.modelExecution?.gaps.join(" "),
+              "could not be associated",
+            );
+          }
+          assert.equal(ids[0], ids[1]);
+        }),
+      ),
+  );
   it.effect(
     "waits for the native permission receipt and never replaces V2-owned response delivery",
     () =>

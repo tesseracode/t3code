@@ -1,0 +1,27 @@
+{
+  "feature": "copilot-fusion-model-selection",
+  "verdict": "offline-implementation-only; rollout-blocked",
+  "approval": "Maintainer explicitly approved offline implementation while unavailable SDK target/account gates remain blockers.",
+  "implementation": {
+    "discovery": "Typed global and destination-session RPC catalogs; opaque account IDs, visibility and disabled reasons; explicit defaults unchanged.",
+    "selection": "Create/resume capi.autoTier and per-turn setModel options; authoritative getCurrent snapshots distinguish requested/effective/pending/activating/failure.",
+    "history": "Additive typed metadata on existing system_notice items; stable provider-instance/thread/native-session/Fusion/phase identities; persisted through existing event/projector storage.",
+    "bounds": "512 characters per metadata string, 64 planned models, 16 gaps, 128 execution records per live turn and 512 meaningful native replay events; visible truncation gaps.",
+    "privacy": "Whitelisted identifiers, statuses and timing only; no phase content, critic drafts, unrestricted error text, raw arguments or phase/aggregate accounting totals.",
+    "clients": "Shared summaries and expandable details for web/desktop and mobile; unavailable choices cannot be newly selected or cycled to; saved unknown/disabled routing requests remain explicit.",
+    "connections": "Existing environment-scoped contracts and timeline path; no client origins, separate event bus or new storage table."
+  },
+  "remainingGates": [
+    "SDK native packaged execution on Mac x64, Windows and WSL/Linux",
+    "Authenticated account-specific Auto/Fusion catalog and vendor-policy eligibility",
+    "Separately approved real Fusion single/cascade/critique execution, callbacks and native replay",
+    "Authorized integrated browser/device presentation pass"
+  ],
+  "constraints": {
+    "realAccountExecution": false,
+    "vendorInference": false,
+    "deployed": false,
+    "browserOrComputerUse": false,
+    "providerDefaultsChanged": false
+  }
+}

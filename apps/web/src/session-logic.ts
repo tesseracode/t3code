@@ -25,6 +25,7 @@ import {
 } from "@t3tools/shared/toolActivity";
 import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
 import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
+import { modelExecutionSummary } from "@t3tools/client-runtime/work-log/model-execution";
 import type { McpAppReference } from "@t3tools/shared/mcpApp";
 import { htmlRenderFromToolItem, mcpAppFromToolItem } from "@t3tools/shared/toolOutput";
 import {
@@ -479,8 +480,8 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "system_notice":
       return {
         ...common,
-        label: item.message,
-        sourceActivityKind: "runtime.warning",
+        label: item.modelExecution ? modelExecutionSummary(item.modelExecution) : item.message,
+        ...(item.modelExecution ? {} : { sourceActivityKind: "runtime.warning" }),
       };
     case "error": {
       const presentation = providerErrorPresentation(item);

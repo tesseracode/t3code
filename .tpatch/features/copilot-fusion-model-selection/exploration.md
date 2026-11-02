@@ -4,7 +4,15 @@
 
 The smallest credible slice uses existing shared model options and V2 persisted
 turn items; it does not need an orchestrator, a second connection registry or a
-raw SDK-event WebSocket channel. Fusion remains unimplemented.
+raw SDK-event WebSocket channel.
+
+Implementation authorization on November 2 permits offline development after
+Mac arm64 native fixture qualification, while other packaged targets and real
+account/Fusion execution remain unqualified rollout gates. Use optional typed
+modelExecution metadata on existing system_notice items, with a readable fallback
+message: old clients can still decode and display the notice, without a new
+discriminated-union tag or JSON encoded into transcript text. The final recorded
+patch and regenerated recipe cover all manual-session edits.
 
 The sibling SDK upgrade is being applied in the isolated worktree. Its native
 no-auth handshake reports CLI 1.0.105 / protocol 3. This establishes transport

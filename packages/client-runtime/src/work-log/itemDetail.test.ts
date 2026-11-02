@@ -2,9 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
 import { ThreadId, TurnItemId, type OrchestrationV2TurnItem } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 
-import { turnItemOutputImages, turnItemOutputText } from "./itemDetail.ts";
+import { turnItemHasDetail, turnItemOutputImages, turnItemOutputText } from "./itemDetail.ts";
 
-function toolItem(output: unknown): OrchestrationV2TurnItem {
+function toolItem(output: unknown): Extract<OrchestrationV2TurnItem, { type: "dynamic_tool" }> {
   return {
     id: TurnItemId.make("images"),
     threadId: ThreadId.make("thread"),
@@ -51,4 +51,30 @@ describe("tool image output parsing", () => {
       expect(turnItemOutputText(overflow)).toBe("Two additional screenshots:\n[image]\n[image]");
     },
   );
+});
+
+it("keeps typed model notices expandable without changing ordinary notice output", () => {
+  const notice = {
+    ...toolItem(null),
+    type: "system_notice" as const,
+    message: "",
+  };
+  expect(turnItemHasDetail(notice)).toBe(false);
+  expect(turnItemOutputText({ ...notice, message: "Ordinary notice" })).toBeNull();
+  const executionNotice = {
+    ...notice,
+    modelExecution: {
+      version: 1 as const,
+      kind: "gap" as const,
+      nativeSessionId: "session",
+      eventId: "gap",
+      sourceTimestamp: "2026-11-02T10:00:00Z",
+      receivedAt: "2026-11-02T10:00:01Z",
+      status: "incomplete",
+      startSource: "unknown" as const,
+      gaps: ["missing start"],
+    },
+  };
+  expect(turnItemHasDetail(executionNotice)).toBe(true);
+  expect(turnItemOutputText(executionNotice)).toContain("Incomplete model execution telemetry");
 });

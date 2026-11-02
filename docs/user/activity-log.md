@@ -17,3 +17,15 @@ Failed calls do not count as successful messages or creations. Waiting on a thre
 it finished, and an interrupt or cancellation request does not mean the thread stopped. When tool
 details are unavailable, summaries use a broader description instead of guessing how many threads
 were affected.
+
+When Copilot reports Fusion model activity, open a model phase or routing entry to inspect its
+details on web, desktop, or mobile. Requested routing and planned work do not prove which model
+executed. Phase details distinguish observed from estimated starts, provider elapsed time from
+event and receipt timestamps, and show reported final models, fallback, failures, and telemetry
+gaps. Missing timing or model data stays unknown rather than being inferred from the request.
+
+For Copilot, select **Auto routing** and its **Routing** option when your connected account
+advertises them. Available preferences come from that account; unavailable choices show their
+reason. Explicit models and your default model are unchanged. You can switch back to an explicit
+model at any time. A requested preference may be pending or activating: the routing entry shows
+the confirmed effective preference separately, including activation failures.

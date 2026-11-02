@@ -391,6 +391,10 @@
       "types": "./src/work-log/itemDetail.ts",
       "default": "./src/work-log/itemDetail.ts"
     },
+    "./work-log/model-execution": {
+      "types": "./src/work-log/modelExecution.ts",
+      "default": "./src/work-log/modelExecution.ts"
+    },
     "./work-log/presentation": {
       "types": "./src/work-log/presentation.ts",
       "default": "./src/work-log/presentation.ts"
