@@ -80,3 +80,7 @@ from this feature (existing backlog #26 and #21 respectively).
 
 The GitHub issue reports are compatibility cautions, not independently
 reproduced failures or established facts about every account/runtime.
+
+Experiment priority: next week the maintainer intends to use Fusion for day-to-day tasks and needs durable visibility into which concrete models ran and when. Distinguish requested routing, effective preference, planned phases, actual execution and final-source attribution, including gaps and fallback. Qualify the hard prerequisite copilot-sdk-runtime-upgrade before Fusion implementation; definition may proceed alongside upgrade qualification. This clarification does not authorize implementation, paid turns, vendor-policy changes or live settings changes.
+
+Follow-up authorization: proceed with Path B definition and exploration alongside the SDK upgrade compatibility investigation, keeping the hard SDK prerequisite and existing live execution/implementation gates.
