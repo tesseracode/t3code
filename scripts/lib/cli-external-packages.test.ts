@@ -39,6 +39,13 @@ describe("shouldBundleCliDependency", () => {
       "@napi-rs/keyring",
       "@clerk/electron-passkeys",
       "node-addon-api",
+      "@github/copilot-sdk",
+      "@github/copilot",
+      "@github/copilot-win32-x64",
+      "koffi",
+      "@koromix/koffi-linux-x64",
+      "vscode-jsonrpc/node",
+      "detect-libc",
     ]) {
       assert.strictEqual(shouldBundleCliDependency(id), false, id);
     }

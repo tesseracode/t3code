@@ -58,6 +58,29 @@ the version.
   - nightly releases are aliased to the `nightly` hosted app channel
 - Signing is optional and auto-detected per platform from secrets.
 
+## Isolated fork previews and Copilot runtime stages
+
+[Personal fork previews](fork-native-preview.md) use a separate, unsigned,
+manual build-only workflow. They do not use the release train or the signed
+PR-preview publisher below.
+
+Copilot's reviewed packaging boundary is SDK 1.0.8, CLI/platform packages
+1.0.75, Koffi/native bindings 3.3.1, vscode-jsonrpc 8.2.1, Zod 4.4.3 and
+detect-libc 2.1.2. Carry all five owner-scoped overrides into generated
+desktop, Windows sidecar and CLI stages. A source lockfile alone cannot pin
+those independent production installs. External roots follow the server's
+reachable workspace owners, including provider packages; reading only the
+server manifest loses native runtimes after package extraction.
+
+Before pruning, validate the SDK-owner dependency closure and complete native
+inventory. Pruning is limited to the reviewed CLI payload and glibc-only musl
+exclusions; retain universal macOS CPUs, specialized clipboard bindings and
+Windows computer-use executables. Do not remove upstream bundle/native probes,
+locks, TLS checks, archive hashes or the complete Windows 80-file budget.
+WSL validates and repairs Copilot command modes before promotion and rechecks
+warm-cache readiness. Full installed-platform qualification remains separate
+from fixture tests.
+
 ## Pull request macOS previews
 
 Labeling a PR `preview:mac` publishes a signed, notarized Apple Silicon DMG with T3 Connect enabled
