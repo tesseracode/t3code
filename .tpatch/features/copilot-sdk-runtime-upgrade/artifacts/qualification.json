@@ -1,7 +1,7 @@
 {
   "feature": "copilot-sdk-runtime-upgrade",
   "scope": "isolated worktree; not deployed",
-  "verdict": "local-regressions-and-macos-arm64-noauth-startup-pass; rollout-needs-review",
+  "verdict": "local-regressions-and-offline-native-macos-arm64-session-callbacks-pass; rollout-blocked",
   "versions": {
     "sdk": "1.0.28",
     "nativeRuntimeReported": "1.0.105",
@@ -62,15 +62,33 @@
     {
       "method": "SHA-512 integrity verification and native-member inspection of published darwin-x64, win32-x64, win32-arm64, linux-x64 and linux-arm64 archives",
       "result": "passed layout inspection only; no target execution claim"
+    },
+    {
+      "method": "Real SDK/native runtime with useLoggedInUser=false, private disposable HOME/COPILOT_HOME and a loopback OpenAI-compatible inference fixture",
+      "result": "passed native session creation, fixture conversation, explicit save, native stop/start and cold resume retaining the transcript; no authenticated account or vendor inference used",
+      "caveat": "An empty session without a user turn was not resumable after disconnect even with explicit save. Persistence qualification used a real local fixture turn; no regression attribution is established."
+    },
+    {
+      "method": "Real native deferred permission callback returns no-result, then permissions.handlePendingPermissionRequest returns success for approve-once",
+      "result": "passed; harmless printf tool completed with exit 0. Native ask_user invoked the actual onUserInputRequest callback."
+    },
+    {
+      "method": "Hold a received loopback inference request until native session.abort acknowledges cancellation",
+      "result": "passed active native cancellation without sleeps or real inference"
     }
   ],
   "remainingGates": [
     "Authenticated account-specific Auto/Fusion catalog discovery",
-    "Real native session create/resume and CLI continuity, including store rollback safety",
-    "Real permission/input delivery and cancellation against the upgraded runtime",
+    "Authenticated-account session/CLI continuity and native-store rollback safety beyond disposable offline fixture coverage",
     "Packaged Electron and standalone target execution on Mac x64, Windows and WSL/Linux",
-    "Actual Fusion event delivery, model attribution and client history presentation"
+    "Actual authenticated Fusion event delivery, model attribution and callback behavior",
+    "Integrated real-client history presentation; browser/device use has not been approved"
   ],
+  "offlineImplementationApproval": "Maintainer explicitly approved proceeding with offline Fusion implementation while all unavailable target/account gates continue to block rollout.",
+  "unavailableTargets": {
+    "macosX64": "Intel emulation unavailable on this host",
+    "windowsLinux": "No runnable target; Docker daemon unavailable"
+  },
   "replayRepair": {
     "result": "SDK verification passes against provider and superseding packaging root before SDK landing",
     "packagingRoot": "copilot-runtime-packaging-replay",
