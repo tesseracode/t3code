@@ -1,9 +1,9 @@
 diff --git a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml
 new file mode 100644
-index 000000000..532aa76c6
+index 000000000..a8e2ba045
 --- /dev/null
 +++ b/.github/workflows/fork-native-preview.yml
-@@ -0,0 +1,154 @@
+@@ -0,0 +1,165 @@
 +name: Fork native preview (build only)
 +
 +on:
@@ -13,6 +13,14 @@ index 000000000..532aa76c6
 +        description: Unsigned preview version (leave empty for a unique run version)
 +        required: false
 +        type: string
++      windows_target:
++        description: Windows delivery format (ZIP supports side-by-side validation)
++        required: true
++        default: nsis
++        type: choice
++        options:
++          - nsis
++          - zip
 +
 +permissions:
 +  contents: read
@@ -91,6 +99,7 @@ index 000000000..532aa76c6
 +        shell: pwsh
 +        working-directory: C:\t3\s
 +    env:
++      WINDOWS_TARGET: ${{ inputs.windows_target || 'nsis' }}
 +      TEMP: C:\t3\tmp
 +      TMP: C:\t3\tmp
 +      TMPDIR: C:\t3\tmp
@@ -142,18 +151,20 @@ index 000000000..532aa76c6
 +          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected.sha256) { throw 'WSL digest mismatch' }
 +          node scripts/update-release-package-versions.ts $env:PREVIEW_VERSION
 +          if ($LASTEXITCODE -ne 0) { throw 'Version transform failed' }
-+      - name: Build isolated unsigned Windows installer
++      - name: Build isolated unsigned Windows preview
 +        run: |
-+          node scripts/build-desktop-artifact.ts --platform win --arch x64 --target nsis --fork-preview --build-version $env:PREVIEW_VERSION --wsl-runtime "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz" --output-dir C:\t3\release --keep-stage --verbose
++          if ($env:WINDOWS_TARGET -notin @('nsis', 'zip')) { throw 'Unsupported Windows preview target' }
++          node scripts/build-desktop-artifact.ts --platform win --arch x64 --target $env:WINDOWS_TARGET --fork-preview --build-version $env:PREVIEW_VERSION --wsl-runtime "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz" --output-dir C:\t3\release --keep-stage --verbose
 +          if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed' }
 +          node scripts/fork-preview-manifest.mjs --directory C:\t3\release --target windows-x64 --version $env:PREVIEW_VERSION --wsl-archive "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz"
 +          if ($LASTEXITCODE -ne 0) { throw 'Manifest verification failed' }
-+      - name: Upload installer and provenance
++      - name: Upload Windows preview and provenance
 +        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
 +        with:
 +          name: fork-preview-windows-x64
 +          path: |
 +            C:\t3\release\*.exe
++            C:\t3\release\*.zip
 +            C:\t3\release\manifest.json
 +            C:\t3\release\SHA256SUMS
 +          if-no-files-found: error
@@ -1217,10 +1228,10 @@ index ab52ca07a..0fbb61b9f 100644
          return provideSpawner(probeWslRuntimeImpl(distro, linuxAppRoot));
 diff --git a/docs/operations/fork-native-preview.md b/docs/operations/fork-native-preview.md
 new file mode 100644
-index 000000000..3f4afb7aa
+index 000000000..46792c1a3
 --- /dev/null
 +++ b/docs/operations/fork-native-preview.md
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,129 @@
 +# Personal fork native previews
 +
 +These are unsigned personal previews of stable `v0.1.4`, not releases.
@@ -1260,6 +1271,20 @@ index 000000000..3f4afb7aa
 +argument re-quoting. They read the Linux account database, not an inherited
 +`HOME`. A failed probe stops isolated startup rather than using the ordinary
 +profile; its transport/exit details are logged.
++
++## Linux and WSL runtime prerequisites
++
++A bundled Node runtime is not a fully static Linux executable. Minimal images
++can lack `libatomic.so.1`; Debian/Ubuntu provide it in `libatomic1`. Follow the
++[user installation guidance](../user/install.md#linux-runtime-libraries) only
++inside the explicitly owned test distro or an approved target environment.
++Do not install it into an unrelated live distro to make a test pass.
++
++Qualify the actual target image, not just a build runner with compiler libraries
++already installed. Preserve a missing-library failure as pristine-image evidence,
++record the exact packages/versions subsequently installed, and label the resulting
++checks as a dependency-installed variant. Installing a prerequisite does not by
++itself prove managed startup, cache repair, native provider execution or migration.
 +
 +## Build
 +

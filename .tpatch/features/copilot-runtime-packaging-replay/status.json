@@ -1,0 +1,36 @@
+{
+  "id": "copilot-runtime-packaging-replay",
+  "slug": "copilot-runtime-packaging-replay",
+  "title": "Maintain the complete current Copilot runtime packaging root against the current provider generation. Supersede copilot-runtime-packaging without deleting its historical artifacts. Use an explicit reconstructed packaging-free baseline retaining the current provider; include later workflow/docs changes, preserve all runtime packaging safeguards, and make SDK hard-depend on this replacement root. No product or deployment changes.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-02T08:10:14Z",
+  "updated_at": "2026-11-02T08:11:10Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-02T08:10:45Z",
+    "base_commit": "ba951f958e8cd3cb6582f7902171f573621407a7",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-runtime-packaging",
+      "kind": "supersedes"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-02T08:11:05Z",
+    "passed": true,
+    "recipe_hash_at_verify": "e00b849de89074d98a1df96185c5e712e9bce8341192c1b43b96ce7211cd0e0b",
+    "patch_hash_at_verify": "097951c0d3a4fc2cb3948e24ea0f4b9d6890d665866f83f6b5317ac030e0d7ce",
+    "parent_snapshot": {
+      "copilot-cli-provider": "applied"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+ .tpatch/FEATURES.md                                |   4 +-
+ .../copilot-fusion-model-selection/request.md      |   4 +
+ .../copilot-fusion-model-selection/status.json     |  11 +-
+ .../artifacts/patch-generations.json               | 131 ++++++++++++++++++++-
+ .../artifacts/post-apply.patch                     |  39 ++++--
+ .../features/copilot-runtime-packaging/record.md   |  17 +--
+ .../features/copilot-runtime-packaging/status.json |   6 +-
+ 7 files changed, 189 insertions(+), 23 deletions(-)
