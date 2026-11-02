@@ -56,10 +56,13 @@ const layerDesktopClerk = (
     copyText: () => Effect.void,
   },
   listeners = new Map<string, (...args: unknown[]) => void>(),
+  isolatedPreview = false,
 ) => {
   const environment = DesktopEnvironment.DesktopEnvironment.of({
     stateDir: "/tmp/t3-state",
     isDevelopment,
+    isolatedPreview,
+    baseDir: "/tmp/fork-preview",
     appDataDirectory: "/tmp/app-data",
     platform,
   } as unknown as DesktopEnvironment.DesktopEnvironment["Service"]);
@@ -107,6 +110,29 @@ describe("DesktopClerk", () => {
     createClerkBridgeMock.mockReset();
     requestSingleInstanceLockMock.mockReset().mockReturnValue(true);
     storageMock.mockReset();
+  });
+  it.effect("does not claim a stock URL scheme or passkey support for the isolated preview", () => {
+    storageMock.mockReturnValue(storageAdapter);
+    createClerkBridgeMock.mockReturnValue({ cleanup: vi.fn(), isPrimaryInstance: true });
+    const events: string[] = [];
+    return Effect.gen(function* () {
+      yield* Effect.scoped(
+        Layer.build(
+          layerDesktopClerk(false, events, "darwin", undefined, undefined, undefined, true),
+        ),
+      );
+      assert.deepEqual(createClerkBridgeMock.mock.calls[0]?.[0], {
+        storage: storageAdapter,
+        manageSingleInstanceLock: false,
+        passkeys: false,
+      });
+      assert.deepEqual(events, [
+        "setPath:userData:/tmp/fork-preview/electron",
+        "requestSingleInstanceLock",
+        "on:second-instance",
+        "on:open-url",
+      ]);
+    });
   });
 
   it.each([

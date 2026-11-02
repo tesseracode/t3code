@@ -56,6 +56,7 @@ function layerEnvironment(
     readonly otlpTracesUrl?: string;
     readonly otlpMetricsUrl?: string;
     readonly otlpLogsUrl?: string;
+    readonly isolatedPreview?: boolean;
   },
 ) {
   return DesktopEnvironment.layer({
@@ -81,6 +82,7 @@ function layerEnvironment(
           T3CODE_OTLP_TRACES_URL: options?.otlpTracesUrl,
           T3CODE_OTLP_METRICS_URL: options?.otlpMetricsUrl,
           T3CODE_OTLP_LOGS_URL: options?.otlpLogsUrl,
+          T3CODE_DESKTOP_ISOLATED_PREVIEW: options?.isolatedPreview ? "true" : undefined,
         }),
       ),
     ),
@@ -143,6 +145,7 @@ const withPackagedWslHarness = <A, E, R>(
     readonly forbidFallback?: string;
     readonly cleanupLegacy?: Effect.Effect<void>;
     readonly forbidCleanup?: string;
+    readonly isolatedPreview?: boolean;
   },
   effect: (
     context: PackagedWslHarnessContext,
@@ -210,6 +213,9 @@ const withPackagedWslHarness = <A, E, R>(
               appPath: baseDir,
               platform: "win32",
               resourcesPath: baseDir,
+              ...(input.isolatedPreview === undefined
+                ? {}
+                : { isolatedPreview: input.isolatedPreview }),
             }),
           ),
         ),
@@ -729,6 +735,30 @@ describe("DesktopBackendConfiguration", () => {
         restoreEnv("OTEL_RESOURCE_ATTRIBUTES", previousResourceAttributes);
       }
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("preview WSL uses a Linux-owned separate data home", () =>
+    withPackagedWslHarness(
+      {
+        archiveHash: "a".repeat(64),
+        isolatedPreview: true,
+        wsl: () => ({
+          prepareRuntime: () => ({
+            ok: true,
+            linuxAppRoot: "/home/preview/.t3-fork-preview/wsl-runtime/fixture",
+          }),
+          getUserHome: () => Option.some("/home/preview"),
+        }),
+      },
+      ({ baseDir }) =>
+        Effect.gen(function* () {
+          const configuration = yield* DesktopBackendConfiguration.DesktopBackendConfiguration;
+          const config = yield* configuration.resolveWsl({ port: 5050, distro: null });
+          assert.isTrue(Option.isNone(config.preflightFailure));
+          assert.include(config.args, "T3CODE_HOME=/home/preview/.t3-fork-preview");
+          assert.notInclude(config.args, `T3CODE_HOME=${baseDir}`);
+        }),
+    ),
   );
 
   it.effect("resolveWsl preserves existing WSLENV entries when forwarding backend secrets", () =>
