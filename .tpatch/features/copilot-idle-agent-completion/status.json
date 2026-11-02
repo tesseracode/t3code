@@ -1,0 +1,18 @@
+{
+  "id": "copilot-idle-agent-completion",
+  "slug": "copilot-idle-agent-completion",
+  "title": "Fix Copilot idle reusable helpers incorrectly keeping completed threads in Waiting. A returned idle helper must not hold parent completion; retain agent reuse, real running-child work, approvals, input requests, command/background-service semantics, and reconnect correctness across shared web/desktop/mobile execution presentation. Track a separate scoped fix; no live database edits or deployment.",
+  "state": "requested",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-02T21:41:24Z",
+  "updated_at": "2026-11-02T21:41:24Z",
+  "last_command": "add",
+  "apply": {},
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    }
+  ]
+}
