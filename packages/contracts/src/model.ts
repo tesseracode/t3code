@@ -13,6 +13,8 @@ export const ProviderOptionChoice = Schema.Struct({
   description: Schema.optional(TrimmedNonEmptyString),
   disabledReason: Schema.optional(TrimmedNonEmptyString),
   isDefault: Schema.optional(Schema.Boolean),
+  /** A select choice that dispatches false to explicitly reset the provider preference. */
+  isReset: Schema.optional(Schema.Boolean),
 });
 export type ProviderOptionChoice = typeof ProviderOptionChoice.Type;
 

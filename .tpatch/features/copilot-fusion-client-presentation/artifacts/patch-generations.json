@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "feature": "copilot-fusion-client-presentation",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_2bbc93375b14",
+      "kind": "record",
+      "patch_sha256": "1200ced90fd0e8fedeb4b3c8a5dd94de8b47e2e9d48170e2687c3bece46b4b8f",
+      "git_patch_id": "b89d4af2a52b242a9ca02b44c4d5e092086c4616",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "b5f235f583c9248e985a44dfa83228d8a480bbaf8f88295f9693b5f69704f2e2",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "c715f234138b5f7af0e825cd67f2f0deb7a790b0",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts",
+        "apps/server/src/orchestration-v2/TurnItemPositionStore.ts",
+        "docs/user/activity-log.md",
+        "docs/user/providers-copilot.md",
+        "packages/client-runtime/src/modelTraits.test.ts",
+        "packages/client-runtime/src/work-log/modelExecution.test.ts",
+        "packages/client-runtime/src/work-log/modelExecution.ts",
+        "packages/contracts/src/model.ts",
+        "packages/contracts/src/orchestrationV2.ts",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-copilot/src/server/client.ts",
+        "packages/provider-copilot/src/server/routing.test.ts",
+        "packages/provider-copilot/src/server/routing.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/status.ts",
+        "packages/provider-copilot/src/settings.ts",
+        "packages/shared/src/model.test.ts",
+        "packages/shared/src/model.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-routing-late-telemetry",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+          "parent_recipe_sha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

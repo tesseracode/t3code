@@ -13,7 +13,9 @@ export function modelExecutionSummary(execution: OrchestrationV2ModelExecution):
             execution.pattern,
             execution.status === "resolved" && execution.model
               ? `selected ${execution.model}`
-              : undefined,
+              : execution.requestedProviderDefault
+                ? `${execution.status === "effective" ? "effective" : "requested"} provider default`
+                : undefined,
             execution.effectivePreference
               ? `effective ${execution.effectivePreference}`
               : execution.requestedPreference
@@ -68,8 +70,17 @@ export function modelExecutionDetail(
     );
   add("Requested model", execution.requestedModel);
   add("Resolved virtual model", execution.syntheticModel);
-  add("Requested routing", execution.requestedPreference);
-  add("Effective routing", execution.effectivePreference);
+  add(
+    "Requested routing",
+    execution.requestedProviderDefault ? "provider default" : execution.requestedPreference,
+  );
+  add(
+    "Effective routing",
+    execution.effectivePreference ??
+      (execution.requestedProviderDefault && execution.status === "effective"
+        ? "provider default"
+        : undefined),
+  );
   add("Pending routing", execution.pendingPreference);
   add("Activating routing", execution.activatingPreference);
   add(

@@ -1,0 +1,32 @@
+{
+  "id": "copilot-fusion-client-presentation",
+  "slug": "copilot-fusion-client-presentation",
+  "title": "Copilot Fusion client presentation",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-03T19:24:47Z",
+  "updated_at": "2026-11-03T19:26:33Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-03T19:24:47Z",
+    "base_commit": "c715f234138b5f7af0e825cd67f2f0deb7a790b0",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-routing-late-telemetry",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-03T19:26:29Z",
+    "passed": false,
+    "recipe_hash_at_verify": "b5f235f583c9248e985a44dfa83228d8a480bbaf8f88295f9693b5f69704f2e2",
+    "patch_hash_at_verify": "1200ced90fd0e8fedeb4b3c8a5dd94de8b47e2e9d48170e2687c3bece46b4b8f",
+    "parent_snapshot": {
+      "copilot-routing-late-telemetry": "applied"
+    }
+  }
+}

@@ -11,7 +11,7 @@ const layerTest = TurnItemPositionStore.layer.pipe(
   Layer.provideMerge(SqlitePersistence.layerMemory),
 );
 
-it.effect("reuses an item's position without attempting another allocation insert", () =>
+it.effect("reuses positions without redundant inserts and binds late run ownership", () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const positions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
@@ -45,11 +45,28 @@ it.effect("reuses an item's position without attempting another allocation inser
     assert.equal(
       yield* positions.allocate({
         ...input,
-        runId: RunId.make("run:moved"),
-        runOrdinal: 2,
+        turnItemId: TurnItemId.make("item:next"),
+        runId: RunId.make("run:not-yet-known"),
       }),
-      first,
+      next,
     );
+    const associated = {
+      ...input,
+      runId: RunId.make("run:moved"),
+      runOrdinal: 2,
+    };
+    const moved = yield* positions.allocate(associated);
+    assert.equal(moved, 2_000_001);
+    assert.equal(yield* positions.allocate(associated), moved);
+    assert.equal(
+      yield* positions.allocate({
+        ...associated,
+        turnItemId: TurnItemId.make("item:next"),
+      }),
+      moved + 1,
+    );
+    assert.equal(yield* positions.allocate(input), moved);
+    assert.equal(yield* positions.allocate({ ...associated, runOrdinal: 3 }), moved);
     assert.equal(
       yield* positions.allocate({ ...input, threadId: ThreadId.make("thread:other") }),
       1,

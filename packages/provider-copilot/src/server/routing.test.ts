@@ -39,11 +39,36 @@ export const autoCatalog: AutoCatalog = {
 };
 
 describe("account-advertised routing", () => {
+  it("distinguishes an explicit provider-default reset from an omitted preference", () => {
+    assert.isNull(
+      autoTierForSelection({
+        instanceId,
+        model: "auto",
+        options: [{ id: "autoTier", value: false }],
+      }),
+    );
+    assert.isUndefined(autoTierForSelection({ instanceId, model: "auto" }));
+    assert.throws(
+      () =>
+        autoTierForSelection({
+          instanceId,
+          model: "auto",
+          options: [{ id: "autoTier", value: true }],
+        }),
+      /advertised tier/,
+    );
+    const descriptor = routingDescriptor({
+      ...autoCatalog,
+      tiers: [...autoCatalog.tiers, { ...autoCatalog.tiers[0]!, id: "provider-default" }],
+    });
+    assert.equal(descriptor.options.at(-1)?.id, "_provider-default");
+    assert.isTrue(descriptor.options.at(-1)?.isReset);
+  });
   it("uses opaque IDs without aliases, honors visibility, and exposes disabled reasons", () => {
     const descriptor = routingDescriptor(autoCatalog);
     assert.deepEqual(
       descriptor.options.map((option) => option.id),
-      ["standard", "fuse@2026:opaque", "blocked"],
+      ["standard", "fuse@2026:opaque", "blocked", "provider-default"],
     );
     assert.equal(descriptor.options[2]?.disabledReason, "Your account policy disables this.");
     assert.equal(descriptor.currentValue, "standard");

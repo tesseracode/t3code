@@ -27,6 +27,7 @@ export function modelsFromSdk(
   auto?: AutoCatalog,
 ) {
   const seen = new Set<string>();
+  const autoName = auto?.tiers.some((tier) => tier.type === "fusion") ? "Fusion" : undefined;
   return providerModelsFromSettings(
     models
       .flatMap((model) => {
@@ -39,7 +40,7 @@ export function modelsFromSdk(
         return [
           {
             slug,
-            name: model.name,
+            name: slug === "auto" && autoName ? autoName : model.name,
             isCustom: false,
             ...(seen.size === 1 ? { isDefault: true } : {}),
             capabilities: createModelCapabilities({
@@ -71,7 +72,7 @@ export function modelsFromSdk(
           ? [
               {
                 slug: "auto",
-                name: "Auto routing",
+                name: autoName ?? "Auto routing",
                 isCustom: false,
                 capabilities: createModelCapabilities({
                   optionDescriptors: [routingDescriptor(auto)],

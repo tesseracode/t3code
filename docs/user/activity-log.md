@@ -30,8 +30,11 @@ Auto model-resolution entries show the selected model, not proof that it complet
 Events without a native turn association remain visibly unassociated; late routing and phase
 events enrich existing activity rather than creating additional user turns.
 
-For Copilot, select **Auto routing** and its **Routing** option when your connected account
+For Copilot, enable **Fusion** in provider settings to opt in to its available tiers.
+Select **Fusion** and its separate **Fusion effort** control when your connected account
 advertises them. Available preferences come from that account; unavailable choices show their
-reason. Explicit models and your default model are unchanged. You can switch back to an explicit
-model at any time. A requested preference may be pending or activating: the routing entry shows
-the confirmed effective preference separately, including activation failures.
+reason. Without Fusion metadata, ordinary **Auto** routing remains available. Explicit models
+and your default model are unchanged. Choose **Provider default** to clear a saved routing
+preference, or switch back to an explicit model. A requested preference may be pending or
+activating: the routing entry shows the confirmed effective preference separately, including
+activation failures. Intermediate Fusion drafts are not final answers and stay out of chat.

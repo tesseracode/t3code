@@ -36,6 +36,40 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
 });
 
 describe("descriptor helpers", () => {
+  it("round trips an explicit reset without dispatching the picker-only choice ID", () => {
+    const caps = createModelCapabilities({
+      optionDescriptors: [
+        {
+          id: "autoTier",
+          label: "Fusion effort",
+          type: "select",
+          currentValue: "balance",
+          options: [
+            { id: "balance", label: "Standard", isDefault: true },
+            { id: "reset", label: "Provider default", isReset: true },
+          ],
+        },
+      ],
+    });
+    const selection = createModelSelection(ProviderInstanceId.make("githubCopilot"), "auto", [
+      { id: "autoTier", value: false },
+    ]);
+    const descriptors = getProviderOptionDescriptors({ caps, selections: selection.options });
+    expect(getProviderOptionCurrentValue(descriptors[0])).toBe("reset");
+    expect(getProviderOptionCurrentLabel(descriptors[0], selection)).toBe("Provider default");
+    expect(
+      buildExplicitProviderOptionSelectionsFromDescriptors(descriptors, selection.options),
+    ).toEqual([{ id: "autoTier", value: false }]);
+    expect(buildProviderOptionSelectionsFromDescriptors(descriptors)).toEqual([
+      { id: "autoTier", value: false },
+    ]);
+    expect(getProviderOptionCurrentLabel(caps.optionDescriptors?.[0], selection)).toBe(
+      "Provider default",
+    );
+    expect(
+      buildExplicitProviderOptionSelectionsFromDescriptors(descriptors, undefined),
+    ).toBeUndefined();
+  });
   it("preserves an opaque saved routing request that the destination no longer advertises", () => {
     const descriptors = getProviderOptionDescriptors({
       caps: createModelCapabilities({

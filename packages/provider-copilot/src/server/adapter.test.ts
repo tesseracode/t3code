@@ -106,7 +106,7 @@ function fakeSdk() {
     sessionId: "native-copilot",
     send: async (message) => {
       sent.push(typeof message === "string" ? { prompt: message } : message);
-      return "native-user-message";
+      return `native-user-message-${sent.length}`;
     },
     abort: async () => {
       emit("session.idle");
@@ -331,6 +331,273 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   );
 
 describe("native Copilot V2", () => {
+  it.effect.each(["single", "cascade", "critique"])(
+    "publishes only committed root %s output before late plan telemetry",
+    (pattern) =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const autoSelection: ModelSelection = {
+            instanceId,
+            model: "auto",
+            options: [{ id: "autoTier", value: "opaque-high" }],
+          };
+          fake.setCatalog({
+            models: [],
+            auto: {
+              defaultTier: "opaque-high",
+              tiers: [
+                {
+                  id: "opaque-high",
+                  displayName: "High",
+                  description: "",
+                  type: "fusion",
+                  status: { enabled: true },
+                },
+              ],
+            },
+          });
+          const { start, drain, emitted, takeEvent } = yield* setup(fake, undefined, autoSelection);
+          yield* start();
+          const fusion = {
+            fusionId: "fusion-1",
+            phaseId: "solver",
+            sourceModel: "solver-model",
+            pattern,
+            role: "solver",
+            conversationScope: "root",
+          };
+          fake.emit("assistant.message_delta", {
+            messageId: "answer",
+            deltaContent: "DISCARDED DRAFT",
+          });
+          fake.emit("assistant.reasoning_delta", {
+            reasoningId: "reason",
+            deltaContent: "PRIVATE",
+          });
+          fake.emit("assistant.reasoning", { reasoningId: "reason", content: "PRIVATE" });
+          fake.emit("assistant.message", {
+            messageId: "answer",
+            content: "DISCARDED DRAFT",
+            fusion,
+          });
+          assert.equal((yield* drain()).messages.length, 0);
+          assert.isFalse(emitted.some((event) => event.type === "message.updated"));
+          fake.emit("assistant.message", {
+            messageId: "review",
+            content: "PRIVATE REVIEW",
+            fusion: { ...fusion, commitId: "review-commit", conversationScope: "review" },
+          });
+          fake.emit("assistant.message", {
+            messageId: "answer",
+            content: "Correct final answer",
+            originatingMessageId: "native-user-message-1",
+            fusion: { ...fusion, commitId: "final-commit" },
+          });
+          fake.emit("session.fusion_resolved", {
+            fusionId: "fusion-1",
+            turnId: "different-native-namespace",
+            primaryModel: "solver-model",
+            fallbackModel: "fallback-model",
+            contractVersion: 1,
+            syntheticModel: "opaque-high",
+            policy: "standard",
+            pattern,
+          });
+          fake.emit("assistant.message", {
+            messageId: "answer",
+            content: "Correct final answer",
+            fusion: { ...fusion, commitId: "final-commit" },
+          });
+          const route = yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution?.fusionId === "fusion-1" &&
+              event.turnItem.runId === RunId.make("run-1"),
+          );
+          const snapshot = yield* drain();
+          assert.deepEqual(
+            snapshot.messages.map((message) => message.text),
+            ["Correct final answer"],
+          );
+          assert.isFalse(snapshot.messages[0]!.streaming);
+          assert.ok(route.type === "turn_item.updated");
+          if (route.type === "turn_item.updated")
+            assert.equal(route.turnItem.runId, RunId.make("run-1"));
+          assert.isFalse(
+            emitted.some(
+              (event) => event.type === "turn_item.updated" && event.turnItem.type === "reasoning",
+            ),
+          );
+        }),
+      ),
+  );
+
+  it.effect(
+    "backfills Fusion ownership when its root message precedes the native send acknowledgement",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const gate = promiseGate();
+          fake.session.send = async () => {
+            fake.emit("assistant.message", {
+              messageId: "answer",
+              originatingMessageId: "late-ack",
+              content: "Correct final answer",
+              fusion: {
+                fusionId: "fusion-1",
+                phaseId: "solver",
+                conversationScope: "root",
+                commitId: "commit",
+              },
+            });
+            fake.emit("session.fusion_resolved", {
+              fusionId: "fusion-1",
+              turnId: "synthetic-turn",
+              primaryModel: "solver-model",
+              fallbackModel: "fallback-model",
+              contractVersion: 1,
+              syntheticModel: "opaque-high",
+              policy: "standard",
+              pattern: "single",
+            });
+            await gate.promise;
+            return "late-ack";
+          };
+          const { start, drain, takeEvent } = yield* setup(fake);
+          const running = yield* Effect.forkChild(start());
+          yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution?.fusionId === "fusion-1" &&
+              event.turnItem.runId === null,
+          );
+          assert.equal((yield* drain()).messages.length, 0);
+          gate.resolve();
+          yield* Fiber.join(running);
+          const route = yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution?.fusionId === "fusion-1" &&
+              event.turnItem.runId === RunId.make("run-1"),
+          );
+          const snapshot = yield* drain();
+          assert.equal(snapshot.messages[0]?.text, "Correct final answer");
+          assert.equal(snapshot.messages[0]?.runId, RunId.make("run-1"));
+          assert.ok(route.type === "turn_item.updated");
+          if (route.type === "turn_item.updated")
+            assert.equal(route.turnItem.runId, RunId.make("run-1"));
+        }),
+      ),
+  );
+
+  it.effect(
+    "keeps late committed answers on their original run without guessing unknown origins",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const { start, drain } = yield* setup(fake);
+          const answer = {
+            messageId: "answer",
+            originatingMessageId: "native-user-message-1",
+            content: "Initial committed answer",
+            fusion: {
+              fusionId: "fusion-1",
+              phaseId: "solver",
+              conversationScope: "root",
+              commitId: "commit",
+            },
+          };
+          yield* start();
+          fake.emit("assistant.message", answer);
+          fake.emit("session.idle", {});
+          yield* drain();
+          yield* start(2);
+          fake.emit("assistant.message", { ...answer, content: "Updated committed answer" });
+          fake.emit("assistant.message", {
+            ...answer,
+            messageId: "unknown-answer",
+            originatingMessageId: "unassociated-history-message",
+            content: "Unassociated old answer",
+            fusion: { ...answer.fusion, fusionId: "unknown-fusion" },
+          });
+          const snapshot = yield* drain();
+          assert.deepEqual(
+            snapshot.messages.map((message) => message.text),
+            ["Updated committed answer"],
+          );
+          assert.equal(snapshot.messages[0]?.runId, RunId.make("run-1"));
+        }),
+      ),
+  );
+
+  it.effect("filters uncommitted and review-scoped messages on cold native import", () =>
+    provide(
+      Effect.gen(function* () {
+        const fake = fakeSdk();
+        const message = (
+          id: string,
+          content: string,
+          commitId?: string,
+          scope = "root",
+        ): SessionEvent => ({
+          id,
+          type: "assistant.message",
+          timestamp: "2026-10-29T00:00:01Z",
+          parentId: null,
+          data: {
+            messageId: "answer",
+            content,
+            toolRequests: [],
+            fusion: {
+              fusionId: "fusion-1",
+              phaseId: "solver",
+              pattern: "critique",
+              policy: "standard",
+              syntheticModel: "opaque-high",
+              sourceModel: "solver-model",
+              role: "solver",
+              conversationScope: scope,
+              ...(commitId ? { commitId } : {}),
+            },
+          },
+        });
+        fake.session.getEvents = async () => [
+          message("draft", "DISCARDED DRAFT"),
+          message("review", "PRIVATE REVIEW", "review-commit", "review"),
+          message("final", "Correct final answer", "final-commit"),
+        ];
+        const { drain } = yield* setup(fake, "owned-native-session");
+        assert.deepEqual(
+          (yield* drain()).messages.map((entry) => entry.text),
+          ["Correct final answer"],
+        );
+      }),
+    ),
+  );
+
+  it.effect("dispatches explicit default reset as null rather than preserving a prior tier", () =>
+    provide(
+      Effect.gen(function* () {
+        const fake = fakeSdk();
+        fake.setCurrent({ modelId: "auto" });
+        const reset: ModelSelection = {
+          instanceId,
+          model: "auto",
+          options: [{ id: "autoTier", value: false }],
+        };
+        const { start } = yield* setup(fake, "owned-native-session", reset);
+        yield* start();
+        assert.deepEqual(fake.modelChanges.at(-1), { model: "auto", options: { autoTier: null } });
+        assert.isUndefined(fake.config.capi);
+      }),
+    ),
+  );
   it.effect(
     "reimports duplicate Auto resolution with a stable item identity across cold starts",
     () =>

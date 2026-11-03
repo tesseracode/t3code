@@ -32,6 +32,32 @@ const skill = (
 });
 
 describe("Copilot discovery and account isolation", () => {
+  it("opts in per subprocess, preserving unrelated flags and leaving the default environment alone", () => {
+    const environment = {
+      HOME: "/private",
+      COPILOT_CLI_ENABLED_FEATURE_FLAGS: "EXTENSIONS,DYNAMIC_AUTO_TIERS",
+    };
+    assert.isFalse(decode({}).enableFusion);
+    const disabled = resolveClientConfiguration({
+      settings: decode({}),
+      cwd: "/workspace",
+      environment,
+    });
+    assert.equal(
+      disabled.options.env?.COPILOT_CLI_ENABLED_FEATURE_FLAGS,
+      "EXTENSIONS,DYNAMIC_AUTO_TIERS",
+    );
+    const enabled = resolveClientConfiguration({
+      settings: decode({ enableFusion: true }),
+      cwd: "/workspace",
+      environment,
+    });
+    assert.equal(
+      enabled.options.env?.COPILOT_CLI_ENABLED_FEATURE_FLAGS,
+      "EXTENSIONS,DYNAMIC_AUTO_TIERS,HYDRAFUSION_PLAN_V2",
+    );
+    assert.equal(environment.COPILOT_CLI_ENABLED_FEATURE_FLAGS, "EXTENSIONS,DYNAMIC_AUTO_TIERS");
+  });
   it("adds advertised Auto routing without replacing explicit-model defaults", () => {
     const auto: AutoCatalog = {
       defaultTier: "opaque-tier",
@@ -53,6 +79,8 @@ describe("Copilot discovery and account isolation", () => {
     assert.isTrue(result[0]?.isDefault);
     assert.isUndefined(result[1]?.isDefault);
     assert.equal(result[1]?.capabilities?.optionDescriptors?.[0]?.id, "autoTier");
+    assert.equal(result[1]?.name, "Fusion");
+    assert.equal(result[1]?.capabilities?.optionDescriptors?.[0]?.label, "Fusion effort");
     assert.deepEqual(
       modelsFromSdk([model("explicit")], decode({})).map((entry) => entry.slug),
       ["explicit"],
@@ -67,6 +95,7 @@ describe("Copilot discovery and account isolation", () => {
     assert.isTrue(result[0]?.isDefault);
     assert.isUndefined(result[1]?.isDefault);
     assert.deepEqual(result[1]?.capabilities?.optionDescriptors, []);
+    assert.equal(result[1]?.name, "auto");
     assert.deepEqual(
       modelsFromSdk([model("auto", { policy: { state: "disabled", terms: "" } })], decode({})),
       [],

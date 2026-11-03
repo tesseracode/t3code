@@ -214,9 +214,11 @@ function withDescriptorCurrentValue(
     return descriptor;
   }
   const currentValue =
-    typeof rawCurrentValue === "string"
-      ? resolveDescriptorChoiceValue(descriptor, rawCurrentValue)
-      : resolveDescriptorChoiceValue(descriptor, descriptor.currentValue);
+    rawCurrentValue === false && descriptor.options.some((option) => option.isReset)
+      ? descriptor.options.find((option) => option.isReset)?.id
+      : typeof rawCurrentValue === "string"
+        ? resolveDescriptorChoiceValue(descriptor, rawCurrentValue)
+        : resolveDescriptorChoiceValue(descriptor, descriptor.currentValue);
   if (!currentValue) {
     const { currentValue: _unusedCurrentValue, ...rest } = descriptor;
     return rest;
@@ -278,9 +280,18 @@ export function getProviderOptionCurrentValue(
     return undefined;
   }
   const hasExplicitOption = selection?.options?.some((option) => option.id === descriptor.id);
+  if (
+    descriptor.type === "select" &&
+    getProviderOptionStatedValue(descriptor.id, selection, reportedSelection) === false &&
+    descriptor.options.some((option) => option.isReset)
+  )
+    return descriptor.options.find((option) => option.isReset)?.id;
   // Reported values are display-only; callers that build dispatch options omit this context.
   const reportedValue = getReportedOptionValue(descriptor.id, selection, reportedSelection);
-  if (reportedValue !== undefined) return reportedValue;
+  if (reportedValue !== undefined)
+    return descriptor.type === "select" && reportedValue === false
+      ? descriptor.options.find((option) => option.isReset)?.id
+      : reportedValue;
   if (descriptor.id === "variant" && selection && !hasExplicitOption) return undefined;
   if (descriptor.type === "boolean") {
     return descriptor.currentValue;
@@ -331,7 +342,14 @@ export function buildProviderOptionSelectionsFromDescriptors(
   for (const descriptor of descriptors) {
     const value = getProviderOptionCurrentValue(descriptor);
     if (typeof value === "string" || typeof value === "boolean") {
-      nextSelections.push({ id: descriptor.id, value });
+      nextSelections.push({
+        id: descriptor.id,
+        value:
+          descriptor.type === "select" &&
+          descriptor.options.find((option) => option.id === value)?.isReset
+            ? false
+            : value,
+      });
     }
   }
 

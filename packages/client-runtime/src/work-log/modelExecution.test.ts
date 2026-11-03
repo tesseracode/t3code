@@ -19,6 +19,26 @@ const phase: OrchestrationV2ModelExecution = {
 };
 
 describe("model execution presentation", () => {
+  it("shows an explicit provider-default reset separately from unknown preference", () => {
+    const reset: OrchestrationV2ModelExecution = {
+      ...phase,
+      kind: "selection",
+      requestedModel: "auto",
+      requestedProviderDefault: true,
+      status: "effective",
+    };
+    expect(modelExecutionSummary(reset)).toContain("effective provider default");
+    expect(modelExecutionDetail(reset)).toContain("Requested routing: provider default");
+    expect(modelExecutionDetail(reset)).toContain("Effective routing: provider default");
+    const pending = {
+      ...reset,
+      status: "pending",
+      effectivePreference: "previous-tier",
+      pendingPreference: null,
+    };
+    expect(modelExecutionDetail(pending)).toContain("Effective routing: previous-tier");
+    expect(modelExecutionDetail(pending)).toContain("Pending routing: none");
+  });
   it("uses provider duration rather than receipt latency and distinguishes timing evidence", () => {
     expect(modelExecutionSummary(phase)).toContain("actual-model · completed · 4.8s");
     const detail = modelExecutionDetail(phase);

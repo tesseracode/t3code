@@ -29,7 +29,10 @@ import {
   type OrchestrationV2Subagent,
   type ServerProviderSkill,
 } from "@t3tools/contracts";
-import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
+import {
+  getModelSelectionStringOptionValue,
+  getProviderOptionStatedValue,
+} from "@t3tools/shared/model";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -64,6 +67,15 @@ import {
 
 export const COPILOT_DRIVER = ProviderDriverKind.make("githubCopilot");
 const decodeModelExecution = Schema.decodeEffect(OrchestrationV2ModelExecution);
+function publishesFusionText(
+  fusion: Extract<SessionEvent, { type: "assistant.message" }>["data"]["fusion"],
+) {
+  return (
+    fusion === undefined ||
+    (fusion.commitId !== undefined &&
+      (fusion.conversationScope === undefined || fusion.conversationScope === "root"))
+  );
+}
 const ref = (nativeId: string) => ({
   driver: COPILOT_DRIVER,
   nativeId,
@@ -120,6 +132,7 @@ interface ActiveTurn {
   providerTurn: OrchestrationV2ProviderTurn;
   nextOrdinal: number;
   readonly items: Map<string, OrchestrationV2TurnItem>;
+  readonly fusionText: boolean;
   accepted: boolean;
   idle: boolean;
   interrupted: boolean;
@@ -233,6 +246,9 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       >();
       const fusionOwners = new Map<string, ActiveTurn>();
       const nativeTurnOwners = new Map<string, ActiveTurn>();
+      const nativeMessageOwners = new Map<string, ActiveTurn>();
+      const pendingFusionOrigins = new Map<string, string>();
+      const pendingFusionMessages = new Map<string, { origin: string; content: string }>();
       let replayExecutionEvents: ReadonlyArray<SessionEvent> = [];
       let omittedReplayEvents = 0;
       const emit = (event: ProviderAdapter.ProviderAdapterV2Event) =>
@@ -474,6 +490,8 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         );
         const now = DateTime.formatIso(yield* DateTime.now);
         const requested = getModelSelectionStringOptionValue(selection, "autoTier");
+        const requestedProviderDefault =
+          getProviderOptionStatedValue("autoTier", selection) === false;
         const execution: OrchestrationV2ModelExecution = {
           version: 1,
           kind: "selection",
@@ -489,12 +507,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                 ? current.modelId
                   ? "different-model"
                   : "unknown"
-                : selection.model === "auto" && !current.autoTier
+                : selection.model === "auto" && !current.autoTier && !requestedProviderDefault
                   ? "preference-unknown"
                   : "effective",
           requestedModel: selection.model,
           ...(current.modelId ? { model: current.modelId } : {}),
           ...(requested ? { requestedPreference: requested } : {}),
+          ...(requestedProviderDefault ? { requestedProviderDefault: true } : {}),
           ...(current.autoTier ? { effectivePreference: current.autoTier } : {}),
           ...(current.pendingAutoTier !== undefined
             ? { pendingPreference: current.pendingAutoTier }
@@ -511,6 +530,24 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         });
         if (selection.model === "auto" || failure)
           yield* putExecution(`selection:${owner?.providerTurn.id ?? "current"}`, execution, owner);
+      });
+      const bindFusionOwner = Effect.fnUntraced(function* (fusionId: string, owner: ActiveTurn) {
+        fusionOwners.set(fusionId, owner);
+        if (fusionOwners.size > MAX_EXECUTION_ITEMS)
+          fusionOwners.delete(fusionOwners.keys().next().value!);
+        for (const [key, item] of executionItems) {
+          if (item.runId === null && item.modelExecution?.fusionId === fusionId)
+            yield* putExecution(
+              key,
+              {
+                ...item.modelExecution,
+                gaps: item.modelExecution.gaps.filter(
+                  (gap) => gap !== "Native execution could not be associated with a T3 run.",
+                ),
+              },
+              owner,
+            );
+        }
       });
       const recordFusion = Effect.fnUntraced(function* (event: SessionEvent, replay = false) {
         const key = fusionExecutionKey(event);
@@ -531,26 +568,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             Date.parse(event.timestamp) < DateTime.toEpochMillis(owner.providerTurn.startedAt)
           )
             owner = undefined;
-          if (owner && execution.fusionId && execution.kind === "route") {
-            fusionOwners.set(execution.fusionId, owner);
-            if (fusionOwners.size > MAX_EXECUTION_ITEMS)
-              fusionOwners.delete(fusionOwners.keys().next().value!);
-          }
-          if (owner && execution.fusionId) {
-            for (const [phaseKey, item] of executionItems) {
-              if (item.runId === null && item.modelExecution?.fusionId === execution.fusionId)
-                yield* putExecution(
-                  phaseKey,
-                  {
-                    ...item.modelExecution,
-                    gaps: item.modelExecution.gaps.filter(
-                      (gap) => gap !== "Native execution could not be associated with a T3 run.",
-                    ),
-                  },
-                  owner,
-                );
-            }
-          }
+          if (owner && execution.fusionId) yield* bindFusionOwner(execution.fusionId, owner);
         }
         if (
           owner &&
@@ -1044,13 +1062,48 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             return;
           }
           case "assistant.message_delta":
+            // SDK deltas lack phase attribution; Fusion publishes its committed full snapshot.
+            if (turn?.fusionText) return;
             if (turn)
               yield* textEvent(turn, event.data.messageId, event.data.deltaContent, false, false);
             return;
-          case "assistant.message":
-            if (turn) yield* textEvent(turn, event.data.messageId, event.data.content, true, false);
+          case "assistant.message": {
+            const messageOwner = event.data.originatingMessageId
+              ? nativeMessageOwners.get(event.data.originatingMessageId)
+              : undefined;
+            if (
+              event.data.fusion &&
+              event.data.originatingMessageId &&
+              (event.data.fusion.conversationScope === undefined ||
+                event.data.fusion.conversationScope === "root")
+            ) {
+              if (messageOwner) yield* bindFusionOwner(event.data.fusion.fusionId, messageOwner);
+              else {
+                pendingFusionOrigins.set(
+                  event.data.fusion.fusionId,
+                  event.data.originatingMessageId,
+                );
+                if (pendingFusionOrigins.size > MAX_EXECUTION_ITEMS)
+                  pendingFusionOrigins.delete(pendingFusionOrigins.keys().next().value!);
+              }
+            }
+            if (!publishesFusionText(event.data.fusion)) return;
+            if (event.data.fusion && event.data.originatingMessageId && !messageOwner) {
+              pendingFusionMessages.set(event.data.messageId, {
+                origin: event.data.originatingMessageId,
+                content: event.data.content,
+              });
+              if (pendingFusionMessages.size > MAX_EXECUTION_ITEMS)
+                pendingFusionMessages.delete(pendingFusionMessages.keys().next().value!);
+              return;
+            }
+            const owner = messageOwner ?? turn;
+            if (owner)
+              yield* textEvent(owner, event.data.messageId, event.data.content, true, false);
             return;
+          }
           case "assistant.reasoning_delta":
+            if (turn?.fusionText) return;
             if (turn)
               yield* textEvent(
                 turn,
@@ -1061,6 +1114,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
               );
             return;
           case "assistant.reasoning":
+            if (turn?.fusionText) return;
             if (turn)
               yield* textEvent(
                 turn,
@@ -1547,6 +1601,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
               cause: new Error("Copilot session is already in use by another client."),
             });
           }
+          if (autoTier === null)
+            yield* sdk("reset routing preference", () =>
+              native!.setModel("auto", { autoTier: null }),
+            );
           const now = yield* DateTime.now;
           if (nativeId) {
             const transcript = yield* sdk("read native transcript", () => native!.getEvents()).pipe(
@@ -1567,7 +1625,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                   (event.type !== "assistant.message" && event.type !== "user.message")
                 )
                   continue;
-                if (event.type === "assistant.message" && event.data.content.length === 0) continue;
+                if (
+                  event.type === "assistant.message" &&
+                  (event.data.content.length === 0 || !publishesFusionText(event.data.fusion))
+                )
+                  continue;
                 const messageId = MessageId.make(`${open.providerSessionId}:history:${event.id}`);
                 messages.set(messageId, {
                   id: messageId,
@@ -1674,21 +1736,17 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             reason: "previous_turn_active",
           });
         const effort = reasoningEffort(turnInput.modelSelection);
-        const autoTier =
+        const autoCatalog =
           turnInput.modelSelection.model === "auto"
-            ? yield* sdk("validate routing selection", async () =>
-                autoTierForSelection(
-                  turnInput.modelSelection,
-                  (await native!.rpc.model.list()).auto,
-                ),
-              )
-            : yield* sdk("validate model selection", async () =>
-                autoTierForSelection(turnInput.modelSelection),
-              );
+            ? yield* sdk("list routing choices", async () => (await native!.rpc.model.list()).auto)
+            : undefined;
+        const autoTier = yield* sdk("validate model selection", async () =>
+          autoTierForSelection(turnInput.modelSelection, autoCatalog),
+        );
         yield* sdk("set model", () =>
           native!.setModel(turnInput.modelSelection.model, {
             ...(effort ? { reasoningEffort: effort } : {}),
-            ...(autoTier ? { autoTier } : {}),
+            ...(autoTier !== undefined ? { autoTier } : {}),
           }),
         );
         const modeResult = yield* sdk("set mode", () =>
@@ -1722,6 +1780,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
           providerTurn,
           nextOrdinal: 1,
           items: new Map(),
+          fusionText: autoCatalog?.tiers.some((tier) => tier.type === "fusion") === true,
           accepted: false,
           idle: false,
           interrupted: false,
@@ -1771,7 +1830,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
           attachments.push({ type: "file" as const, path, displayName: attachment.name });
         }
         history = "";
-        yield* sdk(
+        const nativeMessageId = yield* sdk(
           "send",
           () =>
             native!.send({
@@ -1789,6 +1848,21 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             }),
           ),
         );
+        nativeMessageOwners.set(nativeMessageId, turn);
+        if (nativeMessageOwners.size > MAX_EXECUTION_ITEMS)
+          nativeMessageOwners.delete(nativeMessageOwners.keys().next().value!);
+        for (const [fusionId, origin] of pendingFusionOrigins) {
+          if (origin === nativeMessageId) {
+            pendingFusionOrigins.delete(fusionId);
+            yield* bindFusionOwner(fusionId, turn);
+          }
+        }
+        for (const [messageId, message] of pendingFusionMessages) {
+          if (message.origin === nativeMessageId) {
+            pendingFusionMessages.delete(messageId);
+            yield* textEvent(turn, messageId, message.content, true, false);
+          }
+        }
         turn.accepted = true;
         yield* Queue.offer(inbox, { type: "accepted" });
       });

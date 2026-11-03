@@ -1571,6 +1571,7 @@ export const OrchestrationV2ModelExecution = Schema.Struct({
   syntheticModel: Schema.optional(ModelExecutionText),
   requestedModel: Schema.optional(ModelExecutionText),
   requestedPreference: Schema.optional(ModelExecutionText),
+  requestedProviderDefault: Schema.optional(Schema.Boolean),
   effectivePreference: Schema.optional(ModelExecutionText),
   pendingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
   activatingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),

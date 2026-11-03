@@ -49,7 +49,8 @@ export const layer: Layer.Layer<TurnItemPositionStoreV2, never, SqlClient.SqlCli
           WHERE thread_id = ${threadId} AND turn_item_id = ${turnItemId}
           LIMIT 1
         `;
-          if (existing[0] !== undefined) return existing[0].ordinal;
+          if (existing[0] !== undefined && (existing[0].ordinal >= 1_000_000 || runId === null))
+            return existing[0].ordinal;
 
           const runRows =
             runId === null
@@ -63,7 +64,23 @@ export const layer: Layer.Layer<TurnItemPositionStoreV2, never, SqlClient.SqlCli
           const runOrdinal = suppliedRunOrdinal ?? runRows[0]?.ordinal ?? null;
           const lowerBound = runOrdinal === null ? 0 : runOrdinal * 1_000_000;
           const upperBound = runOrdinal === null ? 999_999 : lowerBound + 999_999;
-          yield* sql`
+          if (existing[0] !== undefined) {
+            if (runOrdinal === null) return existing[0].ordinal;
+            // Late ownership evidence moves an unassociated item into its run's range.
+            yield* sql`
+              UPDATE orchestration_v2_turn_item_positions
+              SET ordinal = (
+                SELECT COALESCE(MAX(ordinal), ${lowerBound}) + 1
+                FROM orchestration_v2_turn_item_positions
+                WHERE thread_id = ${threadId}
+                  AND ordinal >= ${lowerBound}
+                  AND ordinal <= ${upperBound}
+              )
+              WHERE thread_id = ${threadId} AND turn_item_id = ${turnItemId}
+                AND ordinal < 1000000
+            `;
+          } else
+            yield* sql`
           INSERT INTO orchestration_v2_turn_item_positions (thread_id, turn_item_id, ordinal)
           SELECT
             ${threadId},
