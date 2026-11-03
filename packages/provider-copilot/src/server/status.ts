@@ -31,13 +31,7 @@ export function modelsFromSdk(
     models
       .flatMap((model) => {
         const slug = model.id.trim();
-        if (
-          !slug ||
-          !model.name.trim() ||
-          seen.has(slug) ||
-          model.policy?.state === "disabled" ||
-          (slug === "auto" && !auto)
-        )
+        if (!slug || !model.name.trim() || seen.has(slug) || model.policy?.state === "disabled")
           return [];
         seen.add(slug);
         const efforts = model.supportedReasoningEfforts ?? [];
@@ -223,7 +217,7 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
         : !catalog.auto
           ? {
               message:
-                "This account/runtime does not advertise Auto or Fusion routing. Explicit models remain available.",
+                "This account/runtime does not advertise routing preferences. Available models can still use their default routing.",
             }
           : {}),
     },

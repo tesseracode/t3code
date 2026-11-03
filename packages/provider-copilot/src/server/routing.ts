@@ -52,9 +52,10 @@ export function autoTierForSelection(selection: ModelSelection, auto?: AutoCatal
       throw new Error("A Copilot routing preference requires the account-advertised auto model.");
     return undefined;
   }
+  if (requested === undefined) return undefined;
   if (!auto)
-    throw new Error("This Copilot runtime/account does not advertise Auto or Fusion routing.");
-  const id = requested ?? auto.defaultTier;
+    throw new Error("This Copilot runtime/account does not advertise routing preferences.");
+  const id = requested;
   const tier = auto.tiers.find((entry) => entry.id === id);
   if (!tier || tier.id.length > 512 || !tier.status.enabled || tier.status.pickerVisible === false)
     throw new Error(

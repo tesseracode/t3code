@@ -1,0 +1,21 @@
+{
+  "feature": "copilot-auto-default-routing",
+  "baseline": "2b383e8463042f4f2332707568dbeab9a39bfe38",
+  "hardParent": "copilot-fusion-model-selection",
+  "patchSha256": "08fb073397bbcf694f48141c4345d6376caff996ab489ae88b58483f711c8e2a",
+  "recipeSha256": "8096decffab3b3364ecf110f701f262b44ce99a1f62d212551e3eb07754ac1ad",
+  "result": "exact-leaf-composition",
+  "files": [
+    "docs/user/providers-copilot.md",
+    "packages/provider-copilot/src/server/adapter.test.ts",
+    "packages/provider-copilot/src/server/routing.test.ts",
+    "packages/provider-copilot/src/server/routing.ts",
+    "packages/provider-copilot/src/server/status.test.ts",
+    "packages/provider-copilot/src/server/status.ts"
+  ],
+  "canonicalReplay": "passed",
+  "allPreconditions": "passed",
+  "patchRecipeSourceAgreement": "passed",
+  "nativeAncestorVerification": "blocked",
+  "limitation": "Exact current-baseline correction proof, not historical-ancestor or future-upstream verification."
+}

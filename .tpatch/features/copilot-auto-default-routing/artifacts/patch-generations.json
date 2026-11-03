@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "feature": "copilot-auto-default-routing",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_8c411927fe5c",
+      "kind": "record",
+      "patch_sha256": "08fb073397bbcf694f48141c4345d6376caff996ab489ae88b58483f711c8e2a",
+      "git_patch_id": "d04bdda59a5a7c45eef5c9c26d2a2a0a84f5c31d",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "6b8bc5012877e12e7a92b86536182a46a4c6f5df807dc7a0693c65b55ad8d944",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "2b383e8463042f4f2332707568dbeab9a39bfe38",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/user/providers-copilot.md",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/routing.test.ts",
+          "packages/provider-copilot/src/server/routing.ts",
+          "packages/provider-copilot/src/server/status.test.ts",
+          "packages/provider-copilot/src/server/status.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/user/providers-copilot.md",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/routing.test.ts",
+        "packages/provider-copilot/src/server/routing.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/status.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-fusion-model-selection",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
+          "parent_recipe_sha256": "a9f07a134e711fc1edf0c793f3aadf9739e90de32f69031776b5981c0cc24550"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

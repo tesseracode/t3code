@@ -417,6 +417,41 @@ describe("native Copilot V2", () => {
       ),
   );
   it.effect(
+    "creates, resumes and switches plain Auto turns without optional routing-tier metadata",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const autoSelection: ModelSelection = { instanceId, model: "auto" };
+          for (const resumed of [undefined, "native-copilot"]) {
+            const fake = fakeSdk();
+            fake.setCurrent({ modelId: "auto" });
+            const { start, drain } = yield* setup(fake, resumed, autoSelection);
+            assert.equal(fake.config.model, "auto");
+            assert.isUndefined(fake.config.capi);
+            yield* start();
+            assert.equal(fake.sent.length, 1);
+            fake.emit("session.idle");
+            yield* drain();
+            yield* start(2, selection);
+            fake.emit("session.idle");
+            yield* drain();
+            yield* start(3, autoSelection);
+            assert.equal(fake.sent.length, 3);
+            assert.deepEqual(
+              fake.modelChanges.map((change) => change.model),
+              ["auto", "gpt-4.1", "auto"],
+            );
+            assert.isTrue(
+              fake.modelChanges.every((change) => change.options?.autoTier === undefined),
+            );
+            fake.emit("session.idle");
+            yield* drain();
+          }
+        }),
+      ),
+  );
+
+  it.effect(
     "preserves opaque create/resume routing and distinguishes pending, applied and failed activation",
     () =>
       provide(
