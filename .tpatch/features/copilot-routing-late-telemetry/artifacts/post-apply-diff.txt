@@ -1,0 +1,7 @@
+ docs/user/activity-log.md                          |   6 +
+ .../src/work-log/modelExecution.test.ts            |  33 ++++-
+ .../client-runtime/src/work-log/modelExecution.ts  |  15 +-
+ .../provider-copilot/src/server/adapter.test.ts    | 161 +++++++++++++++++++++
+ .../provider-copilot/src/server/fusion.test.ts     |  77 ++++++++++
+ packages/provider-copilot/src/server/fusion.ts     |  79 +++++++---
+ 6 files changed, 348 insertions(+), 23 deletions(-)

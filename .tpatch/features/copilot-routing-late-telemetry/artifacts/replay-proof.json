@@ -1,0 +1,21 @@
+{
+  "feature": "copilot-routing-late-telemetry",
+  "baseline": "07508376dc320bdbcddd98b5ff33d72d3b142469",
+  "hardParent": "copilot-auto-default-routing",
+  "patchSha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+  "recipeSha256": "d2ea728ea2927fa958e78ffff9414a9183a27d5cf44f879525c89a0995c4b4d5",
+  "result": "exact-leaf-composition",
+  "files": [
+    "docs/user/activity-log.md",
+    "packages/client-runtime/src/work-log/modelExecution.test.ts",
+    "packages/client-runtime/src/work-log/modelExecution.ts",
+    "packages/provider-copilot/src/server/adapter.test.ts",
+    "packages/provider-copilot/src/server/fusion.test.ts",
+    "packages/provider-copilot/src/server/fusion.ts"
+  ],
+  "canonicalReplay": "passed",
+  "allPreconditions": "passed",
+  "patchRecipeSourceAgreement": "passed",
+  "nativeAncestorVerification": "blocked",
+  "limitation": "Exact current-baseline correction proof, not historical-ancestor or future-upstream verification."
+}

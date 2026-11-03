@@ -24,6 +24,12 @@ executed. Phase details distinguish observed from estimated starts, provider ela
 event and receipt timestamps, and show reported final models, fallback, failures, and telemetry
 gaps. Missing timing or model data stays unknown rather than being inferred from the request.
 
+Routing summaries include the reported Fusion execution pattern and final source model.
+Planned fallback models are labeled separately: a fallback in the plan does not mean it ran.
+Auto model-resolution entries show the selected model, not proof that it completed a response.
+Events without a native turn association remain visibly unassociated; late routing and phase
+events enrich existing activity rather than creating additional user turns.
+
 For Copilot, select **Auto routing** and its **Routing** option when your connected account
 advertises them. Available preferences come from that account; unavailable choices show their
 reason. Explicit models and your default model are unchanged. You can switch back to an explicit

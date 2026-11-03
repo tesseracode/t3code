@@ -19,6 +19,8 @@ export function fusionExecutionKey(event: SessionEvent): string | undefined {
   )
     throw new Error("Copilot execution identity exceeds the supported metadata bound.");
   switch (event.type) {
+    case "session.auto_mode_resolved":
+      return `auto-resolution:${event.id}`;
     case "session.fusion_resolved":
     case "session.fusion_completed":
       return `fusion:${event.data.fusionId}:route`;
@@ -52,6 +54,14 @@ export function normalizeFusionExecution(
     gaps: [],
   };
   switch (event.type) {
+    case "session.auto_mode_resolved":
+      return {
+        ...base,
+        requestedModel: "auto",
+        model: label(event.data.chosenModel),
+        status: "resolved",
+        ...(event.data.routingMethod ? { reason: label(event.data.routingMethod) } : {}),
+      };
     case "session.fusion_resolved": {
       const data = event.data;
       const plannedModels = [
@@ -65,10 +75,7 @@ export function normalizeFusionExecution(
           phaseId: critic.phaseId,
         })),
       ];
-      // Replaying the route must not erase a later authoritative completion.
-      if (previous?.endedAt) return { ...previous, plannedModels };
-      return {
-        ...base,
+      const routeFacts = {
         fusionId: data.fusionId,
         nativeTurnId: data.turnId,
         syntheticModel: label(data.syntheticModel),
@@ -76,14 +83,37 @@ export function normalizeFusionExecution(
         fallbackModel: label(data.fallbackModel),
         contractVersion: data.contractVersion,
         plannedModels,
-        gaps: [
-          ...(data.contractVersion !== 1
-            ? ["Unrecognized routing contract version; execution facts may be incomplete."]
-            : []),
-          ...((data.critics?.length ?? 0) > 60
-            ? ["The routing plan was truncated to 64 models."]
-            : []),
-        ],
+      };
+      const gaps = [
+        ...(data.contractVersion !== 1
+          ? ["Unrecognized routing contract version; execution facts may be incomplete."]
+          : []),
+        ...((data.critics?.length ?? 0) > 60
+          ? ["The routing plan was truncated to 64 models."]
+          : []),
+      ];
+      // A late plan fills missing facts without erasing authoritative completion.
+      if (previous?.endedAt)
+        return {
+          ...routeFacts,
+          ...previous,
+          plannedModels,
+          contractVersion: data.contractVersion,
+          gaps: [
+            ...previous.gaps.filter(
+              (gap) =>
+                gap !== "The resolved routing plan was not observed." &&
+                gap !==
+                  "Unrecognized routing contract version; execution facts may be incomplete." &&
+                gap !== "The routing plan was truncated to 64 models.",
+            ),
+            ...gaps,
+          ],
+        };
+      return {
+        ...base,
+        ...routeFacts,
+        gaps,
       };
     }
     case "session.fusion_completed":
@@ -127,9 +157,17 @@ export function normalizeFusionExecution(
         ],
       };
     case "assistant.fusion_phase_started": {
+      const phaseFacts = {
+        model: previous?.model ?? label(event.data.model),
+        pattern: previous?.pattern ?? event.data.pattern,
+        role: previous?.role ?? label(event.data.role),
+        phaseKind: previous?.phaseKind ?? event.data.phaseKind,
+        conversationScope: previous?.conversationScope ?? event.data.conversationScope,
+      };
       if (previous?.status === "unknown" && previous.gaps.includes(ROOT_PHASE_GAP))
         return {
           ...previous,
+          ...phaseFacts,
           receivedAt,
           startedAt: previous.startSource === "observed" ? previous.startedAt : event.timestamp,
           startSource: "observed",
@@ -138,10 +176,15 @@ export function normalizeFusionExecution(
         if (Date.parse(event.timestamp) > Date.parse(previous.endedAt)) return previous;
         return {
           ...previous,
+          ...phaseFacts,
           startedAt: event.timestamp,
           startSource: "observed",
-          gaps: previous.gaps.filter(
-            (gap) => gap !== "Phase start was not observed; its start time is only an estimate.",
+          gaps: previous.gaps.flatMap((gap) =>
+            gap === "Phase start was not observed; its start time is only an estimate."
+              ? []
+              : gap === "Phase start and usable elapsed time were not observed."
+                ? ["Usable elapsed time was not reported."]
+                : [gap],
           ),
         };
       }
@@ -150,8 +193,8 @@ export function normalizeFusionExecution(
         kind: "phase",
         fusionId: event.data.fusionId,
         phaseId: event.data.phaseId,
-        phaseKind: event.data.phaseKind,
-        conversationScope: event.data.conversationScope,
+        phaseKind: event.data.phaseKind ?? previous?.phaseKind,
+        conversationScope: event.data.conversationScope ?? previous?.conversationScope,
         model: label(event.data.model),
         role: label(event.data.role),
         pattern: event.data.pattern,
@@ -170,8 +213,8 @@ export function normalizeFusionExecution(
         kind: "phase",
         fusionId: event.data.fusionId,
         phaseId: event.data.phaseId,
-        phaseKind: event.data.phaseKind,
-        conversationScope: event.data.conversationScope,
+        phaseKind: event.data.phaseKind ?? previous?.phaseKind,
+        conversationScope: event.data.conversationScope ?? previous?.conversationScope,
         model: label(event.data.model),
         role: label(event.data.role),
         status: event.data.status,

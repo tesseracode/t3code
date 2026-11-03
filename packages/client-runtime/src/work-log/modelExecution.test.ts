@@ -75,11 +75,42 @@ describe("model execution presentation", () => {
     expect(modelExecutionSummary(failed)).toContain("final final-model");
     expect(modelExecutionSummary(failed)).toContain("telemetry gaps");
     const detail = modelExecutionDetail(failed);
-    expect(detail).toContain("Fallback model: fallback-model");
+    expect(detail).toContain("Planned fallback model (not execution evidence): fallback-model");
     expect(detail).toContain("Final source model: final-model");
     expect(detail).toContain("Final source phase: final-phase");
     expect(detail).toContain("Reason: Provider unavailable");
     expect(detail).toContain("Background work: awaiting completion");
     expect(detail).toContain("Telemetry gaps:\n- missing phase start\n- duration incomplete");
+  });
+
+  it("shows Fusion patterns and final models without reporting planned fallback as executed", () => {
+    for (const pattern of ["single", "cascade", "critique"]) {
+      const route: OrchestrationV2ModelExecution = {
+        ...phase,
+        kind: "route",
+        pattern,
+        syntheticModel: "opaque-fusion",
+        finalSourceModel: "actual-final-model",
+        fallbackModel: "unused-fallback",
+      };
+      expect(modelExecutionSummary(route)).toContain(`opaque-fusion · ${pattern}`);
+      expect(modelExecutionSummary(route)).toContain("final actual-final-model");
+      expect(modelExecutionSummary(route)).toContain("planned fallback unused-fallback");
+    }
+  });
+
+  it("shows ordinary Auto resolution as selection rather than Fusion or final execution", () => {
+    const resolved: OrchestrationV2ModelExecution = {
+      ...phase,
+      kind: "route",
+      requestedModel: "auto",
+      status: "resolved",
+    };
+    expect(modelExecutionSummary(resolved)).toContain("selected actual-model");
+    expect(modelExecutionSummary(resolved)).not.toContain("final ");
+    expect(modelExecutionDetail(resolved)).toContain(
+      "Selected model (not execution evidence): actual-model",
+    );
+    expect(modelExecutionDetail(resolved)).not.toContain("Pattern:");
   });
 });

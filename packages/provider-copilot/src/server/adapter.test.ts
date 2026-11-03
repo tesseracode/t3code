@@ -332,6 +332,167 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 
 describe("native Copilot V2", () => {
   it.effect(
+    "reimports duplicate Auto resolution with a stable item identity across cold starts",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const ids: string[] = [];
+          for (let restart = 0; restart < 2; restart++) {
+            const fake = fakeSdk();
+            fake.session.getEvents = async () => [
+              {
+                type: "session.auto_mode_resolved",
+                id: "durable-auto",
+                parentId: "chronological-not-semantic",
+                timestamp: "2026-10-29T00:00:02Z",
+                data: {
+                  chosenModel: "actual-model",
+                  fallback: false,
+                  candidateModels: ["actual-model"],
+                  categoryScores: { needs_reasoning: 0 },
+                  routingMethod: "auto_v2",
+                },
+              },
+            ];
+            const { takeEvent } = yield* setup(
+              fake,
+              "native-copilot",
+              selection,
+              ProviderSessionId.make(`auto-restart-${restart}`),
+            );
+            const imported = yield* takeEvent(
+              (event) =>
+                event.type === "turn_item.updated" &&
+                event.turnItem.type === "system_notice" &&
+                event.turnItem.modelExecution?.eventId === "durable-auto",
+            );
+            if (imported.type !== "turn_item.updated" || imported.turnItem.type !== "system_notice")
+              return assert.fail("Expected Auto history");
+            ids.push(imported.turnItem.id);
+            assert.equal(imported.turnItem.modelExecution?.model, "actual-model");
+            assert.equal(imported.turnItem.runId, null);
+            assert.isUndefined(imported.turnItem.modelExecution?.finalSourceModel);
+          }
+          assert.equal(ids[0], ids[1]);
+        }),
+      ),
+  );
+
+  it.effect(
+    "persists Auto resolutions without assigning chronological-only events to a user turn",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk();
+          const { start, takeEvent, drain } = yield* setup(fake);
+          yield* start();
+          fake.emit("session.auto_mode_resolved", {
+            chosenModel: "actual-model",
+            routingMethod: "auto_v2",
+          });
+          const reported = yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.modelExecution?.status === "resolved",
+          );
+          if (reported.type !== "turn_item.updated" || reported.turnItem.type !== "system_notice")
+            return assert.fail("Expected routing metadata");
+          assert.equal(reported.turnItem.modelExecution?.model, "actual-model");
+          assert.equal(reported.turnItem.runId, null);
+          assert.isUndefined(reported.turnItem.modelExecution?.pattern);
+          assert.equal((yield* drain()).providerTurns[0]?.status, "running");
+        }),
+      ),
+  );
+
+  it.effect(
+    "reattaches phase and completion received before route and turn-start for every pattern",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          for (const pattern of ["single", "cascade", "critique"]) {
+            const fake = fakeSdk();
+            const { start, drain, emitted, takeEvent } = yield* setup(fake);
+            yield* start();
+            fake.emit("assistant.fusion_phase_completed", {
+              fusionId: "fusion-ordered",
+              phaseId: "primary",
+              model: "actual-model",
+              role: "primary",
+              phaseKind: "primary",
+              conversationScope: "root",
+              status: "succeeded",
+              durationMs: 2000,
+              content: "PRIVATE DRAFT",
+            });
+            fake.emit("session.fusion_completed", {
+              fusionId: "fusion-ordered",
+              turnId: "0",
+              pattern,
+              syntheticModel: "opaque-fusion",
+              outcome: "completed",
+              durationMs: 2000,
+              finalSourceModel: "actual-model",
+              finalSourcePhaseId: "primary",
+            });
+            fake.emit("assistant.turn_start", { turnId: "0" });
+            fake.emit("session.fusion_resolved", {
+              fusionId: "fusion-ordered",
+              turnId: "0",
+              pattern,
+              contractVersion: 1,
+              syntheticModel: "opaque-fusion",
+              primaryModel: "planned-model",
+              fallbackModel: "unused-fallback",
+            });
+            yield* takeEvent(
+              (event) =>
+                event.type === "turn_item.updated" &&
+                event.turnItem.type === "system_notice" &&
+                event.turnItem.modelExecution?.fusionId === "fusion-ordered" &&
+                event.turnItem.modelExecution?.kind === "route" &&
+                event.turnItem.modelExecution?.plannedModels !== undefined,
+            );
+            const beforeIdle = yield* drain();
+            assert.equal(beforeIdle.providerTurns.length, 1);
+            assert.equal(beforeIdle.providerTurns[0]?.status, "running");
+            const items = new Map(
+              emitted.flatMap((event) =>
+                event.type === "turn_item.updated"
+                  ? [[event.turnItem.id, event.turnItem] as const]
+                  : [],
+              ),
+            );
+            const metadata = [...items.values()].filter(
+              (item) =>
+                item.type === "system_notice" && item.modelExecution?.fusionId === "fusion-ordered",
+            );
+            assert.equal(metadata.length, 2);
+            assert.isTrue(metadata.every((item) => item.runId === RunId.make("run-1")));
+            const route = metadata.find(
+              (item) => item.type === "system_notice" && item.modelExecution?.kind === "route",
+            );
+            if (route?.type !== "system_notice") return assert.fail("Expected route metadata");
+            assert.equal(route.modelExecution?.pattern, pattern);
+            assert.equal(route.modelExecution?.status, "completed");
+            assert.equal(route.modelExecution?.finalSourceModel, "actual-model");
+            assert.deepEqual(route.modelExecution?.gaps, []);
+            assert.notInclude(JSON.stringify(metadata), "PRIVATE DRAFT");
+            fake.emit("assistant.message", {
+              messageId: "final-response",
+              content: "Demo final result",
+            });
+            fake.emit("session.idle");
+            const completed = yield* drain();
+            assert.equal(completed.providerTurns.length, 1);
+            assert.equal(completed.providerTurns[0]?.status, "completed");
+          }
+        }),
+      ),
+  );
+
+  it.effect(
     "bounds live phase records and exposes an overflow gap instead of silently losing telemetry",
     () =>
       provide(

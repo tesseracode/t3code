@@ -1,0 +1,86 @@
+{
+  "feature": "copilot-routing-late-telemetry",
+  "baseline": "07508376dc320bdbcddd98b5ff33d72d3b142469",
+  "scope": "Auto resolution persistence, late Fusion metadata enrichment, and shared activity summaries; not the separate Fusion picker redesign.",
+  "focusedTests": {
+    "files": [
+      "packages/provider-copilot/src/server/fusion.test.ts",
+      "packages/provider-copilot/src/server/adapter.test.ts",
+      "packages/client-runtime/src/work-log/modelExecution.test.ts"
+    ],
+    "passed": 39,
+    "providerTypecheck": "passed",
+    "clientRuntimeTypecheck": "passed",
+    "scopedLint": "passed",
+    "eventOrderCoverage": [
+      "phase and completion before route and turn-start, for Single/Cascade/Critique",
+      "late plan preserves completion status, final source and timestamps",
+      "late start enriches phase facts without resurrecting terminal work",
+      "duplicate completion preserves enriched phase facts",
+      "cold replay retains stable Auto item identity without chronological run guessing",
+      "missing duration remains unknown",
+      "private drafts and classifier payloads excluded"
+    ]
+  },
+  "liveOrdinaryAutoDemo": {
+    "sdk": "1.0.28",
+    "runtime": "1.0.105",
+    "isolatedT3Home": true,
+    "isolatedCopilotHome": true,
+    "projectConfigurationDiscovery": false,
+    "workspace": "Disposable repository containing only a harmless sum function.",
+    "inferencePrompts": 1,
+    "requestedModel": "auto",
+    "requestedTier": null,
+    "chosenModel": "gpt-6-luna",
+    "routingMethod": "auto_v2",
+    "resolvedAt": "2026-11-03T09:30:11.013Z",
+    "authoritativeAssistantMessageModel": "gpt-6-luna",
+    "responseAt": "2026-11-03T09:30:14.607Z",
+    "response": "AUTO_DEMO_RESULT: 10",
+    "fusionEvents": 0,
+    "browserResultAndChosenModel": "observed",
+    "browserReloadPersistence": "observed",
+    "association": "Resolution has no semantic turn ID; the UI explicitly preserves this telemetry gap.",
+    "screenshots": [
+      "live-sdk-model-catalog.png",
+      "live-auto-result.png",
+      "live-auto-model-info.png",
+      "live-auto-result-after-reload.png"
+    ],
+    "evidenceLocation": "Maintainer session artifacts, not committed screenshot assets.",
+    "limitation": "Real ordinary Auto inference, not Fusion Standard or explicit Fusion tier qualification."
+  },
+  "discovery": {
+    "inferencePrompts": 0,
+    "cases": [
+      "bundled runtime, experimental false",
+      "bundled runtime, experimental true",
+      "installed runtime, experimental false",
+      "installed runtime, experimental true"
+    ],
+    "globalAndSessionAutoTierMetadata": "absent in all four cases",
+    "nativeInteractiveDiagnostic": "Inconclusive; no picker observation establishes an account/runtime limitation.",
+    "unadvertisedTierIdsForced": false
+  },
+  "surfaces": {
+    "web": "Live isolated browser pass and reload.",
+    "desktop": "Consumes the same web/shared presentation; no packaged desktop claim.",
+    "mobile": "Consumes shared summary/detail helpers; no new native device pass in this correction.",
+    "providers": "Only Copilot normalization changed.",
+    "contracts": "Unchanged.",
+    "entryPoints": "No model-selection action or keybinding changed; existing activity details use shared formatting.",
+    "reverseStates": "Terminal outcomes remain terminal when start/plan telemetry arrives late.",
+    "connectionModes": "No origins or transport paths changed; metadata uses existing persisted contracts."
+  },
+  "remainingGates": [
+    "Separate Fusion model/effort picker redesign.",
+    "SDK-advertised selectable tier IDs and real per-tier execution.",
+    "SDK-driven multi-phase final-answer delivery.",
+    "Native tpatch overlapping-parent verification.",
+    "Packaged platform qualification."
+  ],
+  "deployment": "not performed",
+  "pullRequest": "not created",
+  "liveUserStateWrites": false
+}
