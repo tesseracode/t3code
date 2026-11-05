@@ -1,0 +1,23 @@
+{
+  "id": "copilot-runtime-knip-declaration",
+  "slug": "copilot-runtime-knip-declaration",
+  "title": "Teach the server workspace Knip audit that its pinned Copilot SDK is an intentional external runtime root, loaded from the emitted server location and staged into CLI/desktop artifacts. Keep the dependency, native payload safeguards, and all other dependency auditing intact. Resolve issue #41 with a narrowly scoped configuration exception and existing runtime packaging regressions.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-05T18:35:14Z",
+  "updated_at": "2026-11-05T18:36:28Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-05T18:35:42Z",
+    "base_commit": "60c107e3b3c888dca25f604950b0a9662b3e1d29",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "verify": {
+    "verified_at": "2026-11-05T18:36:23Z",
+    "passed": true,
+    "recipe_hash_at_verify": "52279d22e89f956b40288f1d1bbfc6736804359920a4a462bf5f0584ca73ccf4",
+    "patch_hash_at_verify": "626513e72e70b3d6b0c938e1489c648a6f5a87acd4772dc9404ea4891a3c0a7c"
+  }
+}
