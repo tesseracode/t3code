@@ -1,0 +1,32 @@
+{
+  "id": "copilot-background-routing",
+  "slug": "copilot-background-routing",
+  "title": "Honor account-advertised Auto and Fusion routing preferences in all shared Copilot background text generation operations. Validate opaque autoTier IDs before creating an ephemeral session, forward capi.autoTier, preserve omission versus explicit provider-default reset, and retain tool-free discovery-disabled JSON generation and owned-session cleanup. Resolve issue #37 without claiming the separate missing-title report is reproduced.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-05T07:44:58Z",
+  "updated_at": "2026-11-05T07:47:52Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-05T07:47:30Z",
+    "base_commit": "0c0303b8f468934d08ebf6f45f72b19da29a23ce",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-fusion-model-selection",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-05T07:47:48Z",
+    "passed": false,
+    "recipe_hash_at_verify": "d4aa6e25f3df994850c4d86fc97939c984ad2298d51c2c7b365972d01cc4bcb6",
+    "patch_hash_at_verify": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+    "parent_snapshot": {
+      "copilot-fusion-model-selection": "applied"
+    }
+  }
+}

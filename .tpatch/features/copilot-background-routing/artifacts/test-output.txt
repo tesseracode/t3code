@@ -1,0 +1,13 @@
+# Test run — 2026-11-05T07:47:30Z
+# Command: vp test run packages/provider-copilot/src/server/textGeneration.test.ts packages/provider-copilot/src/server/routing.test.ts
+# Directory: <isolated-worktree>
+
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 <isolated-worktree>
+
+
+ Test Files  2 passed (2)
+      Tests  9 passed (9)
+   Start at  23:47:27
+   Duration  2.90s (transform 66%, setup 22%, import 12%)

@@ -8,12 +8,18 @@ import { TextGenerationError } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
+import { getProviderOptionStatedValue } from "@t3tools/shared/model";
 import type { CopilotSettings } from "../settings.ts";
 import { createClient, resolveClientConfiguration } from "./client.ts";
 import { reasoningEffort } from "./adapter.ts";
+import { autoTierForSelection } from "./routing.ts";
 
-type GenerationSession = Pick<CopilotSession, "sessionId" | "sendAndWait" | "disconnect">;
+type GenerationSession = Pick<
+  CopilotSession,
+  "sessionId" | "sendAndWait" | "disconnect" | "setModel"
+>;
 type GenerationClient = Pick<CopilotClient, "start" | "stop" | "forceStop" | "deleteSession"> & {
+  readonly rpc: { readonly models: Pick<CopilotClient["rpc"]["models"], "list"> };
   readonly createSession: (config: SessionConfig) => Promise<GenerationSession>;
 };
 export interface GenerationOptions {
@@ -93,6 +99,19 @@ export function makeTextGeneration(
           );
           yield* call("startup", () => client.start(), 30_000);
           const effort = reasoningEffort(request.modelSelection);
+          const autoCatalog =
+            request.modelSelection.model === "auto" &&
+            typeof getProviderOptionStatedValue("autoTier", request.modelSelection) === "string"
+              ? yield* call(
+                  "routing discovery",
+                  async () => (await client.rpc.models.list({})).auto,
+                  30_000,
+                )
+              : undefined;
+          const autoTier = yield* Effect.try({
+            try: () => autoTierForSelection(request.modelSelection, autoCatalog),
+            catch: error,
+          });
           const owned = yield* call(
             "session creation",
             () =>
@@ -101,6 +120,7 @@ export function makeTextGeneration(
                   clientName: "t3-code-text-generation",
                   workingDirectory: request.cwd,
                   model: request.modelSelection.model,
+                  ...(autoTier ? { capi: { autoTier } } : {}),
                   ...(effort ? { reasoningEffort: effort } : {}),
                   streaming: false,
                   enableConfigDiscovery: false,
@@ -130,6 +150,12 @@ export function makeTextGeneration(
                 }),
             30_000,
           );
+          if (autoTier === null)
+            yield* call(
+              "routing reset",
+              () => owned.setModel(request.modelSelection.model, { autoTier: null }),
+              30_000,
+            );
           const reply = yield* call(
             "response",
             () => owned.sendAndWait({ prompt: request.prompt }, 180_000),

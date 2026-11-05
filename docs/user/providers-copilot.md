@@ -30,6 +30,10 @@ Choose **Provider default** in the effort control to explicitly clear a saved
 preference. Omitting a preference on reconnect instead restores the committed
 selection. A change may remain pending until the next turn.
 
+Background generation, including titles and source-control text, honors the
+selected account-advertised routing preference. Unavailable preferences fail
+explicitly rather than silently using a different tier.
+
 Fusion can use one model or multiple draft/review phases. The activity log shows
 reported phases and the final source model, while chat shows the committed final
 answer rather than intermediate drafts. Fusion-enabled Auto answers appear as full
