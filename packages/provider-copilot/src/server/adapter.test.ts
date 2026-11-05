@@ -331,6 +331,39 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   );
 
 describe("native Copilot V2", () => {
+  it.effect("renews routing preferences without replacing ordinary model switches", () =>
+    provide(
+      Effect.gen(function* () {
+        const adapter = yield* makeAdapter({ instanceId, settings, environment: {} });
+        const auto: ModelSelection = { instanceId, model: "auto" };
+        const high: ModelSelection = {
+          ...auto,
+          options: [{ id: "autoTier", value: "hydrafusion" }],
+        };
+        const max: ModelSelection = {
+          ...auto,
+          options: [{ id: "autoTier", value: "hydrafusion-max" }],
+        };
+        for (const [current, target, type] of [
+          [selection, max, "restart_session"],
+          [auto, max, "restart_session"],
+          [high, max, "restart_session"],
+          [max, max, "apply_on_next_turn"],
+          [max, selection, "apply_on_next_turn"],
+          [selection, auto, "apply_on_next_turn"],
+        ] as const) {
+          assert.deepEqual(
+            yield* adapter.planSelectionTransition({
+              current,
+              target,
+              sessionCapabilities: yield* adapter.getCapabilities(),
+            }),
+            { type },
+          );
+        }
+      }),
+    ),
+  );
   it.effect.each(["single", "cascade", "critique"])(
     "publishes only committed root %s output before late plan telemetry",
     (pattern) =>

@@ -18,8 +18,10 @@ effective, and activating routing and shows reported model phases and timing. Se
 [Activity log](activity-log.md). Explicit-model selection and defaults are unchanged.
 
 To opt in to dynamic Fusion tiers, turn on **Enable Fusion** for this provider in
-**Settings > Providers**. The setting affects new Copilot runtimes on that
-environment and is off by default. When the account advertises Fusion, the model
+**Settings > Providers**. The setting is off by default on each environment.
+Changing an explicit routing preference renews the Copilot runtime and resumes
+the same native conversation, so existing chats receive the updated setting.
+When the account advertises Fusion, the model
 picker shows **Fusion**, with a separate **Fusion effort** control for its available
 tiers, such as **Standard**, **High**, and **Max**. Names and availability come from
 your account; choosing an effort does not pin the solver or reviewer model.

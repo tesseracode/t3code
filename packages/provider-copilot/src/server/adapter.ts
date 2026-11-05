@@ -204,8 +204,17 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
     getCapabilities: Effect.fn("CopilotAdapter.getCapabilities")(() =>
       Effect.succeed(capabilities),
     ),
-    planSelectionTransition: Effect.fn("CopilotAdapter.planSelectionTransition")(() =>
-      Effect.succeed(turnScopedSelectionTransition()),
+    planSelectionTransition: Effect.fn("CopilotAdapter.planSelectionTransition")(
+      ({ current, target }) =>
+        Effect.succeed(
+          target.model === "auto" &&
+            typeof getProviderOptionStatedValue("autoTier", target) === "string" &&
+            (current.model !== "auto" ||
+              getProviderOptionStatedValue("autoTier", current) !==
+                getProviderOptionStatedValue("autoTier", target))
+            ? { type: "restart_session" as const }
+            : turnScopedSelectionTransition(),
+        ),
     ),
     openSession: Effect.fn("CopilotAdapter.openSession")(function* (open) {
       const cwd = open.runtimePolicy.cwd ?? host.paths.cwd;

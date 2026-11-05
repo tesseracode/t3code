@@ -1,0 +1,32 @@
+{
+  "id": "copilot-fusion-runtime-transition",
+  "slug": "copilot-fusion-runtime-transition",
+  "title": "Fix entering Fusion from an existing concrete or plain Auto session after enabling Fusion. Renew the native runtime through the existing restart-and-resume selection transition so it receives current opt-in flags, while retaining native conversation identity/history and not injecting duplicate history. Keep routed Auto tier changes and concrete switches warm when possible; preserve background-work guards and no silent model fallback. Track the observed pre-inference routing validation failure separately from worktree-handoff stream closure.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-05T07:38:43Z",
+  "updated_at": "2026-11-05T07:42:13Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-05T07:42:13Z",
+    "base_commit": "c69222b5429a77fb92e985d37710bff6df9c593b",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-fusion-model-selection",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-05T07:40:14Z",
+    "passed": false,
+    "recipe_hash_at_verify": "d94c8bacfa502f7dae4413b361792c39e9bcfa076221192184a33f8a7301b454",
+    "patch_hash_at_verify": "1c2fdabc20d387ac812c9b6dd91c7d196bbebadff6c7b61071f0802b9126b874",
+    "parent_snapshot": {
+      "copilot-fusion-model-selection": "applied"
+    }
+  }
+}

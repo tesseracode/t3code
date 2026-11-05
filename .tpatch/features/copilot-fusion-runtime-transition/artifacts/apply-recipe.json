@@ -1,0 +1,23 @@
+{
+  "feature": "copilot-fusion-runtime-transition",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "search": "    planSelectionTransition: Effect.fn(\"CopilotAdapter.planSelectionTransition\")(() =>\n      Effect.succeed(turnScopedSelectionTransition()),\n    ),",
+      "replace": "    planSelectionTransition: Effect.fn(\"CopilotAdapter.planSelectionTransition\")(({ current, target }) =>\n      Effect.succeed(\n        target.model === \"auto\" &&\n          typeof getProviderOptionStatedValue(\"autoTier\", target) === \"string\" &&\n          (current.model !== \"auto\" ||\n            getProviderOptionStatedValue(\"autoTier\", current) !==\n              getProviderOptionStatedValue(\"autoTier\", target))\n          ? { type: \"restart_session\" as const }\n          : turnScopedSelectionTransition(),\n      ),\n    ),"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.test.ts",
+      "search": "describe(\"native Copilot V2\", () => {",
+      "replace": "describe(\"native Copilot V2\", () => {\n  it.effect(\"renews routing preferences without replacing ordinary model switches\", () =>\n    provide(\n      Effect.gen(function* () {\n        const adapter = yield* makeAdapter({ instanceId, settings, environment: {} });\n        const auto: ModelSelection = { instanceId, model: \"auto\" };\n        const high: ModelSelection = { ...auto, options: [{ id: \"autoTier\", value: \"hydrafusion\" }] };\n        const max: ModelSelection = { ...auto, options: [{ id: \"autoTier\", value: \"hydrafusion-max\" }] };\n        for (const [current, target, type] of [\n          [selection, max, \"restart_session\"],\n          [auto, max, \"restart_session\"],\n          [high, max, \"restart_session\"],\n          [max, max, \"apply_on_next_turn\"],\n          [max, selection, \"apply_on_next_turn\"],\n          [selection, auto, \"apply_on_next_turn\"],\n        ] as const) {\n          assert.deepEqual(yield* adapter.planSelectionTransition({\n            current, target, sessionCapabilities: yield* adapter.getCapabilities(),\n          }), { type });\n        }\n      }),\n    ),\n  );"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "docs/user/providers-copilot.md",
+      "search": "**Settings > Providers**. The setting affects new Copilot runtimes on that\nenvironment and is off by default.",
+      "replace": "**Settings > Providers**. The setting is off by default on each environment.\nChanging an explicit routing preference renews the Copilot runtime and resumes\nthe same native conversation, so existing chats receive the updated setting."
+    }
+  ]
+}

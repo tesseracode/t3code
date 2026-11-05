@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-fusion-runtime-transition",
+  "completed_at": "2026-11-05T07:42:13Z",
+  "base_commit": "c69222b5429a77fb92e985d37710bff6df9c593b",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "tpatch test — command: vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/routing.test.ts apps/server/src/orchestration-v2/ProviderSwitchService.test.ts apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts"
+}
