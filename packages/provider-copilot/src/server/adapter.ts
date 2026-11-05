@@ -110,6 +110,10 @@ export interface AdapterOptions {
   readonly onSkills?: (cwd: string, skills: ReadonlyArray<ServerProviderSkill> | null) => void;
 }
 
+function isPendingTask(task: Task): boolean {
+  return task.status === "running" || (task.status === "idle" && task.type !== "agent");
+}
+
 function permissionPrompt(request: PermissionRequest): string {
   switch (request.kind) {
     case "shell":
@@ -826,13 +830,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             });
         }
         yield* updateThread({
-          pendingBackgroundTasks: listed.tasks
-            .filter((task) => task.status === "running" || task.status === "idle")
-            .map((task) => ({
-              taskId: task.id,
-              kind: task.type === "agent" ? ("subagent" as const) : ("command" as const),
-              ...(task.description ? { description: task.description } : {}),
-            })),
+          pendingBackgroundTasks: listed.tasks.filter(isPendingTask).map((task) => ({
+            taskId: task.id,
+            kind: task.type === "agent" ? ("subagent" as const) : ("command" as const),
+            ...(task.description ? { description: task.description } : {}),
+          })),
         });
       });
       const refreshPlan = Effect.fnUntraced(function* () {
@@ -1881,9 +1883,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         providerSessionId: open.providerSessionId,
         providerSession,
         events: Stream.fromQueue(events),
-        hasPendingBackgroundWork: Effect.sync(() =>
-          [...tasks.values()].some((task) => task.status === "running" || task.status === "idle"),
-        ),
+        hasPendingBackgroundWork: Effect.sync(() => [...tasks.values()].some(isPendingTask)),
         ensureThread,
         resumeThread: (resume) =>
           ensureThread({

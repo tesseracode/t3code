@@ -1,0 +1,29 @@
+{
+  "feature": "copilot-idle-agent-completion",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "search": "function permissionPrompt(request: PermissionRequest): string {",
+      "replace": "function isPendingTask(task: Task): boolean {\n  return task.status === \"running\" || (task.status === \"idle\" && task.type !== \"agent\");\n}\n\nfunction permissionPrompt(request: PermissionRequest): string {"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "search": ".filter((task) => task.status === \"running\" || task.status === \"idle\")",
+      "replace": ".filter(isPendingTask)"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "search": "[...tasks.values()].some((task) => task.status === \"running\" || task.status === \"idle\")",
+      "replace": "[...tasks.values()].some(isPendingTask)"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.test.ts",
+      "search": "          yield* start(2);\n          fake.setTasks({ tasks: [{ ...task, status: \"completed\", result: \"Finished\" }] });",
+      "replace": "          fake.setTasks({ tasks: [{ ...task, status: \"idle\", latestResponse: \"Ready\" }] });\n          fake.emit(\"session.background_tasks_changed\");\n          const idle = yield* takeEvent((event) => event.type === \"subagent.updated\" && event.subagent.status === \"idle\");\n          assert.deepEqual((yield* drain()).providerThread.pendingBackgroundTasks, []);\n          assert.isFalse(yield* runtime.hasPendingBackgroundWork!);\n          if (idle.type !== \"subagent.updated\") return assert.fail(\"Expected idle helper.\");\n          assert.equal(idle.subagent.result, \"Ready\");\n          assert.isNull(idle.subagent.completedAt);\n          fake.emit(\"session.background_tasks_changed\");\n          assert.deepEqual((yield* drain()).providerThread.pendingBackgroundTasks, []);\n          fake.setTasks({ tasks: [task] });\n          fake.emit(\"session.background_tasks_changed\");\n          assert.equal((yield* drain()).providerThread.pendingBackgroundTasks?.[0]?.taskId, \"bg-task\");\n          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);\n          yield* start(2);\n          fake.setTasks({ tasks: [{ ...task, status: \"completed\", result: \"Finished\" }] });"
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index f95b73f92..e89a4e54a 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -1719,6 +1719,29 @@ describe("native Copilot V2", () => {
+             running.type === "subagent.updated" ? running.subagent.runId : null,
+             "run-1",
+           );
++          fake.setTasks({ tasks: [{ ...task, status: "idle", latestResponse: "Ready" }] });
++          fake.emit("session.background_tasks_changed");
++          const idle = yield* takeEvent(
++            (event) => event.type === "subagent.updated" && event.subagent.status === "idle",
++          );
++          assert.deepEqual((yield* drain()).providerThread.pendingBackgroundTasks, []);
++          assert.isFalse(yield* runtime.hasPendingBackgroundWork!);
++          if (idle.type !== "subagent.updated") return assert.fail("Expected idle helper.");
++          assert.equal(idle.subagent.result, "Ready");
++          assert.isNull(idle.subagent.completedAt);
++          assert.equal(
++            idle.subagent.id,
++            running.type === "subagent.updated" ? running.subagent.id : null,
++          );
++          fake.emit("session.background_tasks_changed");
++          assert.deepEqual((yield* drain()).providerThread.pendingBackgroundTasks, []);
++          fake.setTasks({ tasks: [task] });
++          fake.emit("session.background_tasks_changed");
++          assert.equal(
++            (yield* drain()).providerThread.pendingBackgroundTasks?.[0]?.taskId,
++            "bg-task",
++          );
++          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
+           yield* start(2);
+           fake.setTasks({ tasks: [{ ...task, status: "completed", result: "Finished" }] });
+           fake.emit("assistant.idle", {}, "bg-task");
+@@ -1730,6 +1753,25 @@ describe("native Copilot V2", () => {
+             "run-1",
+           );
+           assert.equal((yield* drain()).providerTurns[1]?.status, "running");
++          fake.setTasks({
++            tasks: [
++              {
++                id: "idle-shell",
++                type: "shell",
++                status: "idle",
++                description: "Retained service",
++                command: "fixture-service",
++                attachmentMode: "detached",
++                startedAt: task.startedAt,
++              },
++            ],
++          });
++          fake.emit("session.background_tasks_changed");
++          assert.equal(
++            (yield* drain()).providerThread.pendingBackgroundTasks?.[0]?.kind,
++            "command",
++          );
++          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
+           fake.setTasks({ tasks: [] });
+           fake.emit("session.background_tasks_changed");
+           yield* drain();
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+index 0309b77ed..415fe6110 100644
+--- a/packages/provider-copilot/src/server/adapter.ts
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -110,6 +110,10 @@ export interface AdapterOptions {
+   readonly onSkills?: (cwd: string, skills: ReadonlyArray<ServerProviderSkill> | null) => void;
+ }
+ 
++function isPendingTask(task: Task): boolean {
++  return task.status === "running" || (task.status === "idle" && task.type !== "agent");
++}
++
+ function permissionPrompt(request: PermissionRequest): string {
+   switch (request.kind) {
+     case "shell":
+@@ -826,13 +830,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             });
+         }
+         yield* updateThread({
+-          pendingBackgroundTasks: listed.tasks
+-            .filter((task) => task.status === "running" || task.status === "idle")
+-            .map((task) => ({
+-              taskId: task.id,
+-              kind: task.type === "agent" ? ("subagent" as const) : ("command" as const),
+-              ...(task.description ? { description: task.description } : {}),
+-            })),
++          pendingBackgroundTasks: listed.tasks.filter(isPendingTask).map((task) => ({
++            taskId: task.id,
++            kind: task.type === "agent" ? ("subagent" as const) : ("command" as const),
++            ...(task.description ? { description: task.description } : {}),
++          })),
+         });
+       });
+       const refreshPlan = Effect.fnUntraced(function* () {
+@@ -1881,9 +1883,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+         providerSessionId: open.providerSessionId,
+         providerSession,
+         events: Stream.fromQueue(events),
+-        hasPendingBackgroundWork: Effect.sync(() =>
+-          [...tasks.values()].some((task) => task.status === "running" || task.status === "idle"),
+-        ),
++        hasPendingBackgroundWork: Effect.sync(() => [...tasks.values()].some(isPendingTask)),
+         ensureThread,
+         resumeThread: (resume) =>
+           ensureThread({

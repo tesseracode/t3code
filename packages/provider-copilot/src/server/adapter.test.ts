@@ -1719,6 +1719,29 @@ describe("native Copilot V2", () => {
             running.type === "subagent.updated" ? running.subagent.runId : null,
             "run-1",
           );
+          fake.setTasks({ tasks: [{ ...task, status: "idle", latestResponse: "Ready" }] });
+          fake.emit("session.background_tasks_changed");
+          const idle = yield* takeEvent(
+            (event) => event.type === "subagent.updated" && event.subagent.status === "idle",
+          );
+          assert.deepEqual((yield* drain()).providerThread.pendingBackgroundTasks, []);
+          assert.isFalse(yield* runtime.hasPendingBackgroundWork!);
+          if (idle.type !== "subagent.updated") return assert.fail("Expected idle helper.");
+          assert.equal(idle.subagent.result, "Ready");
+          assert.isNull(idle.subagent.completedAt);
+          assert.equal(
+            idle.subagent.id,
+            running.type === "subagent.updated" ? running.subagent.id : null,
+          );
+          fake.emit("session.background_tasks_changed");
+          assert.deepEqual((yield* drain()).providerThread.pendingBackgroundTasks, []);
+          fake.setTasks({ tasks: [task] });
+          fake.emit("session.background_tasks_changed");
+          assert.equal(
+            (yield* drain()).providerThread.pendingBackgroundTasks?.[0]?.taskId,
+            "bg-task",
+          );
+          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
           yield* start(2);
           fake.setTasks({ tasks: [{ ...task, status: "completed", result: "Finished" }] });
           fake.emit("assistant.idle", {}, "bg-task");
@@ -1730,6 +1753,25 @@ describe("native Copilot V2", () => {
             "run-1",
           );
           assert.equal((yield* drain()).providerTurns[1]?.status, "running");
+          fake.setTasks({
+            tasks: [
+              {
+                id: "idle-shell",
+                type: "shell",
+                status: "idle",
+                description: "Retained service",
+                command: "fixture-service",
+                attachmentMode: "detached",
+                startedAt: task.startedAt,
+              },
+            ],
+          });
+          fake.emit("session.background_tasks_changed");
+          assert.equal(
+            (yield* drain()).providerThread.pendingBackgroundTasks?.[0]?.kind,
+            "command",
+          );
+          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
           fake.setTasks({ tasks: [] });
           fake.emit("session.background_tasks_changed");
           yield* drain();
