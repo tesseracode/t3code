@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "feature": "copilot-runtime-knip-declaration",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_9400756de691",
+      "kind": "record",
+      "patch_sha256": "626513e72e70b3d6b0c938e1489c648a6f5a87acd4772dc9404ea4891a3c0a7c",
+      "git_patch_id": "972c6f28c613e11a58bbc31491e28bcd6fff3570",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "52279d22e89f956b40288f1d1bbfc6736804359920a4a462bf5f0584ca73ccf4",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "60c107e3b3c888dca25f604950b0a9662b3e1d29",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "knip.jsonc"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "knip.jsonc"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}
