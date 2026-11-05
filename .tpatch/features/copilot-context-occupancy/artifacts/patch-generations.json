@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "feature": "copilot-context-occupancy",
+  "current_generation": 2,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_be155d394b4d",
+      "kind": "record",
+      "patch_sha256": "77660b2e9676b0bc60e4c3784d72af013920624a9a43cab4755a8ae71c746556",
+      "git_patch_id": "859cfc0cb8250fc97b9c6a0ae33ad65933ca6674",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "0bf00cf07a300913c3b2c64a51ea969c685a721991d384611fb8cd6caeed7d58",
+      "canonical_patch": "",
+      "audit_patch": "",
+      "base_commit": "f03693d6a4b53e4fc16278203a247ccf946b6bef",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+          "apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts",
+          "packages/provider-core/src/server/ProviderAdapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+        "apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-core/src/server/ProviderAdapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 24,
+          "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_4ab0ad6ed2a6",
+      "kind": "amend-refresh",
+      "patch_sha256": "7fe62a01cbd83a1ec1f97964d78e917664e728ab97e410cd54e12dd17a4b82aa",
+      "git_patch_id": "557e20945581dd406ee1279c98593a9a00fbb82c",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "0bf00cf07a300913c3b2c64a51ea969c685a721991d384611fb8cd6caeed7d58",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "f03693d6a4b53e4fc16278203a247ccf946b6bef",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+          "apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts",
+          "packages/provider-core/src/server/ProviderAdapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+        "apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-core/src/server/ProviderAdapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 24,
+          "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

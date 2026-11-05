@@ -1,0 +1,13 @@
+# Test run — 2026-11-05T07:53:05Z
+# Command: vp test run apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts apps/server/src/orchestration-v2/ContextHandoffBudget.test.ts packages/provider-copilot/src/server/adapter.test.ts
+# Directory: <isolated-worktree>
+
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 <isolated-worktree>
+
+
+ Test Files  3 passed (3)
+      Tests  96 passed (96)
+   Start at  23:52:36
+   Duration  29.47s (tests 87%, transform 8%, import 4%, setup 1%)

@@ -560,6 +560,10 @@ export interface ProviderAdapterV2SessionRuntime {
     cwd?: string | null,
   ) => number | undefined;
   readonly canReuseContextUsage?: (previous: ModelSelection, next: ModelSelection) => boolean;
+  /** False when turn usage is cumulative billing rather than native context occupancy. */
+  readonly turnUsageIsContextUsage?: boolean;
+  /** False preserves resume/admission errors without requesting a fresh native conversation. */
+  readonly supportsNativeThreadReplacement?: boolean;
   readonly ensureThread: (
     input: ProviderAdapterV2EnsureThreadInput,
   ) => Effect.Effect<OrchestrationV2ProviderThread, ProviderAdapterV2Error>;

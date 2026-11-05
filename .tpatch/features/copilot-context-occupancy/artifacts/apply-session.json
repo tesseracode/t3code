@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-context-occupancy",
+  "completed_at": "2026-11-05T07:53:05Z",
+  "base_commit": "f03693d6a4b53e4fc16278203a247ccf946b6bef",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "tpatch test — command: vp test run apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts apps/server/src/orchestration-v2/ContextHandoffBudget.test.ts packages/provider-copilot/src/server/adapter.test.ts"
+}

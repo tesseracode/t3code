@@ -108,6 +108,8 @@ function makeTestAdapter(input: {
   readonly initialContextUsage?: OrchestrationV2ProviderThread["contextUsage"];
   readonly getModelContextWindow?: (selection: ModelSelection) => number | undefined;
   readonly canReuseContextUsage?: ProviderAdapter.ProviderAdapterV2SessionRuntime["canReuseContextUsage"];
+  readonly turnUsageIsContextUsage?: boolean;
+  readonly supportsNativeThreadReplacement?: boolean;
   readonly tokenUsageByRunOrdinal?: Readonly<
     Record<number, Omit<OrchestrationV2ProviderTurnTokenUsage, "updatedAt">>
   >;
@@ -148,6 +150,8 @@ function makeTestAdapter(input: {
           providerSessionId: sessionInput.providerSessionId,
           providerSession,
           events: Stream.fromPubSub(events),
+          turnUsageIsContextUsage: input.turnUsageIsContextUsage ?? true,
+          supportsNativeThreadReplacement: input.supportsNativeThreadReplacement ?? true,
           ...(input.pendingBackgroundWork === undefined
             ? {}
             : {
@@ -436,9 +440,11 @@ describe("orchestration v2 provider switching", () => {
     "screenshot-exhausted-target-tight-native",
     "screenshot-exhausted-target-background-native",
     "screenshot-exhausted-target-subagent-native",
+    "screenshot-exhausted-target-no-replacement-native",
     "prior-images-reasoning-change-replacement-small-native",
     "imported-prior-images-fallback",
     "prior-images-telemetry-native",
+    "prior-images-cumulative-native",
     "prior-images-unsent-native",
     "prior-images-legacy-replacement-native",
     "delivery-write-failure",
@@ -457,8 +463,10 @@ describe("orchestration v2 provider switching", () => {
         const generation = yield* Ref.make(0);
         const pendingBackgroundWork = yield* Ref.make(false);
         const priorImages = scenario.includes("prior-images");
+        const cumulativeUsage = scenario.includes("cumulative");
         const exhaustedTarget = scenario.includes("exhausted-target");
-        const replaceNative = scenario.includes("replacement");
+        const replaceNative =
+          scenario.includes("replacement") && !scenario.includes("no-replacement");
         const capacityScenario = modelScenario || scenario.includes("reported-capacity");
         const returning =
           scenario === "large-current-input" ||
@@ -494,6 +502,17 @@ describe("orchestration v2 provider switching", () => {
               : {},
             capturedTurns,
             ...(scenario.includes("retry") || scenario.includes("unsent") ? { failStartOnce } : {}),
+            ...(cumulativeUsage || scenario.includes("no-replacement")
+              ? { supportsNativeThreadReplacement: false, nativeThreadGeneration: generation }
+              : {}),
+            ...(cumulativeUsage
+              ? {
+                  turnUsageIsContextUsage: false,
+                  tokenUsageByRunOrdinal: {
+                    2: { usedTokens: 1_169_410, inputTokens: 1_162_188, outputTokens: 7_222 },
+                  },
+                }
+              : {}),
             ...(replaceNative ? { failResumeOnce, nativeThreadGeneration: generation } : {}),
             ...(exhaustedTarget ? { nativeThreadGeneration: generation } : {}),
             ...(scenario.includes("target-background") || scenario.includes("target-subagent")
@@ -532,7 +551,11 @@ describe("orchestration v2 provider switching", () => {
                 : scenario === "large-current-input" || priorImages || exhaustedTarget
                   ? {
                       getModelContextWindow: () =>
-                        scenario.includes("target-tight") ? 25_121 : 32_000,
+                        cumulativeUsage
+                          ? 200_000
+                          : scenario.includes("target-tight")
+                            ? 25_121
+                            : 32_000,
                     }
                   : {}),
             ...(scenario.endsWith("-native") || scenario === "large-current-input"
@@ -738,6 +761,31 @@ describe("orchestration v2 provider switching", () => {
                 ],
               });
             }
+            if (cumulativeUsage) {
+              const target = (yield* orchestrator.getThreadProjection(
+                threadId,
+              )).providerThreads.find(
+                (thread) => thread.providerInstanceId === CLAUDE_MODEL_SELECTION.instanceId,
+              )!;
+              yield* eventSink.write({
+                events: [
+                  {
+                    id: EventId.make("native-occupancy-not-billing"),
+                    type: "provider-thread.updated",
+                    threadId,
+                    occurredAt: yield* DateTime.now,
+                    payload: {
+                      ...target,
+                      contextUsage: {
+                        usedTokens: 120_615,
+                        maxTokens: 200_000,
+                        compactsAutomatically: true,
+                      },
+                    },
+                  },
+                ],
+              });
+            }
             yield* dispatch(
               3,
               priorImages && !replaceNative
@@ -852,7 +900,8 @@ describe("orchestration v2 provider switching", () => {
             scenario.includes("target-oversized") ||
             scenario.includes("target-tight") ||
             scenario.includes("target-background") ||
-            scenario.includes("target-subagent")
+            scenario.includes("target-subagent") ||
+            scenario.includes("no-replacement")
           ) {
             assert.equal(projection.runs.at(-1)?.status, "failed");
             assert.equal(yield* Ref.get(generation), 1);
@@ -864,6 +913,13 @@ describe("orchestration v2 provider switching", () => {
               assert.equal(
                 failure?.type === "error" ? failure.failure.message : null,
                 "The target provider still has background work running. Wait for it to finish or stop it before retrying the handoff.",
+              );
+            }
+            if (scenario.includes("no-replacement")) {
+              const failure = projection.turnItems.findLast((item) => item.type === "error");
+              assert.include(
+                failure?.type === "error" ? failure.failure.message : "",
+                "too little context for a provider handoff",
               );
             }
             return;
@@ -925,6 +981,7 @@ describe("orchestration v2 provider switching", () => {
               scenario.startsWith("imported") ||
               scenario.includes("telemetry") ||
               scenario.includes("unsent") ||
+              cumulativeUsage ||
               replaceNative;
             const sourceText =
               `${replaceNative ? "Another" : "New"} source constraint ` + "q".repeat(9_000);
@@ -963,6 +1020,23 @@ describe("orchestration v2 provider switching", () => {
               else
                 assert.deepEqual(target.contextUsage, { usedTokens: 37_321, maxTokens: 258_400 });
               assert.lengthOf((yield* Ref.get(capturedTurns)).at(-1)!.attachments, 2);
+            }
+            if (cumulativeUsage) {
+              assert.deepEqual(target.contextUsage, {
+                usedTokens: 120_615,
+                maxTokens: 200_000,
+                compactsAutomatically: true,
+              });
+              assert.equal(yield* Ref.get(generation), 1);
+              const targetTurns = (yield* Ref.get(capturedTurns)).filter(
+                (turn) => turn.driver === CLAUDE_DRIVER,
+              );
+              assert.equal(targetTurns[0]?.nativeThreadId, targetTurns[1]?.nativeThreadId);
+              const billing = projection.providerTurns.find(
+                (turn) => turn.tokenUsage?.inputTokens === 1_162_188,
+              );
+              assert.equal(billing?.tokenUsage?.usedTokens, 1_169_410);
+              assert.equal(billing?.tokenUsage?.outputTokens, 7_222);
             }
             if (replaceNative) assert.equal(yield* Ref.get(generation), 2);
             return;
@@ -1219,7 +1293,7 @@ describe("orchestration v2 provider switching", () => {
       ),
   );
 
-  it.live.each(["native", "legacy"] as const)(
+  it.live.each(["native", "legacy", "replacement-unsupported"] as const)(
     "starts a replacement native thread as new after the resume fallback with %s attempts",
     (attempts) =>
       Effect.scoped(
@@ -1238,12 +1312,18 @@ describe("orchestration v2 provider switching", () => {
               capturedTurns,
               failResumeOnce,
               nativeThreadGeneration: generation,
+              ...(attempts === "replacement-unsupported"
+                ? { supportsNativeThreadReplacement: false, failResume: true }
+                : {}),
             }),
           ]);
           yield* Effect.gen(function* () {
             const orchestrator = yield* Orchestrator.OrchestratorV2;
             const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
-            const runToCompletion = Effect.fn("runToCompletion")(function* (ordinal: number) {
+            const runToCompletion = Effect.fn("runToCompletion")(function* (
+              ordinal: number,
+              status = "completed",
+            ) {
               yield* orchestrator.dispatch({
                 type: "message.dispatch",
                 commandId: CommandId.make(`resume-fallback:${ordinal}`),
@@ -1268,7 +1348,7 @@ describe("orchestration v2 provider switching", () => {
               yield* worker.drain();
               assert.equal(
                 (yield* orchestrator.getThreadProjection(threadId)).runs.at(-1)?.status,
-                "completed",
+                status,
               );
             });
             yield* orchestrator.dispatch({
@@ -1314,7 +1394,28 @@ describe("orchestration v2 provider switching", () => {
               });
             }
             yield* Ref.set(failResumeOnce, true);
-            yield* runToCompletion(2);
+            yield* runToCompletion(
+              2,
+              attempts === "replacement-unsupported" ? "failed" : "completed",
+            );
+            if (attempts === "replacement-unsupported") {
+              const failure = (yield* orchestrator.getThreadProjection(
+                threadId,
+              )).turnItems.findLast((item) => item.type === "error");
+              assert.notInclude(
+                failure?.type === "error" ? failure.failure.message : "",
+                "replacement is unsupported",
+              );
+              const turns = yield* Ref.get(capturedTurns);
+              assert.equal(turns.length, 1);
+              assert.equal(yield* Ref.get(generation), 1);
+              assert.equal(
+                (yield* orchestrator.getThreadProjection(threadId)).providerThreads[0]
+                  ?.nativeThreadRef?.nativeId,
+                turns[0]?.nativeThreadId,
+              );
+              return;
+            }
             yield* runToCompletion(3);
 
             const turns = yield* Ref.get(capturedTurns);

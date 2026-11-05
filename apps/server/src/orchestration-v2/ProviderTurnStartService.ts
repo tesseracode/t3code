@@ -794,7 +794,10 @@ export const layer: Layer.Layer<
         Effect.orElseSucceed(() => DEFAULT_HANDOFF_TOKEN_CAP),
       );
       const handoffContextForThread = (loadedProviderThread: OrchestrationV2ProviderThread) => {
-        const measuredContext = latestNativeContextUsage(projection, providerThread);
+        const measuredContext =
+          session.turnUsageIsContextUsage === false
+            ? undefined
+            : latestNativeContextUsage(projection, providerThread);
         const previousSelection =
           measuredContext?.modelSelection ??
           projection.runs.findLast(
@@ -1122,7 +1125,7 @@ export const layer: Layer.Layer<
             Effect.as(true),
             Effect.catchTags({ ContextHandoffBudgetError: () => Effect.succeed(false) }),
           );
-          if (fits) return resumed.success;
+          if (fits || session.supportsNativeThreadReplacement === false) return resumed.success;
           const freshThread = { ...resumed.success, nativeThreadRef: null };
           const freshContext = handoffContextForThread(freshThread);
           const { handoff } = yield* recoveryHandoff;
@@ -1158,6 +1161,8 @@ export const layer: Layer.Layer<
             );
           }
         }
+        if (resumed._tag === "Failure" && session.supportsNativeThreadReplacement === false)
+          return yield* loadFromProvider(Effect.fail(resumed.failure));
         resumedHandoffContext = undefined;
         resumedRetryHandoff = [];
         if (!(yield* isCurrentAttemptInStatus("starting"))) return undefined;
