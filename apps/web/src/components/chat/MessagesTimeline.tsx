@@ -23,6 +23,7 @@ import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
 import { resolveWorkGroupScrollAnchor } from "@t3tools/client-runtime/work-log/scroll-anchor";
 import type { WorkflowOpening } from "@t3tools/client-runtime/state/subagentRuntime";
 import { observeResize } from "~/lib/observeResize";
+import { observeIntersection } from "~/lib/observeIntersection";
 import { useStableCallback } from "~/hooks/useStableCallback";
 
 const NOOP_USE_ARTIFACT_TEMPLATE = () => {};
@@ -412,6 +413,9 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const [expandedAttemptIds, setExpandedAttemptIds] = useState<ReadonlySet<RunAttemptId>>(
     () => listState.rememberedPosition?.disclosures?.attempts ?? new Set(),
   );
+  const [visibleTurnFoldRunIds, setVisibleTurnFoldRunIds] = useState<ReadonlySet<RunId>>(
+    () => new Set(),
+  );
   // A list that opens on a thread with find open takes the opening step below,
   // so the restore runs and releases follow once for find.
   const [positionedThreadKey, setPositionedThreadKey] = useState<string | null>(() =>
@@ -432,6 +436,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     ? timelineListStateFor(listIdentityKey)
     : listState;
   if (identityChanged) {
+    setVisibleTurnFoldRunIds(new Set());
     setPlayingAudioRows(new Map());
     setListState({
       identity: listIdentityKey,
@@ -501,8 +506,20 @@ const ConversationTimeline = memo(function ConversationTimeline({
     return disclosureAnchorKey === null || row.id === disclosureAnchorKey;
   };
 
-  const onToggleTurnFold = (runId: RunId) => {
-    suspendEndScrollMaintenanceForDisclosure(`turn-fold:${runId}`);
+  const onTurnFoldVisibilityChange = useStableCallback(
+    (runId: RunId, visible: boolean, threadKey: string) => {
+      if (threadKey !== routeThreadKey) return;
+      setVisibleTurnFoldRunIds((existing) => {
+        if (existing.has(runId) === visible) return existing;
+        const next = new Set(existing);
+        if (visible) next.add(runId);
+        else next.delete(runId);
+        return next;
+      });
+    },
+  );
+  const onToggleTurnFold = (runId: RunId, anchorKey = `turn-fold:${runId}`) => {
+    suspendEndScrollMaintenanceForDisclosure(anchorKey);
     setExpandedRunIds((existing) => {
       const next = new Set(existing);
       if (next.has(runId)) {
@@ -1039,6 +1056,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
     workflowOpening,
     onForkFromRun,
     onToggleTurnFold,
+    visibleTurnFoldRunIds,
+    onTurnFoldVisibilityChange,
     onToggleAttemptFold,
     onToggleWorkGroup,
     onToggleWorkEntry: suspendEndScrollMaintenanceForDisclosure,
@@ -1496,7 +1515,11 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
       {row.kind === "context-compaction" ? <ContextCompactionTimelineRow row={row} /> : null}
       {row.kind === "message" && row.message.role === "user" ? <UserMessageRow row={row} /> : null}
       {row.kind === "message" && row.message.role === "assistant" ? (
-        <AssistantTimelineRow row={row} />
+        row.turnFold ? (
+          <AssistantWithTurnFold row={row} fold={row.turnFold} />
+        ) : (
+          <AssistantTimelineRow row={row} />
+        )
       ) : null}
       {row.kind === "assistant-meta" ? <AssistantMetaTimelineRow row={row} /> : null}
       {row.kind === "proposed-plan" ? <ProposedPlanTimelineRow row={row} /> : null}
@@ -1508,6 +1531,29 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
     </div>
   );
 });
+
+function AssistantWithTurnFold({
+  row,
+  fold,
+}: {
+  row: Extract<TimelineRow, { kind: "message" }>;
+  fold: NonNullable<Extract<TimelineRow, { kind: "message" }>["turnFold"]>;
+}) {
+  const ctx = use(TimelineRowCtx);
+  return (
+    <>
+      {ctx.visibleTurnFoldRunIds.has(fold.runId) ? null : (
+        <TurnFoldTimelineRow
+          key={fold.id}
+          row={fold}
+          terminalEntryId={row.id}
+          hiddenCount={fold.hiddenCount}
+        />
+      )}
+      <AssistantTimelineRow row={row} />
+    </>
+  );
+}
 
 function WorktreeSetupTimelineRow({
   row,
@@ -1638,18 +1684,45 @@ function WorkHistorySkeleton() {
   );
 }
 
-function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-fold" }> }) {
+function TurnFoldTimelineRow({
+  row,
+  terminalEntryId,
+  hiddenCount,
+}: {
+  row: Extract<TimelineRow, { kind: "turn-fold" }>;
+  terminalEntryId?: string;
+  hiddenCount?: number;
+}) {
   const ctx = use(TimelineRowCtx);
+  const secondary = terminalEntryId !== undefined;
+  const { onTurnFoldVisibilityChange, routeThreadKey } = ctx;
+  const observePrimary = (element: HTMLDivElement | null) => {
+    if (!element) return;
+    const report = (visible: boolean) =>
+      onTurnFoldVisibilityChange(row.runId, visible, routeThreadKey);
+    const stop = observeIntersection(element, (entry) => report(entry.isIntersecting));
+    return () => {
+      stop();
+      report(false);
+    };
+  };
   const { loading, error, toggle } = useDeferredWorkLoading(row, () =>
-    ctx.onToggleTurnFold(row.runId),
+    ctx.onToggleTurnFold(row.runId, terminalEntryId),
   );
 
   return (
-    <div className="group/timeline-row border-b border-border/60 pb-2 pe-0.5 pt-1">
+    <div
+      ref={secondary ? undefined : observePrimary}
+      className={cn(
+        "group/timeline-row pe-0.5",
+        secondary ? "pb-2" : "border-b border-border/60 pb-2 pt-1",
+      )}
+    >
       <div className="relative flex items-center gap-1">
         <button
           type="button"
           aria-expanded={row.expanded}
+          data-turn-fold-secondary={secondary ? "" : undefined}
           data-scroll-anchor-ignore
           onClick={toggle}
           aria-busy={loading}
@@ -1657,15 +1730,20 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
         >
           <span>
             {row.label}
+            {hiddenCount === undefined
+              ? ""
+              : ` · ${hiddenCount} earlier ${hiddenCount === 1 ? "item" : "items"} ${row.expanded ? "shown" : "hidden"}`}
             {error ? ` · ${error}` : ""}
           </span>
           <MorphIcon className="size-3.5" icon={row.expanded ? ChevronDown : ChevronRight} />
         </button>
-        <TimelineRowTimestamp
-          createdAt={row.createdAt}
-          timestampFormat={ctx.timestampFormat}
-          className="ms-auto"
-        />
+        {secondary ? null : (
+          <TimelineRowTimestamp
+            createdAt={row.createdAt}
+            timestampFormat={ctx.timestampFormat}
+            className="ms-auto"
+          />
+        )}
       </div>
       {loading ? <WorkHistorySkeleton /> : null}
     </div>

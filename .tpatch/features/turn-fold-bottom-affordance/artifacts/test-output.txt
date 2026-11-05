@@ -1,0 +1,47 @@
+# Test run — 2026-11-05T18:57:22Z
+# Command: vp run check:changed cdfe568280
+# Directory: <isolated-worktree>
+
+$ node scripts/check-changed.ts cdfe568280 ⊘ cache disabled
+check:changed: 16 files since cdfe56828043
+
+> vp format  pass  0.3s
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 172ms on 4 files using 10 threads.
+
+> vp lint  pass  0.9s
+
+> vp typecheck (2 packages)  pass  1.7s
+~/apps/web$ tsc --noEmit ○ cache miss: 'apps/web/src/components/chat/MessagesTimeline.tsx' modified, executing
+~/scripts$ tsc --noEmit ◉ cache hit, replaying
+
+
+---
+vp run: 1/2 cache hit (50%), 2/2 successful, 640ms saved. (Run `vp run --last-details` for full details)
+
+> vp knip 1/2  pass  5.8s
+
+> vp knip 2/2  pass  10.8s
+
+> vp test (3 files)  pass  11.7s
+
+ RUN  v5.0.5 <isolated-worktree>
+
+
+ Test Files  3 passed (3)
+      Tests  123 passed (123)
+   Start at  10:57:11
+   Duration  9.68s (transform 39%, import 20%, tests 20%, worker 16%, setup 6%)
+
+
+check:changed summary
+  pass  format  0.3s
+  pass  lint  0.9s
+  pass  knip 1/2  5.8s
+  pass  knip 2/2  10.8s
+  pass  typecheck (2 packages)  1.7s
+  pass  test (3 files)  11.7s
+  CI also runs: full test suites, build
+  unused patch check skipped: no dependency files changed

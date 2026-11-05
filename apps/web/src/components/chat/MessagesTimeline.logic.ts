@@ -496,6 +496,16 @@ export type MessagesTimelineRow = MessagesTimelineRowContent & {
   readonly continuesWorkLog?: boolean;
 };
 
+interface TurnFoldRow {
+  kind: "turn-fold";
+  deferredWorkItemIds?: ReadonlyArray<string>;
+  id: string;
+  createdAt: string;
+  runId: RunId;
+  label: string;
+  expanded: boolean;
+}
+
 type MessagesTimelineRowContent =
   | {
       kind: "worktree-setup";
@@ -551,15 +561,7 @@ type MessagesTimelineRowContent =
       toolIcon?: WorkLogEntry["toolIcon"];
       hasFailure: boolean;
     }
-  | {
-      kind: "turn-fold";
-      deferredWorkItemIds?: ReadonlyArray<string>;
-      id: string;
-      createdAt: string;
-      runId: RunId;
-      label: string;
-      expanded: boolean;
-    }
+  | TurnFoldRow
   | {
       kind: "attempt-fold";
       deferredWorkItemIds?: ReadonlyArray<string>;
@@ -594,6 +596,7 @@ type MessagesTimelineRowContent =
       assistantCopyStreaming: boolean;
       assistantTurnDiffSummary?: TurnDiffSummary | undefined;
       revertTurnCount?: number | undefined;
+      turnFold?: TurnFoldRow & { hiddenCount: number };
     }
   | {
       kind: "assistant-meta";
@@ -1438,6 +1441,7 @@ export function deriveMessagesTimelineRows(input: {
     completeSupersededReplyEntryIds: completeSupersededReplyIds,
   });
   const timelineEntryById = new Map(timelineEntries.map((entry) => [entry.id, entry]));
+  const turnFoldsByTerminalEntryId = new Map<string, TurnFoldRow & { hiddenCount: number }>();
   const collapsedEntryIds = new Set<string>();
   const collapsedFoldMemberIds = new Set<string>();
   for (const fold of foldsByAnchorEntryId.values()) {
@@ -1685,15 +1689,22 @@ export function deriveMessagesTimelineRows(input: {
 
     const turnFold = foldsByAnchorEntryId.get(timelineEntry.id);
     if (turnFold) {
-      const deferredWorkItemIds = [...turnFold.entryIds].flatMap((entryId) => {
+      const deferredWorkItemIds: string[] = [];
+      let terminalEntryId: string | undefined;
+      for (const entryId of turnFold.entryIds) {
         const entry = timelineEntryById.get(entryId);
-        return entry?.kind === "work" &&
+        if (entry?.kind === "message" && terminalAssistantMessageIds.has(entry.message.id)) {
+          terminalEntryId = entryId;
+        }
+        if (
+          entry?.kind === "work" &&
           entry.entry.projectedItem?.item.deferredWork &&
           !supersededWorkItemIds.has(String(entry.entry.projectedItem.sourceItemId))
-          ? [String(entry.entry.projectedItem.sourceItemId)]
-          : [];
-      });
-      nextRows.push({
+        ) {
+          deferredWorkItemIds.push(String(entry.entry.projectedItem.sourceItemId));
+        }
+      }
+      const foldRow: TurnFoldRow = {
         kind: "turn-fold",
         id: `turn-fold:${turnFold.runId}`,
         ...(deferredWorkItemIds.length > 0 ? { deferredWorkItemIds } : {}),
@@ -1701,7 +1712,14 @@ export function deriveMessagesTimelineRows(input: {
         runId: turnFold.runId,
         label: turnFold.label,
         expanded: input.expandedRunIds?.has(turnFold.runId) ?? false,
-      });
+      };
+      nextRows.push(foldRow);
+      if (terminalEntryId !== undefined && turnFold.hiddenEntryIds.size > 0) {
+        turnFoldsByTerminalEntryId.set(terminalEntryId, {
+          ...foldRow,
+          hiddenCount: turnFold.hiddenEntryIds.size,
+        });
+      }
     }
 
     if (collapsedEntryIds.has(timelineEntry.id)) {
@@ -2013,11 +2031,13 @@ export function deriveMessagesTimelineRows(input: {
       terminalAssistantMessageIds.has(timelineEntry.message.id) &&
       !assistantResponseStillInProgress;
 
+    const messageTurnFold = turnFoldsByTerminalEntryId.get(timelineEntry.id);
     nextRows.push({
       kind: "message",
       id: timelineEntry.id,
       createdAt: timelineEntry.createdAt,
       message: timelineEntry.message,
+      ...(messageTurnFold === undefined ? {} : { turnFold: messageTurnFold }),
       ...(timelineEntry.projectedItem === undefined
         ? {}
         : { projectedItem: timelineEntry.projectedItem }),
@@ -2468,7 +2488,12 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.showAssistantCopyButton === bm.showAssistantCopyButton &&
         a.assistantCopyStreaming === bm.assistantCopyStreaming &&
         a.assistantTurnDiffSummary === bm.assistantTurnDiffSummary &&
-        a.revertTurnCount === bm.revertTurnCount
+        a.revertTurnCount === bm.revertTurnCount &&
+        (a.turnFold === bm.turnFold ||
+          (a.turnFold !== undefined &&
+            bm.turnFold !== undefined &&
+            a.turnFold.hiddenCount === bm.turnFold.hiddenCount &&
+            isRowUnchanged(a.turnFold, bm.turnFold)))
       );
     }
   }

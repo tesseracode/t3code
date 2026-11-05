@@ -1,0 +1,8 @@
+{
+  "slug": "turn-fold-bottom-affordance",
+  "completed_at": "2026-11-05T18:57:22Z",
+  "base_commit": "cdfe5682804389e2be74a5de9b0043b6a3a03941",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "tpatch test — command: vp run check:changed cdfe568280"
+}

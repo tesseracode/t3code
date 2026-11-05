@@ -1,0 +1,5 @@
+ .../chat/MessagesTimeline.browser.test.tsx         |  95 ++++++++++++++++++++
+ .../src/components/chat/MessagesTimeline.logic.ts  |  59 ++++++++----
+ apps/web/src/components/chat/MessagesTimeline.tsx  | 100 ++++++++++++++++++---
+ apps/web/src/components/chat/timelineRowContext.ts |   4 +-
+ 4 files changed, 229 insertions(+), 29 deletions(-)

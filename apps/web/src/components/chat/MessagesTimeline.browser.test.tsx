@@ -5,6 +5,7 @@ import { stubGlobal } from "../../../test/render";
 import {
   EnvironmentId,
   MessageId,
+  PlanId,
   RunAttemptId,
   RunId,
   RuntimeRequestId,
@@ -160,6 +161,100 @@ const TASK_ID = ScheduledTaskId.make("task-1");
 const AUTOMATION_PROMPT = "Triage the inbox\n\nLabel every new issue and close duplicates.";
 
 describe("MessagesTimeline messages", () => {
+  it("finds an offscreen turn fold from its final reply without moving the reader", async () => {
+    setup();
+    const props = baseProps();
+    const runId = RunId.make("long-settled-turn");
+    const entries: Entry[] = [
+      message("Review the plan", { runId }, "fold-prompt"),
+      message("Earlier findings\n\n".repeat(80), { role: "assistant", runId }, "fold-interim"),
+      {
+        kind: "proposed-plan",
+        id: "fold-plan",
+        createdAt: CREATED_AT,
+        proposedPlan: {
+          id: PlanId.make("long-plan"),
+          runId,
+          planMarkdown: `# Deployment plan\n\n${Array.from(
+            { length: 60 },
+            (_, index) =>
+              `Step ${index + 1}: preserve the existing deployment and review its inputs.`,
+          ).join("\n\n")}`,
+          status: "draft",
+          createdAt: CREATED_AT,
+          updatedAt: CREATED_AT,
+        },
+      },
+      message("A second interim report", { role: "assistant", runId }, "fold-interim-2"),
+      message("Final review is ready.", { role: "assistant", runId }, "fold-final"),
+      message("A later question", {}, "later-question"),
+      message("A later answer\n\n".repeat(80), { role: "assistant" }, "later-answer"),
+    ];
+    const container = document.createElement("div");
+    container.style.cssText = "height: 600px; width: 900px; display: flex; flex-direction: column;";
+    await using screen = await render(
+      <MessagesTimeline
+        {...props}
+        timelineEntries={entries}
+        latestRun={{
+          runId,
+          status: "completed",
+          startedAt: CREATED_AT,
+          completedAt: "2026-03-17T19:13:28.000Z",
+        }}
+      />,
+      { container },
+    );
+    const list = props.listRef.current!;
+    const scrollToRow = async (id: string) => {
+      await act(() =>
+        list.scrollToIndex({
+          index: list.getState().data.findIndex((row) => row.id === id),
+          animated: false,
+          viewOffset: 80,
+        }),
+      );
+    };
+    const fold = () => list.getState().data.find((row) => row.kind === "turn-fold");
+    const secondary = () =>
+      screen.container.querySelector<HTMLButtonElement>("[data-turn-fold-secondary]");
+    const final = () =>
+      screen.container.querySelector<HTMLElement>('[data-message-id="fold-final"]')!;
+    await scrollToRow(`turn-fold:${runId}`);
+    await vi.waitFor(() => {
+      expect(final()).not.toBeNull();
+      expect(secondary()).toBeNull();
+    });
+    await screen.getByRole("button", { name: "Worked for 1m", exact: true }).click();
+    await vi.waitFor(() => expect(fold()).toMatchObject({ expanded: true }));
+    await screen.getByRole("button", { name: "Worked for 1m", exact: true }).click();
+    await vi.waitFor(() => expect(fold()).toMatchObject({ expanded: false }));
+    await screen.getByRole("button", { name: "Expand plan", exact: true }).click();
+    await scrollToRow("entry-fold-final");
+    await vi.waitFor(() => {
+      expect(secondary()?.textContent).toContain("Worked for 1m · 2 earlier items hidden");
+      expect(final().getBoundingClientRect().top).toBeGreaterThanOrEqual(
+        list.getScrollableNode()!.getBoundingClientRect().top,
+      );
+    });
+    const top = final().getBoundingClientRect().top;
+    await click(secondary()!);
+    await vi.waitFor(() => {
+      expect(fold()).toMatchObject({ expanded: true });
+      expect(secondary()?.textContent).toContain("2 earlier items shown");
+      expect(Math.abs(final().getBoundingClientRect().top - top)).toBeLessThan(2);
+    });
+    await click(secondary()!);
+    await vi.waitFor(() => {
+      expect(fold()).toMatchObject({ expanded: false });
+      expect(Math.abs(final().getBoundingClientRect().top - top)).toBeLessThan(2);
+    });
+    await scrollToRow(`turn-fold:${runId}`);
+    await vi.waitFor(() => expect(secondary()).toBeNull());
+    await scrollToRow("entry-fold-final");
+    await vi.waitFor(() => expect(secondary()).not.toBeNull());
+  });
+
   it("settles when equally long messages have very different rendered heights", async () => {
     const props = baseProps();
     const tall = message("a\n\n".repeat(6000), { role: "assistant" }, "tall");
