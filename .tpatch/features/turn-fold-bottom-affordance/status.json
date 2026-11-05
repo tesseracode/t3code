@@ -1,0 +1,23 @@
+{
+  "id": "turn-fold-bottom-affordance",
+  "slug": "turn-fold-bottom-affordance",
+  "title": "Mirror a settled turn fold immediately above its terminal assistant response only when the original fold control is outside the viewport. Reuse its duration, hidden-entry count, deferred work loading, and expansion state; preserve reader position when toggled from the lower control. Keep fold membership and native mobile unchanged. Approved six-hour scope, issue #27.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-05T18:39:41Z",
+  "updated_at": "2026-11-05T18:58:12Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-05T18:57:22Z",
+    "base_commit": "cdfe5682804389e2be74a5de9b0043b6a3a03941",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "verify": {
+    "verified_at": "2026-11-05T18:58:07Z",
+    "passed": true,
+    "recipe_hash_at_verify": "cfa6483d4c51bd51ba5e03cd14cb8a0eaa690f565a51a1b4ef58305a8380e952",
+    "patch_hash_at_verify": "34f0e6dfa0c5bfa44a7a9057953051d604acd22c96ac7d9ccda619dc45c6afaf"
+  }
+}

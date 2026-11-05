@@ -1,0 +1,435 @@
+diff --git a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
+index 5b4d8627d..749bd611a 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
++++ b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
+@@ -5,6 +5,7 @@ import { stubGlobal } from "../../../test/render";
+ import {
+   EnvironmentId,
+   MessageId,
++  PlanId,
+   RunAttemptId,
+   RunId,
+   RuntimeRequestId,
+@@ -160,6 +161,100 @@ const TASK_ID = ScheduledTaskId.make("task-1");
+ const AUTOMATION_PROMPT = "Triage the inbox\n\nLabel every new issue and close duplicates.";
+ 
+ describe("MessagesTimeline messages", () => {
++  it("finds an offscreen turn fold from its final reply without moving the reader", async () => {
++    setup();
++    const props = baseProps();
++    const runId = RunId.make("long-settled-turn");
++    const entries: Entry[] = [
++      message("Review the plan", { runId }, "fold-prompt"),
++      message("Earlier findings\n\n".repeat(80), { role: "assistant", runId }, "fold-interim"),
++      {
++        kind: "proposed-plan",
++        id: "fold-plan",
++        createdAt: CREATED_AT,
++        proposedPlan: {
++          id: PlanId.make("long-plan"),
++          runId,
++          planMarkdown: `# Deployment plan\n\n${Array.from(
++            { length: 60 },
++            (_, index) =>
++              `Step ${index + 1}: preserve the existing deployment and review its inputs.`,
++          ).join("\n\n")}`,
++          status: "draft",
++          createdAt: CREATED_AT,
++          updatedAt: CREATED_AT,
++        },
++      },
++      message("A second interim report", { role: "assistant", runId }, "fold-interim-2"),
++      message("Final review is ready.", { role: "assistant", runId }, "fold-final"),
++      message("A later question", {}, "later-question"),
++      message("A later answer\n\n".repeat(80), { role: "assistant" }, "later-answer"),
++    ];
++    const container = document.createElement("div");
++    container.style.cssText = "height: 600px; width: 900px; display: flex; flex-direction: column;";
++    await using screen = await render(
++      <MessagesTimeline
++        {...props}
++        timelineEntries={entries}
++        latestRun={{
++          runId,
++          status: "completed",
++          startedAt: CREATED_AT,
++          completedAt: "2026-03-17T19:13:28.000Z",
++        }}
++      />,
++      { container },
++    );
++    const list = props.listRef.current!;
++    const scrollToRow = async (id: string) => {
++      await act(() =>
++        list.scrollToIndex({
++          index: list.getState().data.findIndex((row) => row.id === id),
++          animated: false,
++          viewOffset: 80,
++        }),
++      );
++    };
++    const fold = () => list.getState().data.find((row) => row.kind === "turn-fold");
++    const secondary = () =>
++      screen.container.querySelector<HTMLButtonElement>("[data-turn-fold-secondary]");
++    const final = () =>
++      screen.container.querySelector<HTMLElement>('[data-message-id="fold-final"]')!;
++    await scrollToRow(`turn-fold:${runId}`);
++    await vi.waitFor(() => {
++      expect(final()).not.toBeNull();
++      expect(secondary()).toBeNull();
++    });
++    await screen.getByRole("button", { name: "Worked for 1m", exact: true }).click();
++    await vi.waitFor(() => expect(fold()).toMatchObject({ expanded: true }));
++    await screen.getByRole("button", { name: "Worked for 1m", exact: true }).click();
++    await vi.waitFor(() => expect(fold()).toMatchObject({ expanded: false }));
++    await screen.getByRole("button", { name: "Expand plan", exact: true }).click();
++    await scrollToRow("entry-fold-final");
++    await vi.waitFor(() => {
++      expect(secondary()?.textContent).toContain("Worked for 1m · 2 earlier items hidden");
++      expect(final().getBoundingClientRect().top).toBeGreaterThanOrEqual(
++        list.getScrollableNode()!.getBoundingClientRect().top,
++      );
++    });
++    const top = final().getBoundingClientRect().top;
++    await click(secondary()!);
++    await vi.waitFor(() => {
++      expect(fold()).toMatchObject({ expanded: true });
++      expect(secondary()?.textContent).toContain("2 earlier items shown");
++      expect(Math.abs(final().getBoundingClientRect().top - top)).toBeLessThan(2);
++    });
++    await click(secondary()!);
++    await vi.waitFor(() => {
++      expect(fold()).toMatchObject({ expanded: false });
++      expect(Math.abs(final().getBoundingClientRect().top - top)).toBeLessThan(2);
++    });
++    await scrollToRow(`turn-fold:${runId}`);
++    await vi.waitFor(() => expect(secondary()).toBeNull());
++    await scrollToRow("entry-fold-final");
++    await vi.waitFor(() => expect(secondary()).not.toBeNull());
++  });
++
+   it("settles when equally long messages have very different rendered heights", async () => {
+     const props = baseProps();
+     const tall = message("a\n\n".repeat(6000), { role: "assistant" }, "tall");
+diff --git a/apps/web/src/components/chat/MessagesTimeline.logic.ts b/apps/web/src/components/chat/MessagesTimeline.logic.ts
+index 051d585be..1d55a7cf7 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.logic.ts
++++ b/apps/web/src/components/chat/MessagesTimeline.logic.ts
+@@ -496,6 +496,16 @@ export type MessagesTimelineRow = MessagesTimelineRowContent & {
+   readonly continuesWorkLog?: boolean;
+ };
+ 
++interface TurnFoldRow {
++  kind: "turn-fold";
++  deferredWorkItemIds?: ReadonlyArray<string>;
++  id: string;
++  createdAt: string;
++  runId: RunId;
++  label: string;
++  expanded: boolean;
++}
++
+ type MessagesTimelineRowContent =
+   | {
+       kind: "worktree-setup";
+@@ -551,15 +561,7 @@ type MessagesTimelineRowContent =
+       toolIcon?: WorkLogEntry["toolIcon"];
+       hasFailure: boolean;
+     }
+-  | {
+-      kind: "turn-fold";
+-      deferredWorkItemIds?: ReadonlyArray<string>;
+-      id: string;
+-      createdAt: string;
+-      runId: RunId;
+-      label: string;
+-      expanded: boolean;
+-    }
++  | TurnFoldRow
+   | {
+       kind: "attempt-fold";
+       deferredWorkItemIds?: ReadonlyArray<string>;
+@@ -594,6 +596,7 @@ type MessagesTimelineRowContent =
+       assistantCopyStreaming: boolean;
+       assistantTurnDiffSummary?: TurnDiffSummary | undefined;
+       revertTurnCount?: number | undefined;
++      turnFold?: TurnFoldRow & { hiddenCount: number };
+     }
+   | {
+       kind: "assistant-meta";
+@@ -1438,6 +1441,7 @@ export function deriveMessagesTimelineRows(input: {
+     completeSupersededReplyEntryIds: completeSupersededReplyIds,
+   });
+   const timelineEntryById = new Map(timelineEntries.map((entry) => [entry.id, entry]));
++  const turnFoldsByTerminalEntryId = new Map<string, TurnFoldRow & { hiddenCount: number }>();
+   const collapsedEntryIds = new Set<string>();
+   const collapsedFoldMemberIds = new Set<string>();
+   for (const fold of foldsByAnchorEntryId.values()) {
+@@ -1685,15 +1689,22 @@ export function deriveMessagesTimelineRows(input: {
+ 
+     const turnFold = foldsByAnchorEntryId.get(timelineEntry.id);
+     if (turnFold) {
+-      const deferredWorkItemIds = [...turnFold.entryIds].flatMap((entryId) => {
++      const deferredWorkItemIds: string[] = [];
++      let terminalEntryId: string | undefined;
++      for (const entryId of turnFold.entryIds) {
+         const entry = timelineEntryById.get(entryId);
+-        return entry?.kind === "work" &&
++        if (entry?.kind === "message" && terminalAssistantMessageIds.has(entry.message.id)) {
++          terminalEntryId = entryId;
++        }
++        if (
++          entry?.kind === "work" &&
+           entry.entry.projectedItem?.item.deferredWork &&
+           !supersededWorkItemIds.has(String(entry.entry.projectedItem.sourceItemId))
+-          ? [String(entry.entry.projectedItem.sourceItemId)]
+-          : [];
+-      });
+-      nextRows.push({
++        ) {
++          deferredWorkItemIds.push(String(entry.entry.projectedItem.sourceItemId));
++        }
++      }
++      const foldRow: TurnFoldRow = {
+         kind: "turn-fold",
+         id: `turn-fold:${turnFold.runId}`,
+         ...(deferredWorkItemIds.length > 0 ? { deferredWorkItemIds } : {}),
+@@ -1701,7 +1712,14 @@ export function deriveMessagesTimelineRows(input: {
+         runId: turnFold.runId,
+         label: turnFold.label,
+         expanded: input.expandedRunIds?.has(turnFold.runId) ?? false,
+-      });
++      };
++      nextRows.push(foldRow);
++      if (terminalEntryId !== undefined && turnFold.hiddenEntryIds.size > 0) {
++        turnFoldsByTerminalEntryId.set(terminalEntryId, {
++          ...foldRow,
++          hiddenCount: turnFold.hiddenEntryIds.size,
++        });
++      }
+     }
+ 
+     if (collapsedEntryIds.has(timelineEntry.id)) {
+@@ -2013,11 +2031,13 @@ export function deriveMessagesTimelineRows(input: {
+       terminalAssistantMessageIds.has(timelineEntry.message.id) &&
+       !assistantResponseStillInProgress;
+ 
++    const messageTurnFold = turnFoldsByTerminalEntryId.get(timelineEntry.id);
+     nextRows.push({
+       kind: "message",
+       id: timelineEntry.id,
+       createdAt: timelineEntry.createdAt,
+       message: timelineEntry.message,
++      ...(messageTurnFold === undefined ? {} : { turnFold: messageTurnFold }),
+       ...(timelineEntry.projectedItem === undefined
+         ? {}
+         : { projectedItem: timelineEntry.projectedItem }),
+@@ -2468,7 +2488,12 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
+         a.showAssistantCopyButton === bm.showAssistantCopyButton &&
+         a.assistantCopyStreaming === bm.assistantCopyStreaming &&
+         a.assistantTurnDiffSummary === bm.assistantTurnDiffSummary &&
+-        a.revertTurnCount === bm.revertTurnCount
++        a.revertTurnCount === bm.revertTurnCount &&
++        (a.turnFold === bm.turnFold ||
++          (a.turnFold !== undefined &&
++            bm.turnFold !== undefined &&
++            a.turnFold.hiddenCount === bm.turnFold.hiddenCount &&
++            isRowUnchanged(a.turnFold, bm.turnFold)))
+       );
+     }
+   }
+diff --git a/apps/web/src/components/chat/MessagesTimeline.tsx b/apps/web/src/components/chat/MessagesTimeline.tsx
+index d50cd03d8..2e61d6c87 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.tsx
++++ b/apps/web/src/components/chat/MessagesTimeline.tsx
+@@ -23,6 +23,7 @@ import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
+ import { resolveWorkGroupScrollAnchor } from "@t3tools/client-runtime/work-log/scroll-anchor";
+ import type { WorkflowOpening } from "@t3tools/client-runtime/state/subagentRuntime";
+ import { observeResize } from "~/lib/observeResize";
++import { observeIntersection } from "~/lib/observeIntersection";
+ import { useStableCallback } from "~/hooks/useStableCallback";
+ 
+ const NOOP_USE_ARTIFACT_TEMPLATE = () => {};
+@@ -412,6 +413,9 @@ const ConversationTimeline = memo(function ConversationTimeline({
+   const [expandedAttemptIds, setExpandedAttemptIds] = useState<ReadonlySet<RunAttemptId>>(
+     () => listState.rememberedPosition?.disclosures?.attempts ?? new Set(),
+   );
++  const [visibleTurnFoldRunIds, setVisibleTurnFoldRunIds] = useState<ReadonlySet<RunId>>(
++    () => new Set(),
++  );
+   // A list that opens on a thread with find open takes the opening step below,
+   // so the restore runs and releases follow once for find.
+   const [positionedThreadKey, setPositionedThreadKey] = useState<string | null>(() =>
+@@ -432,6 +436,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
+     ? timelineListStateFor(listIdentityKey)
+     : listState;
+   if (identityChanged) {
++    setVisibleTurnFoldRunIds(new Set());
+     setPlayingAudioRows(new Map());
+     setListState({
+       identity: listIdentityKey,
+@@ -501,8 +506,20 @@ const ConversationTimeline = memo(function ConversationTimeline({
+     return disclosureAnchorKey === null || row.id === disclosureAnchorKey;
+   };
+ 
+-  const onToggleTurnFold = (runId: RunId) => {
+-    suspendEndScrollMaintenanceForDisclosure(`turn-fold:${runId}`);
++  const onTurnFoldVisibilityChange = useStableCallback(
++    (runId: RunId, visible: boolean, threadKey: string) => {
++      if (threadKey !== routeThreadKey) return;
++      setVisibleTurnFoldRunIds((existing) => {
++        if (existing.has(runId) === visible) return existing;
++        const next = new Set(existing);
++        if (visible) next.add(runId);
++        else next.delete(runId);
++        return next;
++      });
++    },
++  );
++  const onToggleTurnFold = (runId: RunId, anchorKey = `turn-fold:${runId}`) => {
++    suspendEndScrollMaintenanceForDisclosure(anchorKey);
+     setExpandedRunIds((existing) => {
+       const next = new Set(existing);
+       if (next.has(runId)) {
+@@ -1039,6 +1056,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
+     workflowOpening,
+     onForkFromRun,
+     onToggleTurnFold,
++    visibleTurnFoldRunIds,
++    onTurnFoldVisibilityChange,
+     onToggleAttemptFold,
+     onToggleWorkGroup,
+     onToggleWorkEntry: suspendEndScrollMaintenanceForDisclosure,
+@@ -1496,7 +1515,11 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
+       {row.kind === "context-compaction" ? <ContextCompactionTimelineRow row={row} /> : null}
+       {row.kind === "message" && row.message.role === "user" ? <UserMessageRow row={row} /> : null}
+       {row.kind === "message" && row.message.role === "assistant" ? (
+-        <AssistantTimelineRow row={row} />
++        row.turnFold ? (
++          <AssistantWithTurnFold row={row} fold={row.turnFold} />
++        ) : (
++          <AssistantTimelineRow row={row} />
++        )
+       ) : null}
+       {row.kind === "assistant-meta" ? <AssistantMetaTimelineRow row={row} /> : null}
+       {row.kind === "proposed-plan" ? <ProposedPlanTimelineRow row={row} /> : null}
+@@ -1509,6 +1532,29 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
+   );
+ });
+ 
++function AssistantWithTurnFold({
++  row,
++  fold,
++}: {
++  row: Extract<TimelineRow, { kind: "message" }>;
++  fold: NonNullable<Extract<TimelineRow, { kind: "message" }>["turnFold"]>;
++}) {
++  const ctx = use(TimelineRowCtx);
++  return (
++    <>
++      {ctx.visibleTurnFoldRunIds.has(fold.runId) ? null : (
++        <TurnFoldTimelineRow
++          key={fold.id}
++          row={fold}
++          terminalEntryId={row.id}
++          hiddenCount={fold.hiddenCount}
++        />
++      )}
++      <AssistantTimelineRow row={row} />
++    </>
++  );
++}
++
+ function WorktreeSetupTimelineRow({
+   row,
+ }: {
+@@ -1638,18 +1684,45 @@ function WorkHistorySkeleton() {
+   );
+ }
+ 
+-function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-fold" }> }) {
++function TurnFoldTimelineRow({
++  row,
++  terminalEntryId,
++  hiddenCount,
++}: {
++  row: Extract<TimelineRow, { kind: "turn-fold" }>;
++  terminalEntryId?: string;
++  hiddenCount?: number;
++}) {
+   const ctx = use(TimelineRowCtx);
++  const secondary = terminalEntryId !== undefined;
++  const { onTurnFoldVisibilityChange, routeThreadKey } = ctx;
++  const observePrimary = (element: HTMLDivElement | null) => {
++    if (!element) return;
++    const report = (visible: boolean) =>
++      onTurnFoldVisibilityChange(row.runId, visible, routeThreadKey);
++    const stop = observeIntersection(element, (entry) => report(entry.isIntersecting));
++    return () => {
++      stop();
++      report(false);
++    };
++  };
+   const { loading, error, toggle } = useDeferredWorkLoading(row, () =>
+-    ctx.onToggleTurnFold(row.runId),
++    ctx.onToggleTurnFold(row.runId, terminalEntryId),
+   );
+ 
+   return (
+-    <div className="group/timeline-row border-b border-border/60 pb-2 pe-0.5 pt-1">
++    <div
++      ref={secondary ? undefined : observePrimary}
++      className={cn(
++        "group/timeline-row pe-0.5",
++        secondary ? "pb-2" : "border-b border-border/60 pb-2 pt-1",
++      )}
++    >
+       <div className="relative flex items-center gap-1">
+         <button
+           type="button"
+           aria-expanded={row.expanded}
++          data-turn-fold-secondary={secondary ? "" : undefined}
+           data-scroll-anchor-ignore
+           onClick={toggle}
+           aria-busy={loading}
+@@ -1657,15 +1730,20 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
+         >
+           <span>
+             {row.label}
++            {hiddenCount === undefined
++              ? ""
++              : ` · ${hiddenCount} earlier ${hiddenCount === 1 ? "item" : "items"} ${row.expanded ? "shown" : "hidden"}`}
+             {error ? ` · ${error}` : ""}
+           </span>
+           <MorphIcon className="size-3.5" icon={row.expanded ? ChevronDown : ChevronRight} />
+         </button>
+-        <TimelineRowTimestamp
+-          createdAt={row.createdAt}
+-          timestampFormat={ctx.timestampFormat}
+-          className="ms-auto"
+-        />
++        {secondary ? null : (
++          <TimelineRowTimestamp
++            createdAt={row.createdAt}
++            timestampFormat={ctx.timestampFormat}
++            className="ms-auto"
++          />
++        )}
+       </div>
+       {loading ? <WorkHistorySkeleton /> : null}
+     </div>
+diff --git a/apps/web/src/components/chat/timelineRowContext.ts b/apps/web/src/components/chat/timelineRowContext.ts
+index fcb4cc83d..d03feca18 100644
+--- a/apps/web/src/components/chat/timelineRowContext.ts
++++ b/apps/web/src/components/chat/timelineRowContext.ts
+@@ -86,7 +86,9 @@ export interface TimelineRowSharedState {
+   onForkFromRun:
+     | ((input: { readonly sourceThreadId: ThreadId; readonly runId: RunId }) => Promise<void>)
+     | undefined;
+-  onToggleTurnFold: (runId: RunId) => void;
++  onToggleTurnFold: (runId: RunId, anchorKey?: string) => void;
++  visibleTurnFoldRunIds: ReadonlySet<RunId>;
++  onTurnFoldVisibilityChange: (runId: RunId, visible: boolean, threadKey: string) => void;
+   onToggleAttemptFold: (attemptId: RunAttemptId) => void;
+   onFileOpen: (attachment: ChatFileAttachment) => void;
+   onFileDownload: (attachment: ChatFileAttachment) => void;
