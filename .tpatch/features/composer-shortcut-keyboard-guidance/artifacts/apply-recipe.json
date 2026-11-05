@@ -1,0 +1,11 @@
+{
+  "feature": "composer-shortcut-keyboard-guidance",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "docs/user/keybindings.md",
+      "search": "inserts a new line. This applies to the web and desktop composer at desktop widths.",
+      "replace": "inserts a new line. With a physical keyboard, these preferences also apply in\nnarrow web and desktop windows. When a software keyboard is open, plain Enter\ninserts a new line instead of sending; modifier shortcuts remain available."
+    }
+  ]
+}

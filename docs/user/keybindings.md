@@ -14,7 +14,9 @@ is local to this client and does not resolve the underlying request.
 
 In **Settings → Chat → Send shortcut**, choose whether Enter sends, requires
 `mod+Enter` for multiline prompts, or always requires `mod+Enter`. `Shift+Enter`
-inserts a new line. This applies to the web and desktop composer at desktop widths.
+inserts a new line. With a physical keyboard, these preferences also apply in
+narrow web and desktop windows. When a software keyboard is open, plain Enter
+inserts a new line instead of sending; modifier shortcuts remain available.
 
 **Follow-up behavior** chooses Queue or Steer while the agent runs. Use
 `mod+Enter` to do the opposite for one message, even when the send shortcut
