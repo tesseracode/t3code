@@ -1,0 +1,23 @@
+{
+  "id": "composer-shortcut-keyboard-guidance",
+  "slug": "composer-shortcut-keyboard-guidance",
+  "title": "Correct keyboard shortcut guidance after upstream software-keyboard detection superseded the old narrow-window submission guard. Explain that physical-keyboard send preferences apply at any web/desktop width, while an open software keyboard keeps plain Enter as a newline. Resolve issue #18 without introducing a redundant override setting.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-05T18:33:31Z",
+  "updated_at": "2026-11-05T18:33:53Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-05T18:33:47Z",
+    "base_commit": "021e6349cef1761698549ab3bd07f68a393dac5e",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "verify": {
+    "verified_at": "2026-11-05T18:33:48Z",
+    "passed": true,
+    "recipe_hash_at_verify": "f23ca36566f0ed7c451da736aa95950bb156f25aea6cccc90acc9684dab88ffc",
+    "patch_hash_at_verify": "8d7c2a6b3db67c74319da7a51c3685d6b72db3d6b14ff9737b7f9cc6e6d8bee6"
+  }
+}

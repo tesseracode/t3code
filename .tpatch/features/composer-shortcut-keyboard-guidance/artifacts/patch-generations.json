@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "feature": "composer-shortcut-keyboard-guidance",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_c7a3176030bf",
+      "kind": "record",
+      "patch_sha256": "8d7c2a6b3db67c74319da7a51c3685d6b72db3d6b14ff9737b7f9cc6e6d8bee6",
+      "git_patch_id": "4e1679700d26d1a6489c25677e199f2cf5fcd14f",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "f23ca36566f0ed7c451da736aa95950bb156f25aea6cccc90acc9684dab88ffc",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "021e6349cef1761698549ab3bd07f68a393dac5e",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/user/keybindings.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/user/keybindings.md"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

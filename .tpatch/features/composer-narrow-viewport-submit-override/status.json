@@ -1,0 +1,27 @@
+{
+  "id": "composer-narrow-viewport-submit-override",
+  "slug": "composer-narrow-viewport-submit-override",
+  "title": "Add an opt-in web client setting to bypass the narrow-viewport composer submission guard for physical-keyboard users, preserving mobile newline behavior by default.",
+  "state": "rejected",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-01T18:32:57Z",
+  "updated_at": "2026-11-05T18:33:31Z",
+  "last_command": "reject",
+  "notes": "Phase advanced manually (--manual); artifact authored at analysis.md",
+  "apply": {},
+  "reconcile": {},
+  "rejection": {
+    "reason": "superseded",
+    "note": "Upstream keyboard detection removes the width guard; isolated 639px Enter/modifier/background sends and persisted send preferences now satisfy the user problem without an override.",
+    "actor": "Copilot",
+    "related": "GH#18",
+    "evidence": [
+      {
+        "path": "analysis.md",
+        "sha256": "4ead2951237602b602d7bf871aeed8d0e1392f8baac26f53fa95d366ee4073e1"
+      }
+    ],
+    "rejected_at": "2026-11-05T18:33:31Z",
+    "prior_state": "analyzed"
+  }
+}
