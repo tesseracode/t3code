@@ -2793,6 +2793,46 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     return decided.success;
   });
 
+  const detachProviderSession = Effect.fn("Orchestrator.detachProviderSession")(function* (input: {
+    readonly command: OrchestrationV2ServerCommand & { readonly threadId: ThreadId };
+    readonly session: OrchestrationV2ThreadProjection["providerSessions"][number];
+    readonly detail: string;
+    readonly now: DateTime.Utc;
+    readonly events: Ref.Ref<Array<OrchestrationV2DomainEvent>>;
+    readonly effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>;
+  }) {
+    yield* emit(
+      input.events,
+      input.command,
+    )({
+      type: "provider-session.detached",
+      threadId: input.command.threadId,
+      driver: input.session.driver,
+      providerInstanceId: input.session.providerInstanceId,
+      occurredAt: input.now,
+      payload: {
+        providerSessionId: input.session.id,
+        detachedAt: input.now,
+        reason: input.detail,
+      },
+    });
+    yield* Ref.update(input.effects, (existing) => [
+      ...existing,
+      {
+        id: `effect:${input.command.commandId}:provider-session.detach:${input.session.id}`,
+        commandId: input.command.commandId,
+        threadId: input.command.threadId,
+        request: {
+          type: "provider-session.detach",
+          providerSessionId: input.session.id,
+          detail: input.detail,
+          // Terminal detaches revoke MCP credentials; selection restarts must retain them.
+          ...(input.command.type === "thread.archive" ? { revokeMcpCredential: true } : {}),
+        },
+      } satisfies PendingOrchestrationEffectV2,
+    ]);
+  });
+
   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
     command: Extract<
       OrchestrationV2ServerCommand,
@@ -3866,53 +3906,22 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       yield* Effect.forEach(
         liveSessions,
         (session) =>
-          Effect.gen(function* () {
-            yield* emit(
-              events,
-              command,
-            )({
-              type: "provider-session.detached",
-              threadId: command.threadId,
-              driver: session.driver,
-              providerInstanceId: session.providerInstanceId,
-              occurredAt: now,
-              payload: {
-                providerSessionId: session.id,
-                detachedAt: now,
-                reason:
-                  command.type === "thread.archive"
-                    ? "Thread archived."
-                    : command.type === "thread.settle"
-                      ? "Thread settled."
-                      : command.type === "thread.metadata.update"
-                        ? "Workspace changed."
-                        : command.type === "thread.runtime-mode.set"
-                          ? "Runtime mode changed."
-                          : "Provider or model selection changed.",
-              },
-            });
-            const pendingEffect = {
-              id: `effect:${command.commandId}:provider-session.detach:${session.id}`,
-              commandId: command.commandId,
-              threadId: command.threadId,
-              request: {
-                type: "provider-session.detach",
-                providerSessionId: session.id,
-                detail:
-                  command.type === "thread.archive"
-                    ? "Thread archived."
-                    : command.type === "thread.settle"
-                      ? "Thread settled."
-                      : command.type === "thread.metadata.update"
-                        ? "Workspace changed."
-                        : command.type === "thread.runtime-mode.set"
-                          ? "Runtime mode changed."
-                          : "Provider or model selection changed.",
-                // Terminal detaches revoke MCP credentials; reattachments need other detach reasons to preserve them.
-                ...(command.type === "thread.archive" ? { revokeMcpCredential: true } : {}),
-              },
-            } satisfies PendingOrchestrationEffectV2;
-            yield* Ref.update(effects, (existing) => [...existing, pendingEffect]);
+          detachProviderSession({
+            command,
+            session,
+            events,
+            effects,
+            now,
+            detail:
+              command.type === "thread.archive"
+                ? "Thread archived."
+                : command.type === "thread.settle"
+                  ? "Thread settled."
+                  : command.type === "thread.metadata.update"
+                    ? "Workspace changed."
+                    : command.type === "thread.runtime-mode.set"
+                      ? "Runtime mode changed."
+                      : "Provider or model selection changed.",
           }),
         { concurrency: 1, discard: true },
       );
@@ -5859,8 +5868,33 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             }),
         ),
       );
+      const switchPlan = modelSelectionsEqual(projection.thread.modelSelection, modelSelection)
+        ? null
+        : yield* providerSwitchService
+            .plan({ projection, targetModelSelection: modelSelection })
+            .pipe(mapDispatchError(command));
+      for (const session of projection.providerSessions) {
+        if (
+          switchPlan?.releaseProviderSessionIds.includes(session.id) &&
+          session.status !== "stopped" &&
+          session.status !== "error"
+        ) {
+          yield* detachProviderSession({
+            command,
+            session,
+            events,
+            effects,
+            now,
+            detail: "Provider or model selection changed.",
+          });
+        }
+      }
       const providerSessionId =
-        activeProviderThread?.providerSessionId ??
+        (activeProviderThread?.providerSessionId !== null &&
+        activeProviderThread?.providerSessionId !== undefined &&
+        !switchPlan?.releaseProviderSessionIds.includes(activeProviderThread.providerSessionId)
+          ? activeProviderThread.providerSessionId
+          : null) ??
         (yield* mapDispatchError(command)(
           providerSessionIdFor({
             adapter,

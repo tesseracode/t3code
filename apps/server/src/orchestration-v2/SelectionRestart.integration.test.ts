@@ -438,12 +438,12 @@ it.live("retries a failed selection restart session open before completing", () 
   ),
 );
 
-it.live(
-  "restarts the live session on a model change when a newer stopped session record exists",
-  () =>
+it.live.each(["selection-command", "message-dispatch"] as const)(
+  "restarts the live session on a model change with a newer stopped session record (%s)",
+  (mode) =>
     Effect.scoped(
       Effect.gen(function* () {
-        const name = "selection-restart-dead-stopped";
+        const name = `selection-restart-dead-stopped-${mode}`;
         const cwd = yield* checkpointWorkspace(name);
         const threadId = ThreadId.make(`thread:${name}`);
         const state = yield* Ref.make<RestartAdapterState>({
@@ -549,14 +549,19 @@ it.live(
             ],
           });
 
-          const switchCommandId = CommandId.make(`${name}:switch`);
-          yield* orchestrator.dispatch({
-            type: "thread.model-selection.set",
-            commandId: switchCommandId,
-            threadId,
-            modelSelection: replacementSelection,
-          });
-          yield* worker.drain();
+          const switchCommandId = CommandId.make(
+            `${name}:${mode === "selection-command" ? "switch" : "second"}`,
+          );
+          if (mode === "selection-command") {
+            yield* orchestrator.dispatch({
+              type: "thread.model-selection.set",
+              commandId: switchCommandId,
+              threadId,
+              modelSelection: replacementSelection,
+            });
+            yield* worker.drain();
+          }
+          const second = yield* dispatch("second", replacementSelection);
           const storedSwitchEvents = yield* eventSink
             .readByCommandId({ commandId: switchCommandId })
             .pipe(Stream.runCollect);
@@ -565,8 +570,6 @@ it.live(
               ? [stored.event.payload.providerSessionId]
               : [],
           );
-
-          const second = yield* dispatch("second", replacementSelection);
           return {
             projection: second,
             captured: yield* Ref.get(state),

@@ -1,0 +1,32 @@
+{
+  "id": "provider-direct-dispatch-selection-restart",
+  "slug": "provider-direct-dispatch-selection-restart",
+  "title": "Honor the adapter selection transition for an immediate same-provider message.dispatch. If the adapter requires a runtime restart, detach only the live replaced session through the existing outbox path before starting the new run, preserve native conversation identity, and retain MCP credentials. Cover direct composer sends as well as separate selection commands; this completes the application-level path for #40 without replacing the earlier routing feature canonical patch.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-05T08:15:11Z",
+  "updated_at": "2026-11-05T08:23:46Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-05T08:19:22Z",
+    "base_commit": "30fad02f12291b5383ae1403a19e1c7adb881b5f",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-fusion-runtime-transition",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-05T08:21:53Z",
+    "passed": false,
+    "recipe_hash_at_verify": "c916654f2e1b005d7fa1fa247a86cb256da4a79ca4104521afee69dfe92a83ac",
+    "patch_hash_at_verify": "79593f90cade8656e8a55a6e37576eb2f9d18b86d0cc5715e0b561a33f00555f",
+    "parent_snapshot": {
+      "copilot-fusion-runtime-transition": "applied"
+    }
+  }
+}
