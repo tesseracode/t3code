@@ -1,0 +1,32 @@
+{
+  "id": "copilot-extension-opt-out",
+  "slug": "copilot-extension-opt-out",
+  "title": "Explicitly opt out of unsupported standalone extension hosting on native Copilot chat creation and resume. Preserve native skills, configuration discovery, MCP and saved conversation identity; cover issue #38 without conflating No project with standalone extensions.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-05T07:55:20Z",
+  "updated_at": "2026-11-05T07:57:43Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-05T07:57:22Z",
+    "base_commit": "6b43f8280c25fa4734ac823c2fc97cdfb614f390",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-05T07:57:39Z",
+    "passed": false,
+    "recipe_hash_at_verify": "f1838e253f2fbc4c4350453b9a11ed33d486bf37246390baee3ff132b8137244",
+    "patch_hash_at_verify": "cee87244cb829ee3a7cfd9704dc979616f68d29bce090490191ea5d53a03ffac",
+    "parent_snapshot": {
+      "copilot-cli-provider": "applied"
+    }
+  }
+}

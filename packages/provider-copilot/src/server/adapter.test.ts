@@ -67,8 +67,15 @@ const host = ProviderHost.ProviderHost.of({
     }),
 });
 
-function fakeSdk() {
+function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
   let config: SessionConfig | undefined;
+  const configure = (created: SessionConfig) => {
+    if (options.persistedExtensions && created.requestExtensions !== false)
+      throw new Error(
+        "Failed to initialize standalone session extensions: extensionSdkPath is required when standalone extensions are requested",
+      );
+    config = created;
+  };
   let serial = 0;
   let disconnected = 0;
   let stopped = 0;
@@ -154,14 +161,14 @@ function fakeSdk() {
     },
     forceStop: async () => {},
     createSession: async (created) => {
-      config = created;
+      configure(created);
       emit("session.idle");
       return session;
     },
     resumeSession: async (id, created) => {
       resumed = id;
       continuePendingWork = created.continuePendingWork;
-      config = created;
+      configure(created);
       emit("session.resume", { alreadyInUse: conflict });
       return session;
     },
@@ -331,6 +338,26 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   );
 
 describe("native Copilot V2", () => {
+  it.effect.each([undefined, "native-copilot"])(
+    "starts and settles with unsupported extensions disabled, native resume %s",
+    (nativeId) =>
+      provide(
+        Effect.gen(function* () {
+          const fake = fakeSdk({ persistedExtensions: true });
+          const { start, drain, thread } = yield* setup(fake, nativeId);
+          assert.equal(thread.nativeThreadRef?.nativeId, "native-copilot");
+          assert.isTrue(fake.config.enableSkills);
+          assert.equal(fake.config.enableConfigDiscovery, settings.enableConfigDiscovery);
+          yield* start();
+          fake.emit("assistant.message", { messageId: "reply", content: "Fixture completed" });
+          fake.emit("session.idle");
+          const snapshot = yield* drain();
+          assert.equal(snapshot.providerTurns[0]?.status, "completed");
+          assert.equal(snapshot.messages[0]?.text, "Fixture completed");
+          assert.equal(fake.sent.length, 1);
+        }),
+      ),
+  );
   it.effect("renews routing preferences without replacing ordinary model switches", () =>
     provide(
       Effect.gen(function* () {
