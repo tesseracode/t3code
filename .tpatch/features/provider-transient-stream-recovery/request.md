@@ -6,3 +6,11 @@
 ## Description
 
 Evaluate bounded automatic backoff and native-session resume after genuinely transient provider event-stream closure. Current T3 event-pump failure emits ProviderAdapterEventStreamError and terminates the owning run; persistence-write retries are not provider reconnection. Investigate the observed stream closure during worktree handoff separately from transient network faults. Verify native Copilot retry behavior rather than assuming five attempts. Require classified retryable failures, bounded attempts/deadline/cancellation, visible recovery state, original native identity/history, no duplicate prompt/tool/approval execution, no silent fallback or fresh-session replacement, and no retry of authentication, validation, unsupported configuration or deliberate shutdown/handoff. Request-only feature; implementation not authorized in this task.
+
+## Follow-up authorization
+
+On 2026-11-06 the maintainer approved bounded investigation and implementation
+only where original native identity and non-duplication can be proved. This does
+not authorize blind prompt resend, fresh-session replacement, paid qualification
+turns, or changes to a live conversation. Preserve an explicit blocker when the
+current provider contract cannot establish safe recovery.
