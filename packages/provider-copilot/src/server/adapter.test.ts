@@ -19,6 +19,7 @@ import {
   type ModelSelection,
   type ServerProviderSkill,
 } from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -44,6 +45,8 @@ const policy: ProviderAdapter.ProviderAdapterV2RuntimePolicy = {
   interactionMode: "default",
 };
 const settings = Schema.decodeSync(CopilotSettings)({});
+const isEventStreamError = Schema.is(ProviderAdapter.ProviderAdapterEventStreamError);
+const isProtocolError = Schema.is(ProviderAdapter.ProviderAdapterProtocolError);
 const host = ProviderHost.ProviderHost.of({
   paths: {
     cwd: "/workspace",
@@ -305,7 +308,7 @@ const setup = Effect.fnUntraced(function* (
   });
   const emitted: ProviderAdapter.ProviderAdapterV2Event[] = [];
   const eventQueue = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
-  yield* runtime.events.pipe(
+  const eventFiber = yield* runtime.events.pipe(
     Stream.runForEach((event) =>
       Effect.sync(() => {
         emitted.push(event);
@@ -372,7 +375,7 @@ const setup = Effect.fnUntraced(function* (
     });
   });
   const drain = () => runtime.readThreadSnapshot({ providerThread: thread });
-  return { runtime, thread, emitted, start, drain, takeEvent };
+  return { runtime, thread, emitted, start, drain, takeEvent, eventFiber };
 });
 
 const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -1745,6 +1748,55 @@ describe("native Copilot V2", () => {
           assert.equal((yield* drain()).providerTurns[0]?.status, "interrupted");
         }),
       ),
+  );
+
+  it.effect("fails its stream and drains when a native handler fails during interruption", () =>
+    provide(
+      Effect.gen(function* () {
+        const fake = fakeSdk();
+        const { runtime, start, drain, thread, eventFiber } = yield* setup(fake, "native-copilot");
+        yield* start();
+        const turn = (yield* drain()).providerTurns[0]!;
+        const failure = new Error("Routing read failed during interruption.");
+        const reading = promiseGate();
+        const rejectRead = promiseGate();
+        fake.session.rpc.model.getCurrent = async () => {
+          reading.resolve();
+          await rejectRead.promise;
+          throw failure;
+        };
+        fake.session.abort = async () => {
+          fake.emit("session.model_change", { newModel: "gpt-4.1" });
+          fake.emit("session.idle");
+        };
+        yield* runtime.interruptTurn({ providerThread: thread, providerTurnId: turn.id });
+        yield* Effect.promise(() => reading.promise);
+        const pendingDrain = yield* drain().pipe(Effect.exit, Effect.forkChild);
+        rejectRead.resolve();
+        const stream = yield* Fiber.await(eventFiber);
+        assert.isTrue(Exit.isFailure(stream));
+        if (Exit.isFailure(stream)) {
+          const error = Cause.squash(stream.cause);
+          assert.instanceOf(error, ProviderAdapter.ProviderAdapterEventStreamError);
+          if (isEventStreamError(error)) {
+            assert.equal(error.driver, runtime.driver);
+            assert.equal(error.providerSessionId, sessionId);
+            assert.instanceOf(error.cause, ProviderAdapter.ProviderAdapterProtocolError);
+            if (isProtocolError(error.cause)) {
+              assert.equal(error.cause.cause, failure);
+            }
+            for (const draining of [yield* Fiber.join(pendingDrain), yield* Effect.exit(drain())]) {
+              assert.isTrue(Exit.isFailure(draining));
+              if (Exit.isFailure(draining)) {
+                assert.equal(Cause.squash(draining.cause), error);
+              }
+            }
+          }
+        }
+        assert.equal(fake.resumed, "native-copilot");
+        assert.lengthOf(fake.sent, 1);
+      }),
+    ),
   );
 
   it.effect("bridges permission and user-input callbacks as live V2 requests", () =>

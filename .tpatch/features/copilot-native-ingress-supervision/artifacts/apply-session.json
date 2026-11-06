@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-native-ingress-supervision",
+  "completed_at": "2026-11-06T08:50:05Z",
+  "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Injected abort-boundary routing fault reproduced the original open-stream hang before the correction; 38 adapter tests and affected-file checks pass afterward. No incident attribution, model inference, resend or native replacement."
+}
