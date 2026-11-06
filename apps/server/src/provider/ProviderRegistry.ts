@@ -2,9 +2,11 @@ import {
   defaultInstanceIdForDriver,
   isProviderWorkspaceSnapshotCurrent,
   ProviderDriverKind,
+  ServerProviderSkillControlError,
   type ProviderInstanceId,
   type ServerProvider,
   type ServerProviderUpdateState,
+  type ServerProviderSkillControlInput,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -72,6 +74,10 @@ export class ProviderRegistry extends Context.Service<
       readonly cwd: string;
       readonly fresh?: boolean;
     }) => Effect.Effect<ReadonlyArray<ServerProvider>>;
+
+    readonly setSkillEnabled: (
+      input: ServerProviderSkillControlInput,
+    ) => Effect.Effect<ReadonlyArray<ServerProvider>, ServerProviderSkillControlError>;
 
     readonly getProviderMaintenanceCapabilitiesForInstance: (
       instanceId: ProviderInstanceId,
@@ -1002,6 +1008,54 @@ export const layer = Layer.effect(
       return yield* Fiber.join(claim.scan);
     });
 
+    const setSkillEnabled = Effect.fn("ProviderRegistry.setSkillEnabled")(function* (
+      input: ServerProviderSkillControlInput,
+    ) {
+      const instance = yield* instanceRegistry.getInstance(input.instanceId);
+      const providers = yield* Ref.get(providersRef);
+      if (
+        !instance?.enabled ||
+        !providers.some((provider) => provider.instanceId === input.instanceId && provider.enabled)
+      )
+        return yield* new ServerProviderSkillControlError({
+          instanceId: input.instanceId,
+          reason: "instance_unavailable",
+        });
+      if (!instance.orchestrationAdapter.setSkillEnabled || !instance.snapshotForCwd)
+        return yield* new ServerProviderSkillControlError({
+          instanceId: input.instanceId,
+          reason: "unsupported",
+        });
+      const { cwd } = yield* instance.orchestrationAdapter.setSkillEnabled(input);
+      const snapshot = yield* instance.snapshotForCwd(cwd).pipe(
+        Effect.mapError(
+          (cause) =>
+            new ServerProviderSkillControlError({
+              instanceId: input.instanceId,
+              reason: "operation_failed",
+              cause,
+            }),
+        ),
+      );
+      if ((yield* instanceRegistry.getInstance(input.instanceId)) !== instance)
+        return yield* new ServerProviderSkillControlError({
+          instanceId: input.instanceId,
+          reason: "instance_unavailable",
+        });
+      const checkedAt = DateTime.formatIso(yield* DateTime.now);
+      return yield* updateProviders((providers) =>
+        providers.map((provider) =>
+          provider.instanceId === input.instanceId
+            ? upsertProviderWorkspaceSnapshot(provider, cwd, {
+                ...snapshot,
+                checkedAt,
+                slashCommandsPending: snapshot.slashCommandsPending ?? snapshot.status === "error",
+              })
+            : provider,
+        ),
+      );
+    });
+
     return {
       getProviders: Ref.get(providersRef),
       refresh: (provider?: ProviderDriverKind) =>
@@ -1011,6 +1065,7 @@ export const layer = Layer.effect(
       refreshWorkspaceSnapshot: (input) =>
         refreshWorkspaceSnapshot(input).pipe(Effect.catchCause(recoverRefreshFailure)),
       refreshAfterUpdate,
+      setSkillEnabled,
       getProviderMaintenanceCapabilitiesForInstance,
       setProviderMaintenanceActionState,
       get streamChanges() {

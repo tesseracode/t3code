@@ -7,7 +7,6 @@ import type {
   MessageOptions,
   PermissionRequest,
   ResumeSessionConfig,
-  SkillsLoadedSkill,
 } from "@github/copilot-sdk";
 import {
   MessageId,
@@ -16,6 +15,7 @@ import {
   ProviderDriverKind,
   ProviderTurnId,
   RuntimeRequestId,
+  ServerProviderSkillControlError,
   TurnItemId,
   type ModelSelection,
   type OrchestrationV2ConversationMessage,
@@ -26,6 +26,7 @@ import {
   type OrchestrationV2TurnItem,
   OrchestrationV2ModelExecution,
   type ProviderInstanceId,
+  type ProviderSessionId,
   type OrchestrationV2Subagent,
   type ServerProviderSkill,
 } from "@t3tools/contracts";
@@ -95,7 +96,7 @@ export type SessionHandle = Pick<
     readonly mode: Pick<Rpc["mode"], "set">;
     readonly model: Pick<Rpc["model"], "list" | "getCurrent">;
     readonly plan: Pick<Rpc["plan"], "read">;
-    readonly skills: Pick<Rpc["skills"], "list">;
+    readonly skills: Pick<Rpc["skills"], "list" | "enable" | "disable">;
     readonly tasks: Pick<Rpc["tasks"], "list" | "cancel">;
     readonly permissions: Pick<Rpc["permissions"], "handlePendingPermissionRequest">;
   };
@@ -202,6 +203,17 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
   const loggers = yield* Effect.serviceOption(ProviderEventLoggers.ProviderEventLoggers);
   const nativeLogger = Option.getOrUndefined(loggers)?.native;
+  const skillSessions = new Map<
+    ProviderSessionId,
+    {
+      readonly owner: symbol;
+      readonly cwd: string;
+      readonly update: (
+        skillName: string,
+        enabled: boolean,
+      ) => Effect.Effect<void, ProviderAdapter.ProviderAdapterV2Error>;
+    }
+  >();
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: input.instanceId,
     driver: COPILOT_DRIVER,
@@ -220,8 +232,36 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             : turnScopedSelectionTransition(),
         ),
     ),
+    setSkillEnabled: Effect.fn("CopilotAdapter.setSkillEnabled")(function* (selection) {
+      if (selection.providerSessionId === undefined && skillSessions.size > 1)
+        return yield* new ServerProviderSkillControlError({
+          instanceId: input.instanceId,
+          reason: "session_required",
+        });
+      const session =
+        selection.providerSessionId === undefined
+          ? skillSessions.values().next().value
+          : skillSessions.get(selection.providerSessionId);
+      if (!session)
+        return yield* new ServerProviderSkillControlError({
+          instanceId: input.instanceId,
+          reason: "session_unavailable",
+        });
+      yield* session.update(selection.skillName, selection.enabled).pipe(
+        Effect.mapError(
+          (cause) =>
+            new ServerProviderSkillControlError({
+              instanceId: input.instanceId,
+              reason: "operation_failed",
+              cause,
+            }),
+        ),
+      );
+      return { cwd: session.cwd };
+    }),
     openSession: Effect.fn("CopilotAdapter.openSession")(function* (open) {
       const cwd = open.runtimePolicy.cwd ?? host.paths.cwd;
+      const skillOwner = Symbol();
       const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
       const inbox = yield* Queue.unbounded<Ingress>();
       const now = yield* DateTime.now;
@@ -366,6 +406,8 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       yield* Effect.addFinalizer(() =>
         Effect.gen(function* () {
           stopped = true;
+          if (skillSessions.get(open.providerSessionId)?.owner === skillOwner)
+            skillSessions.delete(open.providerSessionId);
           options.onSkills?.(cwd, null);
           yield* settlePending();
           const disconnected = native
@@ -1721,7 +1763,31 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             Effect.result,
           );
           if (skills._tag === "Success")
-            options.onSkills?.(cwd, skillsFromSdk(skills.success.skills as SkillsLoadedSkill[]));
+            options.onSkills?.(cwd, skillsFromSdk(skills.success.skills));
+          skillSessions.set(open.providerSessionId, {
+            owner: skillOwner,
+            cwd,
+            update: Effect.fn("CopilotAdapter.updateSessionSkill")(function* (name, enabled) {
+              if (!native || stopped)
+                return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                  driver: COPILOT_DRIVER,
+                  detail: "The selected Copilot session has closed.",
+                });
+              const session = native;
+              yield* sdk("update skill", () =>
+                enabled
+                  ? session.rpc.skills.enable({ name })
+                  : session.rpc.skills.disable({ name }),
+              );
+              const updated = yield* sdk("list skills", () => session.rpc.skills.list());
+              if (stopped)
+                return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                  driver: COPILOT_DRIVER,
+                  detail: "The selected Copilot session closed during the skill update.",
+                });
+              options.onSkills?.(cwd, skillsFromSdk(updated.skills));
+            }),
+          });
           yield* drain();
           return createdThread;
         });

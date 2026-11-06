@@ -51,8 +51,7 @@ you connect from the web app, desktop, or mobile.
 instructions, and skills. The skill picker uses the current project's discovered
 skills, not a combined list from unrelated projects. Disabled and agent-only
 skills are not offered as user commands.
-Enabling or disabling skills during an active session is not exposed by this
-integration.
+The picker does not currently expose enable/disable controls.
 
 ## Conversations and permissions
 

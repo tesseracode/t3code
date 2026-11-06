@@ -90,6 +90,54 @@ it("requires operate permission for tool updates even alongside a read-only chec
 });
 
 describe("RPC scope middleware", () => {
+  it.effect.each([
+    { scopes: [AuthOrchestrationReadScope], allowed: false },
+    { scopes: [AuthProvidersManageScope], allowed: true },
+  ])(
+    "authorizes skill controls before entering the handler, allowed $allowed",
+    ({ scopes, allowed }) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const method = WS_METHODS.serverSetSkillEnabled;
+          const group = WsRpcGroup.omit(
+            ...[...WsRpcGroup.requests.keys()].filter(
+              (tag): tag is Exclude<keyof typeof RPC_REQUIRED_SCOPES, typeof method> =>
+                tag !== method,
+            ),
+          );
+          let handled = false;
+          const client = yield* RpcTest.makeClient(group).pipe(
+            Effect.provide(
+              Layer.mergeAll(
+                group.toLayerHandler(method, () =>
+                  Effect.sync(() => {
+                    handled = true;
+                    return { providers: [] };
+                  }),
+                ),
+                RpcAuthorization.layer(scopes),
+              ),
+            ),
+          );
+          const result = yield* client[method]({
+            instanceId: ProviderInstanceId.make("githubCopilot"),
+            skillName: "review",
+            enabled: false,
+          }).pipe(Effect.result);
+          expect(handled).toBe(allowed);
+          if (allowed) {
+            expect(result._tag).toBe("Success");
+          } else {
+            expect(result._tag).toBe("Failure");
+            if (result._tag === "Failure")
+              expect(result.failure).toMatchObject({
+                requiredPermission: AuthProvidersManageScope,
+              });
+          }
+        }),
+      ),
+  );
+
   const tested = [WS_METHODS.serverProbe, WS_METHODS.serverRetryResourceTelemetry] as const;
   const group = WsRpcGroup.omit(
     ...[...WsRpcGroup.requests.keys()].filter(

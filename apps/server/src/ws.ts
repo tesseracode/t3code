@@ -2426,6 +2426,8 @@ export const layerWsRpc = (
           ),
         [WS_METHODS.serverUpdateProvider]: (input) =>
           providerMaintenanceRunner.updateProvider(input),
+        [WS_METHODS.serverSetSkillEnabled]: (input) =>
+          providerRegistry.setSkillEnabled(input).pipe(Effect.map((providers) => ({ providers }))),
         [WS_METHODS.providerConsumeResetCredit]:
           /* Request instrumentation already owns the span; keep this helper in that context. */
           Effect.fnUntraced(function* (input) {

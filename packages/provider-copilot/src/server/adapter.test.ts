@@ -17,6 +17,7 @@ import {
   ThreadId,
   type OrchestrationV2AppThread,
   type ModelSelection,
+  type ServerProviderSkill,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -24,6 +25,7 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
@@ -87,6 +89,8 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
   > = [];
   let permissionResponse = async (): Promise<{ success: boolean }> => ({ success: true });
   let background: Awaited<ReturnType<SessionHandle["rpc"]["tasks"]["list"]>> = { tasks: [] };
+  let skills: Awaited<ReturnType<SessionHandle["rpc"]["skills"]["list"]>> = { skills: [] };
+  let skillFailure: Error | undefined;
   let catalog: ModelCatalog = { models: [] };
   let current: Awaited<ReturnType<SessionHandle["rpc"]["model"]["getCurrent"]>> = {
     modelId: "gpt-4.1",
@@ -138,7 +142,25 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
           path: "/copilot/plan.md",
         }),
       },
-      skills: { list: async () => ({ skills: [] }) },
+      skills: {
+        list: async () => skills,
+        enable: async ({ name }) => {
+          if (skillFailure) throw skillFailure;
+          skills = {
+            skills: skills.skills.map((skill) =>
+              skill.name === name ? { ...skill, enabled: true } : skill,
+            ),
+          };
+        },
+        disable: async ({ name }) => {
+          if (skillFailure) throw skillFailure;
+          skills = {
+            skills: skills.skills.map((skill) =>
+              skill.name === name ? { ...skill, enabled: false } : skill,
+            ),
+          };
+        },
+      },
       tasks: { list: async () => background, cancel: async () => ({ cancelled: true }) },
       permissions: {
         handlePendingPermissionRequest: async (
@@ -205,6 +227,15 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
     },
     setTasks: (tasks: typeof background) => {
       background = tasks;
+    },
+    setSkills: (value: typeof skills) => {
+      skills = value;
+    },
+    get skills() {
+      return skills.skills;
+    },
+    setSkillFailure: (value: Error | undefined) => {
+      skillFailure = value;
     },
     permissionReplies,
     setPermissionResponse: (response: () => Promise<{ success: boolean }>) => {
@@ -338,6 +369,123 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   );
 
 describe("native Copilot V2", () => {
+  it.effect(
+    "preserves skill ownership, fresh inventory and errors across live session scopes",
+    () =>
+      provide(
+        Effect.gen(function* () {
+          const first = fakeSdk();
+          const second = fakeSdk();
+          for (const fake of [first, second])
+            fake.setSkills({
+              skills: [
+                {
+                  name: "review",
+                  description: "Review changes",
+                  source: "project",
+                  userInvocable: true,
+                  enabled: true,
+                  path: "/workspace/.agents/skills/review/SKILL.md",
+                },
+              ],
+            });
+          let nextClient = 0;
+          const inventories = new Map<string, ReadonlyArray<ServerProviderSkill>>();
+          const adapter = yield* makeAdapter(
+            { instanceId, settings, environment: { HOME: "/test-account" } },
+            {
+              clientFactory: () => (nextClient++ === 0 ? first.client : second.client),
+              onSkills: (cwd, discovered) => {
+                if (discovered) inventories.set(cwd, discovered);
+                else inventories.delete(cwd);
+              },
+            },
+          );
+          if (!adapter.setSkillEnabled)
+            throw new Error("Copilot instance skill controls are missing");
+          const unavailable = yield* adapter
+            .setSkillEnabled({ skillName: "review", enabled: false })
+            .pipe(Effect.result);
+          assert.equal(unavailable._tag, "Failure");
+          if (unavailable._tag === "Failure")
+            assert.equal(unavailable.failure.reason, "session_unavailable");
+
+          const firstScope = yield* Effect.acquireRelease(Scope.make(), (scope) =>
+            Scope.close(scope, Exit.succeed(undefined)),
+          );
+          const open = Effect.fnUntraced(function* (id: string, scope: Scope.Scope, cwd: string) {
+            const ownThread = ThreadId.make(id);
+            const runtime = yield* adapter
+              .openSession({
+                threadId: ownThread,
+                providerSessionId: ProviderSessionId.make(id),
+                modelSelection: selection,
+                runtimePolicy: { ...policy, cwd },
+              })
+              .pipe(Effect.provideService(Scope.Scope, scope));
+            yield* runtime.ensureThread({
+              threadId: ownThread,
+              modelSelection: selection,
+              runtimePolicy: { ...policy, cwd },
+            });
+          });
+          yield* open("first-runtime", firstScope, "/workspace/first");
+          yield* adapter.setSkillEnabled({ skillName: "review", enabled: false });
+          assert.isFalse(first.skills[0]?.enabled);
+          assert.deepEqual(inventories.get("/workspace/first"), []);
+          yield* adapter.setSkillEnabled({ skillName: "review", enabled: true });
+          assert.equal(inventories.get("/workspace/first")?.[0]?.name, "review");
+
+          const secondScope = yield* Effect.acquireRelease(Scope.make(), (scope) =>
+            Scope.close(scope, Exit.succeed(undefined)),
+          );
+          yield* open("second-runtime", secondScope, "/workspace/second");
+          const ambiguous = yield* adapter
+            .setSkillEnabled({ skillName: "review", enabled: false })
+            .pipe(Effect.result);
+          assert.equal(ambiguous._tag, "Failure");
+          if (ambiguous._tag === "Failure")
+            assert.equal(ambiguous.failure.reason, "session_required");
+          assert.isTrue(first.skills[0]?.enabled);
+          assert.isTrue(second.skills[0]?.enabled);
+
+          yield* adapter.setSkillEnabled({
+            skillName: "review",
+            enabled: false,
+            providerSessionId: ProviderSessionId.make("second-runtime"),
+          });
+          assert.isTrue(first.skills[0]?.enabled);
+          assert.isFalse(second.skills[0]?.enabled);
+          assert.deepEqual(inventories.get("/workspace/second"), []);
+
+          first.setSkillFailure(new Error("Native skill update rejected"));
+          const failed = yield* adapter
+            .setSkillEnabled({
+              skillName: "review",
+              enabled: false,
+              providerSessionId: ProviderSessionId.make("first-runtime"),
+            })
+            .pipe(Effect.result);
+          assert.equal(failed._tag, "Failure");
+          if (failed._tag === "Failure") {
+            assert.equal(failed.failure.reason, "operation_failed");
+            assert.isDefined(failed.failure.cause);
+          }
+          assert.isTrue(first.skills[0]?.enabled);
+          assert.equal(inventories.get("/workspace/first")?.[0]?.name, "review");
+          yield* Scope.close(firstScope, Exit.succeed(undefined));
+          yield* adapter.setSkillEnabled({ skillName: "review", enabled: true });
+          assert.isTrue(second.skills[0]?.enabled);
+          yield* Scope.close(secondScope, Exit.succeed(undefined));
+          const closed = yield* adapter
+            .setSkillEnabled({ skillName: "review", enabled: false })
+            .pipe(Effect.result);
+          assert.equal(closed._tag, "Failure");
+          if (closed._tag === "Failure") assert.equal(closed.failure.reason, "session_unavailable");
+        }),
+      ),
+  );
+
   it.effect.each([undefined, "native-copilot"])(
     "starts and settles with unsupported extensions disabled, native resume %s",
     (nativeId) =>

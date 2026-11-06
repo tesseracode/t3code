@@ -31,6 +31,8 @@ import {
   RuntimeRequestId,
   RunAttemptId,
   RunId,
+  ServerProviderSkillControlInput,
+  ServerProviderSkillControlError,
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
@@ -645,6 +647,9 @@ export class ProviderAdapterV2 extends Context.Service<
     readonly planSelectionTransition: (
       input: ProviderSelectionTransitionInput,
     ) => Effect.Effect<ProviderSelectionTransitionPlan, ProviderAdapterV2Error>;
+    readonly setSkillEnabled?: (
+      input: Omit<ServerProviderSkillControlInput, "instanceId">,
+    ) => Effect.Effect<{ readonly cwd: string }, ServerProviderSkillControlError>;
     readonly openSession: (
       input: ProviderAdapterV2OpenSessionInput,
     ) => Effect.Effect<ProviderAdapterV2SessionRuntime, ProviderAdapterV2Error, Scope.Scope>;

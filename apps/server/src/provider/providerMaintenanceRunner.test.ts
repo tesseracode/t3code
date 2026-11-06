@@ -194,6 +194,7 @@ function makeRegistry(
       refreshInstance: () => Ref.get(providersRef),
       refreshAfterUpdate: () => Ref.get(providersRef),
       refreshWorkspaceSnapshot: () => Ref.get(providersRef),
+      setSkillEnabled: () => Effect.die("Unexpected skill control in provider maintenance fixture"),
       getProviderMaintenanceCapabilitiesForInstance: (_instanceId, provider) =>
         Effect.succeed(lifecycleFor(provider)),
       setProviderMaintenanceActionState,

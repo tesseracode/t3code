@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "feature": "copilot-skill-controls-v014",
+  "current_generation": 2,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_8ef7bc86baa5",
+      "kind": "record",
+      "patch_sha256": "17d3de1a7babc524c1ddea9a65eedf496f1754cc1e9e6fffe788ffd7a9d0a35b",
+      "git_patch_id": "5f5c249c37b6effd17bef47ccc70873f594b7552",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "ea944c76bbb53821e4a6fd13a61b188879866ca1ecdd80affec40aee798aa833",
+      "canonical_patch": "",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "e6d01c63390dbba90f74557ef877f44a6893a375",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/src/auth/RpcAuthorization.test.ts",
+          "apps/server/src/auth/RpcAuthorization.ts",
+          "apps/server/src/observability/RpcInstrumentation.ts",
+          "apps/server/src/provider/ProviderRegistry.test.ts",
+          "apps/server/src/provider/ProviderRegistry.ts",
+          "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+          "apps/server/src/provider/testUtils/providerRegistryMock.ts",
+          "apps/server/src/ws.ts",
+          "docs/user/providers-copilot.md",
+          "packages/client-runtime/src/state/commandPermissions.test.ts",
+          "packages/contracts/src/clientRpcPermissions.ts",
+          "packages/contracts/src/rpc.ts",
+          "packages/contracts/src/server.ts",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts",
+          "packages/provider-core/src/server/ProviderAdapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/auth/RpcAuthorization.test.ts",
+        "apps/server/src/auth/RpcAuthorization.ts",
+        "apps/server/src/observability/RpcInstrumentation.ts",
+        "apps/server/src/provider/ProviderRegistry.test.ts",
+        "apps/server/src/provider/ProviderRegistry.ts",
+        "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+        "apps/server/src/provider/testUtils/providerRegistryMock.ts",
+        "apps/server/src/ws.ts",
+        "docs/user/providers-copilot.md",
+        "packages/client-runtime/src/state/commandPermissions.test.ts",
+        "packages/contracts/src/clientRpcPermissions.ts",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/server.ts",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-core/src/server/ProviderAdapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 24,
+          "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        },
+        {
+          "slug": "copilot-sdk-runtime-upgrade",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+          "parent_recipe_sha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad"
+        },
+        {
+          "slug": "copilot-skill-controls",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-skill-controls-ws-rpc",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_8fef9f5e1dad",
+      "kind": "amend-refresh",
+      "patch_sha256": "44403b651c2eaec8b0c0215b465b2ff1bbfe04eeb7af0b5053a2e003e6632c69",
+      "git_patch_id": "0404d38e12cbd54ce92279d5a40a0c08f21e9458",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "ea944c76bbb53821e4a6fd13a61b188879866ca1ecdd80affec40aee798aa833",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/003-record.patch",
+      "base_commit": "e6d01c63390dbba90f74557ef877f44a6893a375",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/src/auth/RpcAuthorization.test.ts",
+          "apps/server/src/auth/RpcAuthorization.ts",
+          "apps/server/src/observability/RpcInstrumentation.ts",
+          "apps/server/src/provider/ProviderRegistry.test.ts",
+          "apps/server/src/provider/ProviderRegistry.ts",
+          "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+          "apps/server/src/provider/testUtils/providerRegistryMock.ts",
+          "apps/server/src/ws.ts",
+          "docs/user/providers-copilot.md",
+          "packages/client-runtime/src/state/commandPermissions.test.ts",
+          "packages/contracts/src/clientRpcPermissions.ts",
+          "packages/contracts/src/rpc.ts",
+          "packages/contracts/src/server.ts",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts",
+          "packages/provider-core/src/server/ProviderAdapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/auth/RpcAuthorization.test.ts",
+        "apps/server/src/auth/RpcAuthorization.ts",
+        "apps/server/src/observability/RpcInstrumentation.ts",
+        "apps/server/src/provider/ProviderRegistry.test.ts",
+        "apps/server/src/provider/ProviderRegistry.ts",
+        "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+        "apps/server/src/provider/testUtils/providerRegistryMock.ts",
+        "apps/server/src/ws.ts",
+        "docs/user/providers-copilot.md",
+        "packages/client-runtime/src/state/commandPermissions.test.ts",
+        "packages/contracts/src/clientRpcPermissions.ts",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/server.ts",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-core/src/server/ProviderAdapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 24,
+          "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        },
+        {
+          "slug": "copilot-sdk-runtime-upgrade",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+          "parent_recipe_sha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad"
+        },
+        {
+          "slug": "copilot-skill-controls",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        },
+        {
+          "slug": "copilot-skill-controls-ws-rpc",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 0,
+          "parent_patch_sha256": ""
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}
