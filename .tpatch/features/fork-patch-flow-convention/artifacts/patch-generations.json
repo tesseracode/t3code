@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "feature": "fork-patch-flow-convention",
+  "current_generation": 2,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_b626f249c864",
+      "kind": "record",
+      "patch_sha256": "9385e185aa3859689e41298b672a027fbe8557f26419c5467635594956d0fe84",
+      "git_patch_id": "8e0f8a58761bc74a5640cc052f494e15cb597312",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "d9d499712c6c7c5c2021beeb8c1c68b01f3a26670bcf26584b3bcfc3d0989d58",
+      "canonical_patch": "",
+      "audit_patch": "",
+      "base_commit": "98213a256b069ed510aa07f92c6632fc5f9ef146",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          ".tpatch/BRANCHING_STRATEGY.md",
+          "docs/internals/fork-maintenance.md",
+          "docs/operations/patch-flow.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/internals/fork-maintenance.md",
+        "docs/operations/patch-flow.md"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_1ac0ca3a52b3",
+      "kind": "amend-refresh",
+      "patch_sha256": "6ea52c1b0de0c56a589aba5b4dd97a2a2555be21f7cede34a9db6713bc078de1",
+      "git_patch_id": "947229885c3a046c83aa08bd0389689560330860",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "34d4c1a5dd2d45a352f6c16739e736c84571835b29dd9ec416670621f26ac6fd",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "98213a256b069ed510aa07f92c6632fc5f9ef146",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/internals/fork-maintenance.md",
+          "docs/operations/patch-flow.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/internals/fork-maintenance.md",
+        "docs/operations/patch-flow.md"
+      ],
+      "dependencies": [
+        {
+          "slug": "fork-maintenance-policy",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "fba7028e530ab08be19b311c57a0d89f8ef1aefc4a1c7cbe7bec5ba5e4c12368",
+          "parent_recipe_sha256": "cf16f6c48634a74dead24c2cbe29a014deb184c2254b5e63b43dccbf9b1d3ecf"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}
