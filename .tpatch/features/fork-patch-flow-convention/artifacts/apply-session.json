@@ -1,8 +1,8 @@
 {
   "slug": "fork-patch-flow-convention",
-  "completed_at": "2026-11-06T06:42:30Z",
-  "base_commit": "a00bb6f8ad50088594957a6cc23149ae1ec19de6",
+  "completed_at": "2026-11-06T06:44:11Z",
+  "base_commit": "090c23a2eb03bb63b6ae247896c63fc0aad1bb62",
   "has_patch": true,
   "validation_status": "passed",
-  "validation_notes": "Exact previously reviewed documentation postimage restored; recipe regenerated after formatting."
+  "validation_notes": "Formatted full policy root includes the demonstrated recipe-coherence trap; exact recipe and canonical replay will be checked against the reachable landing."
 }

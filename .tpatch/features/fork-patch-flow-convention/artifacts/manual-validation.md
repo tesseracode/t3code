@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-11-06T06:42:30Z
+**Timestamp**: 2026-11-06T06:44:11Z
 
 ## Notes
 
-Exact previously reviewed documentation postimage restored; recipe regenerated after formatting.
+Formatted full policy root includes the demonstrated recipe-coherence trap; exact recipe and canonical replay will be checked against the reachable landing.
