@@ -1,0 +1,69 @@
+{
+  "scope": "Source-qualified diagnostic candidate; not a reproduction or fix of issue 36, a main promotion, package qualification, deployment or installation.",
+  "landing": "62c69bff27e982b23fd23754703e4c757dfeaae1",
+  "parent": "83efed3d9cf01d911d7d77c0e987ede131c71d08",
+  "published_main_at_qualification": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+  "behavior": {
+    "changed": "Stage-specific typed Copilot background errors and a failure-only allowlisted routing diagnostic.",
+    "preserved": [
+      "Original native SDK rejection cause",
+      "Title retry and placeholder-completion policy",
+      "Shared provider fallback",
+      "Owned native-session cleanup and cancellation",
+      "Tool-free background generation",
+      "Successful generation"
+    ],
+    "diagnostic_fields": [
+      "operation",
+      "providerInstanceId",
+      "model",
+      "autoTier",
+      "reasoningEffort"
+    ],
+    "routing_meaning": "Provider-boundary selection after shared server fallback; stated tier is not proof of the eventual model served by Auto/Fusion.",
+    "diagnostic_payload_excludes": [
+      "Prompt",
+      "Response",
+      "Workspace path",
+      "Environment and account settings",
+      "Native session identifiers",
+      "Arbitrary option payloads"
+    ]
+  },
+  "validation": [
+    {
+      "command": "vp test run packages/provider-copilot/src/server/textGeneration.test.ts -t 'rejects unavailable routing|cleans up a failed routing reset'",
+      "result_before_fix": "Two existing cases fail specifically because the stage is absent from the error detail."
+    },
+    {
+      "command": "vp test run packages/provider-copilot/src/server/textGeneration.test.ts apps/server/src/orchestration-v2/ThreadTitleRegenerationService.test.ts",
+      "result": "11 passed in two files; exact diagnostic payload and original SDK cause preservation asserted."
+    },
+    {
+      "command": "vp run check:changed HEAD",
+      "baseline": "83efed3d9cf01d911d7d77c0e987ede131c71d08",
+      "result": "Formatting, lint, both dependency audits, 10 affected package typechecks and five adjacent generator tests passed."
+    }
+  ],
+  "runtime_transcript": {
+    "fixture": "Actual source generator with an injected deterministic SDK startup rejection; no native inference or session creation.",
+    "warning": "Copilot background generation failed",
+    "diagnostic": {
+      "operation": "generateThreadTitle",
+      "providerInstanceId": "githubCopilot",
+      "model": "auto",
+      "autoTier": false
+    },
+    "detail": "GitHub Copilot text generation startup failed.",
+    "original_cause_preserved": true
+  },
+  "replay": {
+    "canonical_source_coverage": "31 complete maintained canonical roots reconstruct the candidate product tree and modes from pinned upstream with no residual.",
+    "new_root": "Unique exact four-trailer landing; complete canonical patch and direct execution of committed write-file recipe exactly reproduce its product tree and modes from the actual parent.",
+    "native_verification": "Failed, not passed. Exact current landing and current materialization are recognized; historical hard-parent replay aborts at the previously recorded copilot-cli-provider parent-landing-drift.",
+    "native_result_file": "native-after-landing.json",
+    "no_historical_metadata_rewritten": true
+  },
+  "live_state_changed": false,
+  "paid_inference_requests": 0
+}

@@ -1,0 +1,26 @@
+{
+  "target": "62c69bff27e982b23fd23754703e4c757dfeaae1",
+  "results": [
+    {
+      "slug": "copilot-text-generation-failure-diagnostics",
+      "base": "83efed3d9cf01d911d7d77c0e987ede131c71d08",
+      "landing": "62c69bff27e982b23fd23754703e4c757dfeaae1",
+      "paths": [
+        "packages/provider-copilot/src/server/textGeneration.test.ts",
+        "packages/provider-copilot/src/server/textGeneration.ts"
+      ],
+      "patchSha256": "2110e4d6aa3151331938fa4a3b22fe5bcaf24f5baa72a751d55ced25a579379f",
+      "recipeSha256": "449305587f19b6a7bc2190ffef87c35a2e0bcd4312c49b59208d2c8df3b2ad2e",
+      "canonicalTree": "b864b526abf4b9803eccfe5d9ad397244351b295",
+      "recipeTree": "b864b526abf4b9803eccfe5d9ad397244351b295",
+      "includesFileModes": true,
+      "residual": [],
+      "exact": true
+    }
+  ],
+  "exact": true,
+  "method": "Independent strict whole-canonical forward application and direct execution of committed write-file recipes from each exact recorded landing parent.",
+  "excluded": [
+    ".tpatch administrative metadata only"
+  ]
+}
