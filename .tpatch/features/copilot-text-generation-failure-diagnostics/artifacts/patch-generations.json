@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "feature": "copilot-text-generation-failure-diagnostics",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_d7d474ca74bd",
+      "kind": "record",
+      "patch_sha256": "2110e4d6aa3151331938fa4a3b22fe5bcaf24f5baa72a751d55ced25a579379f",
+      "git_patch_id": "f36c442849517973a8d4d484c461d38d346ba503",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "449305587f19b6a7bc2190ffef87c35a2e0bcd4312c49b59208d2c8df3b2ad2e",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "83efed3d9cf01d911d7d77c0e987ede131c71d08",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "packages/provider-copilot/src/server/textGeneration.test.ts",
+          "packages/provider-copilot/src/server/textGeneration.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "packages/provider-copilot/src/server/textGeneration.test.ts",
+        "packages/provider-copilot/src/server/textGeneration.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-background-routing",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+          "parent_recipe_sha256": "d4aa6e25f3df994850c4d86fc97939c984ad2298d51c2c7b365972d01cc4bcb6"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

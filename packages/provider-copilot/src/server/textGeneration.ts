@@ -33,10 +33,10 @@ export function makeTextGeneration(
 ) {
   const run: TextGenerationOperations.Runner = Effect.fn("CopilotTextGeneration.run")(
     function* (request) {
-      const error = (cause?: unknown) =>
+      const error = (stage: string) => (cause?: unknown) =>
         new TextGenerationError({
           operation: request.operation,
-          detail: "GitHub Copilot text generation failed.",
+          detail: `GitHub Copilot text generation ${stage} failed.`,
           cause,
         });
       let cleanupFailed = false;
@@ -48,12 +48,12 @@ export function makeTextGeneration(
               (options.clientFactory ?? createClient)(
                 resolveClientConfiguration({ settings, cwd: request.cwd, environment }).options,
               ),
-            catch: error,
+            catch: error("client configuration"),
           });
           let session: GenerationSession | undefined;
           let finalized = false;
           const call = <A>(stage: string, operation: () => Promise<A>, timeoutMs: number) =>
-            Effect.tryPromise({ try: operation, catch: error }).pipe(
+            Effect.tryPromise({ try: operation, catch: error(stage) }).pipe(
               Effect.timeoutOption(timeoutMs),
               Effect.flatMap((result) =>
                 Effect.fromOption(result).pipe(
@@ -110,7 +110,7 @@ export function makeTextGeneration(
               : undefined;
           const autoTier = yield* Effect.try({
             try: () => autoTierForSelection(request.modelSelection, autoCatalog),
-            catch: error,
+            catch: error("routing selection"),
           });
           const owned = yield* call(
             "session creation",
@@ -177,6 +177,18 @@ export function makeTextGeneration(
         });
       return generated;
     },
+    (effect, request) =>
+      effect.pipe(
+        Effect.tapError(() =>
+          Effect.logWarning("Copilot background generation failed", {
+            operation: request.operation,
+            providerInstanceId: request.modelSelection.instanceId,
+            model: request.modelSelection.model,
+            autoTier: getProviderOptionStatedValue("autoTier", request.modelSelection),
+            reasoningEffort: reasoningEffort(request.modelSelection),
+          }),
+        ),
+      ),
   );
   return TextGenerationOperations.fromRunner(
     "CopilotTextGeneration",
