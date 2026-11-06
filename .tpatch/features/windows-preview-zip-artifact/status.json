@@ -15,7 +15,7 @@
   "reconcile": {},
   "depends_on": [
     {
-      "slug": "copilot-runtime-packaging",
+      "slug": "copilot-runtime-packaging-replay",
       "kind": "hard"
     }
   ],
