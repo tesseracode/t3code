@@ -4,9 +4,6 @@ T3 Code is an "agent harness control surface". It enables control of the agents 
 
 Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, and Google Antigravity. If they're set up on your computer, T3 Code can control them.
 
-> [!CAUTION]
-> This fork also adds **experimental GitHub Copilot** support through its bundled native SDK. Enable it in **Settings > Providers** and authenticate your Copilot account. Account model availability and native runtime capabilities vary; see the [Copilot setup guide](docs/user/providers-copilot.md).
-
 ## "Wait, what are you selling me?"
 
 Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.

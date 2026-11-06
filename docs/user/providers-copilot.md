@@ -7,10 +7,6 @@ not the ACP registry or a separately billed hosted model service.
 Sign in on that environment with `copilot login`, then refresh provider status.
 Models and reasoning options come from your account's available catalog.
 
-**Hide internal models** is off by default. Enable it in this provider's settings
-to exclude account models labelled `internal only` from model pickers. Explicit
-custom models remain available.
-
 When **Auto** is available in your model catalog, you can select it to let Copilot
 choose the model using its current routing preferences. Auto remains available
 even when the account does not supply routing-preference details.

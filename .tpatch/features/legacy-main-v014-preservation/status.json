@@ -2,12 +2,12 @@
   "id": "legacy-main-v014-preservation",
   "slug": "legacy-main-v014-preservation",
   "title": "Preserve legacy main provider and composer behavior on v0.1.4",
-  "state": "applied",
+  "state": "unapplied",
   "compatibility": "unknown",
   "requested_at": "2026-11-06T05:49:53Z",
-  "updated_at": "2026-11-06T06:35:03Z",
-  "last_command": "verify",
-  "notes": "Patch recorded",
+  "updated_at": "2026-11-06T06:39:32Z",
+  "last_command": "feature unapply",
+  "notes": "Patch removed from working tree; audit: artifacts/unapply/ua_384b4d7e1c5b/unapply-session.json",
   "apply": {
     "completed_at": "2026-11-06T06:34:16Z",
     "base_commit": "4a34c4941f17ae85cb68f55f89da80dc9b54abc8",
@@ -47,16 +47,5 @@
       "slug": "copilot-resource-events",
       "kind": "supersedes"
     }
-  ],
-  "verify": {
-    "verified_at": "2026-11-06T06:34:58Z",
-    "passed": false,
-    "recipe_hash_at_verify": "4d38e209121f62335df8ceeb6cf17a1596112e50a428752cad706e9a50a6531b",
-    "patch_hash_at_verify": "006a8d9de5683351103abf2a5673a34bc963d41825a6d48dd257439c95c9b247",
-    "parent_snapshot": {
-      "copilot-cli-provider": "applied",
-      "copilot-sdk-runtime-upgrade": "applied",
-      "copilot-skill-controls-v014": "applied"
-    }
-  }
+  ]
 }

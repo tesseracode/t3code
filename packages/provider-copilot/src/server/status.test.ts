@@ -123,22 +123,20 @@ describe("Copilot discovery and account isolation", () => {
   it("discovers allowed models and reasoning options without duplicates or policy-disabled models", () => {
     const result = modelsFromSdk(
       [
-        model("internal", { name: "Fixture model (Internal only)" }),
         model("gpt", {
           supportedReasoningEfforts: ["low", "high"],
           defaultReasoningEffort: "high",
         }),
         model("gpt"),
-        model("custom", { name: "Configured model (INTERNAL ONLY)" }),
         model("blocked", { policy: { state: "disabled", terms: "" } }),
       ],
       decode({ customModels: ["custom"] }),
     );
     assert.deepEqual(
       result.map((entry) => entry.slug),
-      ["internal", "gpt", "custom"],
+      ["gpt", "custom"],
     );
-    assert.deepEqual(result[1]?.capabilities?.optionDescriptors?.[0], {
+    assert.deepEqual(result[0]?.capabilities?.optionDescriptors?.[0], {
       id: "reasoningEffort",
       label: "Reasoning",
       type: "select",
@@ -148,20 +146,6 @@ describe("Copilot discovery and account isolation", () => {
         { id: "high", label: "High", isDefault: true },
       ],
     });
-    const filtered = modelsFromSdk(
-      [
-        model("internal", { name: "Fixture model (Internal only)" }),
-        model("gpt"),
-        model("custom", { name: "Configured model (INTERNAL ONLY)" }),
-        model("blocked", { policy: { state: "disabled", terms: "" } }),
-      ],
-      decode({ customModels: ["custom"], hideInternalModels: true }),
-    );
-    assert.deepEqual(
-      filtered.map((entry) => entry.slug),
-      ["gpt", "custom"],
-    );
-    assert.isTrue(filtered[0]?.isDefault);
   });
 
   it("uses only the selected account's home and preserves SDK-owned native paths", () => {

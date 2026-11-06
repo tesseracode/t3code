@@ -41,7 +41,6 @@ import * as Schema from "effect/Schema";
 import * as Queue from "effect/Queue";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
-import * as Semaphore from "effect/Semaphore";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
@@ -263,7 +262,6 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
     openSession: Effect.fn("CopilotAdapter.openSession")(function* (open) {
       const cwd = open.runtimePolicy.cwd ?? host.paths.cwd;
       const skillOwner = Symbol();
-      const skillMutationSemaphore = yield* Semaphore.make(1);
       const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
       const inbox = yield* Queue.unbounded<Ingress>();
       const now = yield* DateTime.now;
@@ -286,7 +284,6 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       let stopped = false;
       let alreadyInUse = false;
       let history = "";
-      let nextUnownedOrdinal = 1;
       const seen = new Set<string>();
       const turns = new Map<string, OrchestrationV2ProviderTurn>();
       const messages = new Map<string, OrchestrationV2ConversationMessage>();
@@ -465,44 +462,6 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             emit({ type: "turn_item.updated", driver: COPILOT_DRIVER, turnItem: item }),
           ),
         );
-      const putNotice = Effect.fn("CopilotAdapter.putNotice")(function* (
-        eventId: string,
-        title: string,
-        message: string,
-        owner?: ActiveTurn,
-        nativeId = eventId,
-        failed = false,
-      ) {
-        if (!native || !providerThread) return;
-        const now = yield* DateTime.now;
-        const key = `notice:${eventId}`;
-        const item: Extract<OrchestrationV2TurnItem, { type: "system_notice" }> = {
-          ...(owner
-            ? baseItem(owner, key, nativeId)
-            : {
-                id: TurnItemId.make(
-                  `${input.instanceId}:${open.threadId}:copilot:${native.sessionId}:${key}`,
-                ),
-                threadId: open.threadId,
-                runId: null,
-                nodeId: null,
-                providerThreadId: providerThread.id,
-                providerTurnId: null,
-                nativeItemRef: ref(nativeId),
-                parentItemId: null,
-                ordinal: nextUnownedOrdinal++,
-              }),
-          type: "system_notice",
-          title,
-          message: message.slice(0, 2_048),
-          status: failed ? "failed" : "completed",
-          startedAt: now,
-          completedAt: now,
-          updatedAt: now,
-        };
-        if (owner) yield* putItem(owner, key, item);
-        else yield* emit({ type: "turn_item.updated", driver: COPILOT_DRIVER, turnItem: item });
-      });
       const putExecution = Effect.fnUntraced(function* (
         key: string,
         execution: OrchestrationV2ModelExecution,
@@ -537,7 +496,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             providerThreadId: providerThread.id,
             providerTurnId: owner?.providerTurn.id ?? null,
             parentItemId: null,
-            ordinal: owner ? owner.nextOrdinal++ : nextUnownedOrdinal++,
+            ordinal: owner ? owner.nextOrdinal++ : executionItems.size + 1,
             title: execution.kind === "selection" ? "Routing selection" : "Model execution",
           }),
           type: "system_notice",
@@ -1038,70 +997,6 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
           yield* recordFusion(event);
           return;
         }
-        if (event.type === "command.queued" || event.type === "command.execute") {
-          yield* putNotice(
-            event.id,
-            event.type === "command.queued" ? "Queued command" : "Command requested",
-            event.data.command,
-            event.agentId ? taskOwners.get(event.agentId) : (active ?? lastTurn),
-            event.data.requestId,
-          );
-          return;
-        }
-        if (event.type === "system.notification") {
-          const kind = event.data.kind;
-          const taskId =
-            kind.type === "agent_completed" || kind.type === "agent_idle"
-              ? kind.agentId
-              : kind.type === "shell_completed" || kind.type === "shell_detached_completed"
-                ? kind.shellId
-                : undefined;
-          const previousOwner = taskId ? taskOwners.get(taskId) : undefined;
-          if (taskId) {
-            const refreshed = yield* refreshTasks().pipe(Effect.result);
-            if (refreshed._tag === "Failure") {
-              yield* Effect.logWarning("Copilot task notification refresh failed", {
-                notificationKind: kind.type,
-                detail: refreshed.failure.detail,
-              });
-              yield* putNotice(
-                `${event.id}:refresh`,
-                "Background task refresh failed",
-                refreshed.failure.detail,
-                previousOwner,
-                taskId,
-                true,
-              );
-            }
-          }
-          const title =
-            kind.type === "agent_completed"
-              ? "Background agent finished"
-              : kind.type === "agent_idle"
-                ? "Background agent idle"
-                : kind.type === "shell_completed" || kind.type === "shell_detached_completed"
-                  ? "Background shell finished"
-                  : "Copilot notification";
-          yield* putNotice(
-            event.id,
-            title,
-            event.data.content
-              .slice(0, 4_096)
-              .replace(/<\/?system_notification>/gi, "")
-              .trim(),
-            taskId
-              ? (taskOwners.get(taskId) ?? previousOwner)
-              : event.agentId
-                ? taskOwners.get(event.agentId)
-                : undefined,
-            taskId ?? event.id,
-            (kind.type === "agent_completed" && kind.status === "failed") ||
-              (kind.type === "shell_completed" &&
-                kind.exitCode !== undefined &&
-                kind.exitCode !== 0),
-          );
-          return;
-        }
         // Child events never advance or complete the root's user-turn lifecycle.
         if (event.agentId) {
           if (
@@ -1337,31 +1232,6 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
               event.data.error?.message ??
               ""
             ).slice(0, 20_000);
-            const contents = event.data.result?.contents;
-            const richOutput = contents?.some(
-              (content) =>
-                content.type === "image" ||
-                content.type === "audio" ||
-                content.type === "resource" ||
-                content.type === "resource_link",
-            )
-              ? { content: [{ type: "text", text: output }, ...contents] }
-              : undefined;
-            if (richOutput && previous.type !== "dynamic_tool") {
-              const key = `${event.data.toolCallId}:content`;
-              yield* putItem(turn, key, {
-                ...baseItem(turn, key, event.data.toolCallId),
-                parentItemId: previous.id,
-                type: "dynamic_tool",
-                title: "Tool content",
-                toolName: previous.title ?? "Tool content",
-                input: null,
-                output: richOutput,
-                status: event.data.success ? "completed" : "failed",
-                completedAt: now,
-                updatedAt: now,
-              });
-            }
             if (previous.type === "web_search") {
               yield* putItem(turn, event.data.toolCallId, {
                 ...previous,
@@ -1372,25 +1242,15 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
               });
               return;
             }
-            yield* putItem(
-              turn,
-              event.data.toolCallId,
-              previous.type === "dynamic_tool"
-                ? {
-                    ...previous,
-                    status: event.data.success ? "completed" : "failed",
-                    output: richOutput ?? output,
-                    completedAt: now,
-                    updatedAt: now,
-                  }
-                : {
-                    ...previous,
-                    status: event.data.success ? "completed" : "failed",
-                    ...(previous.type === "command_execution" ? { output } : {}),
-                    completedAt: now,
-                    updatedAt: now,
-                  },
-            );
+            yield* putItem(turn, event.data.toolCallId, {
+              ...previous,
+              status: event.data.success ? "completed" : "failed",
+              ...(previous.type === "dynamic_tool" || previous.type === "command_execution"
+                ? { output }
+                : {}),
+              completedAt: now,
+              updatedAt: now,
+            });
             return;
           }
           case "hook.start":
@@ -1926,7 +1786,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                   detail: "The selected Copilot session closed during the skill update.",
                 });
               options.onSkills?.(cwd, skillsFromSdk(updated.skills));
-            }, skillMutationSemaphore.withPermits(1)),
+            }),
           });
           yield* drain();
           return createdThread;

@@ -877,11 +877,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         JSON.stringify({
           providers: {
             copilot: { enabled: true, homePath: "/legacy-account", enableConfigDiscovery: false },
-            githubCopilot: {
-              enabled: false,
-              homePath: "/canonical-account",
-              hideInternalModels: true,
-            },
+            githubCopilot: { enabled: false, homePath: "/canonical-account" },
           },
         }),
       );
@@ -889,7 +885,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("githubCopilot")], {
         driver: ProviderDriverKind.make("githubCopilot"),
         enabled: false,
-        config: { homePath: "/canonical-account", hideInternalModels: true },
+        config: { homePath: "/canonical-account" },
       });
       assert.isUndefined(settings.providerInstances[ProviderInstanceId.make("copilot")]);
     }).pipe(Effect.provide(layerServerSettings())),
@@ -909,7 +905,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
               copilot_work: {
                 driver: "copilot",
                 enabled: true,
-                config: { homePath: "/work-account", hideInternalModels: true },
+                config: { homePath: "/work-account" },
               },
             },
           }),
@@ -918,7 +914,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("copilot_work")], {
           driver: ProviderDriverKind.make("githubCopilot"),
           enabled: true,
-          config: { homePath: "/work-account", hideInternalModels: true },
+          config: { homePath: "/work-account" },
         });
         const persisted = yield* fileSystem.readFileString(serverConfig.settingsPath);
         assert.include(persisted, '"githubCopilot"');

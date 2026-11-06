@@ -36,14 +36,6 @@ export const CopilotSettings = makeProviderSettingsSchema(
         providerSettingsForm: { control: "switch" },
       }),
     ),
-    hideInternalModels: Schema.Boolean.pipe(
-      Schema.withDecodingDefault(Effect.succeed(false)),
-      Schema.annotateKey({
-        title: "Hide internal models",
-        description: "Hide account models labelled internal only from model pickers.",
-        providerSettingsForm: { control: "switch" },
-      }),
-    ),
     enableFusion: Schema.Boolean.pipe(
       Schema.withDecodingDefault(Effect.succeed(false)),
       Schema.annotateKey({
@@ -58,14 +50,6 @@ export const CopilotSettings = makeProviderSettingsSchema(
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
   },
-  {
-    order: [
-      "binaryPath",
-      "homePath",
-      "enableFusion",
-      "enableConfigDiscovery",
-      "hideInternalModels",
-    ],
-  },
+  { order: ["binaryPath", "homePath", "enableFusion", "enableConfigDiscovery"] },
 );
 export type CopilotSettings = typeof CopilotSettings.Type;
