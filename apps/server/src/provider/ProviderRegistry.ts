@@ -332,6 +332,15 @@ const buildSnapshotSource = (instance: ProviderInstance): ProviderSnapshotSource
   streamChanges: instance.snapshot.streamChanges,
 });
 
+const applyModelFilter = (
+  provider: ServerProvider,
+  instance?: ProviderInstance,
+): ServerProvider => {
+  if (!instance?.filterModels || instance.driverKind !== provider.driver) return provider;
+  const models = instance.filterModels(provider.models);
+  return models === provider.models ? provider : { ...provider, models };
+};
+
 export const layer = Layer.effect(
   ProviderRegistry,
   Effect.gen(function* () {
@@ -349,6 +358,9 @@ export const layer = Layer.effect(
     );
 
     const bootInstances = yield* instanceRegistry.listInstances;
+    const bootInstancesById = new Map(
+      bootInstances.map((instance) => [instance.instanceId, instance] as const),
+    );
     const bootSources = bootInstances.map(buildSnapshotSource);
     const fallbackProviders = yield* loadProviders(bootSources);
     const fallbackByInstance = new Map<ProviderInstanceId, ServerProvider>();
@@ -392,7 +404,12 @@ export const layer = Layer.effect(
                   cachedDriver: cachedProvider.driver ?? null,
                 }).pipe(Effect.as(undefined as ServerProvider | undefined));
               }
-              return Effect.succeed(hydrateCachedProvider(correlation));
+              return Effect.succeed(
+                applyModelFilter(
+                  hydrateCachedProvider(correlation),
+                  bootInstancesById.get(source.instanceId),
+                ),
+              );
             }),
           );
         }),
@@ -428,6 +445,7 @@ export const layer = Layer.effect(
       new Map(),
     );
     const syncSemaphore = yield* Semaphore.make(1);
+    const skillUpdateSemaphores = new WeakMap<ProviderInstance, Semaphore.Semaphore>();
 
     const getLiveSources: Effect.Effect<ReadonlyArray<ProviderSnapshotSource>> = Ref.get(
       liveSubsRef,
@@ -474,6 +492,10 @@ export const layer = Layer.effect(
       },
     ) {
       const manifest = yield* manifestService.current;
+      const instances = yield* instanceRegistry.listInstances;
+      const instancesById = new Map(
+        instances.map((instance) => [instance.instanceId, instance] as const),
+      );
       const nextProvidersWithUpdateState = yield* Effect.forEach(
         nextProviders,
         applyProviderUpdateState,
@@ -494,9 +516,12 @@ export const layer = Layer.effect(
             updatedKeys.add(key);
             mergedProviders.set(
               key,
-              options?.replace === true
-                ? provider
-                : mergeProviderSnapshot(mergedProviders.get(key), provider),
+              applyModelFilter(
+                options?.replace === true
+                  ? provider
+                  : mergeProviderSnapshot(mergedProviders.get(key), provider),
+                instancesById.get(key),
+              ),
             );
           }
 
@@ -1012,47 +1037,67 @@ export const layer = Layer.effect(
       input: ServerProviderSkillControlInput,
     ) {
       const instance = yield* instanceRegistry.getInstance(input.instanceId);
-      const providers = yield* Ref.get(providersRef);
-      if (
-        !instance?.enabled ||
-        !providers.some((provider) => provider.instanceId === input.instanceId && provider.enabled)
-      )
+      if (!instance)
         return yield* new ServerProviderSkillControlError({
           instanceId: input.instanceId,
           reason: "instance_unavailable",
         });
-      if (!instance.orchestrationAdapter.setSkillEnabled || !instance.snapshotForCwd)
-        return yield* new ServerProviderSkillControlError({
-          instanceId: input.instanceId,
-          reason: "unsupported",
-        });
-      const { cwd } = yield* instance.orchestrationAdapter.setSkillEnabled(input);
-      const snapshot = yield* instance.snapshotForCwd(cwd).pipe(
-        Effect.mapError(
-          (cause) =>
-            new ServerProviderSkillControlError({
+      const semaphore = yield* Effect.sync(() => {
+        const existing = skillUpdateSemaphores.get(instance);
+        if (existing) return existing;
+        const created = Semaphore.makeUnsafe(1);
+        skillUpdateSemaphores.set(instance, created);
+        return created;
+      });
+      return yield* semaphore.withPermits(1)(
+        Effect.gen(function* () {
+          const providers = yield* Ref.get(providersRef);
+          if (
+            !instance.enabled ||
+            (yield* instanceRegistry.getInstance(input.instanceId)) !== instance ||
+            !providers.some(
+              (provider) => provider.instanceId === input.instanceId && provider.enabled,
+            )
+          )
+            return yield* new ServerProviderSkillControlError({
               instanceId: input.instanceId,
-              reason: "operation_failed",
-              cause,
-            }),
-        ),
-      );
-      if ((yield* instanceRegistry.getInstance(input.instanceId)) !== instance)
-        return yield* new ServerProviderSkillControlError({
-          instanceId: input.instanceId,
-          reason: "instance_unavailable",
-        });
-      const checkedAt = DateTime.formatIso(yield* DateTime.now);
-      return yield* updateProviders((providers) =>
-        providers.map((provider) =>
-          provider.instanceId === input.instanceId
-            ? upsertProviderWorkspaceSnapshot(provider, cwd, {
-                ...snapshot,
-                checkedAt,
-                slashCommandsPending: snapshot.slashCommandsPending ?? snapshot.status === "error",
-              })
-            : provider,
-        ),
+              reason: "instance_unavailable",
+            });
+          if (!instance.orchestrationAdapter.setSkillEnabled || !instance.snapshotForCwd)
+            return yield* new ServerProviderSkillControlError({
+              instanceId: input.instanceId,
+              reason: "unsupported",
+            });
+          const { cwd } = yield* instance.orchestrationAdapter.setSkillEnabled(input);
+          const snapshot = yield* instance.snapshotForCwd(cwd).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerProviderSkillControlError({
+                  instanceId: input.instanceId,
+                  reason: "operation_failed",
+                  cause,
+                }),
+            ),
+          );
+          if ((yield* instanceRegistry.getInstance(input.instanceId)) !== instance)
+            return yield* new ServerProviderSkillControlError({
+              instanceId: input.instanceId,
+              reason: "instance_unavailable",
+            });
+          const checkedAt = DateTime.formatIso(yield* DateTime.now);
+          return yield* updateProviders((providers) =>
+            providers.map((provider) =>
+              provider.instanceId === input.instanceId
+                ? upsertProviderWorkspaceSnapshot(provider, cwd, {
+                    ...snapshot,
+                    checkedAt,
+                    slashCommandsPending:
+                      snapshot.slashCommandsPending ?? snapshot.status === "error",
+                  })
+                : provider,
+            ),
+          );
+        }),
       );
     });
 

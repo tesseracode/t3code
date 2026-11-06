@@ -40,6 +40,8 @@ export interface ProviderInstance {
   readonly accentColor?: string | undefined;
   readonly enabled: boolean;
   readonly snapshot: ManagedServerProvider;
+  // Retained or hydrated catalogs must still obey the current instance's visibility settings.
+  readonly filterModels?: (models: ServerProvider["models"]) => ServerProvider["models"];
   readonly snapshotForCwd?: (
     cwd: string,
   ) => Effect.Effect<ProviderWorkspaceSnapshot, ProviderDriverError>;

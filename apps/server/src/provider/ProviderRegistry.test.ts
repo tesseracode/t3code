@@ -1006,6 +1006,8 @@ it.layer(
 
       it.effect("persists removals across failed refreshes and registry restarts", () =>
         Effect.gen(function* () {
+          const visibleModels = (models: ServerProvider["models"]) =>
+            models.filter((model) => model.slug !== "vega-alpha");
           const config = yield* ServerConfig.ServerConfig;
           const filePath = yield* resolveProviderStatusCachePath({
             cacheDir: config.providerStatusCacheDir,
@@ -1022,6 +1024,7 @@ it.layer(
             },
             displayName: undefined,
             enabled: true,
+            filterModels: visibleModels,
             snapshot: {
               resolveMaintenance: () =>
                 Effect.succeed(
@@ -1049,23 +1052,23 @@ it.layer(
               subscribeChanges: Effect.flatMap(PubSub.unbounded<void>(), PubSub.subscribe),
             },
           );
-          const retainedModels = [
+          const retainedModels = visibleModels([
             customModel,
             ...refreshedProvider.models.filter((model) => !model.isCustom),
-          ];
+          ]);
 
           for (const restarted of [false, true]) {
             yield* Effect.gen(function* () {
               const registry = yield* ProviderRegistry.ProviderRegistry;
               const expectedModels = restarted
                 ? retainedModels
-                : [customModel, ...cachedProvider.models];
+                : visibleModels([customModel, ...cachedProvider.models]);
               assert.deepStrictEqual((yield* registry.getProviders)[0]?.models, expectedModels);
 
               yield* registry.refreshInstance(instance.instanceId);
               assert.deepStrictEqual(
                 (yield* readProviderStatusCache(filePath))?.models,
-                restarted ? retainedModels : refreshedProvider.models,
+                restarted ? retainedModels : visibleModels(refreshedProvider.models),
               );
 
               yield* Ref.set(nextProvider, failedProvider);

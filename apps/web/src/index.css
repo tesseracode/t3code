@@ -2316,16 +2316,24 @@ code {
     #ec4899 90%,
     #ff6b6b 100%
   );
+}
+
+.xhigh-frame {
+  --xhigh-spectrum: linear-gradient(120deg, #22d3ee 0%, #34d399 45%, #10b981 70%, #22d3ee 100%);
+}
+
+.ultrathink-frame,
+.xhigh-frame {
   position: relative;
 }
 
-.ultrathink-frame::before {
+.ultrathink-frame::before,
+.xhigh-frame::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   padding: 2px;
-  background-image: var(--ultrathink-spectrum);
   background-size: 220% 220%;
   background-position: 0% 50%;
   pointer-events: none;
@@ -2340,11 +2348,21 @@ code {
   mask-composite: exclude;
 }
 
-.ultrathink-frame > * {
+.ultrathink-frame::before {
+  background-image: var(--ultrathink-spectrum);
+}
+
+.xhigh-frame::before {
+  background-image: var(--xhigh-spectrum);
+}
+
+.ultrathink-frame > *,
+.xhigh-frame > * {
   position: relative;
 }
 
-.ultrathink-chroma {
+.ultrathink-chroma,
+.xhigh-chroma {
   filter: saturate(1.2);
 }
 

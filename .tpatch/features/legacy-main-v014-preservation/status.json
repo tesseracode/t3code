@@ -1,0 +1,51 @@
+{
+  "id": "legacy-main-v014-preservation",
+  "slug": "legacy-main-v014-preservation",
+  "title": "Preserve legacy main provider and composer behavior on v0.1.4",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-06T05:49:53Z",
+  "updated_at": "2026-11-06T06:34:16Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-06T06:34:16Z",
+    "base_commit": "4a34c4941f17ae85cb68f55f89da80dc9b54abc8",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-sdk-runtime-upgrade",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-skill-controls-v014",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-hide-internal-models",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-command-events",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "readme-copilot-notice",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "effort-theming",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-resource-events",
+      "kind": "supersedes"
+    }
+  ]
+}

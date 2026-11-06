@@ -89,7 +89,9 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
   > = [];
   let permissionResponse = async (): Promise<{ success: boolean }> => ({ success: true });
   let background: Awaited<ReturnType<SessionHandle["rpc"]["tasks"]["list"]>> = { tasks: [] };
+  let taskFailure: Error | undefined;
   let skills: Awaited<ReturnType<SessionHandle["rpc"]["skills"]["list"]>> = { skills: [] };
+  let readSkills: (() => Promise<typeof skills>) | undefined;
   let skillFailure: Error | undefined;
   let catalog: ModelCatalog = { models: [] };
   let current: Awaited<ReturnType<SessionHandle["rpc"]["model"]["getCurrent"]>> = {
@@ -143,7 +145,7 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
         }),
       },
       skills: {
-        list: async () => skills,
+        list: () => readSkills?.() ?? Promise.resolve(skills),
         enable: async ({ name }) => {
           if (skillFailure) throw skillFailure;
           skills = {
@@ -161,7 +163,13 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
           };
         },
       },
-      tasks: { list: async () => background, cancel: async () => ({ cancelled: true }) },
+      tasks: {
+        list: async () => {
+          if (taskFailure) throw taskFailure;
+          return background;
+        },
+        cancel: async () => ({ cancelled: true }),
+      },
       permissions: {
         handlePendingPermissionRequest: async (
           response: Parameters<
@@ -228,8 +236,14 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
     setTasks: (tasks: typeof background) => {
       background = tasks;
     },
+    failTasks: (error?: Error) => {
+      taskFailure = error;
+    },
     setSkills: (value: typeof skills) => {
       skills = value;
+    },
+    setSkillsRead: (read: typeof readSkills) => {
+      readSkills = read;
     },
     get skills() {
       return skills.skills;
@@ -403,6 +417,7 @@ describe("native Copilot V2", () => {
           );
           if (!adapter.setSkillEnabled)
             throw new Error("Copilot instance skill controls are missing");
+          const setSkillEnabled = adapter.setSkillEnabled;
           const unavailable = yield* adapter
             .setSkillEnabled({ skillName: "review", enabled: false })
             .pipe(Effect.result);
@@ -435,6 +450,31 @@ describe("native Copilot V2", () => {
           assert.deepEqual(inventories.get("/workspace/first"), []);
           yield* adapter.setSkillEnabled({ skillName: "review", enabled: true });
           assert.equal(inventories.get("/workspace/first")?.[0]?.name, "review");
+          const readStarted = Promise.withResolvers<void>();
+          const releaseRead = Promise.withResolvers<void>();
+          first.setSkillsRead(async () => {
+            const response = { skills: first.skills.map((skill) => ({ ...skill })) };
+            readStarted.resolve();
+            await releaseRead.promise;
+            return response;
+          });
+          yield* Effect.gen(function* () {
+            const disabling = yield* setSkillEnabled({ skillName: "review", enabled: false }).pipe(
+              Effect.forkScoped,
+            );
+            yield* Effect.promise(() => readStarted.promise);
+            const enabling = yield* setSkillEnabled({
+              skillName: "review",
+              enabled: true,
+            }).pipe(Effect.forkScoped({ startImmediately: true }));
+            assert.isFalse(first.skills[0]?.enabled);
+            releaseRead.resolve();
+            yield* Fiber.join(disabling);
+            yield* Fiber.join(enabling);
+            assert.isTrue(first.skills[0]?.enabled);
+            assert.equal(inventories.get("/workspace/first")?.[0]?.name, "review");
+          }).pipe(Effect.ensuring(Effect.sync(() => releaseRead.resolve())));
+          first.setSkillsRead(undefined);
 
           const secondScope = yield* Effect.acquireRelease(Scope.make(), (scope) =>
             Scope.close(scope, Exit.succeed(undefined)),
@@ -1895,7 +1935,11 @@ describe("native Copilot V2", () => {
             "run-1",
           );
           fake.setTasks({ tasks: [{ ...task, status: "idle", latestResponse: "Ready" }] });
-          fake.emit("session.background_tasks_changed");
+          fake.emit("system.notification", {
+            content: "<system_notification>Ready</system_notification>",
+            kind: { type: "agent_idle", agentId: "bg-task", agentType: "explore" },
+          });
+          assert.deepEqual((yield* drain()).providerThread.pendingBackgroundTasks, []);
           const idle = yield* takeEvent(
             (event) => event.type === "subagent.updated" && event.subagent.status === "idle",
           );
@@ -1919,7 +1963,17 @@ describe("native Copilot V2", () => {
           assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
           yield* start(2);
           fake.setTasks({ tasks: [{ ...task, status: "completed", result: "Finished" }] });
-          fake.emit("assistant.idle", {}, "bg-task");
+          fake.emit("system.notification", {
+            content: "<system_notification>Finished</system_notification>",
+            kind: {
+              type: "agent_completed",
+              agentId: "bg-task",
+              agentType: "explore",
+              status: "completed",
+              description: "Inspect code",
+            },
+          });
+          assert.deepEqual((yield* drain()).providerThread.pendingBackgroundTasks, []);
           const completed = yield* takeEvent(
             (event) => event.type === "subagent.updated" && event.subagent.status === "completed",
           );
@@ -1928,6 +1982,19 @@ describe("native Copilot V2", () => {
             "run-1",
           );
           assert.equal((yield* drain()).providerTurns[1]?.status, "running");
+          const completionNotice = yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.title === "Background agent finished",
+          );
+          if (
+            completionNotice.type !== "turn_item.updated" ||
+            completionNotice.turnItem.type !== "system_notice"
+          )
+            return assert.fail("Expected native completion notice.");
+          assert.equal(completionNotice.turnItem.runId, "run-1");
+          assert.equal(completionNotice.turnItem.message, "Finished");
           fake.setTasks({
             tasks: [
               {
@@ -1947,8 +2014,29 @@ describe("native Copilot V2", () => {
             "command",
           );
           assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
+          fake.failTasks(new Error("Fixture task lookup failed"));
+          fake.emit("system.notification", {
+            content: "<system_notification>Shell stopped</system_notification>",
+            kind: { type: "shell_completed", shellId: "idle-shell", exitCode: 1 },
+          });
+          yield* drain();
+          const failedRefresh = yield* takeEvent(
+            (event) =>
+              event.type === "turn_item.updated" &&
+              event.turnItem.type === "system_notice" &&
+              event.turnItem.title === "Background task refresh failed",
+          );
+          assert.equal(
+            failedRefresh.type === "turn_item.updated" ? failedRefresh.turnItem.status : null,
+            "failed",
+          );
+          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
+          fake.failTasks();
           fake.setTasks({ tasks: [] });
-          fake.emit("session.background_tasks_changed");
+          fake.emit("system.notification", {
+            content: "<system_notification>Shell finished</system_notification>",
+            kind: { type: "shell_detached_completed", shellId: "idle-shell" },
+          });
           yield* drain();
           assert.isFalse(yield* runtime.hasPendingBackgroundWork!);
           fake.emit("session.idle");
@@ -1961,8 +2049,43 @@ describe("native Copilot V2", () => {
     provide(
       Effect.gen(function* () {
         const fake = fakeSdk();
-        const { start, drain, takeEvent } = yield* setup(fake);
+        const { start, drain, takeEvent, emitted } = yield* setup(fake);
         yield* start();
+        fake.emit("command.queued", { requestId: "queued-command", command: "/fixture" });
+        fake.emit("command.execute", {
+          requestId: "executing-command",
+          command: "/fixture check",
+          commandName: "fixture",
+          args: "check",
+        });
+        yield* drain();
+        yield* takeEvent(
+          (event) =>
+            event.type === "turn_item.updated" &&
+            event.turnItem.type === "system_notice" &&
+            event.turnItem.title === "Command requested",
+        );
+        const notices = emitted.flatMap((event) =>
+          event.type === "turn_item.updated" && event.turnItem.type === "system_notice"
+            ? [event.turnItem]
+            : [],
+        );
+        assert.isTrue(
+          notices.some(
+            (notice) =>
+              notice.title === "Queued command" &&
+              notice.message === "/fixture" &&
+              notice.runId === "run-1",
+          ),
+        );
+        assert.isTrue(
+          notices.some(
+            (notice) =>
+              notice.title === "Command requested" &&
+              notice.message === "/fixture check" &&
+              notice.runId === "run-1",
+          ),
+        );
         fake.emit("tool.execution_start", {
           toolCallId: "shell",
           toolName: "bash",
@@ -2020,6 +2143,32 @@ describe("native Copilot V2", () => {
             : "";
         assert.include(input, "[redacted]");
         assert.notInclude(input, "do-not-persist");
+        const content = [
+          { type: "image", data: "aW1hZ2U=", mimeType: "image/png" },
+          { type: "audio", data: "YXVkaW8=", mimeType: "audio/wav" },
+          { type: "resource_link", name: "Fixture file", uri: "file:///workspace/fixture.txt" },
+          {
+            type: "resource",
+            resource: { uri: "fixture://notes", mimeType: "text/plain", text: "Fixture notes" },
+          },
+        ];
+        fake.emit("tool.execution_complete", {
+          toolCallId: "mcp",
+          success: true,
+          result: { content: "Fixture media", contents: content },
+        });
+        const rich = yield* takeEvent(
+          (event) =>
+            event.type === "turn_item.updated" &&
+            event.turnItem.type === "dynamic_tool" &&
+            event.turnItem.status === "completed",
+        );
+        assert.deepEqual(
+          rich.type === "turn_item.updated" && rich.turnItem.type === "dynamic_tool"
+            ? rich.turnItem.output
+            : null,
+          { content: [{ type: "text", text: "Fixture media" }, ...content] },
+        );
         fake.emit("session.idle");
         yield* drain();
       }),
