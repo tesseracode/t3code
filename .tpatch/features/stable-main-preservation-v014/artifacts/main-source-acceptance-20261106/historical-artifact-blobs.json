@@ -1,0 +1,44 @@
+[
+  {
+    "original": ".tpatch/features/copilot-cli-provider/artifacts/incremental.patch",
+    "destination": ".tpatch/history/main-v0.0.23-870f7a197/features/copilot-cli-provider/artifacts/incremental.patch",
+    "blob": "bbd31925c4657fc59ee2650d09e5701ff743830e",
+    "mode": "100644"
+  },
+  {
+    "original": ".tpatch/features/copilot-cli-provider/artifacts/recipe-stale.json",
+    "destination": ".tpatch/history/main-v0.0.23-870f7a197/features/copilot-cli-provider/artifacts/recipe-stale.json",
+    "blob": "1f3b3c4df60dc0522f00e1fb99277119d2cb7afa",
+    "mode": "100644"
+  },
+  {
+    "original": ".tpatch/features/session-search/artifacts/incremental.patch",
+    "destination": ".tpatch/history/main-v0.0.23-870f7a197/features/session-search/artifacts/incremental.patch",
+    "blob": "9b901ca847037ede94ba88e1c8e003f021a9a976",
+    "mode": "100644"
+  },
+  {
+    "original": ".tpatch/features/session-search/artifacts/recipe-stale.json",
+    "destination": ".tpatch/history/main-v0.0.23-870f7a197/features/session-search/artifacts/recipe-stale.json",
+    "blob": "d86dbf15fc342504b7b27d86f8eca955f1825873",
+    "mode": "100644"
+  },
+  {
+    "original": ".tpatch/features/windows-wsl-support/artifacts/apply-recipe.json",
+    "destination": ".tpatch/history/main-v0.0.23-870f7a197/features/windows-wsl-support/artifacts/apply-recipe.json",
+    "blob": "5b504d92937053aed92a672df870696fcc7a8500",
+    "mode": "100644"
+  },
+  {
+    "original": ".tpatch/features/windows-wsl-support/artifacts/incremental.patch",
+    "destination": ".tpatch/history/main-v0.0.23-870f7a197/features/windows-wsl-support/artifacts/incremental.patch",
+    "blob": "a3c4f5314fd7180121be4248ac69c432836d3f0c",
+    "mode": "100644"
+  },
+  {
+    "original": ".tpatch/features/windows-wsl-support/artifacts/recipe-stale.json",
+    "destination": ".tpatch/history/main-v0.0.23-870f7a197/features/windows-wsl-support/artifacts/recipe-stale.json",
+    "blob": "a2d2d26b6a59b96f1a1fed8f684263f25edb642c",
+    "mode": "100644"
+  }
+]
