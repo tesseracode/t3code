@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "feature": "stable-main-preservation-v014",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_34114cf772b1",
+      "kind": "record",
+      "patch_sha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+      "git_patch_id": "6d83adfc56185a1d59ce6d51f99de22826969e6c",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "5751f36722f20c9e974433092d55dfe85e017ed5",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "README.md",
+          "apps/server/src/auth/RpcAuthorization.test.ts",
+          "apps/server/src/auth/RpcAuthorization.ts",
+          "apps/server/src/observability/RpcInstrumentation.ts",
+          "apps/server/src/provider/ProviderRegistry.test.ts",
+          "apps/server/src/provider/ProviderRegistry.ts",
+          "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+          "apps/server/src/provider/testUtils/providerRegistryMock.ts",
+          "apps/server/src/serverSettings.test.ts",
+          "apps/server/src/ws.ts",
+          "apps/web/src/components/chat/composerProviderState.tsx",
+          "apps/web/src/index.css",
+          "docs/user/providers-copilot.md",
+          "packages/client-runtime/src/state/commandPermissions.test.ts",
+          "packages/contracts/src/clientRpcPermissions.ts",
+          "packages/contracts/src/rpc.ts",
+          "packages/contracts/src/server.ts",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts",
+          "packages/provider-copilot/src/server/driver.ts",
+          "packages/provider-copilot/src/server/status.test.ts",
+          "packages/provider-copilot/src/server/status.ts",
+          "packages/provider-copilot/src/settings.ts",
+          "packages/provider-core/src/server/ProviderAdapter.ts",
+          "packages/provider-core/src/server/driver.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "README.md",
+        "apps/server/src/auth/RpcAuthorization.test.ts",
+        "apps/server/src/auth/RpcAuthorization.ts",
+        "apps/server/src/observability/RpcInstrumentation.ts",
+        "apps/server/src/provider/ProviderRegistry.test.ts",
+        "apps/server/src/provider/ProviderRegistry.ts",
+        "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+        "apps/server/src/provider/testUtils/providerRegistryMock.ts",
+        "apps/server/src/serverSettings.test.ts",
+        "apps/server/src/ws.ts",
+        "apps/web/src/components/chat/composerProviderState.tsx",
+        "apps/web/src/index.css",
+        "docs/user/providers-copilot.md",
+        "packages/client-runtime/src/state/commandPermissions.test.ts",
+        "packages/contracts/src/clientRpcPermissions.ts",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/server.ts",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-copilot/src/server/driver.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/status.ts",
+        "packages/provider-copilot/src/settings.ts",
+        "packages/provider-core/src/server/ProviderAdapter.ts",
+        "packages/provider-core/src/server/driver.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 24,
+          "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        },
+        {
+          "slug": "copilot-sdk-runtime-upgrade",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+          "parent_recipe_sha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad"
+        },
+        {
+          "slug": "copilot-skill-controls-v014",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "44403b651c2eaec8b0c0215b465b2ff1bbfe04eeb7af0b5053a2e003e6632c69",
+          "parent_recipe_sha256": "ea944c76bbb53821e4a6fd13a61b188879866ca1ecdd80affec40aee798aa833"
+        },
+        {
+          "slug": "legacy-main-v014-preservation",
+          "kind": "supersedes",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "006a8d9de5683351103abf2a5673a34bc963d41825a6d48dd257439c95c9b247",
+          "parent_recipe_sha256": "4d38e209121f62335df8ceeb6cf17a1596112e50a428752cad706e9a50a6531b"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

@@ -147,6 +147,10 @@ export function getComposerProviderState(input: ComposerProviderStateInput): Com
   const ultrathinkActive =
     (primarySelectDescriptor?.promptInjectedValues?.length ?? 0) > 0 &&
     promptInjectionState === "ultrathink";
+  const extraHighActive =
+    (provider === "codex" || provider === "githubCopilot") &&
+    primarySelectDescriptor?.id === "reasoningEffort" &&
+    primaryValue === "xhigh";
 
   return {
     provider,
@@ -161,7 +165,13 @@ export function getComposerProviderState(input: ComposerProviderStateInput): Com
           composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.07)_inset]",
           modelPickerIconClassName: "ultrathink-chroma",
         }
-      : {}),
+      : extraHighActive
+        ? {
+            composerFrameClassName: "xhigh-frame",
+            composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.07)_inset]",
+            modelPickerIconClassName: "xhigh-chroma",
+          }
+        : {}),
   };
 }
 

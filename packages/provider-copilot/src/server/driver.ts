@@ -17,7 +17,7 @@ import {
 import { CopilotSettings } from "../settings.ts";
 import { makeAdapter } from "./adapter.ts";
 import { createClient, resolveClientConfiguration } from "./client.ts";
-import { checkStatus, pendingSnapshot, skillsFromSdk } from "./status.ts";
+import { checkStatus, filterModelsForSettings, pendingSnapshot, skillsFromSdk } from "./status.ts";
 import { makeTextGeneration } from "./textGeneration.ts";
 
 const driverKind = ProviderDriverKind.make("githubCopilot");
@@ -181,6 +181,7 @@ export const CopilotDriver: ProviderDriver<CopilotSettings, CopilotDriverEnv> = 
       enabled,
       continuationIdentity,
       snapshot,
+      filterModels: (models) => filterModelsForSettings(models, settings),
       snapshotForCwd,
       orchestrationAdapter,
       textGeneration: makeTextGeneration(settings, processEnv),

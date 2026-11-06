@@ -1,0 +1,26 @@
+Focused restoration qualification
+
+Final command: vp run check:changed 98213a256b
+Result: passed format, lint, both Knip passes, server GraphQL generation,
+33 affected-package typechecks and 225 adjacent tests in 12 files.
+No repo-wide checks were run.
+
+The source was restored exactly from the reviewed preservation candidate.
+Tracked product blobs and file modes match that candidate except the separately
+recorded patch-flow guidance about exact authored-recipe proof.
+
+Retained failing-first cases cover native skill ownership/errors, custom SDK
+slug collisions, serialized skill updates, fresh/cached internal-model
+visibility, saved configuration, notification task refresh, command
+observations and typed rich tool results. Both independent review findings
+were corrected before the reviewed source was restored.
+
+Retained isolated real-client qualification proves static extra-high framing,
+ordinary-effort reverse state, saved filter configuration and zero agent runs.
+The real SDK no-send fixture proves selected-session skill ownership with no
+assistant turns and successful native client/session cleanup.
+
+Earlier direct recipe failures remain preserved. This full root supersedes
+the two earlier unqualified restoration records without editing their recipes,
+canonical bytes, generations or original landing commits. Exact committed
+recipe/canonical/tree/mode proofs and native verdicts are separate final gates.

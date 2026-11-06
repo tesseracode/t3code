@@ -12,6 +12,7 @@ import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthPreviewOperateScope,
+  AuthProvidersManageScope,
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
   ThreadId,
@@ -96,11 +97,14 @@ describe("command permissions", () => {
     ),
   );
 
-  it.effect("requires the destination settings grant to run storage cleanup", () =>
+  it.effect.each([
+    { method: WS_METHODS.serverRunStorageCleanup, required: AuthSettingsWriteScope },
+    { method: WS_METHODS.serverSetSkillEnabled, required: AuthProvidersManageScope },
+  ])("requires the destination $required grant for $method", ({ method, required }) =>
     Effect.scoped(
       Effect.gen(function* () {
         const registry = yield* setup;
-        const cleanup = createCommandPermissions(runtime, WS_METHODS.serverRunStorageCleanup);
+        const cleanup = createCommandPermissions(runtime, method);
         registry.set(sessions(env), AsyncResult.success(grant(true)));
         expect(registry.get(cleanup.permissionAtom(env))).toBe(false);
         expect((yield* cleanup.authorize(registry, env).pipe(Effect.flip))._tag).toBe(
@@ -110,8 +114,8 @@ describe("command permissions", () => {
           sessions(env),
           AsyncResult.success({
             ...grant(true),
-            scopes: [AuthSettingsWriteScope],
-            permissions: [AuthSettingsWriteScope],
+            scopes: [required],
+            permissions: [required],
           }),
         );
         expect(registry.get(cleanup.permissionAtom(env))).toBe(true);

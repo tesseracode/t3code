@@ -13,6 +13,7 @@ import {
   NonNegativeInt,
   PositiveInt,
   ProjectId,
+  ProviderSessionId,
   ThreadId,
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
@@ -862,6 +863,40 @@ export const ServerProviderUpdateInput = Schema.Struct({
   instanceId: Schema.optionalKey(ProviderInstanceId),
 });
 export type ServerProviderUpdateInput = typeof ServerProviderUpdateInput.Type;
+
+export const ServerProviderSkillControlInput = Schema.Struct({
+  instanceId: ProviderInstanceId,
+  skillName: TrimmedNonEmptyString,
+  enabled: Schema.Boolean,
+  providerSessionId: Schema.optionalKey(ProviderSessionId),
+});
+export type ServerProviderSkillControlInput = typeof ServerProviderSkillControlInput.Type;
+
+export class ServerProviderSkillControlError extends Schema.TaggedError<ServerProviderSkillControlError>()(
+  "ServerProviderSkillControlError",
+  {
+    instanceId: ProviderInstanceId,
+    reason: Schema.Literals([
+      "instance_unavailable",
+      "unsupported",
+      "session_unavailable",
+      "session_required",
+      "operation_failed",
+    ]),
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override get message(): string {
+    const descriptions = {
+      instance_unavailable: "The provider instance is unavailable.",
+      unsupported: "This provider does not support skill controls.",
+      session_unavailable: "The selected provider session is not active.",
+      session_required: "Multiple sessions are active; select a providerSessionId.",
+      operation_failed: "The native skill update or inventory refresh failed.",
+    };
+    return `Provider skill update failed for ${this.instanceId}: ${descriptions[this.reason]}`;
+  }
+}
 
 export class ServerProviderUpdateError extends Schema.TaggedError<ServerProviderUpdateError>()(
   "ServerProviderUpdateError",

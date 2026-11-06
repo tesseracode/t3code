@@ -50,6 +50,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as OpenCodeRuntime from "@t3tools/provider-opencode/server/OpenCodeRuntime";
 import * as OpenCodeServerLedger from "@t3tools/provider-opencode/server/OpenCodeServerLedger";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
+import { ProviderAdapterV2 } from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderInstanceRegistryHydration from "./ProviderInstanceRegistryHydration.ts";
 import * as PortScanner from "../preview/PortScanner.ts";
 import * as ServerConfig from "../config.ts";
@@ -1005,6 +1006,8 @@ it.layer(
 
       it.effect("persists removals across failed refreshes and registry restarts", () =>
         Effect.gen(function* () {
+          const visibleModels = (models: ServerProvider["models"]) =>
+            models.filter((model) => model.slug !== "vega-alpha");
           const config = yield* ServerConfig.ServerConfig;
           const filePath = yield* resolveProviderStatusCachePath({
             cacheDir: config.providerStatusCacheDir,
@@ -1021,6 +1024,7 @@ it.layer(
             },
             displayName: undefined,
             enabled: true,
+            filterModels: visibleModels,
             snapshot: {
               resolveMaintenance: () =>
                 Effect.succeed(
@@ -1048,23 +1052,23 @@ it.layer(
               subscribeChanges: Effect.flatMap(PubSub.unbounded<void>(), PubSub.subscribe),
             },
           );
-          const retainedModels = [
+          const retainedModels = visibleModels([
             customModel,
             ...refreshedProvider.models.filter((model) => !model.isCustom),
-          ];
+          ]);
 
           for (const restarted of [false, true]) {
             yield* Effect.gen(function* () {
               const registry = yield* ProviderRegistry.ProviderRegistry;
               const expectedModels = restarted
                 ? retainedModels
-                : [customModel, ...cachedProvider.models];
+                : visibleModels([customModel, ...cachedProvider.models]);
               assert.deepStrictEqual((yield* registry.getProviders)[0]?.models, expectedModels);
 
               yield* registry.refreshInstance(instance.instanceId);
               assert.deepStrictEqual(
                 (yield* readProviderStatusCache(filePath))?.models,
-                restarted ? retainedModels : refreshedProvider.models,
+                restarted ? retainedModels : visibleModels(refreshedProvider.models),
               );
 
               yield* Ref.set(nextProvider, failedProvider);
@@ -1424,7 +1428,19 @@ it.layer(
             applyUsageLimits: () => Effect.void,
           },
           snapshotForCwd: () => Ref.get(scanResult),
-          orchestrationAdapter: {} as ProviderInstance["orchestrationAdapter"],
+          orchestrationAdapter: yield* ProviderAdapterV2.pipe(
+            Effect.provide(
+              Layer.mock(ProviderAdapterV2)({
+                instanceId,
+                driver,
+                setSkillEnabled: ({ enabled }) =>
+                  Ref.update(scanResult, (current) => ({
+                    ...current,
+                    skills: enabled ? laterSkills : [],
+                  })).pipe(Effect.as({ cwd: "/workspace" })),
+              }),
+            ),
+          ),
           textGeneration: {} as ProviderInstance["textGeneration"],
         };
         const layerInstanceRegistry = Layer.succeed(
@@ -1471,6 +1487,31 @@ it.layer(
           const provider = (yield* registry.getProviders)[0];
           assert.strictEqual(provider?.status, "error");
           assert.strictEqual(provider?.message, unhealthyProvider.message);
+
+          const mutationInput = { instanceId, skillName: "later" };
+          const disabled = yield* registry.setSkillEnabled({
+            ...mutationInput,
+            enabled: false,
+          });
+          assert.deepStrictEqual(disabled[0]?.workspaceSnapshots?.[0]?.skills, []);
+          const enabled = yield* registry.setSkillEnabled({
+            ...mutationInput,
+            enabled: true,
+          });
+          assert.deepStrictEqual(enabled[0]?.workspaceSnapshots?.[0]?.skills, laterSkills);
+          assert.strictEqual(enabled[0]?.status, "error");
+          assert.deepStrictEqual(enabled[0]?.workspaceSnapshots?.[0]?.slashCommands, [
+            COMPACT_SLASH_COMMAND,
+          ]);
+          const missing = yield* registry
+            .setSkillEnabled({
+              ...mutationInput,
+              instanceId: ProviderInstanceId.make("absent"),
+              enabled: false,
+            })
+            .pipe(Effect.flip);
+          assert.strictEqual(missing.reason, "instance_unavailable");
+          assert.deepStrictEqual((yield* workspaceOf)?.skills, laterSkills);
 
           yield* Ref.set(scanResult, { ...unhealthyProvider, skills: [] });
           yield* registry.refreshWorkspaceSnapshot({ instanceId, cwd: "/workspace" });
