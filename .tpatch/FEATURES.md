@@ -78,6 +78,12 @@
 | `wsl-runtime-executable-modes` | Normalize and verify executable permissions for Linux command payloads after extracting Windows-built wsl-runtime.tar.gz. When Copilot SDK is present, require and chmod the target Linux Copilot, rg, and tgrep executables before promoting the runtime; reject missing or non-executable payloads and invalidate warm caches whose modes are broken. | applied | unknown |
 | `wsl-runtime-fixture-newlines` | Correct the WSL executable-mode test fixture so its Copilot, rg, and tgrep stub commands explicitly emit the newline-delimited output asserted by the executed-shell test. | applied | unknown |
 
+## Unapplied
+
+| Slug | Title | State | Note |
+|------|-------|-------|------|
+| `legacy-main-v014-preservation` | Preserve legacy main provider and composer behavior on v0.1.4 | unapplied | Patch removed from working tree; audit: artifacts/unapply/ua_384b4d7e1c5b/unapply-session.json |
+
 ## Rejected
 
 | Slug | Reason | Evidence | Note |
