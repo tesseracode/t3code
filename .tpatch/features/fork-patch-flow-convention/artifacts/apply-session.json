@@ -1,8 +1,8 @@
 {
   "slug": "fork-patch-flow-convention",
-  "completed_at": "2026-11-06T05:05:47Z",
-  "base_commit": "98213a256b069ed510aa07f92c6632fc5f9ef146",
+  "completed_at": "2026-11-06T06:42:30Z",
+  "base_commit": "a00bb6f8ad50088594957a6cc23149ae1ec19de6",
   "has_patch": true,
   "validation_status": "passed",
-  "validation_notes": "Read current policy and native lifecycle; reviewed pinned-baseline, main-first, late-feature, exact-replay, backport and separate release-gate semantics. No runtime changes."
+  "validation_notes": "Exact previously reviewed documentation postimage restored; recipe regenerated after formatting."
 }

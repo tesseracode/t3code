@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-11-06T05:05:47Z
+**Timestamp**: 2026-11-06T06:42:30Z
 
 ## Notes
 
-Read current policy and native lifecycle; reviewed pinned-baseline, main-first, late-feature, exact-replay, backport and separate release-gate semantics. No runtime changes.
+Exact previously reviewed documentation postimage restored; recipe regenerated after formatting.
