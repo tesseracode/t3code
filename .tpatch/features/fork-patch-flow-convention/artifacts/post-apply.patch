@@ -54,10 +54,10 @@ index 0c4c3c774..8517b5abc 100644
  patches. All other tracked differences require a recorded root or an explicit
 diff --git a/docs/operations/patch-flow.md b/docs/operations/patch-flow.md
 new file mode 100644
-index 000000000..9fb6bfb37
+index 000000000..7ec19c096
 --- /dev/null
 +++ b/docs/operations/patch-flow.md
-@@ -0,0 +1,127 @@
+@@ -0,0 +1,128 @@
 +# Fork patch flow
 +
 +This is the operating workflow for [maintaining the fork](../internals/fork-maintenance.md).
@@ -100,8 +100,9 @@ index 000000000..9fb6bfb37
 +and the coauthor in the same final trailer paragraph. Check Git's parsed
 +trailers and run feature verification again after the landing is reachable:
 +pre-landing verification cannot validate the eventual commit message.
-+Format source before recording. Regenerate retained write-file recipes after
-+source edits, then independently compare recipe and canonical replay with the
++Format source before recording. Rebuild retained write-file recipes from final
++source after edits and confirm that their bytes changed; a regeneration flag
++alone is not proof. Independently compare recipe and canonical replay with the
 +actual landing; native verification alone does not prove those trees match.
 +
 +Before acceptance, account for changes accepted into `main` since the feature

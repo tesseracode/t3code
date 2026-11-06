@@ -1,8 +1,8 @@
 # Implementation Record: fork-patch-flow-convention
 
-**Recorded**: 2026-11-06T06:44:11Z
+**Recorded**: 2026-11-06T06:45:16Z
 **Files changed**: 2
-**Patch size**: 11418 bytes
+**Patch size**: 11499 bytes
 **Capture mode**: working-tree-all
 **Pathspecs**: docs/internals/fork-maintenance.md,docs/operations/patch-flow.md
 
@@ -18,7 +18,7 @@
 - **capture_mode**: `working-tree-all`
 - **pathspecs**: docs/internals/fork-maintenance.md, docs/operations/patch-flow.md
 - **claim_ids**: (none)
-- **base_commit**: `090c23a2eb03bb63b6ae247896c63fc0aad1bb62`
+- **base_commit**: `b898dfc62539010245036d8ed4b5675f77136deb`
 - **upper_commit**: `working-tree`
 
 ## Replay Instructions

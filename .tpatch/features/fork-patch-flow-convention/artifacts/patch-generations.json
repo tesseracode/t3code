@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "fork-patch-flow-convention",
-  "current_generation": 3,
+  "current_generation": 4,
   "generations": [
     {
       "generation": 1,
@@ -93,9 +93,54 @@
       "git_patch_id": "8b912df206cdd2dd177d38696a8e8cd4051d1c92",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "3247ba528e65a4641288ab773ead28b802df6aa55808f1db41f883937505b17a",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/004-record.patch",
       "base_commit": "090c23a2eb03bb63b6ae247896c63fc0aad1bb62",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/internals/fork-maintenance.md",
+          "docs/operations/patch-flow.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/internals/fork-maintenance.md",
+        "docs/operations/patch-flow.md"
+      ],
+      "dependencies": [
+        {
+          "slug": "fork-maintenance-policy",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "fba7028e530ab08be19b311c57a0d89f8ef1aefc4a1c7cbe7bec5ba5e4c12368",
+          "parent_recipe_sha256": "cf16f6c48634a74dead24c2cbe29a014deb184c2254b5e63b43dccbf9b1d3ecf"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 4,
+      "generation_id": "pg_7b71ab5b5152",
+      "kind": "amend-refresh",
+      "patch_sha256": "3f0b49bc0d03de3d9779dba837a6daf6d01a687eefdf041e768b6068ee3f928f",
+      "git_patch_id": "2c6f5b02851ebade7061ade28f51bb73ebaa293f",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "07230a117a509df23c551305faa973f8906f01ba2e1eb85562108adc6e1e1829",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/006-record.patch",
+      "base_commit": "b898dfc62539010245036d8ed4b5675f77136deb",
       "upper": {
         "kind": "working-tree",
         "ref": "working-tree",

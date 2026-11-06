@@ -1,8 +1,8 @@
 # Manual Validation
 
 **Status**: passed
-**Timestamp**: 2026-11-06T06:44:11Z
+**Timestamp**: 2026-11-06T06:45:16Z
 
 ## Notes
 
-Formatted full policy root includes the demonstrated recipe-coherence trap; exact recipe and canonical replay will be checked against the reachable landing.
+Full formatted policy and explicitly authored final recipe; native regeneration flag retention was reproduced and retained.
