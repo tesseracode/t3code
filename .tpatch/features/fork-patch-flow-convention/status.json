@@ -5,8 +5,8 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-11-06T05:04:05Z",
-  "updated_at": "2026-11-06T06:45:16Z",
-  "last_command": "record",
+  "updated_at": "2026-11-06T06:48:42Z",
+  "last_command": "verify",
   "notes": "Patch recorded",
   "apply": {
     "completed_at": "2026-11-06T06:45:16Z",
@@ -19,5 +19,14 @@
       "slug": "fork-maintenance-policy",
       "kind": "hard"
     }
-  ]
+  ],
+  "verify": {
+    "verified_at": "2026-11-06T06:48:42Z",
+    "passed": false,
+    "recipe_hash_at_verify": "07230a117a509df23c551305faa973f8906f01ba2e1eb85562108adc6e1e1829",
+    "patch_hash_at_verify": "3f0b49bc0d03de3d9779dba837a6daf6d01a687eefdf041e768b6068ee3f928f",
+    "parent_snapshot": {
+      "fork-maintenance-policy": "applied"
+    }
+  }
 }

@@ -5,8 +5,8 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-11-06T06:45:52Z",
-  "updated_at": "2026-11-06T06:47:58Z",
-  "last_command": "record",
+  "updated_at": "2026-11-06T06:48:46Z",
+  "last_command": "verify",
   "notes": "Patch recorded",
   "apply": {
     "completed_at": "2026-11-06T06:47:58Z",
@@ -31,5 +31,15 @@
       "slug": "legacy-main-v014-preservation",
       "kind": "supersedes"
     }
-  ]
+  ],
+  "verify": {
+    "verified_at": "2026-11-06T06:48:42Z",
+    "passed": false,
+    "recipe_hash_at_verify": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f",
+    "patch_hash_at_verify": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+    "parent_snapshot": {
+      "copilot-cli-provider": "applied",
+      "copilot-sdk-runtime-upgrade": "applied"
+    }
+  }
 }
