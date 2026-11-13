@@ -65,6 +65,10 @@ const layerScannerTest = (input: ScannerTestInput) =>
               driver: ProviderDriverKind.make("codex"),
               config: { homePath: input.codexHomePath },
             },
+            [ProviderInstanceId.make("githubCopilot")]: {
+              driver: ProviderDriverKind.make("githubCopilot"),
+              enabled: false,
+            },
             ...input.providerInstances,
           },
         }),
@@ -235,6 +239,217 @@ const makeFileIdentityFixture = Effect.fn("AgentSessionScanner.test.makeFileIden
 
 it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
   describe("scan", () => {
+    it.effect("rejects a Copilot transcript atomically replaced while its descriptor is read", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const fs = yield* FileSystem.FileSystem;
+        const claudeHomePath = yield* makeTempDir("t3code-replace-claude-");
+        const codexHomePath = yield* makeTempDir("t3code-replace-codex-");
+        const copilotHome = yield* makeTempDir("t3code-replace-copilot-");
+        const workspaceRoot = yield* makeTempDir("t3code-replace-workspace-");
+        const mtimeMs = Date.parse("2026-09-01T10:00:00.000Z");
+        yield* TestClock.setTime(mtimeMs);
+        const filePath = path.join(copilotHome, "session-state", "native-id", "events.jsonl");
+        const contents = [
+          {
+            type: "session.start",
+            data: { sessionId: "native-id", version: 1, context: { cwd: workspaceRoot } },
+          },
+          { type: "session.handoff", data: { context: "Saved plan" } },
+          { type: "user.message", data: { content: "Preserved prompt" } },
+        ]
+          .map((record, index) =>
+            JSON.stringify({
+              ...record,
+              id: `event-${index}`,
+              parentId: index === 0 ? null : `event-${index - 1}`,
+              timestamp: "2026-09-01T10:00:00.000Z",
+            }),
+          )
+          .join("\n");
+        for (const target of [filePath, `${filePath}.replacement`]) {
+          yield* writeTranscript({ filePath: target, contents, mtimeMs });
+        }
+        const canonicalFilePath = yield* fs.realPath(filePath);
+        let replaceDuringRead = false;
+        let replacements = 0;
+        const fileSystem = FileSystem.FileSystem.of({
+          ...fs,
+          open: (target, options) =>
+            fs.open(target, options).pipe(
+              Effect.map((file) => ({
+                ...file,
+                stat: file.stat,
+                readAlloc: (size: number) =>
+                  file.readAlloc(size).pipe(
+                    Effect.tap(() =>
+                      Effect.gen(function* () {
+                        if (target !== canonicalFilePath || !replaceDuringRead) return;
+                        replaceDuringRead = false;
+                        replacements++;
+                        yield* fs.rename(`${filePath}.replacement`, filePath);
+                      }),
+                    ),
+                  ),
+              })),
+            ),
+        });
+        yield* Effect.gen(function* () {
+          const scanner = yield* AgentSessionScanner.AgentSessionScanner;
+          yield* scanner.scan;
+          const original = yield* scanner.recentThreads(workspaceRoot).pipe(Stream.runCollect);
+          expect(original[0]?._tag).toBe("Importable");
+          replaceDuringRead = true;
+          const replaced = yield* scanner.recentThreads(workspaceRoot).pipe(Stream.runCollect);
+          expect(replacements).toBe(1);
+          expect(replaced.map((outcome) => outcome._tag)).toEqual(["Skipped"]);
+        }).pipe(
+          Effect.provide(
+            layerScannerTest({
+              claudeHomePath,
+              codexHomePath,
+              providerInstances: {
+                [ProviderInstanceId.make("copilot")]: {
+                  driver: ProviderDriverKind.make("githubCopilot"),
+                  enabled: true,
+                  config: { homePath: copilotHome },
+                },
+              },
+            }),
+          ),
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+        );
+      }).pipe(Effect.scoped),
+    );
+    it.effect(
+      "discovers configured Copilot homes without crossing session symlinks and reads bounded immutable text",
+      () =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const fs = yield* FileSystem.FileSystem;
+          const claudeHomePath = yield* makeTempDir("t3code-copilot-claude-");
+          const codexHomePath = yield* makeTempDir("t3code-copilot-codex-");
+          const copilotHome = yield* makeTempDir("t3code-copilot-account-");
+          const secondHome = yield* makeTempDir("t3code-copilot-other-");
+          const workspaceRoot = yield* makeTempDir("t3code-copilot-workspace-");
+          const mtimeMs = Date.parse("2026-09-01T10:00:00.000Z");
+          yield* TestClock.setTime(mtimeMs);
+          const fixture = (sessionId: string) =>
+            [
+              {
+                type: "session.start",
+                data: {
+                  sessionId,
+                  version: 1,
+                  selectedModel: "gpt-6.1-sol",
+                  context: { cwd: workspaceRoot },
+                },
+              },
+              ...Array.from({ length: 205 }, (_, index) => ({
+                type: index % 2 ? "assistant.message" : "user.message",
+                data: { content: `Message ${index}` },
+              })),
+            ]
+              .map((record, index) =>
+                JSON.stringify({
+                  ...record,
+                  id: `event-${index}`,
+                  parentId: index === 0 ? null : `event-${index - 1}`,
+                  timestamp: "2026-09-01T10:00:00.000Z",
+                }),
+              )
+              .join("\n");
+          for (const home of [copilotHome, secondHome]) {
+            yield* writeTranscript({
+              filePath: path.join(home, "session-state", "native-id", "events.jsonl"),
+              contents: fixture("native-id"),
+              mtimeMs,
+            });
+          }
+          yield* writeTranscript({
+            filePath: path.join(copilotHome, "session-state", "corrupt", "events.jsonl"),
+            contents: fixture("corrupt") + "\n{",
+            mtimeMs,
+          });
+          yield* fs.symlink(
+            path.join(secondHome, "session-state", "native-id"),
+            path.join(copilotHome, "session-state", "external"),
+          );
+          const input = {
+            claudeHomePath,
+            codexHomePath,
+            workspaceRoot,
+            providerInstances: {
+              [ProviderInstanceId.make("copilot-a")]: {
+                driver: ProviderDriverKind.make("githubCopilot"),
+                enabled: true,
+                config: { homePath: copilotHome },
+              },
+              [ProviderInstanceId.make("copilot-b")]: {
+                driver: ProviderDriverKind.make("githubCopilot"),
+                enabled: true,
+                environment: [{ name: "COPILOT_HOME", value: secondHome, sensitive: false }],
+              },
+              [ProviderInstanceId.make("copilot-disabled")]: {
+                driver: ProviderDriverKind.make("githubCopilot"),
+                enabled: false,
+                config: { homePath: secondHome },
+              },
+            },
+          };
+          const before = yield* fs.readFileString(
+            path.join(copilotHome, "session-state", "native-id", "events.jsonl"),
+          );
+          const scan = yield* runScan(input);
+          expect(scan.candidates).toHaveLength(1);
+          expect(scan.candidates[0]?.sources).toEqual(["githubCopilot"]);
+          expect(scan.candidates[0]?.threadCount).toBe(3);
+          const outcomes = yield* runRecentThreadOutcomes(input);
+          const threads = outcomes.flatMap((outcome) =>
+            outcome._tag === "Importable" ? [outcome.thread] : [],
+          );
+          expect(threads.map((thread) => thread.providerInstanceId).sort()).toEqual([
+            "copilot-a",
+            "copilot-b",
+          ]);
+          expect(outcomes.filter((outcome) => outcome._tag === "Skipped")).toHaveLength(1);
+          for (const thread of threads) {
+            expect(thread.providerSessionId).toBe("native-id");
+            expect(thread.messages).toHaveLength(200);
+            expect(thread.messages[0]?.text).toBe("Message 0");
+            expect(thread.messages[1]?.text).toBe("Message 6");
+            expect(thread.messages.at(-1)?.text).toBe("Message 204");
+          }
+          expect(
+            yield* fs.readFileString(
+              path.join(copilotHome, "session-state", "native-id", "events.jsonl"),
+            ),
+          ).toBe(before);
+          yield* Effect.gen(function* () {
+            const scanner = yield* AgentSessionScanner.AgentSessionScanner;
+            yield* scanner.scan;
+            const externalHome = yield* makeTempDir("t3code-copilot-replacement-");
+            const externalSession = path.join(externalHome, "native-id");
+            yield* writeTranscript({
+              filePath: path.join(externalSession, "events.jsonl"),
+              contents: fixture("native-id"),
+              mtimeMs,
+            });
+            const file = path.join(copilotHome, "session-state", "native-id", "events.jsonl");
+            yield* fs.rename(file, `${file}.saved`);
+            yield* fs.symlink(path.join(externalSession, "events.jsonl"), file);
+            const directory = path.join(secondHome, "session-state", "native-id");
+            yield* fs.rename(directory, `${directory}.saved`);
+            yield* fs.symlink(externalSession, directory);
+            const replaced = yield* scanner.recentThreads(workspaceRoot).pipe(Stream.runCollect);
+            expect(Array.from(replaced).map((outcome) => outcome._tag)).toEqual([
+              "Skipped",
+              "Skipped",
+              "Skipped",
+            ]);
+          }).pipe(Effect.provide(layerScannerTest(input)));
+        }).pipe(Effect.scoped),
+    );
     it.effect("reads Claude project cwds from transcripts, newest first", () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
@@ -1625,6 +1840,134 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
 });
 
 describe("parseAgentSessionTranscript", () => {
+  it("reads only committed root Copilot text and rejects invalid snapshot identities", () => {
+    const records = [
+      {
+        type: "session.start",
+        data: {
+          sessionId: "copilot-session",
+          version: 1,
+          selectedModel: "auto",
+          context: { cwd: "/workspace" },
+        },
+      },
+      { type: "user.message", data: { content: "First prompt" } },
+      { type: "user.message", agentId: "child", data: { content: "Private child prompt" } },
+      { type: "assistant.message_delta", data: { content: "Fragment" } },
+      { type: "assistant.message", data: { content: "Uncommitted draft", fusion: {} } },
+      {
+        type: "assistant.message",
+        data: { content: "Child commit", fusion: { commitId: "c", conversationScope: "child" } },
+      },
+      {
+        type: "assistant.message",
+        data: {
+          content: "Root answer",
+          model: "gpt-6.1-sol",
+          fusion: { commitId: "c", conversationScope: "root" },
+        },
+      },
+      { type: "session.title_changed", ephemeral: true, data: { title: "Native title" } },
+    ].map((event, index) => ({
+      ...event,
+      id: `event-${index}`,
+      parentId: index === 0 ? null : `event-${index - 1}`,
+      timestamp: `2026-09-01T10:00:0${index}.000Z`,
+    }));
+    const parse = (events: ReadonlyArray<unknown>, suffix = "") =>
+      AgentSessionScanner.parseAgentSessionTranscript({
+        source: "githubCopilot",
+        providerInstanceId: ProviderInstanceId.make("copilot-account"),
+        fallbackSessionId: "copilot-session",
+        lastActiveAtMs: Date.parse(timestampForCopilot),
+        contents: events.map((event) => JSON.stringify(event)).join("\n") + suffix,
+      });
+    const timestampForCopilot = "2026-09-01T10:00:09.000Z";
+    const thread = parse(records);
+    expect(thread?.providerSessionId).toBe("copilot-session");
+    expect(thread?.title).toBe("Native title");
+    expect(thread?.model).toBe("auto");
+    expect(thread?.messages.map((message) => [message.role, message.text])).toEqual([
+      ["user", "First prompt"],
+      ["assistant", "Root answer"],
+    ]);
+    expect(parse(records, "\n{")).toBeNull();
+    expect(parse(records.slice(1))).toBeNull();
+    expect(
+      parse([
+        { ...records[0], data: { sessionId: "wrong-session", version: 1 } },
+        ...records.slice(1),
+      ]),
+    ).toBeNull();
+    expect(
+      parse([
+        { ...records[0], data: { sessionId: "copilot-session", version: 99 } },
+        ...records.slice(1),
+      ]),
+    ).toBeNull();
+    const resume = {
+      id: "resume",
+      parentId: "event-6",
+      timestamp: timestampForCopilot,
+      type: "session.resume",
+      data: { selectedModel: "resumed-selection" },
+    };
+    expect(parse([...records, resume])?.model).toBe("resumed-selection");
+    expect(
+      parse([
+        ...records,
+        resume,
+        {
+          ...resume,
+          id: "change",
+          parentId: "resume",
+          type: "session.model_change",
+          data: { newModel: "changed-selection" },
+        },
+      ])?.model,
+    ).toBe("changed-selection");
+    const handoff = {
+      ...resume,
+      type: "session.handoff",
+      data: { context: "Continue the saved plan", target: "other-agent" },
+    };
+    expect(parse([...records, handoff])?.messages).toEqual(thread?.messages);
+    const deselected = {
+      ...resume,
+      type: "session.model_deselected",
+      data: { reason: "provider_withdrawn" },
+    };
+    expect(parse([...records, deselected])?.model).toBeNull();
+    expect(
+      parse([
+        ...records,
+        deselected,
+        { ...resume, id: "after-deselection", parentId: "resume", data: {} },
+      ])?.model,
+    ).toBeNull();
+    expect(
+      parse([
+        ...records,
+        handoff,
+        { ...resume, id: "after-handoff", parentId: "resume", data: { selectedModel: "auto" } },
+      ])?.model,
+    ).toBe("auto");
+    for (const invalid of [
+      { data: {} },
+      { timestamp: undefined },
+      { timestamp: "not-a-date" },
+      { parentId: "missing-event" },
+      { parentId: null },
+      { parentId: undefined },
+      { id: "event-0" },
+    ]) {
+      expect(parse([records[0], { ...records[1], ...invalid }, ...records.slice(2)])).toBeNull();
+    }
+    // Hidden child events still participate in the persisted chronological chain.
+    expect(
+      parse([...records.slice(0, 2), { ...records[2], parentId: "missing" }, ...records.slice(3)]),
+    ).toBeNull();
+  });
   it.each([false, true])(
     "handles the exact record limit and an interior blank overflow=%s",
     (overflow) => {

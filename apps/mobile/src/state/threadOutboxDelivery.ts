@@ -12,6 +12,7 @@ import {
 import { threadFamilyRead, type ThreadFamilyRead } from "@t3tools/client-runtime/state/threads";
 import { deriveThreadTitleSeed } from "@t3tools/client-runtime/operations";
 import {
+  AGENT_SESSION_SNAPSHOT_NOTICE,
   AuthOrchestrationOperateScope,
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
@@ -769,6 +770,9 @@ export function createThreadOutboxDelivery(): {
     const hasAccess = () =>
       readEnvironmentScope(queuedMessage.environmentId, AuthOrchestrationOperateScope);
     if (!hasAccess()) return true;
+    if (thread.sessionSnapshot !== undefined) {
+      return restoreQueuedMessage(queuedMessage, AGENT_SESSION_SNAPSHOT_NOTICE);
+    }
     const serverConfig = appAtomRegistry.get(
       serverEnvironment.configValueAtom(queuedMessage.environmentId),
     );

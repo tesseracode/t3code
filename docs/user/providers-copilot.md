@@ -61,7 +61,28 @@ The picker does not currently expose enable/disable controls.
 
 Native conversations resume after reconnecting. If another client already owns a
 native session, T3 Code refuses to take it over. Close that client before retrying.
-Older imported conversations may continue in a fresh native session.
+
+### Import existing CLI history
+
+Use **Import projects** in the welcome wizard on the computer that stores your
+Copilot CLI sessions. Import reads the configured account directory without
+starting a provider or taking ownership of a native session. Imported threads
+can also be viewed from connected web, desktop and mobile clients; mobile does
+not yet offer the import picker.
+
+Copilot imports are immutable, read-only text snapshots. They retain the native
+session ID, model and message times, but omit tool activity, attachments and
+possibly older messages. Titles fall back to the first prompt when a native rename
+is not recorded in the journal. A model withdrawn by the provider is not retained
+as the snapshot's selected model. Importing again does not refresh an existing snapshot.
+Invalid journals and files changed since discovery are skipped. Stop activity
+in the CLI and scan again before retrying an import of a changing session.
+Native continuation and copying snapshot context into a new conversation are
+not supported: the current SDK cannot guarantee exclusive admission against
+another CLI controller. Closing a window or an old activity timestamp does not
+establish that ownership was released.
+An offline message recovered for a snapshot is returned to the mobile draft with
+a read-only explanation, without uploading attachments or starting a provider.
 
 Plan mode uses Copilot's native planning flow. Tool approvals and questions appear
 in the thread. Restricted modes ask before tools run; **Auto-accept edits** allows

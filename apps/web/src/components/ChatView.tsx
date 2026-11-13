@@ -1,4 +1,5 @@
 import { workspaceAreaProps } from "../lib/workspaceFocus";
+import { AGENT_SESSION_SNAPSHOT_NOTICE } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
 import { queuedRunEditBlockedReason } from "@t3tools/client-runtime/queued-run-edit";
@@ -3458,7 +3459,14 @@ export default function ChatView(props: ChatViewProps) {
                               onOpenParent={parentThreadLink?.open ?? null}
                             />
                           ) : null}
-                          {!composerMounted ? null : (
+                          {serverThread?.sessionSnapshot !== undefined ? (
+                            <div className="px-4 py-3 text-sm text-muted-foreground" role="note">
+                              <p>{AGENT_SESSION_SNAPSHOT_NOTICE}</p>
+                              <p className="mt-1 break-all font-mono text-xs">
+                                Native session: {serverThread.sessionSnapshot.nativeSessionId}
+                              </p>
+                            </div>
+                          ) : !composerMounted ? null : (
                             <ChatComposer
                               canOperateThread={canOperateThread}
                               reportedModelSelection={reportedModelSelection}
