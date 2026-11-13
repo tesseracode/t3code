@@ -336,6 +336,7 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     readonly hasPendingBackgroundWorkForThread?: Effect.Effect<boolean>;
     readonly backgroundTasksEndWithProcess?: boolean;
     readonly hangSessionScopeClose?: boolean;
+    readonly failSessionScopeClose?: boolean;
     readonly startTurn?: Effect.Effect<void>;
     readonly beforeUnload?: Effect.Effect<void>;
     readonly spawnBeforeOpen?: boolean;
@@ -347,7 +348,13 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     Ref.update(state, (current) => ({
       ...current,
       closeCount: current.closeCount + 1,
-    })),
+    })).pipe(
+      Effect.andThen(
+        options.failSessionScopeClose
+          ? Effect.die("simulated provider teardown failure")
+          : Effect.void,
+      ),
+    ),
   );
   // Register after countClose to wedge teardown before its finalizer, matching a provider stream that never yields.
   const hangClose = Effect.addFinalizer(() =>
@@ -483,6 +490,7 @@ function layerTest(input: {
   readonly hasPendingBackgroundWorkForThread?: Effect.Effect<boolean>;
   readonly backgroundTasksEndWithProcess?: boolean;
   readonly hangSessionScopeClose?: boolean;
+  readonly failSessionScopeClose?: boolean;
   readonly startTurn?: Effect.Effect<void>;
   readonly beforeUnload?: Effect.Effect<void>;
   readonly spawnBeforeOpen?: boolean;
@@ -518,6 +526,9 @@ function layerTest(input: {
       ...(input.hangSessionScopeClose === undefined
         ? {}
         : { hangSessionScopeClose: input.hangSessionScopeClose }),
+      ...(input.failSessionScopeClose === undefined
+        ? {}
+        : { failSessionScopeClose: input.failSessionScopeClose }),
       ...(input.startTurn === undefined ? {} : { startTurn: input.startTurn }),
       ...(input.beforeUnload === undefined ? {} : { beforeUnload: input.beforeUnload }),
       ...(input.spawnBeforeOpen === undefined ? {} : { spawnBeforeOpen: input.spawnBeforeOpen }),
@@ -1707,57 +1718,76 @@ it.effect("ProviderSessionManagerV2 fails browser access closed for a missing pr
   }),
 );
 
-it.effect("ProviderSessionManagerV2 revokes MCP credentials when release persistence fails", () =>
-  Effect.gen(function* () {
-    const state = yield* Ref.make(emptyState);
-    const mcpConfigs = yield* Ref.make<
-      ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
-    >([]);
-    const effect = Effect.gen(function* () {
-      const eventSink = yield* EventSink.EventSinkV2;
-      const idAllocator = yield* IdAllocator.IdAllocatorV2;
-      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
-      const registry = yield* McpSessionRegistry.McpSessionRegistry;
-      const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
-      const now = yield* DateTime.now;
-      const threadId = ThreadId.make("thread-provider-session-manager-mcp-release-failure");
-      const providerSessionId = yield* idAllocator.allocate.providerSession({
-        providerInstanceId: modelSelection.instanceId,
-        threadId,
+it.effect.each(["close", "detach"] as const)(
+  "ProviderSessionManagerV2 revokes MCP credentials and ends subscribers when %s cleanup fails",
+  (release) =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const mcpConfigs = yield* Ref.make<
+        ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
+      >([]);
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const registry = yield* McpSessionRegistry.McpSessionRegistry;
+        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+        const now = yield* DateTime.now;
+        const threadId = ThreadId.make("thread-provider-session-manager-mcp-release-failure");
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+
+        yield* eventSink.write({
+          events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
+        });
+        const runtime = yield* manager.open({
+          threadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+
+        const captured = (yield* Ref.get(mcpConfigs))[0];
+        const token = captured?.authorizationHeader.replace(/^Bearer\s+/, "");
+        assert.isDefined(token);
+        assert.isDefined(yield* registry.resolve(token!));
+
+        const subscription = yield* runtime.subscribeEvents!;
+        const closeError = yield* (
+          release === "close"
+            ? manager.close(providerSessionId)
+            : manager.detach({ providerSessionId, threadId, revokeMcpCredential: true })
+        ).pipe(Effect.flip);
+        assert.equal(
+          closeError._tag,
+          release === "close" ? "ProviderSessionCloseError" : "ProviderSessionReleaseError",
+        );
+        assert.isUndefined(yield* mcpSessions.read(threadId));
+        assert.isUndefined(yield* registry.resolve(token!));
+        const streamError = yield* subscription.events.pipe(Stream.runDrain, Effect.flip);
+        assert.equal(
+          streamError._tag,
+          release === "detach"
+            ? "ProviderAdapterSessionDetached"
+            : "ProviderAdapterEventStreamError",
+        );
       });
 
-      yield* eventSink.write({
-        events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
-      });
-      yield* manager.open({
-        threadId,
-        providerSessionId,
-        modelSelection,
-        runtimePolicy,
-      });
-
-      const captured = (yield* Ref.get(mcpConfigs))[0];
-      const token = captured?.authorizationHeader.replace(/^Bearer\s+/, "");
-      assert.isDefined(token);
-      assert.isDefined(yield* registry.resolve(token!));
-
-      const closeError = yield* manager.close(providerSessionId).pipe(Effect.flip);
-      assert.equal(closeError._tag, "ProviderSessionCloseError");
-      assert.isUndefined(yield* mcpSessions.read(threadId));
-      assert.isUndefined(yield* registry.resolve(token!));
-    });
-
-    yield* effect.pipe(
-      Effect.provide(
-        layerTest({
-          state,
-          idleTimeoutMs: 1_000,
-          mcpConfigs,
-          failReleaseEventWrites: true,
-        }),
-      ),
-    );
-  }),
+      yield* effect.pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 1_000,
+            mcpConfigs,
+            failReleaseEventWrites: release === "close",
+            failSessionScopeClose: release === "detach",
+            capabilities: ExclusiveCapabilities,
+          }),
+        ),
+      );
+    }),
 );
 
 it.effect(

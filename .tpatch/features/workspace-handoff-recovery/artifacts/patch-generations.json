@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "feature": "workspace-handoff-recovery",
+  "current_generation": 2,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_ce77707e57ce",
+      "kind": "record",
+      "patch_sha256": "5eed1a3ce00c050b6625f6cafe473afb8b222a2d5f86a2a3058352c3009ebc30",
+      "git_patch_id": "4c5e25d93f5481980dba12bb05de5352d3eff974",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "c2dfc1353d498b00e6322d78e62641b89469e732772b25349093808dc7efe055",
+      "canonical_patch": "",
+      "audit_patch": "",
+      "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+          "apps/server/src/orchestration-v2/RunExecutionService.ts",
+          "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+          "docs/internals/providers.md",
+          "docs/user/source-control.md",
+          "packages/provider-core/src/server/ProviderAdapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+        "apps/server/src/orchestration-v2/RunExecutionService.ts",
+        "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+        "docs/internals/providers.md",
+        "docs/user/source-control.md",
+        "packages/provider-core/src/server/ProviderAdapter.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_2a84aa71d3c3",
+      "kind": "amend-refresh",
+      "patch_sha256": "63c60325d843cc661cd733936110b3abb6b600b7f9c231624ffbd93c2eedb95e",
+      "git_patch_id": "ea3c5496a51438aa13efa8012d646fb74f46a3d2",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "49c9d885fc2caf5fbc039e529135a5333789f3b7efd8348c142a334c07dc5e48",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+          "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+          "apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+          "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+          "apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+          "apps/server/src/orchestration-v2/RunExecutionService.ts",
+          "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+          "docs/internals/providers.md",
+          "docs/user/source-control.md",
+          "packages/provider-core/src/server/ProviderAdapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+        "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+        "apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+        "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+        "apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+        "apps/server/src/orchestration-v2/RunExecutionService.ts",
+        "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+        "docs/internals/providers.md",
+        "docs/user/source-control.md",
+        "packages/provider-core/src/server/ProviderAdapter.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

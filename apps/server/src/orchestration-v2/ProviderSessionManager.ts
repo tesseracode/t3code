@@ -506,12 +506,20 @@ export const layerWithOptions = (
       const failSubscribers = Effect.fn("ProviderSessionManager.failSubscribers")(function* (
         entry: LiveSessionEntry,
         detail: string,
+        detachedThreadId?: ThreadId,
       ) {
-        const error = new ProviderAdapter.ProviderAdapterEventStreamError({
-          driver: entry.runtime.driver,
-          providerSessionId: entry.runtime.providerSessionId,
-          cause: detail,
-        });
+        const error =
+          detachedThreadId === undefined
+            ? new ProviderAdapter.ProviderAdapterEventStreamError({
+                driver: entry.runtime.driver,
+                providerSessionId: entry.runtime.providerSessionId,
+                cause: detail,
+              })
+            : new ProviderAdapter.ProviderAdapterSessionDetached({
+                driver: entry.runtime.driver,
+                providerSessionId: entry.runtime.providerSessionId,
+                threadId: detachedThreadId,
+              });
         const subscribers = yield* Ref.getAndSet(entry.eventSubscribers, new Map());
         yield* Effect.forEach(
           subscribers.values(),
@@ -998,6 +1006,7 @@ export const layerWithOptions = (
                     yield* failSubscribers(
                       entry,
                       input.detail ?? `Provider session released: ${input.reason}.`,
+                      input.reason === "manual_shutdown" ? input.detachedThreadId : undefined,
                     );
                   }
                   const closeExit = yield* closeScopeWithin(entry.scope, {

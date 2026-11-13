@@ -646,18 +646,18 @@ export const layer: Layer.Layer<
       const existingSessionProjection = projection.providerSessions.find(
         (candidate) => candidate.id === providerSessionId,
       );
-      const failedRuns = new Map(
+      const terminalRuns = new Map(
         projection.runs
           .filter(
             (previous) =>
               previous.ordinal < run.ordinal &&
               previous.providerThreadId === providerThread.id &&
-              previous.status === "failed",
+              (previous.status === "failed" || previous.status === "interrupted"),
           )
           .map((previous) => [previous.activeAttemptId, previous] as const),
       );
       const abandonedTurns = projection.providerTurns.flatMap((turn) => {
-        const previous = failedRuns.get(turn.runAttemptId);
+        const previous = terminalRuns.get(turn.runAttemptId);
         return turn.providerThreadId === providerThread.id &&
           turn.status === "running" &&
           previous !== undefined &&
@@ -669,7 +669,7 @@ export const layer: Layer.Layer<
       if (abandonedTurn !== undefined) {
         const liveSession = yield* providerSessions.get(providerSessionId);
         if (Option.isSome(liveSession)) {
-          // Older versions could fail the run without stopping its provider.
+          // Failed cleanup can leave a failed or interrupted run's provider active.
           // Recover that exact turn before reusing its native conversation.
           const recovered = yield* Effect.result(
             liveSession.value.interruptTurn({

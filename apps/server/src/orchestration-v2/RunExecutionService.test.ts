@@ -2572,6 +2572,126 @@ it.effect("refreshes pull requests after a provider stream exits with an error",
   }),
 );
 
+it.effect(
+  "does not start native work after detachment settles during startup context loading",
+  () =>
+    Effect.gen(function* () {
+      const finalized = yield* Deferred.make<void>();
+      const stillCurrent = yield* Ref.make(true);
+      const starts = yield* Ref.make(0);
+      const interrupts = yield* Ref.make(0);
+      const key = "workspace-detach-during-startup";
+      const result = yield* captureRootRunTermination({
+        key,
+        initialProviderTurnId: null,
+        shouldFinalizeRun: () => Effect.succeed(true),
+        shouldStartProviderTurn: () => Ref.get(stillCurrent),
+        appContext: Deferred.await(finalized).pipe(Effect.as([])),
+        startTurn: () => Ref.update(starts, (count) => count + 1),
+        interruptTurn: () => Ref.update(interrupts, (count) => count + 1),
+        events: (ids) =>
+          Stream.fail(
+            new ProviderAdapter.ProviderAdapterSessionDetached({
+              driver,
+              providerSessionId: ProviderSessionId.make(`session:${key}`),
+              threadId: ids.threadId,
+            }),
+          ),
+        refreshAfterTurn: Ref.set(stillCurrent, false).pipe(
+          Effect.andThen(Deferred.succeed(finalized, undefined)),
+        ),
+      });
+      assert.deepEqual(result.observed, ["run:interrupted", "pull-requests-refreshed"]);
+      assert.equal(yield* Ref.get(starts), 0);
+      assert.equal(yield* Ref.get(interrupts), 0);
+      assert.isFalse(result.written.some((item) => item.type === "error"));
+    }),
+);
+
+it.effect.each([
+  "matching",
+  "interrupt-failure",
+  "other-session",
+  "other-thread",
+  "ownership-lost",
+] as const)("fences intentional workspace detachment for %s", (scenario) =>
+  Effect.gen(function* () {
+    const key = `workspace-detach:${scenario}`;
+    const now = yield* DateTime.now;
+    const interrupts = yield* Ref.make(0);
+    const result = yield* captureRootRunTermination({
+      key,
+      shouldFinalizeRun: () => Effect.succeed(true),
+      rejectTerminalWrite: scenario === "ownership-lost",
+      events: (ids) =>
+        Stream.concat(
+          Stream.make({
+            type: "provider_turn.updated" as const,
+            driver,
+            providerTurn: {
+              id: ids.rootProviderTurnId,
+              providerThreadId: ids.providerThreadId,
+              nodeId: ids.rootNodeId,
+              runAttemptId: ids.attemptId,
+              nativeTurnRef: null,
+              ordinal: 1,
+              status: "running" as const,
+              startedAt: now,
+              completedAt: null,
+            },
+          }),
+          Stream.fail(
+            new ProviderAdapter.ProviderAdapterSessionDetached({
+              driver,
+              providerSessionId: ProviderSessionId.make(
+                scenario === "other-session" ? "unrelated-session" : `session:${key}`,
+              ),
+              threadId:
+                scenario === "other-thread" ? ThreadId.make("unrelated-thread") : ids.threadId,
+            }),
+          ),
+        ),
+      interruptTurn: (input) =>
+        Ref.update(interrupts, (count) => count + 1).pipe(
+          Effect.andThen(
+            scenario === "interrupt-failure"
+              ? Effect.fail(
+                  new ProviderAdapter.ProviderAdapterInterruptError({
+                    driver,
+                    providerThreadId: input.providerThread.id,
+                    providerTurnId: input.providerTurnId,
+                    cause: "simulated cleanup failure",
+                  }),
+                )
+              : Effect.void,
+          ),
+        ),
+    });
+    assert.equal(yield* Ref.get(interrupts), 1);
+    if (scenario === "ownership-lost") {
+      assert.deepEqual(result.finalEvents, []);
+      assert.deepEqual(result.observed, []);
+      return;
+    }
+    const mismatch = scenario === "other-session" || scenario === "other-thread";
+    assert.deepEqual(result.observed, [
+      mismatch ? "run:failed" : "run:interrupted",
+      "pull-requests-refreshed",
+    ]);
+    assert.equal(
+      result.written.some((item) => item.type === "error"),
+      mismatch,
+    );
+    const repaired = result.finalEvents.find((event) => event.type === "provider-turn.updated");
+    if (scenario === "interrupt-failure") {
+      assert.isUndefined(repaired);
+    } else {
+      assert.equal(repaired?.payload.status, "interrupted");
+      assert.isNotNull(repaired?.payload.completedAt);
+    }
+  }),
+);
+
 it.effect.each(["failure", "defect", "interrupt-failure", "ownership-lost"] as const)(
   "stops the live provider and background work before settling an ingestion %s",
   (failureMode) =>

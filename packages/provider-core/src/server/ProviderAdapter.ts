@@ -354,6 +354,16 @@ export class ProviderAdapterEventStreamError extends Schema.TaggedError<Provider
   }
 }
 
+// An explicit last-thread detach ends that execution without reporting a provider failure.
+export class ProviderAdapterSessionDetached extends Schema.TaggedError<ProviderAdapterSessionDetached>()(
+  "ProviderAdapterSessionDetached",
+  {
+    driver: ProviderDriverKind,
+    providerSessionId: ProviderSessionId,
+    threadId: ThreadId,
+  },
+) {}
+
 // Only fixed reasons reach failure messages; detail can contain private configuration.
 const ProviderAdapterFailureReason = Schema.Literals([
   "previous_turn_active",
@@ -391,6 +401,7 @@ export const ProviderAdapterV2Error = Schema.Union([
   ProviderAdapterInterruptError,
   ProviderAdapterRuntimeRequestResponseError,
   ProviderAdapterEventStreamError,
+  ProviderAdapterSessionDetached,
   ProviderAdapterProtocolError,
 ]);
 export type ProviderAdapterV2Error = typeof ProviderAdapterV2Error.Type;

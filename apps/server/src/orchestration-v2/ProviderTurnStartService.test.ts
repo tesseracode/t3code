@@ -279,7 +279,7 @@ function makeLocalCommandHarness(input: {
   readonly writeFailure?: unknown;
   readonly failReadsAfterRunning?: boolean;
   readonly previousTurn?: {
-    readonly runStatus: "failed" | "completed";
+    readonly runStatus: "failed" | "completed" | "interrupted";
     readonly turnStatus: "running" | "completed" | "interrupted";
     readonly differentThread?: boolean;
     readonly liveSession?: boolean;
@@ -948,26 +948,28 @@ effectIt.effect(
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
-effectIt.effect("recovers an abandoned failed turn before continuing its native conversation", () =>
-  Effect.gen(function* () {
-    const harness = makeLocalCommandHarness({
-      text: "Continue",
-      previousTurn: { runStatus: "failed", turnStatus: "running" },
-    });
+effectIt.effect.each(["failed", "interrupted"] as const)(
+  "recovers an abandoned %s turn before continuing its native conversation",
+  (runStatus) =>
+    Effect.gen(function* () {
+      const harness = makeLocalCommandHarness({
+        text: "Continue",
+        previousTurn: { runStatus, turnStatus: "running" },
+      });
 
-    yield* harness.start;
+      yield* harness.start;
 
-    expect(harness.interruptTurn).toHaveBeenCalledOnce();
-    expect(harness.projection().runs.at(-1)?.status).toBe("running");
-    expect(harness.projection().providerTurns[0]).toMatchObject({
-      status: "interrupted",
-      completedAt: expect.anything(),
-    });
-    expect(harness.startRootRun).toHaveBeenCalledOnce();
-    expect(harness.startRootRun.mock.calls[0]?.[0].providerThread.nativeThreadRef?.nativeId).toBe(
-      "existing-native-conversation",
-    );
-  }),
+      expect(harness.interruptTurn).toHaveBeenCalledOnce();
+      expect(harness.projection().runs.at(-1)?.status).toBe("running");
+      expect(harness.projection().providerTurns[0]).toMatchObject({
+        status: "interrupted",
+        completedAt: expect.anything(),
+      });
+      expect(harness.startRootRun).toHaveBeenCalledOnce();
+      expect(harness.startRootRun.mock.calls[0]?.[0].providerThread.nativeThreadRef?.nativeId).toBe(
+        "existing-native-conversation",
+      );
+    }),
 );
 
 effectIt.effect.each([
@@ -987,34 +989,38 @@ effectIt.effect.each([
   }),
 );
 
-effectIt.effect("does not start another turn when abandoned-turn cleanup fails", () =>
-  Effect.gen(function* () {
-    const harness = makeLocalCommandHarness({
-      text: "Continue",
-      previousTurn: { runStatus: "failed", turnStatus: "running", interruptFailure: true },
-    });
+effectIt.effect.each(["failed", "interrupted"] as const)(
+  "does not start another turn when abandoned %s turn cleanup fails",
+  (runStatus) =>
+    Effect.gen(function* () {
+      const harness = makeLocalCommandHarness({
+        text: "Continue",
+        previousTurn: { runStatus, turnStatus: "running", interruptFailure: true },
+      });
 
-    yield* harness.start;
+      yield* harness.start;
 
-    expect(harness.interruptTurn).toHaveBeenCalledOnce();
-    expect(harness.startRootRun).not.toHaveBeenCalled();
-    expect(harness.projection().runs.at(-1)?.status).toBe("failed");
-  }),
+      expect(harness.interruptTurn).toHaveBeenCalledOnce();
+      expect(harness.startRootRun).not.toHaveBeenCalled();
+      expect(harness.projection().runs.at(-1)?.status).toBe("failed");
+    }),
 );
 
-effectIt.effect("retries abandoned-turn cleanup without failing the continuation early", () =>
-  Effect.gen(function* () {
-    const harness = makeLocalCommandHarness({
-      text: "Continue",
-      previousTurn: { runStatus: "failed", turnStatus: "running", interruptFailure: true },
-    });
+effectIt.effect.each(["failed", "interrupted"] as const)(
+  "retries abandoned %s turn cleanup without failing the continuation early",
+  (runStatus) =>
+    Effect.gen(function* () {
+      const harness = makeLocalCommandHarness({
+        text: "Continue",
+        previousTurn: { runStatus, turnStatus: "running", interruptFailure: true },
+      });
 
-    const error = yield* harness.startWithRetry.pipe(Effect.flip);
+      const error = yield* harness.startWithRetry.pipe(Effect.flip);
 
-    expect(error._tag).toBe("ProviderTurnStartError");
-    expect(harness.projection().runs.at(-1)?.status).toBe("starting");
-    expect(harness.open).not.toHaveBeenCalled();
-  }),
+      expect(error._tag).toBe("ProviderTurnStartError");
+      expect(harness.projection().runs.at(-1)?.status).toBe("starting");
+      expect(harness.open).not.toHaveBeenCalled();
+    }),
 );
 
 effectIt.effect("does not start the continuation if recording recovery fails", () =>
