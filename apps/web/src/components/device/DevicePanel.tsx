@@ -148,10 +148,6 @@ export function DevicePanel(props: {
   };
 
   const closeActive = (powerOff: boolean) => {
-    if (!powerOff) {
-      closeSurface();
-      return;
-    }
     if (!activeSession) return;
     const settleOperation = startOperation(null);
     void close({
@@ -244,7 +240,8 @@ export function DevicePanel(props: {
               }
               visible={props.visible}
               onFloat={floatActive}
-              onClose={() => closeActive(false)}
+              onClose={closeSurface}
+              onDisconnect={() => closeActive(false)}
               onPowerOff={() => closeActive(true)}
             />
           ) : loading ? (

@@ -47,6 +47,11 @@ iOS, and power off. Close the tab to stop watching; the device keeps running
 unless you power it off. Closed tabs stay closed after a reload. To watch the
 device again, choose it from **+ → Device**.
 
+To release this thread's device automation without powering off the simulator
+or emulator, choose **Disconnect device** in the device actions menu. Closing
+or hiding the panel only stops watching; it does not release automation
+ownership. Disconnect before moving verification to another thread.
+
 Choose **3D view** to inspect supported devices while the live screen stays
 interactive. On iPhone Duo, use the fold and stance controls to change its
 physical pose, or pinch over the device to adjust the hinge. Turning the model

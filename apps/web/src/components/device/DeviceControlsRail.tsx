@@ -14,6 +14,7 @@ import {
   Smartphone,
   Square,
   Type,
+  Unplug,
   X,
 } from "lucide-react";
 import { Moon, Sun } from "lucide";
@@ -45,6 +46,7 @@ export function DeviceControlsRail(props: {
   onTools: () => void;
   onFloat: () => void;
   onClose: () => void;
+  onDisconnect: () => void;
   onPowerOff: () => void;
   /** The host takes input but runs no device commands (Simlock): no rotation, settings, tools, or screenshots. */
   inputOnly?: boolean;
@@ -225,6 +227,10 @@ export function DeviceControlsRail(props: {
             <MenuItem onClick={props.onClose}>
               <X />
               Close device panel
+            </MenuItem>
+            <MenuItem onClick={props.onDisconnect}>
+              <Unplug />
+              Disconnect device
             </MenuItem>
             <MenuSeparator />
             <MenuItem variant="destructive" onClick={props.onPowerOff}>

@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "feature": "device-session-release",
+  "current_generation": 2,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_d0352d59729a",
+      "kind": "record",
+      "patch_sha256": "f8dc1dcba062ddca869ead147d38655df7fb30c23c740b3674eebd842c4b6d09",
+      "git_patch_id": "34b36efdf374718f6bcd24bc21c8abef76991af3",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "3820229bc8d5992b040ab99c5136aae12c21749772a2682c3ccdd9df2ef1eb6f",
+      "canonical_patch": "",
+      "audit_patch": "",
+      "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+          "apps/web/src/components/device/DeviceControlsRail.tsx",
+          "apps/web/src/components/device/DevicePanel.tsx",
+          "apps/web/src/components/device/DeviceWorkspace.tsx",
+          "docs/user/devices.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+        "apps/web/src/components/device/DeviceControlsRail.tsx",
+        "apps/web/src/components/device/DevicePanel.tsx",
+        "apps/web/src/components/device/DeviceWorkspace.tsx",
+        "docs/user/devices.md"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_d376218dfbef",
+      "kind": "amend-refresh",
+      "patch_sha256": "08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08",
+      "git_patch_id": "e318e2a8bbc1c78d0c636c34d08b0882bc7cb069",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "72be83ab03900c276c51b6751b73e485d43ad42b062472b9d5d69126cbf72e6d",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+          "apps/web/src/components/device/DeviceControlsRail.tsx",
+          "apps/web/src/components/device/DevicePanel.tsx",
+          "apps/web/src/components/device/DeviceWorkspace.tsx",
+          "docs/user/devices.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+        "apps/web/src/components/device/DeviceControlsRail.tsx",
+        "apps/web/src/components/device/DevicePanel.tsx",
+        "apps/web/src/components/device/DeviceWorkspace.tsx",
+        "docs/user/devices.md"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

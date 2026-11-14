@@ -96,10 +96,12 @@ export function DevicePreviewScreen({
   const [selectedKey, setSelectedKey] = useState<string | null>(initialDeviceKey ?? null);
   const [inputConnected, setInputConnected] = useState(false);
   const [streamAttempt, setStreamAttempt] = useState(0);
-  const [shuttingDown, setShuttingDown] = useState(false);
+  const [closingOperation, setClosingOperation] = useState<"shutdown" | "disconnect" | null>(null);
+  const deviceBusy = closingOperation !== null;
   const [controlsVisible, setControlsVisible] = useState(true);
   const retryHost = useAtomCommand(deviceEnvironment.list);
   const shutdown = useAtomCommand(deviceEnvironment.shutdown, { reportFailure: false });
+  const disconnect = useAtomCommand(deviceEnvironment.close, { reportFailure: false });
   const streamRef = useRef<DeviceStreamRef>(null);
   const state = useEnvironmentQuery(deviceEnvironment.state({ environmentId, input: {} }));
   const previews = threadDevicePreviews(state.data, threadId);
@@ -130,8 +132,8 @@ export function DevicePreviewScreen({
   });
 
   const shutDownDevice = async () => {
-    if (!preview || shuttingDown) return;
-    setShuttingDown(true);
+    if (!preview || deviceBusy) return;
+    setClosingOperation("shutdown");
     const result = await shutdown({
       environmentId,
       input: {
@@ -139,13 +141,37 @@ export function DevicePreviewScreen({
         deviceId: preview.session.deviceId,
         platform: preview.session.platform,
       },
-    }).finally(() => setShuttingDown(false));
+    }).finally(() => setClosingOperation(null));
     if (result._tag === "Failure") {
       Dialog.alert("Could not shut down device", String(Cause.squash(result.cause)));
     }
   };
 
+  const disconnectDevice = async () => {
+    if (!preview || deviceBusy) return;
+    setClosingOperation("disconnect");
+    const result = await disconnect({
+      environmentId,
+      input: {
+        threadId,
+        hostId: preview.session.hostId,
+        deviceId: preview.session.deviceId,
+        shutdown: false,
+      },
+    }).finally(() => setClosingOperation(null));
+    if (result._tag === "Failure") {
+      Dialog.alert("Could not disconnect device", String(Cause.squash(result.cause)));
+    }
+  };
+
   const controls: AppBarMenuItem[] = [
+    {
+      id: "disconnect",
+      title: closingOperation === "disconnect" ? "Disconnecting…" : "Disconnect device",
+      icon: "link",
+      disabled: !preview || deviceBusy,
+      onPress: () => void disconnectDevice(),
+    },
     ...(state.data?.hosts
       .filter(
         (host) =>
@@ -198,7 +224,7 @@ export function DevicePreviewScreen({
       id: "reload",
       title: "Reload stream",
       icon: "arrow.clockwise" as const,
-      disabled: !preview || shuttingDown,
+      disabled: !preview || deviceBusy,
       onPress: () => {
         setInputConnected(false);
         setStreamAttempt((attempt) => attempt + 1);
@@ -235,9 +261,9 @@ export function DevicePreviewScreen({
       : []),
     {
       id: "shutdown",
-      title: shuttingDown ? "Shutting down…" : "Shut down device",
+      title: closingOperation === "shutdown" ? "Shutting down…" : "Shut down device",
       icon: "power",
-      disabled: !preview || shuttingDown,
+      disabled: !preview || deviceBusy,
       onPress: () => void shutDownDevice(),
     },
   ];

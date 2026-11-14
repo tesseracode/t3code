@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "feature": "device-session-release",
+  "producer": "record",
+  "patch_present": true,
+  "recipe_present": true,
+  "recipe_decodable": true,
+  "patch_sha256": "08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08",
+  "recipe_sha256": "72be83ab03900c276c51b6751b73e485d43ad42b062472b9d5d69126cbf72e6d",
+  "reference": {
+    "kind": "commit",
+    "commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+    "preimage_set_sha256": "40a32b2ea9c464a9047caf44b22573136cbe9f563f5329d9a75ebbd67482cb84"
+  },
+  "capture": {
+    "mode": "working-tree-all",
+    "pathspecs": [
+      "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+      "apps/web/src/components/device/DeviceControlsRail.tsx",
+      "apps/web/src/components/device/DevicePanel.tsx",
+      "apps/web/src/components/device/DeviceWorkspace.tsx",
+      "docs/user/devices.md"
+    ],
+    "claim_ids": []
+  },
+  "coverage_status": "complete",
+  "cross_base_status": "consumer-derivation-required",
+  "effects": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "5a7d6944bc3841f8083b9c07fec38edd37e13cf497ce3995e15843f2d019b3d4",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "daa65cdb82b3455e16858fe468b653c44e502804494ab0ad779ed50c99d1bdb1",
+      "patch_fragment_sha256": "fd3435928e0567b346a957a142f40596914a917076e616e0f558372bb7862fcb",
+      "effect_sha256": "7fc3be13e1d642fa4f1825313c8a82197615a795aa29004ab7d3e9dac3df7977",
+      "operation_indexes": [
+        1
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/web/src/components/device/DeviceControlsRail.tsx",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "24dd9e4fb217bda427054006717b481fea55e751c74d2547e90c1bde5d4f3f4a",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "9e5faa81164f1f2a6808151203ecbcd78fa10813e2dab12345865193618cc55d",
+      "patch_fragment_sha256": "ea61a23a50e18354bf88c575f3f04929f28f20201a713cae09522c469c764726",
+      "effect_sha256": "c12e9d0983968af49f4df6dd8743a03c4f142e805473725fb16b802200096fd7",
+      "operation_indexes": [
+        2
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "additive-text"
+    },
+    {
+      "ordinal": 3,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/web/src/components/device/DevicePanel.tsx",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "3b0e05dea08ab86d76dfe64c4ae9aa0c2d6335e803ae0096a735b1f602eced58",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "956b43fbb6f22a6f026b298baa42a9497721a527443ccb718d8bccc9305ad155",
+      "patch_fragment_sha256": "d724e07736222ffef4bd9e0209f0ff7a54f01f125a27ffdfab031daf22b9742e",
+      "effect_sha256": "b6565c6953eab452dcc338888c6ad4d858cb6336fbde38d54df2229da82cd97e",
+      "operation_indexes": [
+        3
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    },
+    {
+      "ordinal": 4,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/web/src/components/device/DeviceWorkspace.tsx",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "ec00a1f37e7493dbba6b74b678ec2d6065ed1db3400f2d915242dd78c8faedf9",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "44391eb6449c233d17a645d2903c2306a0ac0f98368d862820998c93379af041",
+      "patch_fragment_sha256": "1306e890305a7198f391efeba155726df16d24a5b07a1d03bf336243bdf4cfd6",
+      "effect_sha256": "3a9f532ab257aab321ab160d32c256189092685931be427d85562db546c8a4ea",
+      "operation_indexes": [
+        4
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "additive-text"
+    },
+    {
+      "ordinal": 5,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "docs/user/devices.md",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "25d6e867771f7c2664a16292d888ad98dc234d2ce007f68d91e37b18c346d05f",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "ecc19200fcf2c71b5493b1ade103646dec5826505c91bd95c061affb8ebf90ea",
+      "patch_fragment_sha256": "c49f34a2fa570384b63a5d0eb736caf40e90ace45d704c9136875c1096c4a181",
+      "effect_sha256": "ef9f7fd655319a4269f227099fc43f84b310a8587065b1cf6404a42adf4c5a5b",
+      "operation_indexes": [
+        5
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "additive-text"
+    }
+  ],
+  "reasons": []
+}

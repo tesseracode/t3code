@@ -1,0 +1,6 @@
+ .../features/devices/DevicePreviewRouteScreen.tsx  | 40 ++++++++++++++++++----
+ .../src/components/device/DeviceControlsRail.tsx   |  6 ++++
+ apps/web/src/components/device/DevicePanel.tsx     |  7 ++--
+ apps/web/src/components/device/DeviceWorkspace.tsx |  2 ++
+ docs/user/devices.md                               |  5 +++
+ 5 files changed, 48 insertions(+), 12 deletions(-)
