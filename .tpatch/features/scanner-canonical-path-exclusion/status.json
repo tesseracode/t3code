@@ -1,0 +1,23 @@
+{
+  "id": "scanner-canonical-path-exclusion",
+  "slug": "scanner-canonical-path-exclusion",
+  "title": "Fix canonical configured-root exclusion in history discovery (#33): exclude symlink aliases of managed base/worktree directories on macOS without changing Copilot history semantics.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-14T03:09:17Z",
+  "updated_at": "2026-11-14T03:09:40Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-14T03:09:34Z",
+    "base_commit": "edaafaa1d0715000cb44acb06ea75a0058dbd5e4",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-session-import",
+      "kind": "hard"
+    }
+  ]
+}

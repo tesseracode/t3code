@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "feature": "scanner-canonical-path-exclusion",
+  "producer": "record",
+  "patch_present": true,
+  "recipe_present": true,
+  "recipe_decodable": true,
+  "patch_sha256": "fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879",
+  "recipe_sha256": "54c06a9fbb5bd8e7e9f2fc751364d292a9b055516b35c735a31b4e283c2a6115",
+  "reference": {
+    "kind": "commit",
+    "commit": "edaafaa1d0715000cb44acb06ea75a0058dbd5e4",
+    "preimage_set_sha256": "4988f1de4ebe3b53ed3c5414c482a354d48cbc0119c8f48d4596adf41253d657"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "apps/server/src/project/AgentSessionScanner.ts"
+    ],
+    "claim_ids": []
+  },
+  "coverage_status": "complete",
+  "cross_base_status": "consumer-derivation-required",
+  "effects": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/server/src/project/AgentSessionScanner.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "e4a4e6bb1f0b485efb163263e1ab987693323d7a9f2f26566583703145cb1df3",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "3bc6902d5626fc8dcedef347aed64c30bd7aad93977ec371739aebf4a2e8f4e8",
+      "patch_fragment_sha256": "fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879",
+      "effect_sha256": "f5fada6d6c483728d1df8790a6a907eb1028423c0369f3af3f3ac0d80a047709",
+      "operation_indexes": [
+        1
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "additive-text"
+    }
+  ],
+  "reasons": []
+}
