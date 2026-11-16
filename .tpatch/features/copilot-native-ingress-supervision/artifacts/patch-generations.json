@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "feature": "copilot-native-ingress-supervision",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_011468d89566",
+      "kind": "record",
+      "patch_sha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+      "git_patch_id": "f61fd32287fcc34d9867587afb0cd15e015822a4",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-idle-agent-completion",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+          "parent_recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3"
+        },
+        {
+          "slug": "copilot-routing-late-telemetry",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+          "parent_recipe_sha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df"
+        },
+        {
+          "slug": "stable-main-preservation-v014",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+          "parent_recipe_sha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

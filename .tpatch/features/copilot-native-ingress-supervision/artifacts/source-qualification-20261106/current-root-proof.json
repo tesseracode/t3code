@@ -1,0 +1,26 @@
+{
+  "target": "0c550b84876fc1a74692dadb74c99aa9b46dcf99",
+  "results": [
+    {
+      "slug": "copilot-native-ingress-supervision",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "landing": "0c550b84876fc1a74692dadb74c99aa9b46dcf99",
+      "paths": [
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts"
+      ],
+      "patchSha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+      "recipeSha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+      "canonicalTree": "6979aa0306bb5369258a2f372f22e0c8865646c4",
+      "recipeTree": "6979aa0306bb5369258a2f372f22e0c8865646c4",
+      "includesFileModes": true,
+      "residual": [],
+      "exact": true
+    }
+  ],
+  "exact": true,
+  "method": "Independent strict whole-canonical forward application and direct execution of committed write-file recipes from each exact recorded landing parent.",
+  "excluded": [
+    ".tpatch administrative metadata only"
+  ]
+}

@@ -34,9 +34,11 @@ import {
   getModelSelectionStringOptionValue,
   getProviderOptionStatedValue,
 } from "@t3tools/shared/model";
+import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Schema from "effect/Schema";
 import * as Queue from "effect/Queue";
 import * as Option from "effect/Option";
@@ -264,7 +266,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
       const cwd = open.runtimePolicy.cwd ?? host.paths.cwd;
       const skillOwner = Symbol();
       const skillMutationSemaphore = yield* Semaphore.make(1);
-      const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
+      const events = yield* Queue.unbounded<
+        ProviderAdapter.ProviderAdapterV2Event,
+        ProviderAdapter.ProviderAdapterEventStreamError
+      >();
       const inbox = yield* Queue.unbounded<Ingress>();
       const now = yield* DateTime.now;
       const providerSession = {
@@ -1648,12 +1653,24 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         });
         yield* putItem(turn, id, item);
       });
-      yield* Stream.fromQueue(inbox).pipe(
+      const ingress = yield* Stream.fromQueue(inbox).pipe(
         Stream.runForEach((entry) => {
           if (entry.type === "drain") return Deferred.succeed(entry.receipt, undefined);
           if (entry.type === "accepted") return active?.idle ? terminal(active) : Effect.void;
           return entry.type === "event" ? onEvent(entry.event) : onRequest(entry);
         }),
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.interrupt
+            : new ProviderAdapter.ProviderAdapterEventStreamError({
+                driver: COPILOT_DRIVER,
+                providerSessionId: open.providerSessionId,
+                cause: Cause.squash(cause),
+              }),
+        ),
+        Effect.tapError((error) =>
+          Queue.fail(events, error).pipe(Effect.andThen(Queue.shutdown(inbox))),
+        ),
         Effect.forkScoped,
       );
 
@@ -1661,6 +1678,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         const receipt = yield* Deferred.make<void>();
         yield* Queue.offer(inbox, { type: "drain", receipt });
         yield* Deferred.await(receipt).pipe(
+          Effect.raceFirst(Fiber.join(ingress)),
           Effect.timeoutOption(15_000),
           Effect.flatMap((result) =>
             Effect.fromOption(result).pipe(
