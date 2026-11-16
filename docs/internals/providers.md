@@ -11,6 +11,18 @@ session or catalog state. For a new driver, start with [adding a provider](./add
 
 ## Process and account isolation
 
+An exclusive session's explicit last-thread detach sends
+`ProviderAdapterSessionDetached` to its consumers. Run execution accepts that
+signal only for the matching session and app thread, and finalizes the current
+attempt as interrupted under the usual atomic fence. It still interrupts native
+work and performs normal cleanup. The signal is distinct from unexpected stream
+failure, which continues to fail the run and hold same-provider queued work.
+Server shutdown still interrupts ingestion for restart recovery. Shared-session
+detach retains its per-thread interruption and unload path.
+If native interruption fails, the provider turn stays running in the projection.
+The next start repairs abandoned turns from both failed and interrupted runs
+before resuming the same native conversation; unsuccessful repair blocks startup.
+
 The `githubCopilot` driver in
 [`packages/provider-copilot`](../../packages/provider-copilot/src/server/driver.ts)
 uses SDK 1.0.8 in `copilot-cli` mode with the reviewed CLI 1.0.75 dependency closure.

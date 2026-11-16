@@ -10,6 +10,15 @@ rebases, the files Git brought in are left out. A file stays in the list when th
 committed it, or fixed a conflict in it. Use the branch comparison to review everything that changed
 against your base branch. Restore still returns the complete saved workspace.
 
+## Move a thread into a worktree
+
+Moving an active thread into a worktree stops its old provider session. That turn
+appears as interrupted rather than as a provider failure. If the move includes
+a continuation message, it can run automatically in the new workspace without
+requiring **Resume queue**. A genuine provider failure still pauses queued work.
+If stopping the old provider fails, the continuation must recover that turn before
+starting; it will not silently run alongside abandoned work.
+
 ## Connect an account
 
 Install Git and configure authentication on the machine running your T3 Code server. For a remote

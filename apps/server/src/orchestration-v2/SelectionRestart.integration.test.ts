@@ -29,6 +29,7 @@ import * as EffectWorker from "./EffectWorker.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
+import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
 import { checkpointWorkspace } from "@t3tools/provider-testing/replayWorkspace";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
@@ -278,6 +279,171 @@ function makeRestartAdapter(
       }),
   };
 }
+
+it.live.each(["workspace-detach", "unexpected-close"] as const)(
+  "preserves queued continuation semantics after %s",
+  (termination) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const cwd = yield* checkpointWorkspace(`handoff-${termination}`);
+        const nextCwd = yield* checkpointWorkspace(`handoff-${termination}-next`);
+        const threadId = ThreadId.make(`thread:handoff-${termination}`);
+        const state = yield* Ref.make<RestartAdapterState>({
+          activeTurn: null,
+          opened: [],
+          started: [],
+          closedSessionCount: 0,
+          failedReplacementOpen: false,
+        });
+        yield* Effect.gen(function* () {
+          const orchestrator = yield* Orchestrator.OrchestratorV2;
+          const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+          const eventSink = yield* EventSink.EventSinkV2;
+          const sessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
+          yield* orchestrator.dispatch({
+            type: "thread.create",
+            createdBy: "user",
+            creationSource: "web",
+            commandId: CommandId.make("handoff:create"),
+            threadId,
+            projectId: ProjectId.make("project:handoff"),
+            title: "Workspace handoff",
+            modelSelection: initialSelection,
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            branch: null,
+            worktreePath: cwd,
+          });
+          const running = yield* eventSink.stream({ threadId }).pipe(
+            Stream.filter(
+              ({ event }) =>
+                event.type === "provider-turn.updated" && event.payload.status === "running",
+            ),
+            Stream.take(1),
+            Stream.runDrain,
+            Effect.forkScoped,
+          );
+          yield* orchestrator.dispatch({
+            type: "message.dispatch",
+            createdBy: "user",
+            creationSource: "web",
+            commandId: CommandId.make("handoff:first"),
+            threadId,
+            messageId: MessageId.make("handoff:first"),
+            text: "Start work",
+            attachments: [],
+            modelSelection: initialSelection,
+            dispatchMode: { type: "start_immediately" },
+          });
+          yield* Fiber.join(running);
+          yield* worker.drain();
+          const before = yield* orchestrator.getThreadProjection(threadId);
+          const firstRun = before.runs[0]!;
+          const firstThread = before.providerThreads[0]!;
+          const continuationResolved = yield* eventSink
+            .stream({
+              threadId,
+              afterSequence: yield* eventSink.latestSequence({ threadId }),
+            })
+            .pipe(
+              Stream.filter(
+                ({ event }) =>
+                  (event.type === "run.updated" &&
+                    event.payload.ordinal === 2 &&
+                    event.payload.queueHeld === true) ||
+                  (event.type === "provider-turn.updated" &&
+                    event.payload.ordinal === 2 &&
+                    event.payload.status === "running"),
+              ),
+              Stream.take(1),
+              Stream.runDrain,
+              Effect.forkScoped,
+            );
+          const terminal = yield* eventSink
+            .stream({
+              threadId,
+              afterSequence: yield* eventSink.latestSequence({ threadId }),
+            })
+            .pipe(
+              Stream.filter(
+                ({ event }) =>
+                  event.type === "run.updated" &&
+                  event.payload.id === firstRun.id &&
+                  (event.payload.status === "interrupted" || event.payload.status === "failed"),
+              ),
+              Stream.take(1),
+              Stream.runDrain,
+              Effect.forkScoped,
+            );
+          if (termination === "workspace-detach") {
+            yield* orchestrator.dispatch({
+              type: "thread.metadata.update",
+              commandId: CommandId.make("handoff:bind"),
+              threadId,
+              worktreePath: nextCwd,
+              expectedWorktreePath: cwd,
+              branch: "candidate",
+            });
+          }
+          yield* orchestrator.dispatch({
+            type: "message.dispatch",
+            createdBy: "agent",
+            creationSource: "mcp",
+            commandId: CommandId.make("handoff:continue"),
+            threadId,
+            messageId: MessageId.make("handoff:continue"),
+            text: "Continue preserved work",
+            attachments: [],
+            modelSelection: initialSelection,
+            dispatchMode: { type: "queue_after_active" },
+          });
+          if (termination === "unexpected-close") {
+            assert.isNotNull(firstThread.providerSessionId);
+            yield* sessions.close(firstThread.providerSessionId!);
+          }
+          yield* worker.drain();
+          yield* Fiber.join(terminal);
+          yield* Fiber.join(continuationResolved);
+          yield* worker.drain();
+          const after = yield* orchestrator.getThreadProjection(threadId);
+          const captured = yield* Ref.get(state);
+          if (termination === "workspace-detach") {
+            assert.equal(after.thread.worktreePath, nextCwd);
+            assert.deepEqual(
+              after.runs.map((run) => run.status),
+              ["interrupted", "running"],
+            );
+            assert.deepEqual(
+              captured.started.map((turn) => turn.cwd),
+              [cwd, nextCwd],
+            );
+            assert.lengthOf(after.providerThreads, 1);
+            assert.deepEqual(
+              after.providerThreads[0]?.nativeThreadRef,
+              firstThread.nativeThreadRef,
+            );
+            assert.isFalse(after.turnItems.some((item) => item.type === "error"));
+            assert.isFalse(after.runs.some((run) => run.queueHeld));
+          } else {
+            assert.deepEqual(
+              after.runs.map((run) => run.status),
+              ["failed", "queued"],
+            );
+            assert.isTrue(after.runs[1]?.queueHeld);
+            assert.lengthOf(captured.started, 1);
+            assert.isTrue(after.turnItems.some((item) => item.type === "error"));
+          }
+        }).pipe(
+          Effect.provide(
+            ProviderReplayHarness.layerWithRegistry(
+              { name: `handoff-${termination}` },
+              ProviderAdapterRegistry.layerSingle(makeRestartAdapter(state, exclusiveCapabilities)),
+            ),
+          ),
+        );
+      }),
+    ),
+);
 
 it.live("retries a failed selection restart session open before completing", () =>
   Effect.scoped(

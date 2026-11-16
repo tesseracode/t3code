@@ -1,0 +1,23 @@
+{
+  "id": "workspace-handoff-recovery",
+  "slug": "workspace-handoff-recovery",
+  "title": "Issue #42: terminalize intentional workspace detachment without false provider failure or stranded queued continuation; preserve genuine failure queue protection, same native identity, and unrelated shared sessions.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-12T20:45:19Z",
+  "updated_at": "2026-11-13T05:47:26Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-12T20:56:29Z",
+    "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "verify": {
+    "verified_at": "2026-11-13T05:47:21Z",
+    "passed": true,
+    "recipe_hash_at_verify": "49c9d885fc2caf5fbc039e529135a5333789f3b7efd8348c142a334c07dc5e48",
+    "patch_hash_at_verify": "63c60325d843cc661cd733936110b3abb6b600b7f9c231624ffbd93c2eedb95e"
+  }
+}

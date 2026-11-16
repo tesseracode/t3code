@@ -1,0 +1,11 @@
+ .../ProviderSessionManager.test.ts                 | 128 ++++++++++------
+ .../src/orchestration-v2/ProviderSessionManager.ts |  19 ++-
+ .../ProviderTurnStartService.test.ts               |  88 ++++++-----
+ .../orchestration-v2/ProviderTurnStartService.ts   |   8 +-
+ .../orchestration-v2/RunExecutionService.test.ts   | 120 +++++++++++++++
+ .../src/orchestration-v2/RunExecutionService.ts    |  46 ++++--
+ .../SelectionRestart.integration.test.ts           | 166 +++++++++++++++++++++
+ docs/internals/providers.md                        |  12 ++
+ docs/user/source-control.md                        |   9 ++
+ .../provider-core/src/server/ProviderAdapter.ts    |  11 ++
+ 10 files changed, 499 insertions(+), 108 deletions(-)

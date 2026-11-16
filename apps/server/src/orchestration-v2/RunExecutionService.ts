@@ -555,6 +555,9 @@ export const RunExecutionServiceV2Error = Schema.Union([
 ]);
 export type RunExecutionServiceV2Error = typeof RunExecutionServiceV2Error.Type;
 
+const isRunExecutionIngestError = Schema.is(RunExecutionIngestError);
+const isSessionDetached = Schema.is(ProviderAdapter.ProviderAdapterSessionDetached);
+
 export interface RunExecutionServiceV2StartRootRunInput {
   readonly commandId: CommandId;
   readonly appThread: OrchestrationV2AppThread;
@@ -1492,16 +1495,24 @@ export const layer: Layer.Layer<
             }),
           ),
           // Server shutdown interrupts the subscription and leaves the run to
-          // restart recovery; every other failure fails the run.
+          // restart recovery. Explicit detach interrupts only its owning thread.
           Effect.catchCauseIf(
             (cause) => !Cause.hasInterruptsOnly(cause),
             (cause) =>
               Effect.gen(function* () {
                 const completedAt = yield* DateTime.now;
-                yield* Effect.logWarning("orchestration V2 provider event ingestion failed", {
-                  runId: input.run.id,
-                  cause,
-                });
+                const ingestError = Cause.squash(cause);
+                const detached =
+                  isRunExecutionIngestError(ingestError) &&
+                  isSessionDetached(ingestError.cause) &&
+                  ingestError.cause.providerSessionId === input.providerSessionId &&
+                  ingestError.cause.threadId === input.run.threadId;
+                if (!detached) {
+                  yield* Effect.logWarning("orchestration V2 provider event ingestion failed", {
+                    runId: input.run.id,
+                    cause,
+                  });
+                }
                 if (yield* Ref.get(rootRunFinalized)) return;
                 const providerThread = yield* Ref.get(latestProviderThread);
                 const routing = yield* Ref.get(eventRouting);
@@ -1557,10 +1568,27 @@ export const layer: Layer.Layer<
                   openRunOwnedSubagents: openSubagents,
                   ...(abandonedProviderTurn === null ? {} : { abandonedProviderTurn }),
                   completedAt,
-                  terminal: makeFailedTerminalEvent(
-                    makeProviderFailure({ cause: Cause.squash(cause), class: "unknown" }),
-                    latestItemOrdinal + 1,
-                  ),
+                  terminal: detached
+                    ? {
+                        type: "turn.terminal",
+                        driver: input.providerThread.driver,
+                        providerThreadId: input.providerThread.id,
+                        providerTurnId:
+                          routing.rootProviderTurnId ??
+                          input.attempt.providerTurnId ??
+                          idAllocator.derive.providerTurn({
+                            driver: input.providerThread.driver,
+                            nativeTurnId: `detached:${input.attempt.id}`,
+                          }),
+                        runOrdinal: input.run.ordinal,
+                        status: "interrupted",
+                        failure: null,
+                        threadDisposition: "reusable",
+                      }
+                    : makeFailedTerminalEvent(
+                        makeProviderFailure({ cause: ingestError, class: "unknown" }),
+                        latestItemOrdinal + 1,
+                      ),
                   failureItemPersisted: false,
                   refreshAfterTurn,
                 }).pipe(
