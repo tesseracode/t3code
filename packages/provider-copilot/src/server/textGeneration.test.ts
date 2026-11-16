@@ -4,6 +4,7 @@ import { ProviderInstanceId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as Logger from "effect/Logger";
 import * as Schema from "effect/Schema";
 import { CopilotSettings } from "../settings.ts";
 import { makeTextGeneration } from "./textGeneration.ts";
@@ -132,6 +133,8 @@ describe("Copilot background text generation", () => {
       for (const scenario of cases) {
         let created = false;
         let stopped = false;
+        const logs: unknown[] = [];
+        const logger = Logger.make(({ message }) => logs.push(message));
         const generation = makeTextGeneration(
           settings,
           {},
@@ -159,18 +162,33 @@ describe("Copilot background text generation", () => {
             }),
           },
         );
-        const result = yield* Effect.exit(
-          generation.generateThreadTitle({
+        const failure = yield* generation
+          .generateThreadTitle({
             cwd: "/workspace",
-            message: "Title",
+            message: "private-prompt-sentinel",
             modelSelection: {
               instanceId: ProviderInstanceId.make("githubCopilot"),
               model: scenario.model ?? "auto",
               options: [{ id: "autoTier", value: scenario.tier }],
             },
-          }),
+          })
+          .pipe(Effect.flip, Effect.provide(Logger.layer([logger], { mergeWithExisting: false })));
+        assert.include(
+          failure.detail,
+          scenario.discoveryFailure ? "routing discovery failed." : "routing selection failed.",
         );
-        assert.isTrue(Exit.isFailure(result));
+        assert.deepEqual(logs, [
+          [
+            "Copilot background generation failed",
+            {
+              operation: "generateThreadTitle",
+              providerInstanceId: "githubCopilot",
+              model: scenario.model ?? "auto",
+              autoTier: scenario.tier,
+              reasoningEffort: undefined,
+            },
+          ],
+        ]);
         assert.isFalse(created);
         assert.isTrue(stopped);
       }
@@ -236,6 +254,7 @@ describe("Copilot background text generation", () => {
     Effect.gen(function* () {
       let sent = false;
       let deleted = false;
+      const nativeFailure = new Error("Reset failed.");
       const generation = makeTextGeneration(
         settings,
         {},
@@ -252,7 +271,7 @@ describe("Copilot background text generation", () => {
               sessionId: "ephemeral",
               disconnect: async () => {},
               setModel: async () => {
-                throw new Error("Reset failed.");
+                throw nativeFailure;
               },
               sendAndWait: async () => {
                 sent = true;
@@ -262,8 +281,8 @@ describe("Copilot background text generation", () => {
           }),
         },
       );
-      const result = yield* Effect.exit(
-        generation.generateThreadTitle({
+      const failure = yield* generation
+        .generateThreadTitle({
           cwd: "/workspace",
           message: "Title",
           modelSelection: {
@@ -271,9 +290,10 @@ describe("Copilot background text generation", () => {
             model: "auto",
             options: [{ id: "autoTier", value: false }],
           },
-        }),
-      );
-      assert.isTrue(Exit.isFailure(result));
+        })
+        .pipe(Effect.flip);
+      assert.include(failure.detail, "routing reset failed.");
+      assert.strictEqual(failure.cause, nativeFailure);
       assert.isTrue(deleted);
       assert.isFalse(sent);
     }),

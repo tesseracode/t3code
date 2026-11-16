@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-text-generation-failure-diagnostics",
+  "completed_at": "2026-11-06T08:11:13Z",
+  "base_commit": "83efed3d9cf01d911d7d77c0e987ede131c71d08",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "11 focused generator and title-lifecycle tests passed; diagnostic-shape and SDK cause preservation asserted."
+}

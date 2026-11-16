@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-06",
+  "source": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+  "sdk": "1.0.28",
+  "runtime": "1.0.105",
+  "protocol": 3,
+  "scope": "Actual native SDK sessions against an isolated loopback-only OpenAI-compatible inference fixture; not vendor/Fusion or shipped-package qualification.",
+  "scenarios": [
+    {
+      "name": "503-twice-then-success",
+      "result": "completed",
+      "requests": 3,
+      "event_counts": {
+        "user.message": 1,
+        "model.turn_retry": 2,
+        "assistant.turn_retry": 2
+      },
+      "native_identity_unchanged": true
+    },
+    {
+      "name": "503-permanent",
+      "result": "failed",
+      "requests": 6,
+      "event_counts": {
+        "user.message": 1,
+        "model.turn_retry": 5,
+        "assistant.turn_retry": 5,
+        "session.error": 1
+      },
+      "native_identity_unchanged": true
+    },
+    {
+      "name": "401-permanent",
+      "result": "failed",
+      "requests": 3,
+      "event_counts": {
+        "user.message": 1,
+        "model.turn_retry": 2,
+        "assistant.turn_retry": 2,
+        "session.error": 1
+      },
+      "native_identity_unchanged": true
+    }
+  ],
+  "t3_outer_retries": 0,
+  "vendor_inference_requests": 0,
+  "tools_executed": 0,
+  "live_profiles_changed": 0,
+  "cleanup": "SDK sessions disconnected, owned native client stopped, loopback listener closed and owned disposable home removed.",
+  "decision": "No generic outer prompt retry or event-stream reconnection implemented without an admitted-request-preserving recovery contract."
+}
