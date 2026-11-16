@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "feature": "copilot-root-aborted-idle",
+  "producer": "record",
+  "patch_present": true,
+  "recipe_present": true,
+  "recipe_decodable": true,
+  "patch_sha256": "2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963",
+  "recipe_sha256": "1397679380a80b9b583a88cd9437b2d017aa48a939be64ba06478aeccf0f7eb3",
+  "reference": {
+    "kind": "commit",
+    "commit": "3e6a6d4ee53d7f6c02109d5731df745cf997fd7c",
+    "preimage_set_sha256": "395d7e1b29f4b85c94a6dd92f72c3c9b367ad62ab4414ab9e18d9de05e00732d"
+  },
+  "capture": {
+    "mode": "working-tree-all",
+    "pathspecs": [
+      "docs/user/providers-copilot.md",
+      "packages/provider-copilot/src/server/adapter.test.ts",
+      "packages/provider-copilot/src/server/adapter.ts"
+    ],
+    "claim_ids": []
+  },
+  "coverage_status": "complete",
+  "cross_base_status": "consumer-derivation-required",
+  "effects": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "docs/user/providers-copilot.md",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "a0bc6f71b03e212596b34cfc2c12c3af23fe3161fab5caa341d744dc4010efee",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "da040598e295ffff659f367ce4d96082042ff4dad01b6b12a5d039e73785d0b8",
+      "patch_fragment_sha256": "26804ffdae30c77337aa34c35a50354e99f1dabbf50b2ea1645225eeb1dd8a8e",
+      "effect_sha256": "6767d3fe2ebbfef0081a391fa6ee8c38b67883c6839bf5c09a5fa2e818feeb1a",
+      "operation_indexes": [
+        1
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.test.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "de6fcb7281fab1739c20a0ec65b365b6fac7be71e4b8160eb8bdbce7e1960dd5",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "eda16f009e00ad09aa6df9e3eb8826d3bbe0112d3d935436d3c52061d8ecdbca",
+      "patch_fragment_sha256": "51225282bf8cb02757044bd755a4ae7cf5e7501146ac90c038cacce23feff072",
+      "effect_sha256": "c2be04f641b6e3d93df35add83515d37d2c6386803bfedb5257490076c629ce0",
+      "operation_indexes": [
+        2
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    },
+    {
+      "ordinal": 3,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "edecb137a67b6a42f39b144479f331bc0f2d53063d9bcdf39d72f2700c31ae42",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "905ab02d4fc7b729edf55940a67b95ca69b823116b5ed71730be4267663593f0",
+      "patch_fragment_sha256": "db02181f59b02996bdb66ebf82f6f1b2f3077ff0000b5d266607169434f54408",
+      "effect_sha256": "42ff13f51fa23141049e1750d0aea06c46221398d95f91ef0b601e51be8de1c5",
+      "operation_indexes": [
+        3
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    }
+  ],
+  "reasons": []
+}

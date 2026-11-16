@@ -1,0 +1,4 @@
+ docs/user/providers-copilot.md                     |  6 +++-
+ .../provider-copilot/src/server/adapter.test.ts    | 32 +++++++++++++++++++---
+ packages/provider-copilot/src/server/adapter.ts    |  5 +++-
+ 3 files changed, 37 insertions(+), 6 deletions(-)

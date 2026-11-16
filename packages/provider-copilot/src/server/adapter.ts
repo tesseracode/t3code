@@ -1188,8 +1188,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
           case "session.plan_changed":
             yield* refreshPlan().pipe(Effect.ignore);
             return;
+          case "assistant.idle":
           case "session.idle":
-            if (!turn) return;
+            if (!turn || (event.type === "assistant.idle" && !event.data.aborted)) return;
+            // Cancellation can idle the root while attached shells still defer session.idle.
+            if (event.data.aborted) turn.interrupted = true;
             turn.idle = true;
             yield* refreshTasks().pipe(Effect.ignore);
             yield* terminal(turn);

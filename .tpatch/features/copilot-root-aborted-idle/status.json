@@ -1,0 +1,27 @@
+{
+  "id": "copilot-root-aborted-idle",
+  "slug": "copilot-root-aborted-idle",
+  "title": "Confirm interruption on explicit root Copilot assistant.idle aborted=true when attached shells defer session.idle (#44). Preserve normal model-step and child boundaries, same native identity, retained background shells and native-ingress supervision. Adapter source qualification only; real native Stop/restart remains an external gate.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-16T06:01:19Z",
+  "updated_at": "2026-11-16T06:02:34Z",
+  "last_command": "record",
+  "notes": "landed at 2026-11-16T06:03:46Z",
+  "apply": {
+    "completed_at": "2026-11-16T06:02:33Z",
+    "base_commit": "3e6a6d4ee53d7f6c02109d5731df745cf997fd7c",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-native-ingress-supervision",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-idle-agent-completion",
+      "kind": "hard"
+    }
+  ]
+}

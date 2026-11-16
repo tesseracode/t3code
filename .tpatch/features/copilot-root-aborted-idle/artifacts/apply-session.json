@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-root-aborted-idle",
+  "completed_at": "2026-11-16T06:02:33Z",
+  "base_commit": "3e6a6d4ee53d7f6c02109d5731df745cf997fd7c",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Frozen regression failed before change: root assistant.idle remained running. Both Copilot source suites now pass 44 tests; no real native Stop/restart run."
+}

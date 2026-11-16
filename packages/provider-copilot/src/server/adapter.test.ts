@@ -1604,6 +1604,7 @@ describe("native Copilot V2", () => {
           fake.emit("assistant.message_delta", { messageId: "reply", deltaContent: "Hello" });
           fake.emit("assistant.turn_end", { turnId: "model-step" });
           fake.emit("assistant.idle");
+          fake.emit("assistant.idle", { aborted: true }, "child");
           fake.emit("session.idle", {}, "child");
           fake.emit("assistant.message", { messageId: "child", content: "Child only" }, "child");
           let snapshot = yield* drain();
@@ -1710,12 +1711,15 @@ describe("native Copilot V2", () => {
       ),
   );
 
-  it.effect(
-    "resumes the same native identity after restart and emits an interrupted rather than successful turn",
-    () =>
+  it.effect.each(["session.idle", "assistant.idle"] as const)(
+    "resumes the same native identity and confirms interruption on root %s with an attached shell",
+    (idleEvent) =>
       provide(
         Effect.gen(function* () {
           const fake = fakeSdk();
+          fake.session.abort = async () => {
+            fake.emit(idleEvent, { aborted: true });
+          };
           fake.session.getEvents = async () => [
             {
               type: "assistant.message",
@@ -1740,12 +1744,32 @@ describe("native Copilot V2", () => {
             ["Previous response"],
           );
           yield* start();
+          fake.setTasks({
+            tasks: [
+              {
+                id: "retained-server",
+                type: "shell",
+                status: "running",
+                description: "Retained dev server",
+                command: "fixture-service",
+                attachmentMode: "attached",
+                startedAt: "2026-10-29T00:00:00Z",
+              },
+            ],
+          });
+          fake.emit("session.background_tasks_changed");
           const snapshot = yield* drain();
           yield* runtime.interruptTurn({
             providerThread: thread,
             providerTurnId: snapshot.providerTurns[0]!.id,
           });
-          assert.equal((yield* drain()).providerTurns[0]?.status, "interrupted");
+          const interrupted = yield* drain();
+          assert.equal(interrupted.providerTurns[0]?.status, "interrupted");
+          assert.equal(
+            interrupted.providerThread.pendingBackgroundTasks?.[0]?.taskId,
+            "retained-server",
+          );
+          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
         }),
       ),
   );
