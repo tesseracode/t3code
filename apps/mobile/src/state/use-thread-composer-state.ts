@@ -1,6 +1,6 @@
 import { useComposerAttachmentActions } from "./use-composer-attachment-actions";
 import * as Dialog from "../components/ui/Dialog";
-import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
+import { AGENT_SESSION_SNAPSHOT_NOTICE, AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { readEnvironmentScope } from "./session";
 import { useAtomValue } from "@effect/atom-react";
 import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
@@ -492,6 +492,13 @@ export function useThreadComposerState() {
       hasAttachmentsOrContext: boolean,
     ) => Promise<boolean | "responded">,
   ) => {
+    if (selectedThreadShell?.sessionSnapshot !== undefined) {
+      setThreadComposerError(
+        scopedThreadKey(selectedThreadShell.environmentId, selectedThreadShell.id),
+        AGENT_SESSION_SNAPSHOT_NOTICE,
+      );
+      return null;
+    }
     if (
       selectedThreadShell &&
       selectedEnvironmentRuntime?.connectionState === "connected" &&

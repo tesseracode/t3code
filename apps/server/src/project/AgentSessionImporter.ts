@@ -24,10 +24,13 @@ import {
 } from "@t3tools/contracts";
 import { normalizeProjectPathForComparison } from "@t3tools/shared/path";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
+import * as Hex from "effect/encoding/Hex";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
@@ -166,6 +169,8 @@ function messageEvents(input: {
 }
 
 const make = Effect.gen(function* () {
+  const crypto = yield* Crypto.Crypto;
+  const path = yield* Path.Path;
   const scanner = yield* AgentSessionScanner.AgentSessionScanner;
   const orchestrator = yield* Orchestrator.OrchestratorV2;
   const projects = yield* ProjectService.ProjectService;
@@ -223,8 +228,25 @@ const make = Effect.gen(function* () {
           return;
         }
         const source = outcome.source;
+        const isSnapshot = source.provider === "githubCopilot";
+        const storageIdentity = isSnapshot
+          ? Hex.encode(
+              yield* crypto
+                .digest(
+                  "SHA-256",
+                  new TextEncoder().encode(path.dirname(path.dirname(source.filePath))),
+                )
+                .pipe(
+                  Effect.mapError(
+                    (cause) => new AgentSessionScanError({ operation: "read-projects", cause }),
+                  ),
+                ),
+            )
+          : null;
         const threadId = ThreadId.make(
-          `import:${source.providerInstanceId}:${source.providerSessionId}`,
+          isSnapshot
+            ? `import-snapshot:${source.providerInstanceId}:${storageIdentity}:${source.providerSessionId}`
+            : `import:${source.providerInstanceId}:${source.providerSessionId}`,
         );
         if (outcome._tag === "AlreadyImported") {
           importedThreadIds.add(threadId);
@@ -250,23 +272,25 @@ const make = Effect.gen(function* () {
             });
           }
           const driver = ProviderDriverKind.make(thread.source);
-          const persistRuntime = runtimes.upsert(
-            {
-              threadId,
-              providerName: driver,
-              providerInstanceId: thread.providerInstanceId,
-              adapterKey: driver,
-              runtimeMode: DEFAULT_RUNTIME_MODE,
-              status: "stopped",
-              lastSeenAt: thread.updatedAt,
-              resumeCursor:
-                thread.source === "codex"
-                  ? { threadId: thread.providerSessionId }
-                  : { threadId, resume: thread.providerSessionId },
-              runtimePayload: { cwd: project.workspaceRoot },
-            },
-            { onConflict: "ignore" },
-          );
+          const persistRuntime = isSnapshot
+            ? Effect.void
+            : runtimes.upsert(
+                {
+                  threadId,
+                  providerName: driver,
+                  providerInstanceId: thread.providerInstanceId,
+                  adapterKey: driver,
+                  runtimeMode: DEFAULT_RUNTIME_MODE,
+                  status: "stopped",
+                  lastSeenAt: thread.updatedAt,
+                  resumeCursor:
+                    thread.source === "codex"
+                      ? { threadId: thread.providerSessionId }
+                      : { threadId, resume: thread.providerSessionId },
+                  runtimePayload: { cwd: project.workspaceRoot },
+                },
+                { onConflict: "ignore" },
+              );
           const existing = yield* Effect.option(orchestrator.getThreadRecords(threadId, []));
           if (Option.isSome(existing)) {
             if (existing.value.thread.projectId !== input.projectId) {
@@ -280,7 +304,7 @@ const make = Effect.gen(function* () {
               return yield* new AgentSessionThreadModifiedError({ threadId });
             }
             yield* persistRuntime;
-            yield* runtimes.recordImportedTranscript({ threadId, source });
+            if (!isSnapshot) yield* runtimes.recordImportedTranscript({ threadId, source });
             return true;
           }
 
@@ -306,8 +330,19 @@ const make = Effect.gen(function* () {
             worktreePath: null,
             linkedPullRequest: null,
             branchPullRequest: null,
-            activeProviderThreadId: providerThreadId,
+            activeProviderThreadId: isSnapshot ? null : providerThreadId,
             historyOrigin: "v1_import",
+            ...(storageIdentity === null
+              ? {}
+              : {
+                  sessionSnapshot: {
+                    kind: "copilot_text_snapshot" as const,
+                    providerInstanceId: thread.providerInstanceId,
+                    nativeSessionId: thread.providerSessionId,
+                    storageIdentity,
+                    capturedAt: DateTime.formatIso(yield* DateTime.now),
+                  },
+                }),
             lineage: {
               parentThreadId: null,
               relationshipToParent: null,
@@ -352,7 +387,7 @@ const make = Effect.gen(function* () {
           };
 
           const committed = yield* eventSink.write({
-            unlessNativeThreadOwned: providerThread,
+            ...(isSnapshot ? {} : { unlessNativeThreadOwned: providerThread }),
             events: [
               {
                 id: EventId.make(`${IMPORT_EVENT_PREFIX}:thread:${threadId}:created`),
@@ -365,20 +400,26 @@ const make = Effect.gen(function* () {
               ...thread.messages.flatMap((message, index) =>
                 messageEvents({ threadId, index, message }),
               ),
-              {
-                id: EventId.make(`${IMPORT_EVENT_PREFIX}:provider-thread:${providerThreadId}`),
-                type: "provider-thread.updated",
-                threadId,
-                driver,
-                providerInstanceId: thread.providerInstanceId,
-                occurredAt: updatedAt,
-                payload: providerThread,
-              },
+              ...(isSnapshot
+                ? []
+                : [
+                    {
+                      id: EventId.make(
+                        `${IMPORT_EVENT_PREFIX}:provider-thread:${providerThreadId}`,
+                      ),
+                      type: "provider-thread.updated" as const,
+                      threadId,
+                      driver,
+                      providerInstanceId: thread.providerInstanceId,
+                      occurredAt: updatedAt,
+                      payload: providerThread,
+                    },
+                  ]),
             ],
           });
           if (committed.length === 0) return null;
           yield* persistRuntime;
-          yield* runtimes.recordImportedTranscript({ threadId, source });
+          if (!isSnapshot) yield* runtimes.recordImportedTranscript({ threadId, source });
           return true;
         }).pipe(
           Effect.catch((cause) =>

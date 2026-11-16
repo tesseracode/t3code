@@ -27,6 +27,7 @@ import * as Stream from "effect/Stream";
 import { isBareGitConfig, parseOriginUrlFromGitConfig } from "@t3tools/shared/git";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { normalizeProjectPathForComparison } from "@t3tools/shared/path";
+import { CopilotSettings } from "@t3tools/provider-copilot/settings";
 import { repositoryPathFromRemoteUrl } from "@t3tools/source-control-core/server/SourceControlProvider";
 
 import * as ServerConfig from "../config.ts";
@@ -77,6 +78,10 @@ const CodexTurnMetadata = Schema.Struct({
 });
 
 const TranscriptRecord = Schema.Struct({
+  id: Schema.optional(Schema.String),
+  parentId: Schema.optional(Schema.NullOr(Schema.String)),
+  agentId: Schema.optional(Schema.String),
+  ephemeral: Schema.optional(Schema.Boolean),
   type: Schema.optional(Schema.String),
   timestamp: Schema.optional(Schema.String),
   cwd: Schema.optional(Schema.String),
@@ -87,6 +92,24 @@ const TranscriptRecord = Schema.Struct({
   isMeta: Schema.optional(Schema.Boolean),
   isCompactSummary: Schema.optional(Schema.Boolean),
   message: Schema.optional(TranscriptMessage),
+  data: Schema.optional(
+    Schema.Struct({
+      sessionId: Schema.optional(Schema.String),
+      version: Schema.optional(Schema.Number),
+      selectedModel: Schema.optional(Schema.String),
+      newModel: Schema.optional(Schema.String),
+      model: Schema.optional(Schema.String),
+      title: Schema.optional(Schema.String),
+      content: Schema.optional(Schema.String),
+      context: Schema.optional(Schema.Struct({ cwd: Schema.optional(Schema.String) })),
+      fusion: Schema.optional(
+        Schema.Struct({
+          commitId: Schema.optional(Schema.String),
+          conversationScope: Schema.optional(Schema.String),
+        }),
+      ),
+    }),
+  ),
   payload: Schema.optional(
     Schema.Struct({
       id: Schema.optional(Schema.String),
@@ -104,12 +127,83 @@ const TranscriptRecord = Schema.Struct({
 
 const decodeClaudeSettings = Schema.decodeUnknownOption(ClaudeSettings);
 const decodeCodexSettings = Schema.decodeUnknownOption(CodexSettings);
+const decodeCopilotSettings = Schema.decodeUnknownOption(CopilotSettings);
 const decodeTranscriptRecord = Schema.decodeUnknownOption(Schema.fromJsonString(TranscriptRecord));
 const decodeTranscriptValue = Schema.decodeUnknownOption(TranscriptRecord);
 const selectTranscriptPath = createTranscriptJsonSelector(TranscriptRecord);
 const decodeCodexTurnMetadata = Schema.decodeUnknownOption(CodexTurnMetadata);
+const decodeCopilotEnvelope = Schema.decodeUnknownOption(
+  Schema.Struct({
+    id: Schema.NonEmptyString,
+    parentId: Schema.NullOr(Schema.NonEmptyString),
+    timestamp: Schema.DateTimeUtcFromString,
+    type: Schema.NonEmptyString,
+  }),
+);
 
 type DecodedTranscriptRecord = typeof TranscriptRecord.Type;
+
+const CopilotTranscriptRecord = Schema.Struct({
+  id: TranscriptRecord.fields.id,
+  parentId: TranscriptRecord.fields.parentId,
+  agentId: TranscriptRecord.fields.agentId,
+  ephemeral: TranscriptRecord.fields.ephemeral,
+  type: TranscriptRecord.fields.type,
+  timestamp: TranscriptRecord.fields.timestamp,
+  data: Schema.optional(Schema.Unknown),
+});
+const decodeCopilotRecord = Schema.decodeUnknownOption(CopilotTranscriptRecord);
+const decodeCopilotJsonRecord = Schema.decodeUnknownOption(
+  Schema.fromJsonString(CopilotTranscriptRecord),
+);
+const copilotDataSchemas = {
+  "session.start": Schema.Struct({
+    sessionId: Schema.String,
+    version: Schema.Number,
+    selectedModel: Schema.optional(Schema.String),
+    context: Schema.optional(Schema.Struct({ cwd: Schema.optional(Schema.String) })),
+  }),
+  "session.resume": Schema.Struct({ selectedModel: Schema.optional(Schema.String) }),
+  "session.model_change": Schema.Struct({ newModel: Schema.NonEmptyString }),
+  "session.title_changed": Schema.Struct({ title: Schema.NonEmptyString }),
+  "user.message": Schema.Struct({ content: Schema.String }),
+  "assistant.message": Schema.Struct({
+    content: Schema.String,
+    fusion: Schema.optional(
+      Schema.Struct({
+        commitId: Schema.optional(Schema.String),
+        conversationScope: Schema.optional(Schema.String),
+      }),
+    ),
+  }),
+};
+
+function normalizeCopilotRecord(
+  record: typeof CopilotTranscriptRecord.Type,
+): Option.Option<DecodedTranscriptRecord> {
+  const { data: rawData, ...envelope } = record;
+  const schema = Object.hasOwn(copilotDataSchemas, record.type ?? "")
+    ? copilotDataSchemas[record.type as keyof typeof copilotDataSchemas]
+    : undefined;
+  if (schema === undefined || (record.ephemeral && record.type !== "session.title_changed")) {
+    return Option.some(envelope);
+  }
+  return Schema.decodeUnknownOption(schema)(rawData).pipe(
+    Option.map((data) => ({ ...envelope, data })),
+  );
+}
+
+function decodeSessionRecord(
+  source: AgentSessionSource,
+  value: unknown,
+  json = false,
+): Option.Option<DecodedTranscriptRecord> {
+  return source === "githubCopilot"
+    ? (json ? decodeCopilotJsonRecord : decodeCopilotRecord)(value).pipe(
+        Option.flatMap(normalizeCopilotRecord),
+      )
+    : (json ? decodeTranscriptRecord : decodeTranscriptValue)(value);
+}
 
 interface AgentSessionTranscriptMetadata {
   readonly source: AgentSessionSource;
@@ -167,7 +261,13 @@ interface RawCandidate {
   readonly transcripts: ReadonlyArray<{
     readonly filePath: string;
     readonly mtimeMs: number | null;
+    readonly copilotOrigin?: CopilotTranscriptOrigin;
   }>;
+}
+
+interface CopilotTranscriptOrigin {
+  readonly canonicalRoot: string;
+  readonly identity: TranscriptIdentity;
 }
 
 interface TranscriptCandidate {
@@ -175,6 +275,7 @@ interface TranscriptCandidate {
   readonly mtimeMs: number;
   readonly providerInstanceId: ProviderInstanceId;
   readonly size: number;
+  readonly copilotOrigin?: CopilotTranscriptOrigin;
 }
 
 interface MetadataReadBudget {
@@ -294,7 +395,11 @@ export function parseAgentSessionTranscript(
   lines = splitTranscriptRecords(input.contents, MAX_IMPORT_RECORDS + 1),
 ): AgentSessionThread | null {
   if (lines.length > MAX_IMPORT_RECORDS) return null;
-  const records = lines.flatMap((line) => Option.toArray(decodeTranscriptRecord(line)));
+  const decoded = lines
+    .filter((line) => line.trim().length > 0)
+    .map((line) => decodeSessionRecord(input.source, line, true));
+  if (input.source === "githubCopilot" && decoded.some(Option.isNone)) return null;
+  const records = decoded.flatMap(Option.toArray);
   const claudeFields =
     input.source === "claudeAgent"
       ? records.reduce(foldClaudeFields, emptyClaudeFields)
@@ -307,6 +412,7 @@ function parseAgentSessionRecords(
   records: ReadonlyArray<DecodedTranscriptRecord>,
   claudeFields: ClaudeFields,
 ): AgentSessionThread | null {
+  if (input.source === "githubCopilot") return parseCopilotRecords(input, records);
   const fallbackTimestamp = DateTime.formatIso(DateTime.makeUnsafe(input.lastActiveAtMs));
   // Claude filenames are session IDs. Codex rollout filenames include extra
   // timestamp text, so only transcript metadata can provide a resumable ID.
@@ -498,8 +604,100 @@ function parseAgentSessionRecords(
   };
 }
 
+function parseCopilotRecords(
+  input: AgentSessionTranscriptMetadata,
+  records: ReadonlyArray<DecodedTranscriptRecord>,
+): AgentSessionThread | null {
+  const start = records.find((record) => record.type === "session.start" && !record.agentId);
+  if (
+    records[0] !== start ||
+    start?.data?.version !== 1 ||
+    start.data.sessionId !== input.fallbackSessionId ||
+    records.some((record) => record.type === "session.snapshot_rewind")
+  )
+    return null;
+  let title: string | undefined;
+  let model = start.data.selectedModel ?? null;
+  const messages: Array<AgentSessionThreadMessage> = [];
+  const seen = new Set<string>();
+  const fallback = DateTime.formatIso(DateTime.makeUnsafe(input.lastActiveAtMs));
+  let predecessor: string | null = null;
+  for (const record of records) {
+    const envelope = decodeCopilotEnvelope(record);
+    if (Option.isNone(envelope)) return null;
+    if (record.ephemeral) {
+      if (record.type === "session.title_changed" && !record.agentId) {
+        if (!record.data?.title?.trim()) return null;
+        title = record.data.title.trim();
+      }
+      continue;
+    }
+    const event = envelope.value;
+    if (seen.has(event.id) || event.parentId !== predecessor) return null;
+    seen.add(event.id);
+    predecessor = event.id;
+    if (
+      (record.type === "user.message" || record.type === "assistant.message") &&
+      record.data?.content === undefined
+    )
+      return null;
+    if (record.agentId) continue;
+    if (record.type === "session.start" && record !== start) return null;
+    if (record.type === "session.title_changed") {
+      if (!record.data?.title?.trim()) return null;
+      title = record.data.title.trim();
+    }
+    if (record.type === "session.model_change") {
+      if (!record.data?.newModel?.trim()) return null;
+      model = record.data.newModel;
+    }
+    if (record.type === "session.model_deselected") model = null;
+    if (record.type === "session.resume") {
+      if (record.data === undefined) return null;
+      model = record.data.selectedModel ?? model;
+    }
+    if (record.type !== "user.message" && record.type !== "assistant.message") continue;
+    const text = record.data?.content;
+    if (text === undefined || !text.trim()) continue;
+    const fusion = record.data?.fusion;
+    if (
+      record.type === "assistant.message" &&
+      fusion !== undefined &&
+      (fusion.commitId === undefined ||
+        (fusion.conversationScope !== undefined && fusion.conversationScope !== "root"))
+    )
+      continue;
+    messages.push({
+      role: record.type === "user.message" ? "user" : "assistant",
+      text,
+      createdAt: DateTime.formatIso(event.timestamp),
+    });
+  }
+  const firstUser = messages.find((message) => message.role === "user");
+  if (firstUser === undefined) return null;
+  const retained =
+    messages.length <= MAX_IMPORTED_MESSAGES
+      ? messages
+      : [firstUser, ...messages.slice(-(MAX_IMPORTED_MESSAGES - 1))];
+  return {
+    source: input.source,
+    providerInstanceId: input.providerInstanceId,
+    providerSessionId: input.fallbackSessionId,
+    title: title ?? deriveTitle(input.source, firstUser.text) ?? "Imported Copilot history",
+    model,
+    createdAt: normalizeTimestamp(start.timestamp, retained[0]?.createdAt ?? fallback),
+    updatedAt: fallback,
+    messages: retained,
+  };
+}
+
 function extractDecodedCwd(record: DecodedTranscriptRecord): string | null {
-  const cwd = record.cwd?.trim() || record.payload?.cwd?.trim();
+  const cwd =
+    record.cwd?.trim() ||
+    record.payload?.cwd?.trim() ||
+    (record.type === "session.start" && !record.agentId
+      ? record.data?.context?.cwd?.trim()
+      : undefined);
   return cwd && cwd.length > 0 ? cwd : null;
 }
 
@@ -507,6 +705,7 @@ function shouldRetainDecodedRecord(
   source: AgentSessionSource,
   record: DecodedTranscriptRecord,
 ): boolean {
+  if (source === "githubCopilot") return true;
   if (source === "claudeAgent") {
     if (isHiddenClaudeRecord(record) || (record.type !== "user" && record.type !== "assistant")) {
       return false;
@@ -557,6 +756,10 @@ function extractCwd(line: string, source: AgentSessionSource): string | null | f
   if (typeof parsed !== "object" || parsed === null) return null;
 
   const record = parsed as Record<string, unknown>;
+  if (source === "githubCopilot") {
+    const decoded = decodeSessionRecord(source, record);
+    return Option.isSome(decoded) ? extractDecodedCwd(decoded.value) : null;
+  }
   if (typeof record.cwd === "string" && record.cwd.trim().length > 0) {
     return record.cwd;
   }
@@ -643,6 +846,8 @@ export const make = Effect.gen(function* () {
   const excludedProjectAncestors = [
     path.join(homeDir, "Downloads"),
     path.join(homeDir, "Documents", "Codex"),
+    yield* fileSystem.realPath(baseDir).pipe(Effect.orElseSucceed(() => baseDir)),
+    yield* fileSystem.realPath(worktreesDir).pipe(Effect.orElseSucceed(() => worktreesDir)),
   ];
 
   const isExcludedProjectPath = (candidatePath: string) =>
@@ -722,6 +927,29 @@ export const make = Effect.gen(function* () {
     } as const;
   });
 
+  const validateCopilotOrigin = Effect.fn("AgentSessionScanner.validateCopilotOrigin")(function* (
+    filePath: string,
+    origin: CopilotTranscriptOrigin | undefined,
+    stats: FileSystem.File.Info,
+  ) {
+    if (origin === undefined) return true;
+    const realFile = yield* fileSystem.realPath(filePath).pipe(Effect.option);
+    const currentStats = yield* statOption(filePath);
+    if (
+      Option.isSome(realFile) &&
+      Option.isSome(currentStats) &&
+      realFile.value === filePath &&
+      path.dirname(path.dirname(realFile.value)) === origin.canonicalRoot &&
+      sameTranscriptIdentity(origin.identity, transcriptIdentity(filePath, stats)) &&
+      sameTranscriptIdentity(origin.identity, transcriptIdentity(filePath, currentStats.value))
+    )
+      return true;
+    yield* Effect.logWarning("Copilot transcript changed or escaped its discovered session root", {
+      filePath,
+    });
+    return false;
+  });
+
   const readCwd = Effect.fn("AgentSessionScanner.readCwd")(function* (
     source: AgentSessionSource,
     transcript: TranscriptCandidate,
@@ -741,6 +969,14 @@ export const make = Effect.gen(function* () {
       fileSystem.open(transcript.filePath, { flag: "r" }).pipe(
         Effect.flatMap((file) =>
           Effect.gen(function* () {
+            if (
+              !(yield* validateCopilotOrigin(
+                transcript.filePath,
+                transcript.copilotOrigin,
+                yield* file.stat,
+              ))
+            )
+              return null;
             const decoder = new TextDecoder();
             let remaining = "";
             let bytesRead = 0;
@@ -810,6 +1046,7 @@ export const make = Effect.gen(function* () {
     expected: ReturnType<typeof transcriptIdentity>,
     recordLimit: number,
     source: AgentSessionSource,
+    copilotOrigin?: CopilotTranscriptOrigin,
   ) {
     if (expected.size > MAX_IMPORTED_TRANSCRIPT_BYTES) return null;
 
@@ -817,7 +1054,11 @@ export const make = Effect.gen(function* () {
       fileSystem.open(filePath, { flag: "r" }).pipe(
         Effect.flatMap((file) =>
           Effect.gen(function* () {
-            if (!sameTranscriptIdentity(expected, transcriptIdentity(filePath, yield* file.stat))) {
+            const openedStats = yield* file.stat;
+            if (
+              !sameTranscriptIdentity(expected, transcriptIdentity(filePath, openedStats)) ||
+              !(yield* validateCopilotOrigin(filePath, copilotOrigin, openedStats))
+            ) {
               return null;
             }
             const records: Array<DecodedTranscriptRecord> = [];
@@ -843,7 +1084,8 @@ export const make = Effect.gen(function* () {
               reader.write(decoder.decode());
               recordCount += 1;
               if (recordCount > recordLimit) return false;
-              const decoded = decodeTranscriptValue(reader.finish());
+              const decoded = decodeSessionRecord(source, reader.finish());
+              if (source === "githubCopilot" && Option.isNone(decoded)) return false;
               if (Option.isSome(decoded)) {
                 if (Option.isNone(cwd)) cwd = Option.fromNullOr(extractDecodedCwd(decoded.value));
                 if (source === "claudeAgent") {
@@ -887,7 +1129,9 @@ export const make = Effect.gen(function* () {
             }
 
             if (recordStarted && !(yield* Effect.try(finishRecord))) return null;
-            return sameTranscriptIdentity(expected, transcriptIdentity(filePath, yield* file.stat))
+            const finalStats = yield* file.stat;
+            return sameTranscriptIdentity(expected, transcriptIdentity(filePath, finalStats)) &&
+              (yield* validateCopilotOrigin(filePath, copilotOrigin, finalStats))
               ? { records, recordCount, cwd, claudeFields }
               : null;
           }),
@@ -1030,6 +1274,38 @@ export const make = Effect.gen(function* () {
     },
   );
 
+  const discoverCopilotTranscripts = Effect.fn("AgentSessionScanner.discoverCopilotTranscripts")(
+    function* (homePath: string, providerInstanceId: ProviderInstanceId, operationBudget: number) {
+      const sessionsDir = path.join(homePath, "session-state");
+      const root = yield* fileSystem.realPath(sessionsDir).pipe(Effect.option);
+      if (Option.isNone(root)) return { transcripts: [], truncated: false };
+      const entries = yield* listDirectory(root.value);
+      const transcripts: Array<TranscriptCandidate> = [];
+      let remaining = operationBudget - 1;
+      for (const entry of entries) {
+        if (remaining < 2) break;
+        remaining -= 2;
+        const filePath = path.join(root.value, entry, "events.jsonl");
+        const realFile = yield* fileSystem.realPath(filePath).pipe(Effect.option);
+        if (Option.isNone(realFile) || realFile.value !== filePath) continue;
+        const stats = yield* statOption(filePath);
+        if (Option.isNone(stats) || stats.value.type !== "File" || Option.isNone(stats.value.mtime))
+          continue;
+        transcripts.push({
+          filePath,
+          mtimeMs: stats.value.mtime.value.getTime(),
+          providerInstanceId,
+          size: Number(stats.value.size),
+          copilotOrigin: {
+            canonicalRoot: root.value,
+            identity: transcriptIdentity(filePath, stats.value),
+          },
+        });
+      }
+      return { transcripts, truncated: entries.length * 2 > operationBudget - 1 };
+    },
+  );
+
   const groupTranscriptsByCwd = Effect.fn("AgentSessionScanner.groupTranscriptsByCwd")(function* (
     source: AgentSessionSource,
     transcripts: ReadonlyArray<TranscriptCandidate>,
@@ -1041,7 +1317,7 @@ export const make = Effect.gen(function* () {
         cwd: string;
         providerInstanceId: ProviderInstanceId;
         lastActiveAtMs: number;
-        transcripts: Array<{ filePath: string; mtimeMs: number }>;
+        transcripts: Array<TranscriptCandidate>;
       }
     >();
 
@@ -1081,7 +1357,7 @@ export const make = Effect.gen(function* () {
     const raw: Array<RawCandidate> = [];
     let truncated = false;
 
-    for (const source of ["claudeAgent", "codex"] as const) {
+    for (const source of ["claudeAgent", "codex", "githubCopilot"] as const) {
       const instances: Array<{
         readonly instanceId: ProviderInstanceId;
         readonly config: ProviderInstanceConfig;
@@ -1111,7 +1387,12 @@ export const make = Effect.gen(function* () {
       const homes: Array<{ homePath: string; providerInstanceId: ProviderInstanceId }> = [];
       const seenHomes = new Set<string>();
       for (const { instanceId, config: instance } of instances) {
-        const homeVariable = source === "claudeAgent" ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME";
+        const homeVariable =
+          source === "claudeAgent"
+            ? "CLAUDE_CONFIG_DIR"
+            : source === "codex"
+              ? "CODEX_HOME"
+              : "COPILOT_HOME";
         const environmentHome =
           instance.environment?.findLast((variable) => variable.name === homeVariable)?.value ??
           hostEnvironment[homeVariable];
@@ -1121,7 +1402,7 @@ export const make = Effect.gen(function* () {
           const config = decodeClaudeSettings(instance.config ?? {});
           if (Option.isNone(config)) continue;
           homePath = resolveClaudeConfigDir(config.value.homePath, environmentHome);
-        } else {
+        } else if (source === "codex") {
           const config = decodeCodexSettings(instance.config ?? {});
           if (Option.isNone(config)) continue;
           const codexSettings =
@@ -1134,6 +1415,21 @@ export const make = Effect.gen(function* () {
             Effect.provideService(Path.Path, path),
           );
           homePath = layout.sharedHomePath;
+        } else {
+          const config = decodeCopilotSettings(instance.config ?? {});
+          if (Option.isNone(config)) continue;
+          const environment = {
+            ...hostEnvironment,
+            ...Object.fromEntries(
+              instance.environment?.map(({ name, value }) => [name, value]) ?? [],
+            ),
+          };
+          const hostHome = environment.HOME || environment.USERPROFILE || homeDir;
+          const configured =
+            config.value.homePath.trim() ||
+            environmentHome?.trim() ||
+            path.join(hostHome, ".copilot");
+          homePath = path.resolve(expandHomePath(configured, hostHome));
         }
 
         const homeKey = `${source}\0${yield* directoryIdentity(homePath)}`;
@@ -1155,7 +1451,9 @@ export const make = Effect.gen(function* () {
         }
         const discovered = yield* source === "claudeAgent"
           ? discoverClaudeTranscripts(home.homePath, home.providerInstanceId, operationBudget)
-          : discoverCodexTranscripts(home.homePath, home.providerInstanceId, operationBudget);
+          : source === "codex"
+            ? discoverCodexTranscripts(home.homePath, home.providerInstanceId, operationBudget)
+            : discoverCopilotTranscripts(home.homePath, home.providerInstanceId, operationBudget);
         truncated ||= discovered.truncated;
         transcriptCandidates.push(...discovered.transcripts);
       }
@@ -1372,6 +1670,14 @@ export const make = Effect.gen(function* () {
           if (Option.isNone(stats) || stats.value.type !== "File") {
             return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
           }
+          if (
+            !(yield* validateCopilotOrigin(
+              transcript.filePath,
+              transcript.copilotOrigin,
+              stats.value,
+            ))
+          )
+            return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
           const identity = transcriptIdentity(transcript.filePath, stats.value);
           const completedSource = completed?.find(
             (source) =>
@@ -1401,6 +1707,7 @@ export const make = Effect.gen(function* () {
             identity,
             recordsRemaining,
             candidate.source,
+            transcript.copilotOrigin,
           );
           if (snapshot === null) {
             return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
@@ -1422,7 +1729,10 @@ export const make = Effect.gen(function* () {
             {
               source: candidate.source,
               providerInstanceId: candidate.providerInstanceId,
-              fallbackSessionId: path.basename(transcript.filePath, ".jsonl"),
+              fallbackSessionId:
+                candidate.source === "githubCopilot"
+                  ? path.basename(path.dirname(transcript.filePath))
+                  : path.basename(transcript.filePath, ".jsonl"),
               lastActiveAtMs: transcript.mtimeMs,
             },
             snapshot.records,

@@ -59,7 +59,8 @@ terminal metadata while the terminal process can use them.
 
 ## Import your projects
 
-T3 Code finds directories that Claude Code or Codex has used. Git repositories
+T3 Code finds directories that Claude Code, Codex or an enabled Copilot CLI
+account has used. Git repositories
 are listed first, newest activity on top. When the remote is on GitHub, the
 group shows the repository as `owner/name`. Clones with the same remote share
 one group. Directories that are not git repositories sit under "Other folders".
@@ -76,6 +77,10 @@ projects it found and warns when projects or conversations may be missing.
 
 Imported projects include Codex and Claude conversations active within the last
 30 days. You can continue those conversations in T3 Code.
+Copilot CLI conversations from that period are imported as read-only text
+snapshots, not resumable native sessions. They remain viewable on connected
+clients, including mobile. See [Copilot CLI history](providers-copilot.md#import-existing-cli-history)
+for limitations.
 
 Conversation import is best effort. T3 Code keeps the first user prompt and the
 newest remaining visible user and assistant messages, with 200 messages total.

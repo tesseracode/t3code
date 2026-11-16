@@ -2,8 +2,20 @@ import * as Schema from "effect/Schema";
 import { IsoDateTime, NonNegativeInt, ProjectId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
-export const AgentSessionSource = Schema.Literals(["claudeAgent", "codex"]);
+export const AgentSessionSource = Schema.Literals(["claudeAgent", "codex", "githubCopilot"]);
 export type AgentSessionSource = typeof AgentSessionSource.Type;
+
+export const AgentSessionSnapshot = Schema.Struct({
+  kind: Schema.Literal("copilot_text_snapshot"),
+  providerInstanceId: ProviderInstanceId,
+  nativeSessionId: Schema.String,
+  storageIdentity: Schema.String,
+  capturedAt: IsoDateTime,
+});
+export type AgentSessionSnapshot = typeof AgentSessionSnapshot.Type;
+
+export const AGENT_SESSION_SNAPSHOT_NOTICE =
+  "Read-only Copilot history snapshot. Tools, attachments and possibly older messages are omitted. Native continuation is unavailable because exclusive session ownership cannot be guaranteed.";
 
 export const AgentSessionImportSource = Schema.Struct({
   provider: AgentSessionSource,

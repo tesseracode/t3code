@@ -1,4 +1,5 @@
 import {
+  AGENT_SESSION_SNAPSHOT_NOTICE,
   AuthOrchestrationOperateScope,
   CommandId,
   EnvironmentId,
@@ -161,6 +162,8 @@ import { appAtomRegistry } from "./atom-registry";
 import { environmentSession } from "./session";
 import { dispatchingQueuedMessageIdAtom, editingQueuedMessageIdsAtom } from "./use-thread-outbox";
 import { createThreadOutboxDelivery } from "./threadOutboxDelivery";
+import { threadComposerErrorsAtom } from "./thread-composer-error";
+import { scopedThreadKey } from "../lib/scopedEntities";
 
 const message = (overrides: Partial<QueuedThreadMessage> = {}): QueuedThreadMessage => ({
   environmentId: EnvironmentId.make("secondary"),
@@ -211,6 +214,7 @@ beforeEach(() => {
   state.config.shellThreadFamilies = false;
   state.modelUnavailable.mockReset().mockReturnValue(false);
   state.familyMount.mockReset().mockReturnValue(() => {});
+  appAtomRegistry.set(threadComposerErrorsAtom, {});
   appAtomRegistry.set(state.threadShells, [state.thread]);
   appAtomRegistry.set(state.manager.queuedMessagesByThreadKeyAtom, {});
   appAtomRegistry.set(dispatchingQueuedMessageIdAtom, null);
@@ -231,6 +235,38 @@ beforeEach(() => {
     draftAttachments: attachments,
     pendingAttachmentIds: [],
   }));
+});
+
+it("restores a persisted snapshot message before settings, upload, or provider commands", async () => {
+  setOperateGrant("secondary", true);
+  appAtomRegistry.set(state.threadShells, [
+    { ...state.thread, sessionSnapshot: { source: "githubCopilot" } },
+  ]);
+  const queued = message({
+    runtimeMode: "approval-required",
+    interactionMode: "plan",
+    text: "Recovered offline message",
+  });
+  await state.manager.enqueue(queued);
+
+  await runDrain();
+
+  expect(remaining()).toEqual([]);
+  expect(state.draftText).toContain(queued.text);
+  expect(
+    appAtomRegistry.get(threadComposerErrorsAtom)[
+      scopedThreadKey(queued.environmentId, queued.threadId)
+    ],
+  ).toMatchObject({ message: AGENT_SESSION_SNAPSHOT_NOTICE, messageId: queued.messageId });
+  for (const command of [
+    state.runtime,
+    state.interaction,
+    state.metadata,
+    state.prepare,
+    state.start,
+  ]) {
+    expect(command).not.toHaveBeenCalled();
+  }
 });
 
 describe("queued PR checkout", () => {

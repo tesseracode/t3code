@@ -1,0 +1,13 @@
+diff --git a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts
+index 21352e9f4e..b38e36a23f 100644
+--- a/apps/server/src/project/AgentSessionScanner.ts
++++ b/apps/server/src/project/AgentSessionScanner.ts
+@@ -846,6 +846,8 @@ export const make = Effect.gen(function* () {
+   const excludedProjectAncestors = [
+     path.join(homeDir, "Downloads"),
+     path.join(homeDir, "Documents", "Codex"),
++    yield* fileSystem.realPath(baseDir).pipe(Effect.orElseSucceed(() => baseDir)),
++    yield* fileSystem.realPath(worktreesDir).pipe(Effect.orElseSucceed(() => worktreesDir)),
+   ];
+ 
+   const isExcludedProjectPath = (candidatePath: string) =>

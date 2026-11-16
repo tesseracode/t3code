@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "feature": "scanner-canonical-path-exclusion",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_658f9d6ac669",
+      "kind": "record",
+      "patch_sha256": "fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879",
+      "git_patch_id": "759544e5f5ee5549efe9f3b85366e02f2119f561",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "54c06a9fbb5bd8e7e9f2fc751364d292a9b055516b35c735a31b4e283c2a6115",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "edaafaa1d0715000cb44acb06ea75a0058dbd5e4",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "apps/server/src/project/AgentSessionScanner.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/project/AgentSessionScanner.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

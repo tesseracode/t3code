@@ -4,6 +4,7 @@ import {
   MessageId,
   EventId,
   NodeId,
+  type OrchestrationV2ServerCommand,
   type OrchestrationV2DomainEvent,
   PlanId,
   ProjectId,
@@ -60,6 +61,150 @@ const layerTest = Layer.mergeAll(
     ProviderAdapterRegistry.layerFromAdapters([adapter]),
     { databaseLayer: layerDatabase, runEffectWorker: false },
   ),
+);
+
+it.effect(
+  "keeps imported snapshots read-only through persisted dispatch while allowing organization",
+  () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const sink = yield* EventSink.EventSinkV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const threadId = ThreadId.make("snapshot:read-only");
+      const targetThreadId = ThreadId.make("snapshot:fork-target");
+      const now = yield* DateTime.now;
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("snapshot:create"),
+        threadId,
+        projectId: ProjectId.make("snapshot:project"),
+        title: "Snapshot",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        createdBy: "system",
+        creationSource: "server",
+      });
+      const original = yield* projections.getThread(threadId);
+      yield* sink.write({
+        events: [
+          {
+            id: EventId.make("snapshot:provenance"),
+            type: "thread.metadata-updated",
+            threadId,
+            occurredAt: now,
+            payload: {
+              ...original,
+              historyOrigin: "v1_import",
+              sessionSnapshot: {
+                kind: "copilot_text_snapshot",
+                nativeSessionId: "native-id",
+                providerInstanceId: instanceId,
+                storageIdentity: "storage-digest",
+                capturedAt: DateTime.formatIso(now),
+              },
+            },
+          },
+        ],
+      });
+      const commands: ReadonlyArray<OrchestrationV2ServerCommand> = [
+        {
+          type: "message.dispatch",
+          commandId: CommandId.make("snapshot:send"),
+          threadId,
+          messageId: MessageId.make("snapshot:message"),
+          text: "Do work",
+          attachments: [],
+          createdBy: "user",
+          creationSource: "mobile",
+          dispatchMode: { type: "start_immediately" },
+        },
+        {
+          type: "provider.switch",
+          commandId: CommandId.make("snapshot:switch"),
+          threadId,
+          modelSelection,
+        },
+        {
+          type: "thread.model-selection.set",
+          commandId: CommandId.make("snapshot:model"),
+          threadId,
+          modelSelection,
+        },
+        {
+          type: "thread.runtime-mode.set",
+          commandId: CommandId.make("snapshot:mode"),
+          threadId,
+          runtimeMode: "full-access",
+        },
+        {
+          type: "thread.metadata.update",
+          commandId: CommandId.make("snapshot:title-generation"),
+          threadId,
+          regenerateTitle: true,
+        },
+        {
+          type: "thread.metadata.update",
+          commandId: CommandId.make("snapshot:workspace"),
+          threadId,
+          worktreePath: "/another-workspace",
+        },
+        {
+          type: "thread.fork",
+          commandId: CommandId.make("snapshot:fork"),
+          sourceThreadId: threadId,
+          targetThreadId,
+          sourcePoint: { type: "latest_stable" },
+          createdBy: "user",
+          creationSource: "mcp",
+        },
+        {
+          type: "thread.merge_back",
+          commandId: CommandId.make("snapshot:merge"),
+          sourceThreadId: threadId,
+          targetThreadId,
+          sourcePoint: { type: "latest_stable" },
+          createdBy: "user",
+          creationSource: "mcp",
+        },
+      ];
+      for (const command of commands) {
+        const result = yield* orchestrator.dispatch(command).pipe(Effect.result);
+        assert.isTrue(Result.isFailure(result));
+        if (Result.isFailure(result)) assert.include(result.failure.message, "read-only");
+        assert.deepEqual(yield* outbox.listByCommandId(command.commandId), []);
+      }
+      yield* orchestrator.dispatch({
+        type: "thread.metadata.update",
+        commandId: CommandId.make("snapshot:rename"),
+        threadId,
+        title: "Renamed snapshot",
+      });
+      yield* orchestrator.dispatch({
+        type: "thread.pin",
+        commandId: CommandId.make("snapshot:pin"),
+        threadId,
+      });
+      yield* orchestrator.dispatch({
+        type: "thread.archive",
+        commandId: CommandId.make("snapshot:archive"),
+        threadId,
+      });
+      yield* orchestrator.dispatch({
+        type: "thread.unarchive",
+        commandId: CommandId.make("snapshot:unarchive"),
+        threadId,
+      });
+      const shell = yield* projections.getThreadShell(threadId);
+      assert.equal(shell?.title, "Renamed snapshot");
+      assert.equal(shell?.sessionSnapshot?.nativeSessionId, "native-id");
+      const records = yield* projections.getThreadRecords(threadId, ["runs", "providerThreads"]);
+      assert.deepEqual(records.runs, []);
+      assert.deepEqual(records.providerThreads, []);
+    }).pipe(Effect.provide(layerTest)),
 );
 
 it.effect(

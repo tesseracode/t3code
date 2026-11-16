@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
 import type {
   AgentSessionProjectCandidate,
+  AgentSessionSource,
   EnvironmentId,
   ProjectId,
   ProviderInstanceId,
@@ -1403,7 +1404,7 @@ function ImportStep({
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6">
           <Spinner size="lg" tone="muted" />
           <p className="text-center text-sm text-muted-foreground">
-            Looking for projects from Claude Code and Codex…
+            Looking for projects from Claude Code, Codex and Copilot CLI…
           </p>
         </div>
         <div className="flex justify-end">
@@ -1418,7 +1419,7 @@ function ImportStep({
   return (
     <StepShell
       title="Import your projects"
-      description="Import projects and conversations from Claude Code and Codex on your selected computers."
+      description="Import projects and conversations from your selected computers. Copilot CLI history is a read-only text snapshot; native continuation is unavailable."
     >
       {candidates.length > 0 ? (
         <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -1480,7 +1481,7 @@ function ImportStep({
                   </div>
                 ) : scanCandidates.length === 0 ? (
                   <p className="py-2 text-sm text-muted-foreground">
-                    No existing Claude Code or Codex projects found.
+                    No existing Claude Code, Codex or Copilot CLI projects found.
                   </p>
                 ) : null}
                 {scan.data?.truncated ? (
@@ -1720,14 +1721,14 @@ function ImportRowMeta({
   threadCount,
   lastActiveAt,
 }: {
-  readonly sources: ReadonlyArray<"claudeAgent" | "codex"> | null;
+  readonly sources: ReadonlyArray<AgentSessionSource> | null;
   readonly threadCount: number;
   readonly lastActiveAt: string | null;
 }) {
   const relative = lastActiveAt === null ? null : formatRelativeTime(lastActiveAt);
   const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
   return (
-    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
+    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
       <span className="flex size-4 items-center justify-center">
         {sources?.includes("claudeAgent") ? (
           <span role="img" aria-label="Claude Code">
@@ -1745,6 +1746,17 @@ function ImportRowMeta({
             <ProviderInstanceIcon
               driverKind={ProviderDriverKind.make("codex")}
               displayName="Codex"
+              iconClassName="size-3"
+            />
+          </span>
+        ) : null}
+      </span>
+      <span className="flex size-4 items-center justify-center">
+        {sources?.includes("githubCopilot") ? (
+          <span role="img" aria-label="Copilot CLI (read-only snapshot)">
+            <ProviderInstanceIcon
+              driverKind={ProviderDriverKind.make("githubCopilot")}
+              displayName="Copilot CLI"
               iconClassName="size-3"
             />
           </span>
