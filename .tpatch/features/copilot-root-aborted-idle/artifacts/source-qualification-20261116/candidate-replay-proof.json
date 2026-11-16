@@ -1,0 +1,2596 @@
+{
+  "target": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+  "main": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+  "upstream": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "excludes": [
+    ".tpatch administrative metadata only"
+  ],
+  "includesFileModes": true,
+  "roots": [
+    {
+      "slug": "device-session-release",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "landing": "fe6a486505b5605c61034d0515f211ac0f014fc6",
+      "canonicalTree": "30f41030cb46092bb7397ae898ea84ceb5470381",
+      "recipeTree": "30f41030cb46092bb7397ae898ea84ceb5470381",
+      "patchSha256": "08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08",
+      "recipeSha256": "72be83ab03900c276c51b6751b73e485d43ad42b062472b9d5d69126cbf72e6d",
+      "parents": [],
+      "historicalStatusParents": [],
+      "residual": [],
+      "recipeResidual": [],
+      "trailers": "Tpatch-Feature: device-session-release\nTpatch-Patch-SHA: 08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08\nTpatch-Recipe-SHA: 72be83ab03900c276c51b6751b73e485d43ad42b062472b9d5d69126cbf72e6d\nTpatch-Base-Commit: 0490e7bb2753ee455d58f9832f6ea943af81b0e0\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "exact": true
+    },
+    {
+      "slug": "copilot-session-import",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "landing": "edaafaa1d0715000cb44acb06ea75a0058dbd5e4",
+      "canonicalTree": "b1a6c60559f18fda9c0f9e6a77564e7fbe00db89",
+      "recipeTree": "b1a6c60559f18fda9c0f9e6a77564e7fbe00db89",
+      "patchSha256": "09cb61d94051e31518518bbd7b76b2bd7501b6daadab32044b20c15c7ca7ac7b",
+      "recipeSha256": "3b1595c718dc1d6a436e01270fb01cf2b2f4ff59ca224682e24725a08d105ec4",
+      "parents": [],
+      "historicalStatusParents": [],
+      "residual": [],
+      "recipeResidual": [],
+      "trailers": "Tpatch-Feature: copilot-session-import\nTpatch-Patch-SHA: 09cb61d94051e31518518bbd7b76b2bd7501b6daadab32044b20c15c7ca7ac7b\nTpatch-Recipe-SHA: 3b1595c718dc1d6a436e01270fb01cf2b2f4ff59ca224682e24725a08d105ec4\nTpatch-Base-Commit: 0490e7bb2753ee455d58f9832f6ea943af81b0e0\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "exact": true
+    },
+    {
+      "slug": "scanner-canonical-path-exclusion",
+      "base": "edaafaa1d0715000cb44acb06ea75a0058dbd5e4",
+      "landing": "d7ff2a45390df46ec7370ce2ea2ba39cc6af4783",
+      "canonicalTree": "a91b8b571821b48ee4197bf01471e574900e2e3f",
+      "recipeTree": "a91b8b571821b48ee4197bf01471e574900e2e3f",
+      "patchSha256": "fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879",
+      "recipeSha256": "54c06a9fbb5bd8e7e9f2fc751364d292a9b055516b35c735a31b4e283c2a6115",
+      "parents": [],
+      "historicalStatusParents": [
+        {
+          "slug": "copilot-session-import",
+          "kind": "hard",
+          "generation": 3,
+          "matchesRecordedBase": true,
+          "note": "Original manifest has no dependency snapshot; compared unchanged original parent generation at recorded base."
+        }
+      ],
+      "residual": [],
+      "recipeResidual": [],
+      "trailers": "Tpatch-Feature: scanner-canonical-path-exclusion\nTpatch-Patch-SHA: fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879\nTpatch-Recipe-SHA: 54c06a9fbb5bd8e7e9f2fc751364d292a9b055516b35c735a31b4e283c2a6115\nTpatch-Base-Commit: edaafaa1d0715000cb44acb06ea75a0058dbd5e4\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "exact": true
+    },
+    {
+      "slug": "workspace-handoff-recovery",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "landing": "8c6c1e8badce2cb04cd253ab6d752ded6ed9faa2",
+      "canonicalTree": "1f6af2d7381a4ff679092ce702517b631b7454e0",
+      "recipeTree": "1f6af2d7381a4ff679092ce702517b631b7454e0",
+      "patchSha256": "63c60325d843cc661cd733936110b3abb6b600b7f9c231624ffbd93c2eedb95e",
+      "recipeSha256": "49c9d885fc2caf5fbc039e529135a5333789f3b7efd8348c142a334c07dc5e48",
+      "parents": [],
+      "historicalStatusParents": [],
+      "residual": [],
+      "recipeResidual": [],
+      "trailers": "Tpatch-Feature: workspace-handoff-recovery\nTpatch-Patch-SHA: 63c60325d843cc661cd733936110b3abb6b600b7f9c231624ffbd93c2eedb95e\nTpatch-Recipe-SHA: 49c9d885fc2caf5fbc039e529135a5333789f3b7efd8348c142a334c07dc5e48\nTpatch-Base-Commit: 0490e7bb2753ee455d58f9832f6ea943af81b0e0\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "exact": true
+    },
+    {
+      "slug": "copilot-native-ingress-supervision",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "landing": "0c550b84876fc1a74692dadb74c99aa9b46dcf99",
+      "canonicalTree": "6979aa0306bb5369258a2f372f22e0c8865646c4",
+      "recipeTree": "6979aa0306bb5369258a2f372f22e0c8865646c4",
+      "patchSha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+      "recipeSha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+      "parents": [
+        {
+          "slug": "copilot-idle-agent-completion",
+          "matchesManifest": true,
+          "generation": 1,
+          "manifestPatchSha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+          "manifestRecipeSha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
+          "actualPatchSha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+          "actualRecipeSha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
+          "manifestMatchesBytes": true
+        },
+        {
+          "slug": "copilot-routing-late-telemetry",
+          "matchesManifest": true,
+          "generation": 1,
+          "manifestPatchSha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+          "manifestRecipeSha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df",
+          "actualPatchSha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+          "actualRecipeSha256": "d2ea728ea2927fa958e78ffff9414a9183a27d5cf44f879525c89a0995c4b4d5",
+          "manifestMatchesBytes": false
+        },
+        {
+          "slug": "stable-main-preservation-v014",
+          "matchesManifest": true,
+          "generation": 1,
+          "manifestPatchSha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+          "manifestRecipeSha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f",
+          "actualPatchSha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+          "actualRecipeSha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f",
+          "manifestMatchesBytes": true
+        }
+      ],
+      "historicalStatusParents": [],
+      "residual": [],
+      "recipeResidual": [],
+      "trailers": "Tpatch-Feature: copilot-native-ingress-supervision\nTpatch-Patch-SHA: 3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e\nTpatch-Recipe-SHA: 7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548\nTpatch-Base-Commit: 0490e7bb2753ee455d58f9832f6ea943af81b0e0\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "exact": true
+    },
+    {
+      "slug": "copilot-text-generation-failure-diagnostics",
+      "base": "83efed3d9cf01d911d7d77c0e987ede131c71d08",
+      "landing": "62c69bff27e982b23fd23754703e4c757dfeaae1",
+      "canonicalTree": "b864b526abf4b9803eccfe5d9ad397244351b295",
+      "recipeTree": "b864b526abf4b9803eccfe5d9ad397244351b295",
+      "patchSha256": "2110e4d6aa3151331938fa4a3b22fe5bcaf24f5baa72a751d55ced25a579379f",
+      "recipeSha256": "449305587f19b6a7bc2190ffef87c35a2e0bcd4312c49b59208d2c8df3b2ad2e",
+      "parents": [
+        {
+          "slug": "copilot-background-routing",
+          "matchesManifest": true,
+          "generation": 1,
+          "manifestPatchSha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+          "manifestRecipeSha256": "d4aa6e25f3df994850c4d86fc97939c984ad2298d51c2c7b365972d01cc4bcb6",
+          "actualPatchSha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+          "actualRecipeSha256": "d4aa6e25f3df994850c4d86fc97939c984ad2298d51c2c7b365972d01cc4bcb6",
+          "manifestMatchesBytes": true
+        }
+      ],
+      "historicalStatusParents": [],
+      "residual": [],
+      "recipeResidual": [],
+      "trailers": "Tpatch-Feature: copilot-text-generation-failure-diagnostics\nTpatch-Patch-SHA: 2110e4d6aa3151331938fa4a3b22fe5bcaf24f5baa72a751d55ced25a579379f\nTpatch-Recipe-SHA: 449305587f19b6a7bc2190ffef87c35a2e0bcd4312c49b59208d2c8df3b2ad2e\nTpatch-Base-Commit: 83efed3d9cf01d911d7d77c0e987ede131c71d08\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "exact": true
+    },
+    {
+      "slug": "copilot-root-aborted-idle",
+      "base": "3e6a6d4ee53d7f6c02109d5731df745cf997fd7c",
+      "landing": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+      "canonicalTree": "d0d9cf1235e289cc527d2651f8c08bf7e2f1cee8",
+      "recipeTree": "d0d9cf1235e289cc527d2651f8c08bf7e2f1cee8",
+      "patchSha256": "2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963",
+      "recipeSha256": "1397679380a80b9b583a88cd9437b2d017aa48a939be64ba06478aeccf0f7eb3",
+      "parents": [
+        {
+          "slug": "copilot-idle-agent-completion",
+          "matchesManifest": true,
+          "generation": 1,
+          "manifestPatchSha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+          "manifestRecipeSha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
+          "actualPatchSha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+          "actualRecipeSha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
+          "manifestMatchesBytes": true
+        },
+        {
+          "slug": "copilot-native-ingress-supervision",
+          "matchesManifest": true,
+          "generation": 1,
+          "manifestPatchSha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+          "manifestRecipeSha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+          "actualPatchSha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+          "actualRecipeSha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+          "manifestMatchesBytes": true
+        }
+      ],
+      "historicalStatusParents": [],
+      "residual": [],
+      "recipeResidual": [],
+      "trailers": "Tpatch-Feature: copilot-root-aborted-idle\nTpatch-Patch-SHA: 2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963\nTpatch-Recipe-SHA: 1397679380a80b9b583a88cd9437b2d017aa48a939be64ba06478aeccf0f7eb3\nTpatch-Base-Commit: 3e6a6d4ee53d7f6c02109d5731df745cf997fd7c\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "exact": true
+    }
+  ],
+  "provenanceGaps": [
+    {
+      "priority": "P3",
+      "slug": "scanner-canonical-path-exclusion",
+      "parent": "copilot-session-import",
+      "reason": "Declared hard dependency is absent from the original generation snapshot; unchanged base comparison is not a captured attestation."
+    },
+    {
+      "priority": "P2",
+      "slug": "copilot-native-ingress-supervision",
+      "parent": "copilot-routing-late-telemetry",
+      "reason": "Inherited parent manifest checksum does not match committed artifact bytes.",
+      "capturedRecipeSha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df",
+      "actualRecipeSha256": "d2ea728ea2927fa958e78ffff9414a9183a27d5cf44f879525c89a0995c4b4d5"
+    }
+  ],
+  "composition": {
+    "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+    "orderedRoots": [
+      "device-session-release",
+      "copilot-session-import",
+      "scanner-canonical-path-exclusion",
+      "workspace-handoff-recovery",
+      "copilot-native-ingress-supervision",
+      "copilot-text-generation-failure-diagnostics",
+      "copilot-root-aborted-idle"
+    ],
+    "canonicalTree": "c273d9ac96a0229493eee0e484b3cec5c461f67d",
+    "recipeTree": "c273d9ac96a0229493eee0e484b3cec5c461f67d",
+    "residual": [],
+    "recipeResidual": [],
+    "composition": [
+      {
+        "slug": "device-session-release",
+        "patchSha256": "08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08",
+        "results": [
+          {
+            "header": "diff --git a/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx b/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/device/DeviceControlsRail.tsx b/apps/web/src/components/device/DeviceControlsRail.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/device/DevicePanel.tsx b/apps/web/src/components/device/DevicePanel.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/device/DeviceWorkspace.tsx b/apps/web/src/components/device/DeviceWorkspace.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/devices.md b/docs/user/devices.md",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-session-import",
+        "patchSha256": "09cb61d94051e31518518bbd7b76b2bd7501b6daadab32044b20c15c7ca7ac7b",
+        "results": [
+          {
+            "header": "diff --git a/apps/mobile/src/features/threads/ThreadDetailScreen.tsx b/apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts b/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/state/threadOutboxDelivery.ts b/apps/mobile/src/state/threadOutboxDelivery.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/state/use-thread-composer-state.ts b/apps/mobile/src/state/use-thread-composer-state.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts b/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProjectionStore.ts b/apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ThreadMessageIntake.ts b/apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionImporter.test.ts b/apps/server/src/project/AgentSessionImporter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionImporter.ts b/apps/server/src/project/AgentSessionImporter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionScanner.test.ts b/apps/server/src/project/AgentSessionScanner.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/ChatView.tsx b/apps/web/src/components/ChatView.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/onboarding/WelcomeWizard.tsx b/apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/welcome-wizard.md b/docs/user/welcome-wizard.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/models.ts b/packages/client-runtime/src/state/models.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/threadWorkflows.ts b/packages/client-runtime/src/state/threadWorkflows.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/agentSessions.ts b/packages/contracts/src/agentSessions.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "scanner-canonical-path-exclusion",
+        "patchSha256": "fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "workspace-handoff-recovery",
+        "patchSha256": "63c60325d843cc661cd733936110b3abb6b600b7f9c231624ffbd93c2eedb95e",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderSessionManager.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/RunExecutionService.test.ts b/apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/providers.md b/docs/internals/providers.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/source-control.md b/docs/user/source-control.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-native-ingress-supervision",
+        "patchSha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+        "results": [
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-text-generation-failure-diagnostics",
+        "patchSha256": "2110e4d6aa3151331938fa4a3b22fe5bcaf24f5baa72a751d55ced25a579379f",
+        "results": [
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-root-aborted-idle",
+        "patchSha256": "2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963",
+        "results": [
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      }
+    ],
+    "recipes": [
+      {
+        "slug": "device-session-release",
+        "recipeSha256": "72be83ab03900c276c51b6751b73e485d43ad42b062472b9d5d69126cbf72e6d",
+        "operations": [
+          {
+            "path": "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:5a7d6944bc3841f8083b9c07fec38edd37e13cf497ce3995e15843f2d019b3d4"
+          },
+          {
+            "path": "apps/web/src/components/device/DeviceControlsRail.tsx",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:24dd9e4fb217bda427054006717b481fea55e751c74d2547e90c1bde5d4f3f4a"
+          },
+          {
+            "path": "apps/web/src/components/device/DevicePanel.tsx",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:3b0e05dea08ab86d76dfe64c4ae9aa0c2d6335e803ae0096a735b1f602eced58"
+          },
+          {
+            "path": "apps/web/src/components/device/DeviceWorkspace.tsx",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:ec00a1f37e7493dbba6b74b678ec2d6065ed1db3400f2d915242dd78c8faedf9"
+          },
+          {
+            "path": "docs/user/devices.md",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:25d6e867771f7c2664a16292d888ad98dc234d2ce007f68d91e37b18c346d05f"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-session-import",
+        "recipeSha256": "3b1595c718dc1d6a436e01270fb01cf2b2f4ff59ca224682e24725a08d105ec4",
+        "operations": [
+          {
+            "path": "apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:7c89a438d6697ad9546376de8ac45863f6d11e6a912cef1e9c4fada30032bf50"
+          },
+          {
+            "path": "apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:10ce642c050fbf13a6c9662ff7d44d637c7ec1d10a86ef9efa459949347c483b"
+          },
+          {
+            "path": "apps/mobile/src/state/threadOutboxDelivery.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:84e988baa7b47d6ec1ea52626fc91eab80aaa0b63e2d8751aa681f9e35a91096"
+          },
+          {
+            "path": "apps/mobile/src/state/use-thread-composer-state.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:91d0e7b822ff2d6754af55d4ee601a160372fdda73d9d632fc9845a2f07ef993"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:2978a3e5f9e6615374343b365b14076d5fc4251440a927eb7382f4a174d44dfa"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/Orchestrator.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:6105242c5699e306c777f83e18a762df6d438dcb8b5f71798055ac93db0186f5"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:6a526d8180fad0bf808be648e963b562a92384f532a7ecb5d79b0d26838f4c5b"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:4f7ebbd7877ce0582b88368b3d08db966b2c84262cc70cc53ed813cec267ee11"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionImporter.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:05d642209455d814282d7ee91e4ea39c59f56c3873b5fea59868b30fb8c3a0bc"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionImporter.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:7797b771dc1b01260fc54a7ebac4885ed2421a797a126f72ef5d105bae99e4ed"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:18c4860dbc3e0e798c68183c9eb138d430ff411512b063bffb578012971b7259"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:357197fbfe6649942bbf1f6c05fced2abe92264efe012796338f02157f15ec0a"
+          },
+          {
+            "path": "apps/web/src/components/ChatView.tsx",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:31557b7cc5f787c271d7c7e716461c67fb19ea54c64c2292a366e7d618747c49"
+          },
+          {
+            "path": "apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:065f22c68b1185c246dbcb67cb50b263729f14929dfa9dd24e164cb52cc0af30"
+          },
+          {
+            "path": "docs/user/providers-copilot.md",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:ef2db6e194c5fa7ab893ec58b95c159ed139d7b9f08b70445f171ad4c7096f40"
+          },
+          {
+            "path": "docs/user/welcome-wizard.md",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:5ea6346175633a99de1e3d16eb567a3d51188e7bb49953c55bcec549b83ae8dc"
+          },
+          {
+            "path": "packages/client-runtime/src/state/models.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:5075bbbefdb330bfb3914f9b94b191f8fe8bef0a74ac2dd79ba92970f5625b38"
+          },
+          {
+            "path": "packages/client-runtime/src/state/threadWorkflows.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:afbbf51c74b9f0d7254be8964973b877a10c15df07e775409e5ada55480affb5"
+          },
+          {
+            "path": "packages/contracts/src/agentSessions.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:1c14f4a2da3a459bf7e52f82af0c54b837ca6cf6d5b3edcc82fe4e2971c0cabd"
+          },
+          {
+            "path": "packages/contracts/src/orchestrationV2.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:badca1ce004180156db0f3558b45be465e7ce99ba45c24ceee31689afdafe7b1"
+          }
+        ]
+      },
+      {
+        "slug": "scanner-canonical-path-exclusion",
+        "recipeSha256": "54c06a9fbb5bd8e7e9f2fc751364d292a9b055516b35c735a31b4e283c2a6115",
+        "operations": [
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:e4a4e6bb1f0b485efb163263e1ab987693323d7a9f2f26566583703145cb1df3"
+          }
+        ]
+      },
+      {
+        "slug": "workspace-handoff-recovery",
+        "recipeSha256": "49c9d885fc2caf5fbc039e529135a5333789f3b7efd8348c142a334c07dc5e48",
+        "operations": [
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:e17edfe871577f230f546ff0c79a2799310284afa8b916c50f001aa0ebe03676"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:1c06e27ee1eae606e5887159f46dfd029bc2b4fe107a1f025ba9b97f474e3fd0"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:14cd74ebc4068f81a23867ddb6152afc19947d06c076784d3f305b6b699ec010"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:6d2e6ed95a1f1d3ed39630aa6882e1dd54f08e4a88ada9ba7605724afcac13a6"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:b52b4564d24407690e6307010e9e596a18fa3d3ba604b6d02a2d1abd4c28c6e6"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:b4207ec06225878a63b7db1ac3dbba04a24c1ac768efdbbcb7885cd91293ea51"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:79a078b07c82c1b29b1737731170f5771f692d6e22bad24347ae7089719e412e"
+          },
+          {
+            "path": "docs/internals/providers.md",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:d1d89d6f40ec78d0f57fa7dbe8a1e12983531c21fc5e69aefca24ff4ed3cf732"
+          },
+          {
+            "path": "docs/user/source-control.md",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:b85439b3d2295f95346b8025a671a5eafce8f4220b68c09fe7f0d467114ad1b6"
+          },
+          {
+            "path": "packages/provider-core/src/server/ProviderAdapter.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:1bd26863c99b5c75da7456fde5acc277bab3ba2b22a73abe32cf71e5298b5f63"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-native-ingress-supervision",
+        "recipeSha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+        "operations": [
+          {
+            "path": "packages/provider-copilot/src/server/adapter.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:d3d04c5d4af229cac96404e03e7341d0274f30394a4dd1b70f6d2a53d4342ff5"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:aa33b8b9ab5551d363064e1af2376926722a30d21397bccbe6dfa1e0afc87b4d"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-text-generation-failure-diagnostics",
+        "recipeSha256": "449305587f19b6a7bc2190ffef87c35a2e0bcd4312c49b59208d2c8df3b2ad2e",
+        "operations": [
+          {
+            "path": "packages/provider-copilot/src/server/textGeneration.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "legacy-absent"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/textGeneration.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "legacy-absent"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-root-aborted-idle",
+        "recipeSha256": "1397679380a80b9b583a88cd9437b2d017aa48a939be64ba06478aeccf0f7eb3",
+        "operations": [
+          {
+            "path": "docs/user/providers-copilot.md",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:a0bc6f71b03e212596b34cfc2c12c3af23fe3161fab5caa341d744dc4010efee"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.test.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:de6fcb7281fab1739c20a0ec65b365b6fac7be71e4b8160eb8bdbce7e1960dd5"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.ts",
+            "type": "write-file",
+            "mode": "100644",
+            "preimage": "sha256:edecb137a67b6a42f39b144479f331bc0f2d53063d9bcdf39d72f2700c31ae42"
+          }
+        ]
+      }
+    ]
+  },
+  "fullCanonical": {
+    "base": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+    "orderedRoots": [
+      "copilot-cli-provider",
+      "session-search",
+      "copilot-sdk-license-notice",
+      "copilot-runtime-packaging-replay",
+      "phase1-foundation",
+      "attention-notifications",
+      "tpatch-local-capture-ignore",
+      "fork-maintenance-policy",
+      "fork-maintenance-check-scope",
+      "foundation-v014-client-compat",
+      "attention-policy-completion-watermarks",
+      "copilot-sdk-runtime-upgrade",
+      "copilot-sdk-v1-license-notices",
+      "copilot-fusion-model-selection",
+      "copilot-auto-default-routing",
+      "copilot-routing-late-telemetry",
+      "copilot-fusion-client-presentation",
+      "windows-preview-zip-artifact",
+      "linux-runtime-libatomic-prerequisite",
+      "copilot-fusion-runtime-transition",
+      "copilot-idle-agent-completion",
+      "copilot-background-routing",
+      "copilot-context-occupancy",
+      "copilot-extension-opt-out",
+      "provider-direct-dispatch-selection-restart",
+      "composer-shortcut-keyboard-guidance",
+      "copilot-runtime-knip-declaration",
+      "turn-fold-bottom-affordance",
+      "fork-patch-flow-convention",
+      "stable-main-preservation-v014",
+      "copilot-native-ingress-supervision",
+      "device-session-release",
+      "copilot-session-import",
+      "scanner-canonical-path-exclusion",
+      "workspace-handoff-recovery",
+      "copilot-text-generation-failure-diagnostics",
+      "copilot-root-aborted-idle"
+    ],
+    "roots": [
+      {
+        "slug": "copilot-cli-provider",
+        "patchSha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/package.json b/apps/server/package.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/provider/builtInDrivers.ts b/apps/server/src/provider/builtInDrivers.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/serverSettings.test.ts b/apps/server/src/serverSettings.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/serverSettings.ts b/apps/server/src/serverSettings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/providers.md b/docs/internals/providers.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/providerClients.ts b/packages/client-runtime/src/providerClients.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/package.json b/packages/provider-copilot/package.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/client.ts b/packages/provider-copilot/src/client.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server.ts b/packages/provider-copilot/src/server.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/capabilities.ts b/packages/provider-copilot/src/server/capabilities.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/driver.test.ts b/packages/provider-copilot/src/server/driver.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/driver.ts b/packages/provider-copilot/src/server/driver.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/tools.ts b/packages/provider-copilot/src/server/tools.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/testing.ts b/packages/provider-copilot/src/testing.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/tsconfig.json b/packages/provider-copilot/tsconfig.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "session-search",
+        "patchSha256": "e98b6ddf7a85432e3adb7ce5bb29ffc4cfae0a2d196c6239bd7d893955f20019",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ThreadFind.test.ts b/apps/server/src/orchestration-v2/ThreadFind.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ThreadFind.ts b/apps/server/src/orchestration-v2/ThreadFind.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/MessagesTimeline.logic.ts b/apps/web/src/components/chat/MessagesTimeline.logic.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/MessagesTimeline.tsx b/apps/web/src/components/chat/MessagesTimeline.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx b/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/ThreadFindBar.tsx b/apps/web/src/components/chat/ThreadFindBar.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx b/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/TimelineWorkGroupRows.tsx b/apps/web/src/components/chat/TimelineWorkGroupRows.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/threadFindHighlights.browser.test.tsx b/apps/web/src/components/chat/threadFindHighlights.browser.test.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/threadFindHighlights.ts b/apps/web/src/components/chat/threadFindHighlights.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/threadFindPosition.ts b/apps/web/src/components/chat/threadFindPosition.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/timelineRowContext.ts b/apps/web/src/components/chat/timelineRowContext.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/useThreadFind.ts b/apps/web/src/components/chat/useThreadFind.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/useThreadFindNavigation.ts b/apps/web/src/components/chat/useThreadFindNavigation.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/useThreadFindPositionReader.ts b/apps/web/src/components/chat/useThreadFindPositionReader.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/thread-find.md b/docs/internals/thread-find.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/threadFindText.ts b/packages/shared/src/threadFindText.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/threadSearch.test.ts b/packages/shared/src/threadSearch.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/threadSearch.ts b/packages/shared/src/threadSearch.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-sdk-license-notice",
+        "patchSha256": "d6be21044ffda12ef416021400bfc83a1c1dc6aa0f2f832c772e8e21e56d9a56",
+        "results": [
+          {
+            "header": "diff --git a/third-party-licenses.config.json b/third-party-licenses.config.json",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-runtime-packaging-replay",
+        "patchSha256": "097951c0d3a4fc2cb3948e24ea0f4b9d6890d665866f83f6b5317ac030e0d7ce",
+        "results": [
+          {
+            "header": "diff --git a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/app/DesktopClerk.test.ts b/apps/desktop/src/app/DesktopClerk.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/app/DesktopClerk.ts b/apps/desktop/src/app/DesktopClerk.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/app/DesktopConfig.ts b/apps/desktop/src/app/DesktopConfig.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/app/DesktopEnvironment.ts b/apps/desktop/src/app/DesktopEnvironment.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts b/apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/app/DesktopLegacyLocalStorage.ts b/apps/desktop/src/app/DesktopLegacyLocalStorage.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/app/DesktopUserData.test.ts b/apps/desktop/src/app/DesktopUserData.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/app/DesktopUserData.ts b/apps/desktop/src/app/DesktopUserData.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.test.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/desktop/src/wsl/DesktopWslEnvironment.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/operations/fork-native-preview.md b/docs/operations/fork-native-preview.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/operations/release.md b/docs/operations/release.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/package.json b/packages/shared/package.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/copilotRuntime.test.ts b/packages/shared/src/copilotRuntime.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/copilotRuntime.ts b/packages/shared/src/copilotRuntime.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/build-cli-archive.ts b/scripts/build-cli-archive.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/fork-preview-bootstrap.cjs b/scripts/fork-preview-bootstrap.cjs",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/fork-preview-manifest.mjs b/scripts/fork-preview-manifest.mjs",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/cli-external-packages.test.ts b/scripts/lib/cli-external-packages.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/cli-external-packages.ts b/scripts/lib/cli-external-packages.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/copilot-payload.ts b/scripts/lib/copilot-payload.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/fork-preview.test.ts b/scripts/lib/fork-preview.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/fork-preview.ts b/scripts/lib/fork-preview.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/runtime-external-dependencies.test.ts b/scripts/lib/runtime-external-dependencies.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/runtime-external-dependencies.ts b/scripts/lib/runtime-external-dependencies.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "phase1-foundation",
+        "patchSha256": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+        "results": [
+          {
+            "header": "diff --git a/apps/mobile/src/state/attention.ts b/apps/mobile/src/state/attention.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/state/tws.ts b/apps/mobile/src/state/tws.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/auth/RpcAuthorization.ts b/apps/server/src/auth/RpcAuthorization.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/observability/RpcInstrumentation.ts b/apps/server/src/observability/RpcInstrumentation.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/AttentionEvidence.ts b/apps/server/src/orchestration-v2/AttentionEvidence.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/AttentionSync.ts b/apps/server/src/orchestration-v2/AttentionSync.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/EffectWorker.test.ts b/apps/server/src/orchestration-v2/EffectWorker.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/EffectWorker.ts b/apps/server/src/orchestration-v2/EffectWorker.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/EventSink.ts b/apps/server/src/orchestration-v2/EventSink.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/FoundationProjection.test.ts b/apps/server/src/orchestration-v2/FoundationProjection.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/FoundationProjection.ts b/apps/server/src/orchestration-v2/FoundationProjection.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProjectionMaintenance.ts b/apps/server/src/orchestration-v2/ProjectionMaintenance.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations.test.ts b/apps/server/src/persistence/ForkMigrations.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations.ts b/apps/server/src/persistence/ForkMigrations.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.test.ts b/apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.ts b/apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/045_TwsBindings.test.ts b/apps/server/src/persistence/ForkMigrations/045_TwsBindings.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/045_TwsBindings.ts b/apps/server/src/persistence/ForkMigrations/045_TwsBindings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts b/apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts b/apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/049_TwsContext.ts b/apps/server/src/persistence/ForkMigrations/049_TwsContext.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/ForkMigrations/050_FoundationV2.ts b/apps/server/src/persistence/ForkMigrations/050_FoundationV2.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Layers/TwsBindings.test.ts b/apps/server/src/persistence/Layers/TwsBindings.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Layers/TwsBindings.ts b/apps/server/src/persistence/Layers/TwsBindings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Migrations.test.ts b/apps/server/src/persistence/Migrations.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Migrations.ts b/apps/server/src/persistence/Migrations.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/OrchestrationEventStore.ts b/apps/server/src/persistence/OrchestrationEventStore.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Services/ProjectionThreadAttentionAudit.ts b/apps/server/src/persistence/Services/ProjectionThreadAttentionAudit.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/persistence/Services/TwsBindings.ts b/apps/server/src/persistence/Services/TwsBindings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/server.ts b/apps/server/src/server.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/serverRuntimeStartup.autoPull.test.ts b/apps/server/src/serverRuntimeStartup.autoPull.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/serverRuntimeStartup.test.ts b/apps/server/src/serverRuntimeStartup.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/serverRuntimeStartup.ts b/apps/server/src/serverRuntimeStartup.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsBindingMatch.test.ts b/apps/server/src/tws/TwsBindingMatch.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsBindingMatch.ts b/apps/server/src/tws/TwsBindingMatch.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsCliAdapter.test.ts b/apps/server/src/tws/TwsCliAdapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsCliAdapter.ts b/apps/server/src/tws/TwsCliAdapter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsCliDecoder.test.ts b/apps/server/src/tws/TwsCliDecoder.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsCliDecoder.ts b/apps/server/src/tws/TwsCliDecoder.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsContextInference.ts b/apps/server/src/tws/TwsContextInference.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsContextModel.ts b/apps/server/src/tws/TwsContextModel.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsContextService.test.ts b/apps/server/src/tws/TwsContextService.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsContextService.ts b/apps/server/src/tws/TwsContextService.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsContextStore.ts b/apps/server/src/tws/TwsContextStore.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsExecutionResolver.ts b/apps/server/src/tws/TwsExecutionResolver.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsTopology.test.ts b/apps/server/src/tws/TwsTopology.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsTopology.ts b/apps/server/src/tws/TwsTopology.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsTopologyRefresh.ts b/apps/server/src/tws/TwsTopologyRefresh.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/runtimeLayer.ts b/apps/server/src/tws/runtimeLayer.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/ws.test.ts b/apps/server/src/ws.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/ws.ts b/apps/server/src/ws.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/settings/TwsIntegrationSettings.tsx b/apps/web/src/components/settings/TwsIntegrationSettings.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/settings/WorktreesSettings.tsx b/apps/web/src/components/settings/WorktreesSettings.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/settings/settingsSearch.ts b/apps/web/src/components/settings/settingsSearch.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/state/attention.ts b/apps/web/src/state/attention.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/state/tws.ts b/apps/web/src/state/tws.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/foundation.md b/docs/internals/foundation.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/tws-context.md b/docs/internals/tws-context.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/tws.md b/docs/user/tws.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/attentionSync.test.ts b/packages/client-runtime/src/attentionSync.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/attentionSync.ts b/packages/client-runtime/src/attentionSync.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/rpc/client.ts b/packages/client-runtime/src/rpc/client.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/attention.test.ts b/packages/client-runtime/src/state/attention.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/attention.ts b/packages/client-runtime/src/state/attention.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/attentionNotifications.test.ts b/packages/client-runtime/src/state/attentionNotifications.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/attentionNotifications.ts b/packages/client-runtime/src/state/attentionNotifications.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/attentionProjection.ts b/packages/client-runtime/src/state/attentionProjection.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/tws.ts b/packages/client-runtime/src/state/tws.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/attention.test.ts b/packages/contracts/src/attention.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/attention.ts b/packages/contracts/src/attention.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/attentionSync.test.ts b/packages/contracts/src/attentionSync.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/attentionSync.ts b/packages/contracts/src/attentionSync.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/clientRpcPermissions.ts b/packages/contracts/src/clientRpcPermissions.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/environment.ts b/packages/contracts/src/environment.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/rpc.ts b/packages/contracts/src/rpc.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/twsBindings.test.ts b/packages/contracts/src/twsBindings.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/twsBindings.ts b/packages/contracts/src/twsBindings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/twsContext.test.ts b/packages/contracts/src/twsContext.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/twsContext.ts b/packages/contracts/src/twsContext.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/workItem.test.ts b/packages/contracts/src/workItem.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/workItem.ts b/packages/contracts/src/workItem.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "attention-notifications",
+        "patchSha256": "6feb99da51a9427557a215cfcfcde7a8b8f7de07489c01d724556f2876e860d1",
+        "results": [
+          {
+            "header": "diff --git a/apps/web/src/attentionNotificationPolicy.test.ts b/apps/web/src/attentionNotificationPolicy.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/attentionNotificationPolicy.ts b/apps/web/src/attentionNotificationPolicy.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/AppSidebarLayout.tsx b/apps/web/src/components/AppSidebarLayout.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/CommandPalette.tsx b/apps/web/src/components/CommandPalette.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts b/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/ThreadNotificationCoordinator.tsx b/apps/web/src/components/ThreadNotificationCoordinator.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/attention/AttentionInbox.tsx b/apps/web/src/components/attention/AttentionInbox.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/attention/AttentionSidebarItem.tsx b/apps/web/src/components/attention/AttentionSidebarItem.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx b/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/attention/attentionInbox.logic.test.ts b/apps/web/src/components/attention/attentionInbox.logic.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/attention/attentionInbox.logic.ts b/apps/web/src/components/attention/attentionInbox.logic.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/attention/useOpenAttentionInbox.ts b/apps/web/src/components/attention/useOpenAttentionInbox.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/settings/NotificationSettings.tsx b/apps/web/src/components/settings/NotificationSettings.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/settings/settingsSearch.ts b/apps/web/src/components/settings/settingsSearch.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/sidebar/SidebarChrome.tsx b/apps/web/src/components/sidebar/SidebarChrome.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/routeTree.gen.ts b/apps/web/src/routeTree.gen.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/routes/_chat.attention.tsx b/apps/web/src/routes/_chat.attention.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/threadNotifications.test.ts b/apps/web/src/threadNotifications.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/threadNotifications.ts b/apps/web/src/threadNotifications.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/attention-notifications.md b/docs/internals/attention-notifications.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/overview.md b/docs/internals/overview.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/attention.md b/docs/user/attention.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/notifications.md b/docs/user/notifications.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/thread-sidebar.md b/docs/user/thread-sidebar.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/keybindings.ts b/packages/contracts/src/keybindings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/settings.test.ts b/packages/contracts/src/settings.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "tpatch-local-capture-ignore",
+        "patchSha256": "2534669ad7e0a2e7fe801555eab601a73bba3a5a6a4a52ff109b13e03f65e729",
+        "results": [
+          {
+            "header": "diff --git a/.gitignore b/.gitignore",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "fork-maintenance-policy",
+        "patchSha256": "fba7028e530ab08be19b311c57a0d89f8ef1aefc4a1c7cbe7bec5ba5e4c12368",
+        "results": [
+          {
+            "header": "diff --git a/docs/internals/fork-maintenance.md b/docs/internals/fork-maintenance.md",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "fork-maintenance-check-scope",
+        "patchSha256": "dc0acca276a3999c02e1da071d3b01fad31b1c931bb02f5b2407cde5386011a4",
+        "results": [
+          {
+            "header": "diff --git a/.github/scripts/ci-changes.cjs b/.github/scripts/ci-changes.cjs",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/ci-changes.test.ts b/scripts/lib/ci-changes.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/vite.config.ts b/vite.config.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "foundation-v014-client-compat",
+        "patchSha256": "9ac66594f926d0d35387331473d86d5e8059f00edbef5b773b46daf5084609a4",
+        "results": [
+          {
+            "header": "diff --git a/apps/mobile/src/state/attention.ts b/apps/mobile/src/state/attention.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/state/tws.ts b/apps/mobile/src/state/tws.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/tws/TwsCliDecoder.ts b/apps/server/src/tws/TwsCliDecoder.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/tws-context.md b/docs/internals/tws-context.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/attention.test.ts b/packages/client-runtime/src/state/attention.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/attention.ts b/packages/client-runtime/src/state/attention.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "attention-policy-completion-watermarks",
+        "patchSha256": "c93803f59c055124c2c58954dea3b2a92891d891a7e12e65c5c235cdf40b1369",
+        "results": [
+          {
+            "header": "diff --git a/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts b/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/ThreadNotificationCoordinator.logic.ts b/apps/web/src/components/ThreadNotificationCoordinator.logic.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/ThreadNotificationCoordinator.tsx b/apps/web/src/components/ThreadNotificationCoordinator.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/attention-notifications.md b/docs/internals/attention-notifications.md",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-sdk-runtime-upgrade",
+        "patchSha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/package.json b/apps/server/package.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/package.json b/packages/provider-copilot/package.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/tools.ts b/packages/provider-copilot/src/server/tools.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/copilotRuntime.test.ts b/packages/shared/src/copilotRuntime.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/copilotRuntime.ts b/packages/shared/src/copilotRuntime.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/cli-external-packages.test.ts b/scripts/lib/cli-external-packages.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/scripts/lib/copilot-payload.ts b/scripts/lib/copilot-payload.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-sdk-v1-license-notices",
+        "patchSha256": "65933499a1fe2a21bed526161e9333733a571ef59a61db46490c51a1212a9cb2",
+        "results": [
+          {
+            "header": "diff --git a/scripts/lib/third-party-licenses.test.ts b/scripts/lib/third-party-licenses.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/third-party-licenses.config.json b/third-party-licenses.config.json",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-fusion-model-selection",
+        "patchSha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
+        "results": [
+          {
+            "header": "diff --git a/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx b/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx b/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/features/threads/thread-settings-options.test.ts b/apps/mobile/src/features/threads/thread-settings-options.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/lib/providerOptions.ts b/apps/mobile/src/lib/providerOptions.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/lib/threadActivity.ts b/apps/mobile/src/lib/threadActivity.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts b/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderEventIngestor.ts b/apps/server/src/orchestration-v2/ProviderEventIngestor.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/TraitsPicker.tsx b/apps/web/src/components/chat/TraitsPicker.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/session-logic.ts b/apps/web/src/session-logic.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/activity-log.md b/docs/user/activity-log.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/modelTraits.ts b/packages/client-runtime/src/modelTraits.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/work-log/itemDetail.test.ts b/packages/client-runtime/src/work-log/itemDetail.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/work-log/itemDetail.ts b/packages/client-runtime/src/work-log/itemDetail.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/model.ts b/packages/contracts/src/model.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/orchestrationV2.test.ts b/packages/contracts/src/orchestrationV2.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/fusion.test.ts b/packages/provider-copilot/src/server/fusion.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/fusion.ts b/packages/provider-copilot/src/server/fusion.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/model.test.ts b/packages/shared/src/model.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/model.ts b/packages/shared/src/model.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-auto-default-routing",
+        "patchSha256": "08fb073397bbcf694f48141c4345d6376caff996ab489ae88b58483f711c8e2a",
+        "results": [
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-routing-late-telemetry",
+        "patchSha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+        "results": [
+          {
+            "header": "diff --git a/docs/user/activity-log.md b/docs/user/activity-log.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/fusion.test.ts b/packages/provider-copilot/src/server/fusion.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/fusion.ts b/packages/provider-copilot/src/server/fusion.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-fusion-client-presentation",
+        "patchSha256": "1200ced90fd0e8fedeb4b3c8a5dd94de8b47e2e9d48170e2687c3bece46b4b8f",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts b/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/TurnItemPositionStore.ts b/apps/server/src/orchestration-v2/TurnItemPositionStore.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/activity-log.md b/docs/user/activity-log.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/modelTraits.test.ts b/packages/client-runtime/src/modelTraits.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/model.ts b/packages/contracts/src/model.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/model.test.ts b/packages/shared/src/model.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/shared/src/model.ts b/packages/shared/src/model.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "windows-preview-zip-artifact",
+        "patchSha256": "3935397e093aa88b0361399991329857942a3bad8aa9e52d3ed33c62bde061a1",
+        "results": [
+          {
+            "header": "diff --git a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml",
+            "result": "strict-reverse-proves-existing-postimage"
+          }
+        ]
+      },
+      {
+        "slug": "linux-runtime-libatomic-prerequisite",
+        "patchSha256": "23a17244dee8af51e9eb9f6a5704688c08352fa83b70a8704deb486fe22b30a6",
+        "results": [
+          {
+            "header": "diff --git a/docs/operations/fork-native-preview.md b/docs/operations/fork-native-preview.md",
+            "result": "strict-reverse-proves-existing-postimage"
+          },
+          {
+            "header": "diff --git a/docs/user/install.md b/docs/user/install.md",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-fusion-runtime-transition",
+        "patchSha256": "faa9f5dc40c9044ce53aff0f03303d24d1bbec95b51b591405ad8bb35ff532d8",
+        "results": [
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-idle-agent-completion",
+        "patchSha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+        "results": [
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-background-routing",
+        "patchSha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+        "results": [
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-context-occupancy",
+        "patchSha256": "7fe62a01cbd83a1ec1f97964d78e917664e728ab97e410cd54e12dd17a4b82aa",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts b/apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-extension-opt-out",
+        "patchSha256": "cee87244cb829ee3a7cfd9704dc979616f68d29bce090490191ea5d53a03ffac",
+        "results": [
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "provider-direct-dispatch-selection-restart",
+        "patchSha256": "a31c6244ea7b13ce27cbb685cb67834306bb7ccd76e37e0a8a15c5ba66b55664",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "composer-shortcut-keyboard-guidance",
+        "patchSha256": "8d7c2a6b3db67c74319da7a51c3685d6b72db3d6b14ff9737b7f9cc6e6d8bee6",
+        "results": [
+          {
+            "header": "diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-runtime-knip-declaration",
+        "patchSha256": "626513e72e70b3d6b0c938e1489c648a6f5a87acd4772dc9404ea4891a3c0a7c",
+        "results": [
+          {
+            "header": "diff --git a/knip.jsonc b/knip.jsonc",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "turn-fold-bottom-affordance",
+        "patchSha256": "34f0e6dfa0c5bfa44a7a9057953051d604acd22c96ac7d9ccda619dc45c6afaf",
+        "results": [
+          {
+            "header": "diff --git a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/MessagesTimeline.logic.ts b/apps/web/src/components/chat/MessagesTimeline.logic.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/MessagesTimeline.tsx b/apps/web/src/components/chat/MessagesTimeline.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/timelineRowContext.ts b/apps/web/src/components/chat/timelineRowContext.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "fork-patch-flow-convention",
+        "patchSha256": "3f0b49bc0d03de3d9779dba837a6daf6d01a687eefdf041e768b6068ee3f928f",
+        "results": [
+          {
+            "header": "diff --git a/docs/internals/fork-maintenance.md b/docs/internals/fork-maintenance.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/operations/patch-flow.md b/docs/operations/patch-flow.md",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "stable-main-preservation-v014",
+        "patchSha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+        "results": [
+          {
+            "header": "diff --git a/README.md b/README.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/auth/RpcAuthorization.test.ts b/apps/server/src/auth/RpcAuthorization.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/auth/RpcAuthorization.ts b/apps/server/src/auth/RpcAuthorization.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/observability/RpcInstrumentation.ts b/apps/server/src/observability/RpcInstrumentation.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/provider/ProviderRegistry.test.ts b/apps/server/src/provider/ProviderRegistry.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/provider/ProviderRegistry.ts b/apps/server/src/provider/ProviderRegistry.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/provider/providerMaintenanceRunner.test.ts b/apps/server/src/provider/providerMaintenanceRunner.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/provider/testUtils/providerRegistryMock.ts b/apps/server/src/provider/testUtils/providerRegistryMock.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/serverSettings.test.ts b/apps/server/src/serverSettings.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/ws.ts b/apps/server/src/ws.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/chat/composerProviderState.tsx b/apps/web/src/components/chat/composerProviderState.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/index.css b/apps/web/src/index.css",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/clientRpcPermissions.ts b/packages/contracts/src/clientRpcPermissions.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/rpc.ts b/packages/contracts/src/rpc.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/server.ts b/packages/contracts/src/server.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/driver.ts b/packages/provider-copilot/src/server/driver.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-core/src/server/driver.ts b/packages/provider-core/src/server/driver.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-native-ingress-supervision",
+        "patchSha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+        "results": [
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "device-session-release",
+        "patchSha256": "08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08",
+        "results": [
+          {
+            "header": "diff --git a/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx b/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/device/DeviceControlsRail.tsx b/apps/web/src/components/device/DeviceControlsRail.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/device/DevicePanel.tsx b/apps/web/src/components/device/DevicePanel.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/device/DeviceWorkspace.tsx b/apps/web/src/components/device/DeviceWorkspace.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/devices.md b/docs/user/devices.md",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-session-import",
+        "patchSha256": "09cb61d94051e31518518bbd7b76b2bd7501b6daadab32044b20c15c7ca7ac7b",
+        "results": [
+          {
+            "header": "diff --git a/apps/mobile/src/features/threads/ThreadDetailScreen.tsx b/apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts b/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/state/threadOutboxDelivery.ts b/apps/mobile/src/state/threadOutboxDelivery.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/mobile/src/state/use-thread-composer-state.ts b/apps/mobile/src/state/use-thread-composer-state.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts b/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProjectionStore.ts b/apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ThreadMessageIntake.ts b/apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionImporter.test.ts b/apps/server/src/project/AgentSessionImporter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionImporter.ts b/apps/server/src/project/AgentSessionImporter.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionScanner.test.ts b/apps/server/src/project/AgentSessionScanner.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/ChatView.tsx b/apps/web/src/components/ChatView.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/web/src/components/onboarding/WelcomeWizard.tsx b/apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/welcome-wizard.md b/docs/user/welcome-wizard.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/models.ts b/packages/client-runtime/src/state/models.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/client-runtime/src/state/threadWorkflows.ts b/packages/client-runtime/src/state/threadWorkflows.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/agentSessions.ts b/packages/contracts/src/agentSessions.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "scanner-canonical-path-exclusion",
+        "patchSha256": "fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "workspace-handoff-recovery",
+        "patchSha256": "63c60325d843cc661cd733936110b3abb6b600b7f9c231624ffbd93c2eedb95e",
+        "results": [
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderSessionManager.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/RunExecutionService.test.ts b/apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/internals/providers.md b/docs/internals/providers.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/docs/user/source-control.md b/docs/user/source-control.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-text-generation-failure-diagnostics",
+        "patchSha256": "2110e4d6aa3151331938fa4a3b22fe5bcaf24f5baa72a751d55ced25a579379f",
+        "results": [
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "strict-forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-root-aborted-idle",
+        "patchSha256": "2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963",
+        "results": [
+          {
+            "header": "diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "strict-forward"
+          },
+          {
+            "header": "diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "strict-forward"
+          }
+        ]
+      }
+    ],
+    "tree": "911b40e7c56c356a0fbd889d81e061569b1d238e",
+    "residual": []
+  },
+  "exact": true,
+  "provenanceComplete": false,
+  "sourceQualified": false
+}
