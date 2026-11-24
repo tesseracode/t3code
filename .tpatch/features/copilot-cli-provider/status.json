@@ -5,8 +5,8 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-04-17T09:58:12Z",
-  "updated_at": "2026-11-24T02:31:05Z",
-  "last_command": "record",
+  "updated_at": "2026-11-24T02:31:44Z",
+  "last_command": "verify",
   "notes": "Patch recorded",
   "apply": {
     "completed_at": "2026-10-29T16:30:04Z",
@@ -20,9 +20,9 @@
     "outcome": "blocked"
   },
   "verify": {
-    "verified_at": "2026-10-29T16:37:45Z",
+    "verified_at": "2026-11-24T02:31:38Z",
     "passed": true,
-    "recipe_hash_at_verify": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a",
-    "patch_hash_at_verify": "5c62d508b66669f6d1c55821cb2ddac16e2936f5bfdcf5ff05b9d7ea2a53af2a"
+    "recipe_hash_at_verify": "ff2a277c5e21317cc58b1d8b04df2ccf7a8377b40ea07bc76cf5576404092c81",
+    "patch_hash_at_verify": "e8e7a6cb8d90c481d0e754ed68390e95e26d286d16f2240b03fd77a7d91006f6"
   }
 }
