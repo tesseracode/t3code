@@ -996,7 +996,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         JSON.stringify({
           providers: {
             copilot: { enabled: true, homePath: "/legacy-account", enableConfigDiscovery: false },
-            githubCopilot: { enabled: false, homePath: "/canonical-account" },
+            githubCopilot: {
+              enabled: false,
+              homePath: "/canonical-account",
+              hideInternalModels: true,
+            },
           },
         }),
       );
@@ -1004,7 +1008,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("githubCopilot")], {
         driver: ProviderDriverKind.make("githubCopilot"),
         enabled: false,
-        config: { homePath: "/canonical-account" },
+        config: { homePath: "/canonical-account", hideInternalModels: true },
       });
       assert.isUndefined(settings.providerInstances[ProviderInstanceId.make("copilot")]);
     }).pipe(Effect.provide(layerServerSettings())),
@@ -1024,7 +1028,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
               copilot_work: {
                 driver: "copilot",
                 enabled: true,
-                config: { homePath: "/work-account" },
+                config: { homePath: "/work-account", hideInternalModels: true },
               },
             },
           }),
@@ -1033,7 +1037,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("copilot_work")], {
           driver: ProviderDriverKind.make("githubCopilot"),
           enabled: true,
-          config: { homePath: "/work-account" },
+          config: { homePath: "/work-account", hideInternalModels: true },
         });
         const persisted = yield* fileSystem.readFileString(serverConfig.settingsPath);
         assert.include(persisted, '"githubCopilot"');

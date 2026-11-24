@@ -1,6 +1,6 @@
 import type { CopilotClient, SkillsLoadedSkill } from "@github/copilot-sdk";
-import type { ServerProviderSkill } from "@t3tools/contracts";
-import { createModelCapabilities } from "@t3tools/shared/model";
+import type { ServerProvider, ServerProviderSkill } from "@t3tools/contracts";
+import { createModelCapabilities, readCustomModelEntries } from "@t3tools/shared/model";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -21,6 +21,25 @@ const presentation = {
 };
 const emptyCapabilities = createModelCapabilities({ optionDescriptors: [] });
 
+export function filterModelsForSettings(
+  models: ServerProvider["models"],
+  settings: CopilotSettings,
+): ServerProvider["models"] {
+  if (!settings.hideInternalModels) return models;
+  const customSlugs = new Set(
+    readCustomModelEntries(settings.customModels).map(({ slug }) => slug),
+  );
+  const visible = models.filter(
+    (model) =>
+      model.isCustom ||
+      customSlugs.has(model.slug) ||
+      !model.name.toLowerCase().includes("internal only"),
+  );
+  return visible.length === models.length
+    ? models
+    : visible.map((model, index) => ({ ...model, isDefault: index === 0 }));
+}
+
 export function modelsFromSdk(
   models: ReadonlyArray<ModelCatalog["models"][number]>,
   settings: CopilotSettings,
@@ -28,61 +47,64 @@ export function modelsFromSdk(
 ) {
   const seen = new Set<string>();
   const autoName = auto?.tiers.some((tier) => tier.type === "fusion") ? "Fusion" : undefined;
-  return providerModelsFromSettings(
-    models
-      .flatMap((model) => {
-        const slug = model.id.trim();
-        if (!slug || !model.name.trim() || seen.has(slug) || model.policy?.state === "disabled")
-          return [];
-        seen.add(slug);
-        const efforts = model.supportedReasoningEfforts ?? [];
-        const routing = slug === "auto" && auto ? routingDescriptor(auto) : undefined;
-        return [
-          {
-            slug,
-            name: slug === "auto" && autoName ? autoName : model.name,
-            isCustom: false,
-            ...(seen.size === 1 ? { isDefault: true } : {}),
-            capabilities: createModelCapabilities({
-              optionDescriptors: [
-                ...(routing ? [routing] : []),
-                ...(efforts.length
-                  ? [
-                      buildSelectOptionDescriptor({
-                        id: "reasoningEffort",
-                        label: "Reasoning",
-                        options: efforts.map((effort) => ({
-                          value: effort,
-                          label:
-                            effort === "xhigh"
-                              ? "Extra High"
-                              : effort[0]!.toUpperCase() + effort.slice(1),
-                          isDefault: effort === model.defaultReasoningEffort,
-                        })),
-                      }),
-                    ]
-                  : []),
-              ],
-            }),
-          },
-        ];
-      })
-      .concat(
-        auto && !seen.has("auto") && !models.some((model) => model.id.trim() === "auto")
-          ? [
-              {
-                slug: "auto",
-                name: autoName ?? "Auto routing",
-                isCustom: false,
-                capabilities: createModelCapabilities({
-                  optionDescriptors: [routingDescriptor(auto)],
-                }),
-              },
-            ]
-          : [],
-      ),
-    settings.customModels,
-    emptyCapabilities,
+  return filterModelsForSettings(
+    providerModelsFromSettings(
+      models
+        .flatMap((model) => {
+          const slug = model.id.trim();
+          if (!slug || !model.name.trim() || seen.has(slug) || model.policy?.state === "disabled")
+            return [];
+          seen.add(slug);
+          const efforts = model.supportedReasoningEfforts ?? [];
+          const routing = slug === "auto" && auto ? routingDescriptor(auto) : undefined;
+          return [
+            {
+              slug,
+              name: slug === "auto" && autoName ? autoName : model.name,
+              isCustom: false,
+              ...(seen.size === 1 ? { isDefault: true } : {}),
+              capabilities: createModelCapabilities({
+                optionDescriptors: [
+                  ...(routing ? [routing] : []),
+                  ...(efforts.length
+                    ? [
+                        buildSelectOptionDescriptor({
+                          id: "reasoningEffort",
+                          label: "Reasoning",
+                          options: efforts.map((effort) => ({
+                            value: effort,
+                            label:
+                              effort === "xhigh"
+                                ? "Extra High"
+                                : effort[0]!.toUpperCase() + effort.slice(1),
+                            isDefault: effort === model.defaultReasoningEffort,
+                          })),
+                        }),
+                      ]
+                    : []),
+                ],
+              }),
+            },
+          ];
+        })
+        .concat(
+          auto && !seen.has("auto") && !models.some((model) => model.id.trim() === "auto")
+            ? [
+                {
+                  slug: "auto",
+                  name: autoName ?? "Auto routing",
+                  isCustom: false,
+                  capabilities: createModelCapabilities({
+                    optionDescriptors: [routingDescriptor(auto)],
+                  }),
+                },
+              ]
+            : [],
+        ),
+      settings.customModels,
+      emptyCapabilities,
+    ),
+    settings,
   );
 }
 

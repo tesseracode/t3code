@@ -77,6 +77,9 @@ T3 Code needs one agent that is installed and signed in. For example, install [C
 
 [Provider setup](./docs/user/install.md#providers) has the steps for each agent. [Install T3 Code](./docs/user/install.md) covers nightly builds, AppImage, WSL, and NixOS.
 
+> [!CAUTION]
+> This fork also adds **experimental GitHub Copilot** support through its bundled native SDK. Enable it in **Settings > Providers** and authenticate your Copilot account. Account model availability and native runtime capabilities vary; see the [Copilot setup guide](docs/user/providers-copilot.md).
+
 ## "Wait, what are you selling me?"
 
 Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.

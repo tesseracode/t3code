@@ -154,6 +154,7 @@ describe("command permissions", () => {
 
   it.effect.each([
     { method: WS_METHODS.serverRunStorageCleanup, scope: AuthSettingsWriteScope },
+    { method: WS_METHODS.serverSetSkillEnabled, scope: AuthProvidersManageScope },
     { method: WS_METHODS.serverReclaimDatabaseSpace, scope: AuthEnvironmentMaintainScope },
   ])("requires the destination $scope grant for $method", ({ method, scope }) =>
     Effect.gen(function* () {

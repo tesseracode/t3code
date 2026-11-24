@@ -1,10 +1,10 @@
 diff --git a/README.md b/README.md
-index 6f6dab985..d5e4c6f60 100644
+index 24dc0f8f7f..4ce47142f1 100644
 --- a/README.md
 +++ b/README.md
-@@ -4,6 +4,9 @@ T3 Code is an "agent harness control surface". It enables control of the agents
+@@ -77,6 +77,9 @@ T3 Code needs one agent that is installed and signed in. For example, install [C
  
- Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, and Google Antigravity. If they're set up on your computer, T3 Code can control them.
+ [Provider setup](./docs/user/install.md#providers) has the steps for each agent. [Install T3 Code](./docs/user/install.md) covers nightly builds, AppImage, WSL, and NixOS.
  
 +> [!CAUTION]
 +> This fork also adds **experimental GitHub Copilot** support through its bundled native SDK. Enable it in **Settings > Providers** and authenticate your Copilot account. Account model availability and native runtime capabilities vary; see the [Copilot setup guide](docs/user/providers-copilot.md).
@@ -13,10 +13,10 @@ index 6f6dab985..d5e4c6f60 100644
  
  Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.
 diff --git a/apps/server/src/auth/RpcAuthorization.test.ts b/apps/server/src/auth/RpcAuthorization.test.ts
-index 0a9f97cc3..48dcae4f4 100644
+index 1d38610692..b572c0b89c 100644
 --- a/apps/server/src/auth/RpcAuthorization.test.ts
 +++ b/apps/server/src/auth/RpcAuthorization.test.ts
-@@ -90,6 +90,54 @@ it("requires operate permission for tool updates even alongside a read-only chec
+@@ -109,6 +109,54 @@ it("requires operate permission for tool updates even alongside a read-only chec
  });
  
  describe("RPC scope middleware", () => {
@@ -72,11 +72,11 @@ index 0a9f97cc3..48dcae4f4 100644
    const group = WsRpcGroup.omit(
      ...[...WsRpcGroup.requests.keys()].filter(
 diff --git a/apps/server/src/auth/RpcAuthorization.ts b/apps/server/src/auth/RpcAuthorization.ts
-index e3473824c..b5165023b 100644
+index 859beb21d3..b600979c97 100644
 --- a/apps/server/src/auth/RpcAuthorization.ts
 +++ b/apps/server/src/auth/RpcAuthorization.ts
-@@ -67,6 +67,7 @@ export const RPC_REQUIRED_SCOPES = {
-   [WS_METHODS.serverGetConfig]: AuthOrchestrationReadScope,
+@@ -72,6 +72,7 @@ export const RPC_REQUIRED_SCOPES = {
+   [WS_METHODS.serverGetNpmRelease]: AuthOrchestrationReadScope,
    [WS_METHODS.serverRefreshProviders]: AuthOrchestrationReadScope,
    [WS_METHODS.serverUpdateProvider]: AuthProvidersManageScope,
 +  [WS_METHODS.serverSetSkillEnabled]: AuthProvidersManageScope,
@@ -84,11 +84,11 @@ index e3473824c..b5165023b 100644
    [WS_METHODS.providerConsumeResetCredit]: AuthProvidersManageScope,
    [WS_METHODS.providerAuthComplete]: AuthProvidersManageScope,
 diff --git a/apps/server/src/observability/RpcInstrumentation.ts b/apps/server/src/observability/RpcInstrumentation.ts
-index 370d2864c..aa6819856 100644
+index a2b698657a..379b6e726f 100644
 --- a/apps/server/src/observability/RpcInstrumentation.ts
 +++ b/apps/server/src/observability/RpcInstrumentation.ts
-@@ -40,6 +40,7 @@ const RPC_AGGREGATES = {
-   [WS_METHODS.serverGetConfig]: "server",
+@@ -41,6 +41,7 @@ const RPC_AGGREGATES = {
+   [WS_METHODS.serverGetNpmRelease]: "server",
    [WS_METHODS.serverRefreshProviders]: "server",
    [WS_METHODS.serverUpdateProvider]: "server",
 +  [WS_METHODS.serverSetSkillEnabled]: "provider",
@@ -96,18 +96,18 @@ index 370d2864c..aa6819856 100644
    [WS_METHODS.providerConsumeResetCredit]: "provider",
    [WS_METHODS.providerAuthComplete]: "provider",
 diff --git a/apps/server/src/provider/ProviderRegistry.test.ts b/apps/server/src/provider/ProviderRegistry.test.ts
-index 14b8dfb2c..44dca195c 100644
+index e4ec16b77d..83db9143c7 100644
 --- a/apps/server/src/provider/ProviderRegistry.test.ts
 +++ b/apps/server/src/provider/ProviderRegistry.test.ts
-@@ -50,6 +50,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
+@@ -65,6 +65,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
  import * as OpenCodeRuntime from "@t3tools/provider-opencode/server/OpenCodeRuntime";
  import * as OpenCodeServerLedger from "@t3tools/provider-opencode/server/OpenCodeServerLedger";
  import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 +import { ProviderAdapterV2 } from "@t3tools/provider-core/server/ProviderAdapter";
+ import * as ProviderInstallationGate from "./ProviderInstallationGate.ts";
  import * as ProviderInstanceRegistryHydration from "./ProviderInstanceRegistryHydration.ts";
  import * as PortScanner from "../preview/PortScanner.ts";
- import * as ServerConfig from "../config.ts";
-@@ -1005,6 +1006,8 @@ it.layer(
+@@ -1837,6 +1838,8 @@ it.layer(
  
        it.effect("persists removals across failed refreshes and registry restarts", () =>
          Effect.gen(function* () {
@@ -116,15 +116,15 @@ index 14b8dfb2c..44dca195c 100644
            const config = yield* ServerConfig.ServerConfig;
            const filePath = yield* resolveProviderStatusCachePath({
              cacheDir: config.providerStatusCacheDir,
-@@ -1021,6 +1024,7 @@ it.layer(
-             },
-             displayName: undefined,
-             enabled: true,
+@@ -1846,6 +1849,7 @@ it.layer(
+           const nextProvider = yield* Ref.make<ServerProvider>(refreshedProvider);
+           const currentProvider = yield* Ref.make<ServerProvider>(pendingProvider);
+           const instance = {
 +            filterModels: visibleModels,
-             snapshot: {
-               resolveMaintenance: () =>
-                 Effect.succeed(
-@@ -1048,23 +1052,23 @@ it.layer(
+             instanceId: cachedProvider.instanceId,
+             driverKind: cachedProvider.driver,
+             continuationIdentity: {
+@@ -1886,10 +1890,10 @@ it.layer(
                subscribeChanges: Effect.flatMap(PubSub.unbounded<void>(), PubSub.subscribe),
              },
            );
@@ -136,14 +136,17 @@ index 14b8dfb2c..44dca195c 100644
 +          ]);
  
            for (const restarted of [false, true]) {
-             yield* Effect.gen(function* () {
+             yield* Ref.set(currentProvider, pendingProvider);
+@@ -1897,7 +1901,7 @@ it.layer(
                const registry = yield* ProviderRegistry.ProviderRegistry;
                const expectedModels = restarted
                  ? retainedModels
 -                : [customModel, ...cachedProvider.models];
 +                : visibleModels([customModel, ...cachedProvider.models]);
                assert.deepStrictEqual((yield* registry.getProviders)[0]?.models, expectedModels);
- 
+               if (!restarted) {
+                 const probeFields = ({ status, installed, auth, version }: ServerProvider) => ({
+@@ -1920,7 +1924,7 @@ it.layer(
                yield* registry.refreshInstance(instance.instanceId);
                assert.deepStrictEqual(
                  (yield* readProviderStatusCache(filePath))?.models,
@@ -152,7 +155,7 @@ index 14b8dfb2c..44dca195c 100644
                );
  
                yield* Ref.set(nextProvider, failedProvider);
-@@ -1424,7 +1428,19 @@ it.layer(
+@@ -2936,7 +2940,19 @@ it.layer(
              applyUsageLimits: () => Effect.void,
            },
            snapshotForCwd: () => Ref.get(scanResult),
@@ -173,7 +176,7 @@ index 14b8dfb2c..44dca195c 100644
            textGeneration: {} as ProviderInstance["textGeneration"],
          };
          const layerInstanceRegistry = Layer.succeed(
-@@ -1472,6 +1488,31 @@ it.layer(
+@@ -2985,6 +3001,31 @@ it.layer(
            assert.strictEqual(provider?.status, "error");
            assert.strictEqual(provider?.message, unhealthyProvider.message);
  
@@ -206,24 +209,25 @@ index 14b8dfb2c..44dca195c 100644
            yield* registry.refreshWorkspaceSnapshot({ instanceId, cwd: "/workspace" });
            assert.deepStrictEqual((yield* workspaceOf)?.skills, []);
 diff --git a/apps/server/src/provider/ProviderRegistry.ts b/apps/server/src/provider/ProviderRegistry.ts
-index 78b11306c..62a62e6a8 100644
+index 43f57bb99a..b426aae6c3 100644
 --- a/apps/server/src/provider/ProviderRegistry.ts
 +++ b/apps/server/src/provider/ProviderRegistry.ts
-@@ -2,9 +2,11 @@ import {
-   defaultInstanceIdForDriver,
+@@ -3,10 +3,12 @@ import {
    isProviderWorkspaceSnapshotCurrent,
+   isProviderWorkspaceSnapshotPending,
    ProviderDriverKind,
 +  ServerProviderSkillControlError,
    type ProviderInstanceId,
+   type SecretReference,
    type ServerProvider,
    type ServerProviderUpdateState,
 +  type ServerProviderSkillControlInput,
  } from "@t3tools/contracts";
  import * as Cause from "effect/Cause";
  import * as Context from "effect/Context";
-@@ -73,6 +75,10 @@ export class ProviderRegistry extends Context.Service<
-       readonly fresh?: boolean;
-     }) => Effect.Effect<ReadonlyArray<ServerProvider>>;
+@@ -111,6 +113,10 @@ export class ProviderRegistry extends Context.Service<
+      */
+     readonly refreshModelCatalog: Effect.Effect<void>;
  
 +    readonly setSkillEnabled: (
 +      input: ServerProviderSkillControlInput,
@@ -232,7 +236,7 @@ index 78b11306c..62a62e6a8 100644
      readonly getProviderMaintenanceCapabilitiesForInstance: (
        instanceId: ProviderInstanceId,
        provider: ProviderDriverKind,
-@@ -326,6 +332,15 @@ const buildSnapshotSource = (instance: ProviderInstance): ProviderSnapshotSource
+@@ -436,6 +442,15 @@ const buildSnapshotSource = (instance: ProviderInstance): ProviderSnapshotSource
    streamChanges: instance.snapshot.streamChanges,
  });
  
@@ -248,7 +252,7 @@ index 78b11306c..62a62e6a8 100644
  export const layer = Layer.effect(
    ProviderRegistry,
    Effect.gen(function* () {
-@@ -343,6 +358,9 @@ export const layer = Layer.effect(
+@@ -455,6 +470,9 @@ export const layer = Layer.effect(
      );
  
      const bootInstances = yield* instanceRegistry.listInstances;
@@ -258,9 +262,9 @@ index 78b11306c..62a62e6a8 100644
      const bootSources = bootInstances.map(buildSnapshotSource);
      const fallbackProviders = yield* loadProviders(bootSources);
      const fallbackByInstance = new Map<ProviderInstanceId, ServerProvider>();
-@@ -386,7 +404,12 @@ export const layer = Layer.effect(
+@@ -509,7 +527,12 @@ export const layer = Layer.effect(
                    cachedDriver: cachedProvider.driver ?? null,
-                 }).pipe(Effect.as(undefined as ServerProvider | undefined));
+                 }).pipe(Effect.as(placeholder));
                }
 -              return Effect.succeed(hydrateCachedProvider(correlation));
 +              return Effect.succeed(
@@ -272,15 +276,15 @@ index 78b11306c..62a62e6a8 100644
              }),
            );
          }),
-@@ -422,6 +445,7 @@ export const layer = Layer.effect(
+@@ -552,6 +575,7 @@ export const layer = Layer.effect(
        new Map(),
      );
      const syncSemaphore = yield* Semaphore.make(1);
 +    const skillUpdateSemaphores = new WeakMap<ProviderInstance, Semaphore.Semaphore>();
  
-     const getLiveSources: Effect.Effect<ReadonlyArray<ProviderSnapshotSource>> = Ref.get(
-       liveSubsRef,
-@@ -468,6 +492,10 @@ export const layer = Layer.effect(
+     const persistProvider = Effect.fn("ProviderRegistry.persistProvider")(function* (
+       provider: ServerProvider,
+@@ -598,6 +622,10 @@ export const layer = Layer.effect(
        },
      ) {
        const manifest = yield* manifestService.current;
@@ -291,7 +295,7 @@ index 78b11306c..62a62e6a8 100644
        const nextProvidersWithUpdateState = yield* Effect.forEach(
          nextProviders,
          applyProviderUpdateState,
-@@ -488,9 +516,12 @@ export const layer = Layer.effect(
+@@ -618,9 +646,12 @@ export const layer = Layer.effect(
              updatedKeys.add(key);
              mergedProviders.set(
                key,
@@ -307,8 +311,8 @@ index 78b11306c..62a62e6a8 100644
              );
            }
  
-@@ -1002,6 +1033,74 @@ export const layer = Layer.effect(
-       return yield* Fiber.join(claim.scan);
+@@ -1323,6 +1354,74 @@ export const layer = Layer.effect(
+       }
      });
  
 +    const setSkillEnabled = Effect.fn("ProviderRegistry.setSkillEnabled")(function* (
@@ -382,43 +386,43 @@ index 78b11306c..62a62e6a8 100644
      return {
        getProviders: Ref.get(providersRef),
        refresh: (provider?: ProviderDriverKind) =>
-@@ -1011,6 +1110,7 @@ export const layer = Layer.effect(
-       refreshWorkspaceSnapshot: (input) =>
-         refreshWorkspaceSnapshot(input).pipe(Effect.catchCause(recoverRefreshFailure)),
-       refreshAfterUpdate,
+@@ -1341,6 +1440,7 @@ export const layer = Layer.effect(
+         Effect.catchCause(recoverRefreshFailure),
+         Effect.asVoid,
+       ),
 +      setSkillEnabled,
        getProviderMaintenanceCapabilitiesForInstance,
        setProviderMaintenanceActionState,
        get streamChanges() {
 diff --git a/apps/server/src/provider/providerMaintenanceRunner.test.ts b/apps/server/src/provider/providerMaintenanceRunner.test.ts
-index 75c592b78..c8622b3f6 100644
+index 985347a66e..aabf066973 100644
 --- a/apps/server/src/provider/providerMaintenanceRunner.test.ts
 +++ b/apps/server/src/provider/providerMaintenanceRunner.test.ts
-@@ -194,6 +194,7 @@ function makeRegistry(
-       refreshInstance: () => Ref.get(providersRef),
-       refreshAfterUpdate: () => Ref.get(providersRef),
+@@ -223,6 +223,7 @@ function makeRegistry(
        refreshWorkspaceSnapshot: () => Ref.get(providersRef),
+       invalidateModelCaches: () => Effect.void,
+       refreshModelCatalog: Effect.void,
 +      setSkillEnabled: () => Effect.die("Unexpected skill control in provider maintenance fixture"),
        getProviderMaintenanceCapabilitiesForInstance: (_instanceId, provider) =>
          Effect.succeed(lifecycleFor(provider)),
        setProviderMaintenanceActionState,
 diff --git a/apps/server/src/provider/testUtils/providerRegistryMock.ts b/apps/server/src/provider/testUtils/providerRegistryMock.ts
-index 358d49afe..97828f3b1 100644
+index ccf4979937..71d3dc1ec7 100644
 --- a/apps/server/src/provider/testUtils/providerRegistryMock.ts
 +++ b/apps/server/src/provider/testUtils/providerRegistryMock.ts
-@@ -13,6 +13,7 @@ const makeProviderRegistryMock = (
-   refreshInstance: () => Effect.succeed(providers),
-   refreshAfterUpdate: () => Effect.succeed(providers),
+@@ -17,6 +17,7 @@ const makeProviderRegistryMock = (
    refreshWorkspaceSnapshot: () => Effect.succeed(providers),
+   invalidateModelCaches: () => Effect.void,
+   refreshModelCatalog: Effect.void,
 +  setSkillEnabled: () => Effect.die("Unexpected skill control in provider registry fixture"),
    getProviderMaintenanceCapabilitiesForInstance: (_instanceId, provider) =>
      Effect.succeed(makeManualOnlyProviderMaintenanceCapabilities({ provider, packageName: null })),
    setProviderMaintenanceActionState: () => Effect.succeed(providers),
 diff --git a/apps/server/src/serverSettings.test.ts b/apps/server/src/serverSettings.test.ts
-index 3187067d5..ce3ea21a6 100644
+index 9df3006e30..3d26cf77b5 100644
 --- a/apps/server/src/serverSettings.test.ts
 +++ b/apps/server/src/serverSettings.test.ts
-@@ -877,7 +877,11 @@ it.layer(NodeServices.layer)("server settings", (it) => {
+@@ -996,7 +996,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
          JSON.stringify({
            providers: {
              copilot: { enabled: true, homePath: "/legacy-account", enableConfigDiscovery: false },
@@ -431,7 +435,7 @@ index 3187067d5..ce3ea21a6 100644
            },
          }),
        );
-@@ -885,7 +889,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
+@@ -1004,7 +1008,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
        assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("githubCopilot")], {
          driver: ProviderDriverKind.make("githubCopilot"),
          enabled: false,
@@ -440,7 +444,7 @@ index 3187067d5..ce3ea21a6 100644
        });
        assert.isUndefined(settings.providerInstances[ProviderInstanceId.make("copilot")]);
      }).pipe(Effect.provide(layerServerSettings())),
-@@ -905,7 +909,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
+@@ -1024,7 +1028,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
                copilot_work: {
                  driver: "copilot",
                  enabled: true,
@@ -449,7 +453,7 @@ index 3187067d5..ce3ea21a6 100644
                },
              },
            }),
-@@ -914,7 +918,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
+@@ -1033,7 +1037,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
          assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("copilot_work")], {
            driver: ProviderDriverKind.make("githubCopilot"),
            enabled: true,
@@ -459,10 +463,10 @@ index 3187067d5..ce3ea21a6 100644
          const persisted = yield* fileSystem.readFileString(serverConfig.settingsPath);
          assert.include(persisted, '"githubCopilot"');
 diff --git a/apps/server/src/ws.ts b/apps/server/src/ws.ts
-index d70acbb01..4263e757d 100644
+index 7b4c232b92..92f3868fc8 100644
 --- a/apps/server/src/ws.ts
 +++ b/apps/server/src/ws.ts
-@@ -2426,6 +2426,8 @@ export const layerWsRpc = (
+@@ -2630,6 +2630,8 @@ export const layerWsRpc = (
            ),
          [WS_METHODS.serverUpdateProvider]: (input) =>
            providerMaintenanceRunner.updateProvider(input),
@@ -472,10 +476,10 @@ index d70acbb01..4263e757d 100644
            /* Request instrumentation already owns the span; keep this helper in that context. */
            Effect.fnUntraced(function* (input) {
 diff --git a/apps/web/src/components/chat/composerProviderState.tsx b/apps/web/src/components/chat/composerProviderState.tsx
-index b2ba63923..33f188981 100644
+index b8d4bdad4b..89d0fb7afd 100644
 --- a/apps/web/src/components/chat/composerProviderState.tsx
 +++ b/apps/web/src/components/chat/composerProviderState.tsx
-@@ -147,6 +147,10 @@ export function getComposerProviderState(input: ComposerProviderStateInput): Com
+@@ -118,6 +118,10 @@ export function getComposerProviderState(input: ComposerProviderStateInput): Com
    const ultrathinkActive =
      (primarySelectDescriptor?.promptInjectedValues?.length ?? 0) > 0 &&
      promptInjectionState === "ultrathink";
@@ -486,7 +490,7 @@ index b2ba63923..33f188981 100644
  
    return {
      provider,
-@@ -161,7 +165,13 @@ export function getComposerProviderState(input: ComposerProviderStateInput): Com
+@@ -132,7 +136,13 @@ export function getComposerProviderState(input: ComposerProviderStateInput): Com
            composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.07)_inset]",
            modelPickerIconClassName: "ultrathink-chroma",
          }
@@ -502,10 +506,10 @@ index b2ba63923..33f188981 100644
  }
  
 diff --git a/apps/web/src/index.css b/apps/web/src/index.css
-index 8acc31232..b3857bc7d 100644
+index 05541d3970..c6a70deeb8 100644
 --- a/apps/web/src/index.css
 +++ b/apps/web/src/index.css
-@@ -2316,16 +2316,24 @@ code {
+@@ -2398,16 +2398,24 @@ code {
      #ec4899 90%,
      #ff6b6b 100%
    );
@@ -532,7 +536,7 @@ index 8acc31232..b3857bc7d 100644
    background-size: 220% 220%;
    background-position: 0% 50%;
    pointer-events: none;
-@@ -2340,11 +2348,21 @@ code {
+@@ -2422,11 +2430,21 @@ code {
    mask-composite: exclude;
  }
  
@@ -557,7 +561,7 @@ index 8acc31232..b3857bc7d 100644
  }
  
 diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
-index b85d6be60..8dc98ce1e 100644
+index f3d8690e94..bbffc43808 100644
 --- a/docs/user/providers-copilot.md
 +++ b/docs/user/providers-copilot.md
 @@ -7,6 +7,10 @@ not the ACP registry or a separately billed hosted model service.
@@ -582,70 +586,34 @@ index b85d6be60..8dc98ce1e 100644
  ## Conversations and permissions
  
 diff --git a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts
-index 9eb7c3b07..e819584ae 100644
+index 0fc89a1fd2..c68d922ad8 100644
 --- a/packages/client-runtime/src/state/commandPermissions.test.ts
 +++ b/packages/client-runtime/src/state/commandPermissions.test.ts
-@@ -12,6 +12,7 @@ import {
-   AuthOrchestrationOperateScope,
-   AuthOrchestrationReadScope,
-   AuthPreviewOperateScope,
-+  AuthProvidersManageScope,
-   AuthSettingsWriteScope,
-   AuthSourceControlWriteScope,
-   ThreadId,
-@@ -96,11 +97,14 @@ describe("command permissions", () => {
-     ),
-   );
+@@ -154,6 +154,7 @@ describe("command permissions", () => {
  
--  it.effect("requires the destination settings grant to run storage cleanup", () =>
-+  it.effect.each([
-+    { method: WS_METHODS.serverRunStorageCleanup, required: AuthSettingsWriteScope },
-+    { method: WS_METHODS.serverSetSkillEnabled, required: AuthProvidersManageScope },
-+  ])("requires the destination $required grant for $method", ({ method, required }) =>
-     Effect.scoped(
-       Effect.gen(function* () {
-         const registry = yield* setup;
--        const cleanup = createCommandPermissions(runtime, WS_METHODS.serverRunStorageCleanup);
-+        const cleanup = createCommandPermissions(runtime, method);
-         registry.set(sessions(env), AsyncResult.success(grant(true)));
-         expect(registry.get(cleanup.permissionAtom(env))).toBe(false);
-         expect((yield* cleanup.authorize(registry, env).pipe(Effect.flip))._tag).toBe(
-@@ -110,8 +114,8 @@ describe("command permissions", () => {
-           sessions(env),
-           AsyncResult.success({
-             ...grant(true),
--            scopes: [AuthSettingsWriteScope],
--            permissions: [AuthSettingsWriteScope],
-+            scopes: [required],
-+            permissions: [required],
-           }),
-         );
-         expect(registry.get(cleanup.permissionAtom(env))).toBe(true);
+   it.effect.each([
+     { method: WS_METHODS.serverRunStorageCleanup, scope: AuthSettingsWriteScope },
++    { method: WS_METHODS.serverSetSkillEnabled, scope: AuthProvidersManageScope },
+     { method: WS_METHODS.serverReclaimDatabaseSpace, scope: AuthEnvironmentMaintainScope },
+   ])("requires the destination $scope grant for $method", ({ method, scope }) =>
+     Effect.gen(function* () {
 diff --git a/packages/contracts/src/clientRpcPermissions.ts b/packages/contracts/src/clientRpcPermissions.ts
-index 84c08e785..b88707db7 100644
+index 0b6164871a..dceb41f253 100644
 --- a/packages/contracts/src/clientRpcPermissions.ts
 +++ b/packages/contracts/src/clientRpcPermissions.ts
-@@ -5,6 +5,7 @@ import {
-   AuthOrchestrationOperateScope,
-   AuthOrchestrationReadScope,
-   AuthPreviewOperateScope,
-+  AuthProvidersManageScope,
-   AuthSettingsWriteScope,
-   AuthSourceControlWriteScope,
-   AuthTerminalOperateScope,
-@@ -15,6 +16,7 @@ import { WS_METHODS } from "./rpc.ts";
+@@ -17,6 +17,7 @@ import { WS_METHODS } from "./rpc.ts";
  
  /** Incremental client enforcement; the server still authorizes every request. */
  export const CLIENT_GUARDED_RPC_SCOPES = {
 +  [WS_METHODS.serverSetSkillEnabled]: AuthProvidersManageScope,
-   [WS_METHODS.twsSetContext]: AuthOrchestrationOperateScope,
+   [WS_METHODS.providerAuthRemoveMethod]: AuthProvidersManageScope,
    [WS_METHODS.previewClose]: AuthPreviewOperateScope,
    // Stopping a server signals its processes, as closing a terminal does.
 diff --git a/packages/contracts/src/rpc.ts b/packages/contracts/src/rpc.ts
-index 612608dae..93689196e 100644
+index 41733dae56..6d001131bd 100644
 --- a/packages/contracts/src/rpc.ts
 +++ b/packages/contracts/src/rpc.ts
-@@ -330,6 +330,8 @@ import {
+@@ -350,6 +350,8 @@ import {
    ServerConfig,
    ServerProviderUpdateError,
    ServerProviderUpdateInput,
@@ -654,15 +622,15 @@ index 612608dae..93689196e 100644
    ServerLifecycleStreamEvent,
    ServerRemoveKeybindingInput,
    ServerRemoveKeybindingResult,
-@@ -510,6 +512,7 @@ export const WS_METHODS = {
-   serverGetConfig: "server.getConfig",
+@@ -536,6 +538,7 @@ export const WS_METHODS = {
+   serverGetNpmRelease: "server.getNpmRelease",
    serverRefreshProviders: "server.refreshProviders",
    serverUpdateProvider: "server.updateProvider",
 +  serverSetSkillEnabled: "server.setSkillEnabled",
    serverUpdateServer: "server.updateServer",
    serverUpdateServerWithProgress: "server.updateServerWithProgress",
    serverCommitDesktopUpdate: "server.commitDesktopUpdate",
-@@ -672,6 +675,12 @@ const WsServerUpdateProviderRpc = Rpc.make(WS_METHODS.serverUpdateProvider, {
+@@ -742,6 +745,12 @@ const WsServerUpdateProviderRpc = Rpc.make(WS_METHODS.serverUpdateProvider, {
    error: Schema.Union([ServerProviderUpdateError, EnvironmentAuthorizationError]),
  });
  
@@ -675,7 +643,7 @@ index 612608dae..93689196e 100644
  const ProviderSetupRpcError = Schema.Union([ProviderSetupError, EnvironmentAuthorizationError]);
  
  const WsProviderConsumeResetCreditRpc = Rpc.make(WS_METHODS.providerConsumeResetCredit, {
-@@ -1983,6 +1992,7 @@ export const WsRpcGroup = RpcGroup.make(
+@@ -2274,6 +2283,7 @@ export const WsRpcGroup = RpcGroup.make(
    WsServerGetConfigRpc,
    WsServerRefreshProvidersRpc,
    WsServerUpdateProviderRpc,
@@ -684,7 +652,7 @@ index 612608dae..93689196e 100644
    WsProviderAuthStartRpc,
    WsProviderAuthCompleteRpc,
 diff --git a/packages/contracts/src/server.ts b/packages/contracts/src/server.ts
-index 134d81606..df3266eec 100644
+index f074b8f6a3..897979679c 100644
 --- a/packages/contracts/src/server.ts
 +++ b/packages/contracts/src/server.ts
 @@ -13,6 +13,7 @@ import {
@@ -695,7 +663,7 @@ index 134d81606..df3266eec 100644
    ThreadId,
    TrimmedNonEmptyString,
  } from "./baseSchemas.ts";
-@@ -863,6 +864,40 @@ export const ServerProviderUpdateInput = Schema.Struct({
+@@ -991,6 +992,40 @@ export const ServerProviderUpdateInput = Schema.Struct({
  });
  export type ServerProviderUpdateInput = typeof ServerProviderUpdateInput.Type;
  
@@ -737,7 +705,7 @@ index 134d81606..df3266eec 100644
    "ServerProviderUpdateError",
    {
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
-index ea88c2449..cb025ce52 100644
+index 661ff2a98c..83dc4c40d5 100644
 --- a/packages/provider-copilot/src/server/adapter.test.ts
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
 @@ -17,6 +17,7 @@ import {
@@ -756,7 +724,7 @@ index ea88c2449..cb025ce52 100644
  import * as Stream from "effect/Stream";
  import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
  import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
-@@ -87,6 +89,10 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
+@@ -88,6 +90,10 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
    > = [];
    let permissionResponse = async (): Promise<{ success: boolean }> => ({ success: true });
    let background: Awaited<ReturnType<SessionHandle["rpc"]["tasks"]["list"]>> = { tasks: [] };
@@ -767,7 +735,7 @@ index ea88c2449..cb025ce52 100644
    let catalog: ModelCatalog = { models: [] };
    let current: Awaited<ReturnType<SessionHandle["rpc"]["model"]["getCurrent"]>> = {
      modelId: "gpt-4.1",
-@@ -138,8 +144,32 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
+@@ -139,8 +145,32 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
            path: "/copilot/plan.md",
          }),
        },
@@ -802,7 +770,7 @@ index ea88c2449..cb025ce52 100644
        permissions: {
          handlePendingPermissionRequest: async (
            response: Parameters<
-@@ -206,6 +236,21 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
+@@ -207,6 +237,21 @@ function fakeSdk(options: { persistedExtensions?: boolean } = {}) {
      setTasks: (tasks: typeof background) => {
        background = tasks;
      },
@@ -824,7 +792,7 @@ index ea88c2449..cb025ce52 100644
      permissionReplies,
      setPermissionResponse: (response: () => Promise<{ success: boolean }>) => {
        permissionResponse = response;
-@@ -338,6 +383,149 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+@@ -339,6 +384,149 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
    );
  
  describe("native Copilot V2", () => {
@@ -974,7 +942,7 @@ index ea88c2449..cb025ce52 100644
    it.effect.each([undefined, "native-copilot"])(
      "starts and settles with unsupported extensions disabled, native resume %s",
      (nativeId) =>
-@@ -1747,7 +1935,11 @@ describe("native Copilot V2", () => {
+@@ -1748,7 +1936,11 @@ describe("native Copilot V2", () => {
              "run-1",
            );
            fake.setTasks({ tasks: [{ ...task, status: "idle", latestResponse: "Ready" }] });
@@ -987,7 +955,7 @@ index ea88c2449..cb025ce52 100644
            const idle = yield* takeEvent(
              (event) => event.type === "subagent.updated" && event.subagent.status === "idle",
            );
-@@ -1771,7 +1963,17 @@ describe("native Copilot V2", () => {
+@@ -1772,7 +1964,17 @@ describe("native Copilot V2", () => {
            assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
            yield* start(2);
            fake.setTasks({ tasks: [{ ...task, status: "completed", result: "Finished" }] });
@@ -1006,7 +974,7 @@ index ea88c2449..cb025ce52 100644
            const completed = yield* takeEvent(
              (event) => event.type === "subagent.updated" && event.subagent.status === "completed",
            );
-@@ -1780,6 +1982,19 @@ describe("native Copilot V2", () => {
+@@ -1781,6 +1983,19 @@ describe("native Copilot V2", () => {
              "run-1",
            );
            assert.equal((yield* drain()).providerTurns[1]?.status, "running");
@@ -1026,7 +994,7 @@ index ea88c2449..cb025ce52 100644
            fake.setTasks({
              tasks: [
                {
-@@ -1799,8 +2014,29 @@ describe("native Copilot V2", () => {
+@@ -1800,8 +2015,29 @@ describe("native Copilot V2", () => {
              "command",
            );
            assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
@@ -1057,7 +1025,7 @@ index ea88c2449..cb025ce52 100644
            yield* drain();
            assert.isFalse(yield* runtime.hasPendingBackgroundWork!);
            fake.emit("session.idle");
-@@ -1813,8 +2049,43 @@ describe("native Copilot V2", () => {
+@@ -1814,8 +2050,43 @@ describe("native Copilot V2", () => {
      provide(
        Effect.gen(function* () {
          const fake = fakeSdk();
@@ -1102,7 +1070,7 @@ index ea88c2449..cb025ce52 100644
          fake.emit("tool.execution_start", {
            toolCallId: "shell",
            toolName: "bash",
-@@ -1872,6 +2143,32 @@ describe("native Copilot V2", () => {
+@@ -1873,6 +2144,32 @@ describe("native Copilot V2", () => {
              : "";
          assert.include(input, "[redacted]");
          assert.notInclude(input, "do-not-persist");
@@ -1136,7 +1104,7 @@ index ea88c2449..cb025ce52 100644
          yield* drain();
        }),
 diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
-index 71f3d7319..30f91876d 100644
+index 71f3d7319d..30f91876dd 100644
 --- a/packages/provider-copilot/src/server/adapter.ts
 +++ b/packages/provider-copilot/src/server/adapter.ts
 @@ -7,7 +7,6 @@ import type {
@@ -1479,7 +1447,7 @@ index 71f3d7319..30f91876d 100644
            return createdThread;
          });
 diff --git a/packages/provider-copilot/src/server/driver.ts b/packages/provider-copilot/src/server/driver.ts
-index ad29ed011..f0621d9bd 100644
+index 76ffd807c1..cb8a9cb2af 100644
 --- a/packages/provider-copilot/src/server/driver.ts
 +++ b/packages/provider-copilot/src/server/driver.ts
 @@ -17,7 +17,7 @@ import {
@@ -1491,7 +1459,7 @@ index ad29ed011..f0621d9bd 100644
  import { makeTextGeneration } from "./textGeneration.ts";
  
  const driverKind = ProviderDriverKind.make("githubCopilot");
-@@ -181,6 +181,7 @@ export const CopilotDriver: ProviderDriver<CopilotSettings, CopilotDriverEnv> =
+@@ -193,6 +193,7 @@ export const CopilotDriver: ProviderDriver<CopilotSettings, CopilotDriverEnv> =
        enabled,
        continuationIdentity,
        snapshot,
@@ -1500,7 +1468,7 @@ index ad29ed011..f0621d9bd 100644
        orchestrationAdapter,
        textGeneration: makeTextGeneration(settings, processEnv),
 diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
-index 0299516a6..2afcc5965 100644
+index 0299516a66..2afcc5965b 100644
 --- a/packages/provider-copilot/src/server/status.test.ts
 +++ b/packages/provider-copilot/src/server/status.test.ts
 @@ -123,20 +123,22 @@ describe("Copilot discovery and account isolation", () => {
@@ -1550,7 +1518,7 @@ index 0299516a6..2afcc5965 100644
  
    it("uses only the selected account's home and preserves SDK-owned native paths", () => {
 diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts
-index 22e77715f..a84504130 100644
+index 1becd05805..7666dd4b0d 100644
 --- a/packages/provider-copilot/src/server/status.ts
 +++ b/packages/provider-copilot/src/server/status.ts
 @@ -1,6 +1,6 @@
@@ -1709,7 +1677,7 @@ index 22e77715f..a84504130 100644
  }
  
 diff --git a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts
-index a2e78004b..b5d1ce004 100644
+index a2e78004bd..b5d1ce0049 100644
 --- a/packages/provider-copilot/src/settings.ts
 +++ b/packages/provider-copilot/src/settings.ts
 @@ -36,6 +36,14 @@ export const CopilotSettings = makeProviderSettingsSchema(
@@ -1744,7 +1712,7 @@ index a2e78004b..b5d1ce004 100644
  );
  export type CopilotSettings = typeof CopilotSettings.Type;
 diff --git a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts
-index 56f5da550..928fa7ab4 100644
+index c0eda801df..cb170e6191 100644
 --- a/packages/provider-core/src/server/ProviderAdapter.ts
 +++ b/packages/provider-core/src/server/ProviderAdapter.ts
 @@ -31,6 +31,8 @@ import {
@@ -1756,7 +1724,7 @@ index 56f5da550..928fa7ab4 100644
    ThreadId,
    TurnItemId,
  } from "@t3tools/contracts";
-@@ -645,6 +647,9 @@ export class ProviderAdapterV2 extends Context.Service<
+@@ -833,6 +835,9 @@ export class ProviderAdapterV2 extends Context.Service<
      readonly planSelectionTransition: (
        input: ProviderSelectionTransitionInput,
      ) => Effect.Effect<ProviderSelectionTransitionPlan, ProviderAdapterV2Error>;
@@ -1767,10 +1735,10 @@ index 56f5da550..928fa7ab4 100644
        input: ProviderAdapterV2OpenSessionInput,
      ) => Effect.Effect<ProviderAdapterV2SessionRuntime, ProviderAdapterV2Error, Scope.Scope>;
 diff --git a/packages/provider-core/src/server/driver.ts b/packages/provider-core/src/server/driver.ts
-index d236a98fd..bf24a443a 100644
+index c0474da3b5..bff5108bcf 100644
 --- a/packages/provider-core/src/server/driver.ts
 +++ b/packages/provider-core/src/server/driver.ts
-@@ -40,6 +40,8 @@ export interface ProviderInstance {
+@@ -46,6 +46,8 @@ export interface ProviderInstance {
    readonly accentColor?: string | undefined;
    readonly enabled: boolean;
    readonly snapshot: ManagedServerProvider;

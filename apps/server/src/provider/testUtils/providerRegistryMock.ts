@@ -17,6 +17,7 @@ const makeProviderRegistryMock = (
   refreshWorkspaceSnapshot: () => Effect.succeed(providers),
   invalidateModelCaches: () => Effect.void,
   refreshModelCatalog: Effect.void,
+  setSkillEnabled: () => Effect.die("Unexpected skill control in provider registry fixture"),
   getProviderMaintenanceCapabilitiesForInstance: (_instanceId, provider) =>
     Effect.succeed(makeManualOnlyProviderMaintenanceCapabilities({ provider, packageName: null })),
   setProviderMaintenanceActionState: () => Effect.succeed(providers),
