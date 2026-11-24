@@ -1545,6 +1545,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
               : {}),
             streaming: true,
             enableSkills: true,
+            requestExtensions: false,
             enableConfigDiscovery: input.settings.enableConfigDiscovery,
             skipCustomInstructions: !input.settings.enableConfigDiscovery,
             ...(mcp

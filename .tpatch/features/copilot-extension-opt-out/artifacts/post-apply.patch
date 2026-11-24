@@ -1,8 +1,8 @@
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
-index e89a4e54a..ea88c2449 100644
+index b18832a1ab..661ff2a98c 100644
 --- a/packages/provider-copilot/src/server/adapter.test.ts
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
-@@ -67,8 +67,15 @@ const host = ProviderHost.ProviderHost.of({
+@@ -68,8 +68,15 @@ const host = ProviderHost.ProviderHost.of({
      }),
  });
  
@@ -19,7 +19,7 @@ index e89a4e54a..ea88c2449 100644
    let serial = 0;
    let disconnected = 0;
    let stopped = 0;
-@@ -154,14 +161,14 @@ function fakeSdk() {
+@@ -155,14 +162,14 @@ function fakeSdk() {
      },
      forceStop: async () => {},
      createSession: async (created) => {
@@ -36,7 +36,7 @@ index e89a4e54a..ea88c2449 100644
        emit("session.resume", { alreadyInUse: conflict });
        return session;
      },
-@@ -331,6 +338,26 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+@@ -332,6 +339,26 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
    );
  
  describe("native Copilot V2", () => {
@@ -64,7 +64,7 @@ index e89a4e54a..ea88c2449 100644
      provide(
        Effect.gen(function* () {
 diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
-index f123aee9a..71f3d7319 100644
+index f123aee9ab..71f3d7319d 100644
 --- a/packages/provider-copilot/src/server/adapter.ts
 +++ b/packages/provider-copilot/src/server/adapter.ts
 @@ -1545,6 +1545,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (

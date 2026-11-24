@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "feature": "copilot-extension-opt-out",
+  "producer": "record",
+  "patch_present": true,
+  "recipe_present": true,
+  "recipe_decodable": true,
+  "patch_sha256": "b7c67612c6925aaeae4871b2cb7712c5ca07128de1b6952886996134aaf82ea5",
+  "recipe_sha256": "1100262360cac70e86ae5800a92be792bd0a050571d90b919384f099f48258e7",
+  "reference": {
+    "kind": "commit",
+    "commit": "71c65a7ed820e5749b875292121a4daffbe8ca8f",
+    "preimage_set_sha256": "b69d45031cc5e9457ec2072e09c2e00807a921d6c96c16061179dc4f7bc6d584"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "packages/provider-copilot/src/server/adapter.test.ts",
+      "packages/provider-copilot/src/server/adapter.ts"
+    ],
+    "claim_ids": []
+  },
+  "coverage_status": "complete",
+  "cross_base_status": "consumer-derivation-required",
+  "effects": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.test.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "b0638a78512c73e0ab515e2db815bbb26883c8a279201ef841af17db20642611",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "99672b4fba63d3fb2d3f2dd5941351cc546def34a89f21a76f31be19942d2411",
+      "patch_fragment_sha256": "c555f1372bd9e29355bd3040fe3adb9343a2ee4ad04b5acdf0d190729e8025e8",
+      "effect_sha256": "eb321ab58eec57ef2c4fa94b5401cbc70d55359ff2c11202050c35d8969f725f",
+      "operation_indexes": [
+        1
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "911e49b249c9f7de6a8e9bc842e6e10980df7a44623bb7749c4e1a3f176f6d9c",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "77b6c3ee6de53474df1ab58d07d9eb48b53aed5d82782d6569bcd6c41e233901",
+      "patch_fragment_sha256": "d6f0d162c1942e51d29be37c434a79bfd521b00a4d90dbbae5e1727471a876c8",
+      "effect_sha256": "c0e0be056f6de406bb3e0031eb74ec2b5246a5e6f13fe898f3da0fa3242221ac",
+      "operation_indexes": [
+        2
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "additive-text"
+    }
+  ],
+  "reasons": []
+}
