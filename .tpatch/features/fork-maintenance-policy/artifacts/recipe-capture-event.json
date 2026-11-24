@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "feature": "fork-maintenance-policy",
+  "patch_present": true,
+  "patch_sha256": "fb0ee75c25bfe948efbd3c15b8135191345b93de25a49c47a88e793d651a1546",
+  "recipe_present": true,
+  "recipe_sha256": "257427654e97fd9e6c28c8588ee27910d199b9fb9fd143d1cda3948b1f021f65",
+  "reference": {
+    "kind": "commit",
+    "commit": "b6a9908bed8ca2b70272b33cc2058835dc40ad95",
+    "preimage_set_sha256": "c64af76c6ff5a3065b114f97b0cc9b7008936e90827b666d055d2f38852d23b4"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "docs/internals/fork-maintenance.md"
+    ],
+    "claim_ids": []
+  },
+  "event": {
+    "patch_rewritten": true,
+    "recipe_regenerated": true,
+    "bound_artifact_edited": false,
+    "stale_marker_present": false
+  },
+  "parent_created_paths": [],
+  "observations": [
+    {
+      "ordinal": 1,
+      "change_kind": "add",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "docs/internals/fork-maintenance.md",
+      "old_path": "",
+      "old_mode": "",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": false,
+      "preimage_sha256": "",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "38c9c3edb0bcef0f4ff35f0028b67f620fc54467b3e7bedd6921f6b90a780411",
+      "patch_fragment_sha256": "fb0ee75c25bfe948efbd3c15b8135191345b93de25a49c47a88e793d651a1546"
+    }
+  ],
+  "coverage_sha256": "c0e4789892efb43ddabf2c92012171a586cea497bd4c9dfa418de08cfb88dfb6"
+}

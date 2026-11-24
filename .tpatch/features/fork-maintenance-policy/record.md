@@ -1,20 +1,19 @@
 # Implementation Record: fork-maintenance-policy
 
-**Recorded**: 2026-10-29T18:06:09Z
+**Recorded**: 2026-11-24T07:13:21Z
 **Files changed**: 1
-**Patch size**: 6649 bytes
-**Capture mode**: committed-range
-**Base commit**: 16a55122c16fdd957ac7bba8e00aed970584d0f2
-**Upper bound**: 3871a7e0fff4eb7f0c54529fdad63c002eb00672
+**Patch size**: 6651 bytes
+**Capture mode**: staged-index
 **Pathspecs**: docs/internals/fork-maintenance.md
 
 ## Capture Provenance
 
-- **capture_mode**: `committed-range`
+- **capture_mode**: `staged-index`
 - **pathspecs**: docs/internals/fork-maintenance.md
 - **claim_ids**: (none)
-- **base_commit**: `16a55122c16fdd957ac7bba8e00aed970584d0f2`
-- **upper_commit**: `3871a7e0fff4eb7f0c54529fdad63c002eb00672`
+- **base_commit**: `b6a9908bed8ca2b70272b33cc2058835dc40ad95`
+- **upper_commit**: `working-tree`
+- **dirty_state**: 1 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
@@ -25,4 +24,3 @@ To re-apply this feature to a clean checkout:
 git apply .tpatch/features/fork-maintenance-policy/artifacts/post-apply.patch
 ```
 
-*Patch was captured as a committed diff from `16a55122c16fdd957ac7bba8e00aed970584d0f2` to `HEAD`.*

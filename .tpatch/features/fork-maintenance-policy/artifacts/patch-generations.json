@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "fork-maintenance-policy",
-  "current_generation": 2,
+  "current_generation": 3,
   "generations": [
     {
       "generation": 1,
@@ -45,7 +45,7 @@
       "git_patch_id": "7a4361f1cb10eb7c84a7bf5a7caf0a67278ad140",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "cf16f6c48634a74dead24c2cbe29a014deb184c2254b5e63b43dccbf9b1d3ecf",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "16a55122c16fdd957ac7bba8e00aed970584d0f2",
       "upper": {
@@ -55,6 +55,40 @@
       },
       "capture": {
         "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/internals/fork-maintenance.md"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/internals/fork-maintenance.md"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 3,
+      "generation_id": "pg_f3f952f26ba0",
+      "kind": "amend-refresh",
+      "patch_sha256": "fb0ee75c25bfe948efbd3c15b8135191345b93de25a49c47a88e793d651a1546",
+      "git_patch_id": "7a4361f1cb10eb7c84a7bf5a7caf0a67278ad140",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "257427654e97fd9e6c28c8588ee27910d199b9fb9fd143d1cda3948b1f021f65",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/004-record.patch",
+      "base_commit": "b6a9908bed8ca2b70272b33cc2058835dc40ad95",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
         "pathspecs": [
           "docs/internals/fork-maintenance.md"
         ],
