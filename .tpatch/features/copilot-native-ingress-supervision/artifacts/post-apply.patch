@@ -1,5 +1,5 @@
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
-index cb025ce52c..e2428debe3 100644
+index 83dc4c40d5..4d80808752 100644
 --- a/packages/provider-copilot/src/server/adapter.test.ts
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
 @@ -19,6 +19,7 @@ import {
@@ -17,9 +17,9 @@ index cb025ce52c..e2428debe3 100644
 +const isEventStreamError = Schema.is(ProviderAdapter.ProviderAdapterEventStreamError);
 +const isProtocolError = Schema.is(ProviderAdapter.ProviderAdapterProtocolError);
  const host = ProviderHost.ProviderHost.of({
+   compatibility: () => Effect.undefined,
    paths: {
-     cwd: "/workspace",
-@@ -305,7 +308,7 @@ const setup = Effect.fnUntraced(function* (
+@@ -306,7 +309,7 @@ const setup = Effect.fnUntraced(function* (
    });
    const emitted: ProviderAdapter.ProviderAdapterV2Event[] = [];
    const eventQueue = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
@@ -28,7 +28,7 @@ index cb025ce52c..e2428debe3 100644
      Stream.runForEach((event) =>
        Effect.sync(() => {
          emitted.push(event);
-@@ -372,7 +375,7 @@ const setup = Effect.fnUntraced(function* (
+@@ -373,7 +376,7 @@ const setup = Effect.fnUntraced(function* (
      });
    });
    const drain = () => runtime.readThreadSnapshot({ providerThread: thread });
@@ -37,7 +37,7 @@ index cb025ce52c..e2428debe3 100644
  });
  
  const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-@@ -1747,6 +1750,55 @@ describe("native Copilot V2", () => {
+@@ -1748,6 +1751,55 @@ describe("native Copilot V2", () => {
        ),
    );
  

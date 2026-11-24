@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-native-ingress-supervision",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "f61fd32287fcc34d9867587afb0cd15e015822a4",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
       "upper": {
@@ -55,6 +55,67 @@
           "parent_generation": 1,
           "parent_patch_sha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
           "parent_recipe_sha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_bf5712cd23d2",
+      "kind": "amend-refresh",
+      "patch_sha256": "317d17c3ecd7ac313cca45d0fc9c9e546c109e655107aee04de6380e47936f3d",
+      "git_patch_id": "3286624dc4b85ee47a9dc0703f9579d625eaf331",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "cc0b025db271494d21dfd47258996522c639bad160785729991d7fb1139627a5",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "9a5c627a176cb47e1439f9cdbe67f987fdb81eca",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-idle-agent-completion",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "066667837658ecff7e3f0a4713e9d2ea2f1ee89fc048b34821c5e6abe5c70d37",
+          "parent_recipe_sha256": "1895411f17af9efd023aef5f87d55b97b501a3cb4ee571c7bad1c827e0136511"
+        },
+        {
+          "slug": "copilot-routing-late-telemetry",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "8a0a0c28e2f60360d60446519dab654f8cb8881091643a5485e32db167a7d336",
+          "parent_recipe_sha256": "7979b4e18345872b978e0bb89aa8a88a417c4a4981617fe73b888d9864875b15"
+        },
+        {
+          "slug": "stable-main-preservation-v014",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "ef096f450b7ae8403a75c55ff3dec680acdbb4189b7a776792bce8318b444205",
+          "parent_recipe_sha256": "61a5bf73a435889768a27b6261b57f2451ddbf0fa612b671b29d7cbf03295ce7"
         }
       ],
       "refs": {

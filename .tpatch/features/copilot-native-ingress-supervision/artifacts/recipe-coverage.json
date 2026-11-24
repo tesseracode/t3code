@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "feature": "copilot-native-ingress-supervision",
+  "producer": "record",
+  "patch_present": true,
+  "recipe_present": true,
+  "recipe_decodable": true,
+  "patch_sha256": "317d17c3ecd7ac313cca45d0fc9c9e546c109e655107aee04de6380e47936f3d",
+  "recipe_sha256": "cc0b025db271494d21dfd47258996522c639bad160785729991d7fb1139627a5",
+  "reference": {
+    "kind": "commit",
+    "commit": "9a5c627a176cb47e1439f9cdbe67f987fdb81eca",
+    "preimage_set_sha256": "62b064f253993c0eea179001dfb6dae621a9c893e6e7f742698af012864518c0"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "packages/provider-copilot/src/server/adapter.test.ts",
+      "packages/provider-copilot/src/server/adapter.ts"
+    ],
+    "claim_ids": []
+  },
+  "coverage_status": "complete",
+  "cross_base_status": "consumer-derivation-required",
+  "effects": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.test.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "22023dc9d09c3901cb4db7558a101006569c619f5844f4abd610566e095c6013",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "d510f9d933ecf8722ea2b39c8488172e0e602fe9af1bbf33440f3e2070e44c8b",
+      "patch_fragment_sha256": "471db3cfa934b5c11082a262c2f21fda12773384ba94e2c6258f0cecf0a5ad3b",
+      "effect_sha256": "3f2d53b8bf55417f7220ba0b1fd7d804c8cc4f888e9d7313a285091008cae338",
+      "operation_indexes": [
+        1
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "d3d04c5d4af229cac96404e03e7341d0274f30394a4dd1b70f6d2a53d4342ff5",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "edecb137a67b6a42f39b144479f331bc0f2d53063d9bcdf39d72f2700c31ae42",
+      "patch_fragment_sha256": "6b2f2553486df95767455e4804f3815c8489cb0df220296c6f67bb5d82e2aa24",
+      "effect_sha256": "b15d72875b27bce51b51e95da40a9615906dd922d8797fbc45c705cb4d90f380",
+      "operation_indexes": [
+        2
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    }
+  ],
+  "reasons": []
+}
