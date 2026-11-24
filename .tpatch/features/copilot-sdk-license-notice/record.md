@@ -1,25 +1,18 @@
 # Implementation Record: copilot-sdk-license-notice
 
-**Recorded**: 2026-10-29T16:47:20Z
+**Recorded**: 2026-11-24T02:31:19Z
 **Files changed**: 1
-**Patch size**: 649 bytes
-**Capture mode**: working-tree-all
-**Pathspecs**: third-party-licenses.config.json
-
-## Change Summary
-
-```
- third-party-licenses.config.json | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-```
+**Patch size**: 651 bytes
+**Capture mode**: staged-index
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: third-party-licenses.config.json
+- **capture_mode**: `staged-index`
+- **pathspecs**: (none)
 - **claim_ids**: (none)
-- **base_commit**: `8605454d5cba4ab065f43fa694e62868fe093e31`
+- **base_commit**: `000eba5bf52dd2c66c364a0d5281cd865cab0938`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 1 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
