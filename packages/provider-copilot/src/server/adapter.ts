@@ -1884,6 +1884,8 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
         providerSession,
         events: Stream.fromQueue(events),
         hasPendingBackgroundWork: Effect.sync(() => [...tasks.values()].some(isPendingTask)),
+        turnUsageIsContextUsage: false,
+        supportsNativeThreadReplacement: false,
         ensureThread,
         resumeThread: (resume) =>
           ensureThread({

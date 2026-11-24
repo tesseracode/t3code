@@ -726,6 +726,10 @@ export interface ProviderAdapterV2SessionRuntime {
   readonly canReuseContextUsage?: (previous: ModelSelection, next: ModelSelection) => boolean;
   /** Excludes turn-scoped options from native thread load matching. */
   readonly normalizeThreadLoadModelSelection?: (selection: ModelSelection) => ModelSelection;
+  /** False when turn usage is cumulative billing rather than native context occupancy. */
+  readonly turnUsageIsContextUsage?: boolean;
+  /** False preserves resume/admission errors without requesting a fresh native conversation. */
+  readonly supportsNativeThreadReplacement?: boolean;
   readonly ensureThread: (
     input: ProviderAdapterV2EnsureThreadInput,
   ) => Effect.Effect<OrchestrationV2ProviderThread, ProviderAdapterV2Error>;

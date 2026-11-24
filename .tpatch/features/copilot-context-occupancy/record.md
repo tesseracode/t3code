@@ -1,28 +1,19 @@
 # Implementation Record: copilot-context-occupancy
 
-**Recorded**: 2026-11-05T07:54:15Z
+**Recorded**: 2026-11-24T07:20:33Z
 **Files changed**: 4
-**Patch size**: 14937 bytes
-**Capture mode**: working-tree-all
-**Pathspecs**: packages/provider-core/src/server/ProviderAdapter.ts,packages/provider-copilot/src/server/adapter.ts,apps/server/src/orchestration-v2/ProviderTurnStartService.ts,apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts
-
-## Change Summary
-
-```
- .../orchestration-v2/ProviderTurnStartService.ts   |   9 +-
- .../testkit/ProviderSwitch.integration.test.ts     | 115 +++++++++++++++++++--
- packages/provider-copilot/src/server/adapter.ts    |   2 +
- .../provider-core/src/server/ProviderAdapter.ts    |   4 +
- 4 files changed, 121 insertions(+), 9 deletions(-)
-```
+**Patch size**: 14821 bytes
+**Capture mode**: staged-index
+**Pathspecs**: apps/server/src/orchestration-v2/ProviderTurnStartService.ts,apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts,packages/provider-copilot/src/server/adapter.ts,packages/provider-core/src/server/ProviderAdapter.ts
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: packages/provider-core/src/server/ProviderAdapter.ts, packages/provider-copilot/src/server/adapter.ts, apps/server/src/orchestration-v2/ProviderTurnStartService.ts, apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts
+- **capture_mode**: `staged-index`
+- **pathspecs**: apps/server/src/orchestration-v2/ProviderTurnStartService.ts, apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts, packages/provider-copilot/src/server/adapter.ts, packages/provider-core/src/server/ProviderAdapter.ts
 - **claim_ids**: (none)
-- **base_commit**: `f03693d6a4b53e4fc16278203a247ccf946b6bef`
+- **base_commit**: `b1498e6f5d511d2182eb3edebc142d46dbf32240`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 4 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 

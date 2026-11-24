@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "feature": "copilot-context-occupancy",
+  "patch_present": true,
+  "patch_sha256": "aa1a09d639de733c10e36daf27aaa6ce8e0b3d4cfb896c2f2f6f8b0d92a91aa6",
+  "recipe_present": true,
+  "recipe_sha256": "83c936efbe6de3d34c4698f8b5ba64ea1133851e2e02e9a6ecacb49667625c67",
+  "reference": {
+    "kind": "commit",
+    "commit": "b1498e6f5d511d2182eb3edebc142d46dbf32240",
+    "preimage_set_sha256": "5ab4c32cdfbe5e48b01645c8a21b09172d228741a029222f590afb79f1e586f5"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+      "apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+      "packages/provider-copilot/src/server/adapter.ts",
+      "packages/provider-core/src/server/ProviderAdapter.ts"
+    ],
+    "claim_ids": []
+  },
+  "event": {
+    "patch_rewritten": true,
+    "recipe_regenerated": true,
+    "bound_artifact_edited": false,
+    "stale_marker_present": false
+  },
+  "parent_created_paths": [],
+  "observations": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "cddd561c289d7716bf23e1cb9c05c1a3ff3088bd67d7fbd03e46f88dc598aa3b",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "d1bd093cf1392fd135ec57a07e71b4643f5ea8288dff0abec9ad87dd901b7d5d",
+      "patch_fragment_sha256": "dfe54760952a0b760124bc0264d22a9d02b3f835902890bbe1e32a1b5d5caece"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "f092658251732dff57f774a9a77c8269e22a11119bed9692464d17d2cfaf72aa",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "f1051a7c25517f61ac0095b9bf59d7e111306195c5ea21a46064b9f285cdc824",
+      "patch_fragment_sha256": "7157d31aebfa95b5e4dfe54b15b9c646adf742454c166963af2e205920a8bf0f"
+    },
+    {
+      "ordinal": 3,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "2456bb25a2aa1c8ce0c6ea6046efe3933879a1648847a0b16ecb526df10f04f2",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "911e49b249c9f7de6a8e9bc842e6e10980df7a44623bb7749c4e1a3f176f6d9c",
+      "patch_fragment_sha256": "c16e175ba9fc27dfd30f66a11a551b0ad33ec385c69fd07ebd7e3e211f44f365"
+    },
+    {
+      "ordinal": 4,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-core/src/server/ProviderAdapter.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "b225b3b85516c27913c6a68b49b98c36b36ec5ceb0f4cd152661741a3f498d9e",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "0e585153181ae96f311551496a0581e925d4bd38a964261b6dad23a878a47845",
+      "patch_fragment_sha256": "e4c17a5dacb92e935515832e1328732eb81693fc07fbbc045177a24022d4aa4e"
+    }
+  ],
+  "coverage_sha256": "471e78bcd9ea5022c59f153549a511643417b442008ff5b2ef9392781925fe6c"
+}
