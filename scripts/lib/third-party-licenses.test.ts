@@ -498,3 +498,55 @@ describe("third-party license generation", () => {
     });
   });
 });
+
+describe("Copilot SDK 1.0.28 omitted notices", () => {
+  it.each([
+    "@github/copilot-sdk",
+    "@github/copilot-sdk-darwin-arm64",
+    "@github/copilot-sdk-darwin-x64",
+    "@github/copilot-sdk-win32-arm64",
+    "@github/copilot-sdk-win32-x64",
+    "@github/copilot-sdk-linux-arm64",
+    "@github/copilot-sdk-linux-x64",
+    "@github/copilot-sdk-linuxmusl-arm64",
+    "@github/copilot-sdk-linuxmusl-x64",
+  ])("generates attributed MIT terms for %s without an archive notice", async (name) => {
+    const fixture = await createFixture();
+    const config = JSON.parse(
+      await NodeFSP.readFile(
+        NodePath.join(REPOSITORY_ROOT, "third-party-licenses.config.json"),
+        "utf8",
+      ),
+    ) as {
+      packageOverrides: ReadonlyArray<Record<string, unknown>>;
+    };
+    const override = config.packageOverrides.find(
+      (entry) => entry.name === name && entry.version === "1.0.28",
+    );
+    expect(override).toBeDefined();
+    await writeJson(fixture.configFile, { customNotices: [], packageOverrides: [override] });
+    await writeJson(NodePath.join(fixture.root, "third-party-licenses/spdx/v3.28.0/MIT.json"), {
+      licenseId: "MIT",
+      licenseText: "MIT fixture terms",
+    });
+    await writeJson(fixture.appManifest, {
+      name: "fixture-app",
+      dependencies: { [name]: "1.0.28" },
+    });
+    const packageRoot = NodePath.join(fixture.root, "node_modules", name);
+    await writeJson(NodePath.join(packageRoot, "package.json"), {
+      name,
+      version: "1.0.28",
+      license: "MIT",
+      main: "index.js",
+    });
+    await NodeFSP.writeFile(NodePath.join(packageRoot, "index.js"), "export {};\n", "utf8");
+    const manifest = await generateThirdPartyLicenseManifest({
+      configFile: fixture.configFile,
+      packageManifests: [{ bundle: "mobile", path: fixture.appManifest }],
+    });
+    const entry = manifest.entries.find((candidate) => candidate.name === name);
+    expect(entry?.license).toBe("MIT");
+    expect(entry?.noticeText).toBe("Copyright GitHub, Inc.\n\nMIT fixture terms");
+  });
+});

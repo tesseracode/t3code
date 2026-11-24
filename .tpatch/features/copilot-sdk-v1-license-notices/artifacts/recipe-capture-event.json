@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "feature": "copilot-sdk-v1-license-notices",
+  "patch_present": true,
+  "patch_sha256": "75b441b5c18e09537cce52f1d4ac0ea13f0302121177f9d4122b4d1c62513544",
+  "recipe_present": true,
+  "recipe_sha256": "60b4b19ac0539105474f990fa7aa3b187743ca62e4fa8ceb48977decf4c48c33",
+  "reference": {
+    "kind": "commit",
+    "commit": "ee46bfa34ae14bec6939ea79ff2559800b375987",
+    "preimage_set_sha256": "5dd243336a0fda50cff9929f056413aa356e74b3b5c4efa7cd4d052c6a7acf04"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "scripts/lib/third-party-licenses.test.ts"
+    ],
+    "claim_ids": []
+  },
+  "event": {
+    "patch_rewritten": true,
+    "recipe_regenerated": true,
+    "bound_artifact_edited": false,
+    "stale_marker_present": false
+  },
+  "parent_created_paths": [],
+  "observations": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "scripts/lib/third-party-licenses.test.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "6ab722b831b58cd3cef9ad0af2a80c15637dee96c06d4c983955853220d82e39",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "ea4b1da19234f44f779da36c0da6778c9dd6e58257b99a0f68855f4a9e0d2590",
+      "patch_fragment_sha256": "75b441b5c18e09537cce52f1d4ac0ea13f0302121177f9d4122b4d1c62513544"
+    }
+  ],
+  "coverage_sha256": "048151b5c1c2c320890e6e358ec0044026b7ff3669915fab2d16d7f03f2d16c2"
+}

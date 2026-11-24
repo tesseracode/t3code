@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-sdk-v1-license-notices",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "f4b60812a520ac1198e572bac7a5c807f8732e97",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "836ff890573b5b981b810b63b278914201a399a931212fc641ff282c3d2ba3c5",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/001-record.patch",
       "base_commit": "8a3e34631cca72fcf79327c5c625077ba71800ae",
       "upper": {
@@ -47,6 +47,57 @@
           "parent_generation": 1,
           "parent_patch_sha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
           "parent_recipe_sha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_a8c44489f056",
+      "kind": "amend-refresh",
+      "patch_sha256": "75b441b5c18e09537cce52f1d4ac0ea13f0302121177f9d4122b4d1c62513544",
+      "git_patch_id": "67398d43f976a52a74b7752f7ae704f98ef8f723",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "60b4b19ac0539105474f990fa7aa3b187743ca62e4fa8ceb48977decf4c48c33",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "ee46bfa34ae14bec6939ea79ff2559800b375987",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "scripts/lib/third-party-licenses.test.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "scripts/lib/third-party-licenses.test.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-sdk-license-notice",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 3,
+          "parent_patch_sha256": "7eee7bec2629641c481e116dac7828f2531f959f8ab0981df0afc2c2fe6e968b",
+          "parent_recipe_sha256": "4bbd44420066ae8bb5bc187420a3b1f32747f6c608d79dd796ba05459a9eec45"
+        },
+        {
+          "slug": "copilot-sdk-runtime-upgrade",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "1b4852d9ec329ba35fdb6e9c2c2ee4d6e050e6608ccc9b296582f306924776d2",
+          "parent_recipe_sha256": "e897fc3f7ed1ccdcc4aef2c44c624c5e73bb7ca828eef2a1f82bc91cb194fc63"
         }
       ],
       "refs": {
