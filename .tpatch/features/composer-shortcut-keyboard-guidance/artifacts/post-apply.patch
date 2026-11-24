@@ -1,8 +1,8 @@
 diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md
-index 96b3daeec..493361d5c 100644
+index 22c50349cb..840eca5e17 100644
 --- a/docs/user/keybindings.md
 +++ b/docs/user/keybindings.md
-@@ -14,7 +14,9 @@ is local to this client and does not resolve the underlying request.
+@@ -15,7 +15,9 @@ Dictation**, and the hold or toggle behavior in **Settings → Voice**. See
  
  In **Settings → Chat → Send shortcut**, choose whether Enter sends, requires
  `mod+Enter` for multiline prompts, or always requires `mod+Enter`. `Shift+Enter`

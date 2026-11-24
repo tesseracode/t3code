@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "feature": "composer-shortcut-keyboard-guidance",
+  "producer": "record",
+  "patch_present": true,
+  "recipe_present": true,
+  "recipe_decodable": true,
+  "patch_sha256": "a1add4ab523191e2a33a56c0e58a6ef2d23287a8026c1da606b101487bafbb51",
+  "recipe_sha256": "254a68aa966f0d6fe8c00912d38047e449ce071b71827d6a7dbd81ec8194df3a",
+  "reference": {
+    "kind": "commit",
+    "commit": "05b3f8196431b40ae700087426788615b1fec459",
+    "preimage_set_sha256": "b45ce4bc7a79603cb3cef960256abf094e58ffc5c5be528c1684b5ffe0bf188c"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "docs/user/keybindings.md"
+    ],
+    "claim_ids": []
+  },
+  "coverage_status": "complete",
+  "cross_base_status": "consumer-derivation-required",
+  "effects": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "docs/user/keybindings.md",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "8ecbab10ed43a3943931bdff2320f5c981010e745feddef55df190b6975af733",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "8678317becabc77c5cf43df3cb3a369bac59a53295b5558c46bd0301cf3d6733",
+      "patch_fragment_sha256": "a1add4ab523191e2a33a56c0e58a6ef2d23287a8026c1da606b101487bafbb51",
+      "effect_sha256": "7a15dabf83ff5a54c3b828aec8159c665f88e6dd237a1bcfa4fb91473fbd0f13",
+      "operation_indexes": [
+        1
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    }
+  ],
+  "reasons": []
+}
