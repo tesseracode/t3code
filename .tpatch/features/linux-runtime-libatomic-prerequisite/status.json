@@ -5,12 +5,12 @@
   "state": "applied",
   "compatibility": "unknown",
   "requested_at": "2026-10-30T10:07:22Z",
-  "updated_at": "2026-10-30T10:12:41Z",
+  "updated_at": "2026-11-24T07:11:31Z",
   "last_command": "record",
-  "notes": "landed at 2026-10-30T10:12:41Z",
+  "notes": "Patch recorded",
   "apply": {
     "completed_at": "2026-10-30T10:08:23Z",
-    "base_commit": "4a5ad9255cefc6cecee050f576e584e618aed71e",
+    "base_commit": "27833ab3d578882c98e3eb9255125b8023afa07f",
     "has_patch": true
   },
   "reconcile": {},

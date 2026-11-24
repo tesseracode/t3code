@@ -1,26 +1,19 @@
 # Implementation Record: linux-runtime-libatomic-prerequisite
 
-**Recorded**: 2026-10-30T10:12:41Z
+**Recorded**: 2026-11-24T07:11:31Z
 **Files changed**: 2
-**Patch size**: 2855 bytes
-**Capture mode**: working-tree-all
-
-## Change Summary
-
-```
- .tpatch/FEATURES.md                    |  1 +
- docs/operations/fork-native-preview.md | 14 ++++++++++++++
- docs/user/install.md                   | 21 ++++++++++++++++++++-
- 3 files changed, 35 insertions(+), 1 deletion(-)
-```
+**Patch size**: 2720 bytes
+**Capture mode**: staged-index
+**Pathspecs**: .github/workflows/fork-native-preview.yml,docs/operations/fork-native-preview.md
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: (none)
+- **capture_mode**: `staged-index`
+- **pathspecs**: .github/workflows/fork-native-preview.yml, docs/operations/fork-native-preview.md
 - **claim_ids**: (none)
-- **base_commit**: `4a5ad9255cefc6cecee050f576e584e618aed71e`
+- **base_commit**: `27833ab3d578882c98e3eb9255125b8023afa07f`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 2 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 

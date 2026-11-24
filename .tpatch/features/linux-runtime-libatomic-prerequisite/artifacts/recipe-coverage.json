@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "feature": "linux-runtime-libatomic-prerequisite",
+  "producer": "record",
+  "patch_present": true,
+  "recipe_present": true,
+  "recipe_decodable": true,
+  "patch_sha256": "7a5dff47c54bfd69bdb2199b019f76291388f32170cf154004e094898969f897",
+  "recipe_sha256": "5b27998d9ad30957969231c7a296ad1234cd363a6db2a7c5b42f132c1b635523",
+  "reference": {
+    "kind": "commit",
+    "commit": "27833ab3d578882c98e3eb9255125b8023afa07f",
+    "preimage_set_sha256": "9cfec42f88d60eaf1711c20fe8a7d2b59fe953bb0d36cdcc4a86e7f8a156e29c"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      ".github/workflows/fork-native-preview.yml",
+      "docs/operations/fork-native-preview.md"
+    ],
+    "claim_ids": []
+  },
+  "coverage_status": "complete",
+  "cross_base_status": "consumer-derivation-required",
+  "effects": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": ".github/workflows/fork-native-preview.yml",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "804ba3fb68961850aebe4d19d81783488ff3d493c12267312be51cf3408dc670",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "b28374e3f9dc86233b64d2d0629a7c5a7be1126e6f09becadadbb7c4b81dea77",
+      "patch_fragment_sha256": "e777b361304940f879e7808e806bcc0e4824df2c5dd19e869e42a8ef9662a250",
+      "effect_sha256": "7391bc306db2ad0f9da50ff0bb740c603221afbd3df70087e183dae32c164db7",
+      "operation_indexes": [
+        1
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "docs/operations/fork-native-preview.md",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "622fe5370df919596d9c7ed28fb25706a159989c43e1d27c762306f0ea6c0af1",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "9d40f512f496a3bb4e5407ac4b450261775f397e0ef525291e33f1c72fbfe6f7",
+      "patch_fragment_sha256": "9ee552f96fe538a63b163b9106227c4723df65e70f772c7489baee21d3e8c8ef",
+      "effect_sha256": "9abcf7359072967cf7fc6efa0d50dea23238750b3b2c406f762a76b2114e6cd6",
+      "operation_indexes": [
+        2
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    }
+  ],
+  "reasons": []
+}

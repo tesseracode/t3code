@@ -40,11 +40,11 @@ profile; its transport/exit details are logged.
 
 ## Linux and WSL runtime prerequisites
 
-A bundled Node runtime is not a fully static Linux executable. Minimal images
-can lack `libatomic.so.1`; Debian/Ubuntu provide it in `libatomic1`. Follow the
-[user installation guidance](../user/install.md#linux-runtime-libraries) only
-inside the explicitly owned test distro or an approved target environment.
-Do not install it into an unrelated live distro to make a test pass.
+A bundled Node runtime is not a fully static Linux executable. The v0.1.11
+archive builder copies `libatomic.so.1` and its license into the archive and
+uses `patchelf` to set the executable's `RUNPATH` to `$ORIGIN/lib`. On a
+pristine WSL image, a missing `libatomic.so.1` is a packaging failure: check
+the archive contents and `RUNPATH` before installing host packages.
 
 Qualify the actual target image, not just a build runner with compiler libraries
 already installed. Preserve a missing-library failure as pristine-image evidence,
@@ -54,7 +54,7 @@ itself prove managed startup, cache repair, native provider execution or migrati
 
 ## Build
 
-Use the repository's Node **26.12.1** and pnpm **12.14.0**, with the existing
+Use the Node and pnpm versions declared in the root `package.json`, with the existing
 native prerequisites in the development runbook. In a
 dedicated build checkout, install locked dependencies, then use
 `scripts/update-release-package-versions.ts` to align the four release manifests.
