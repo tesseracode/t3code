@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "scanner-canonical-path-exclusion",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "759544e5f5ee5549efe9f3b85366e02f2119f561",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "54c06a9fbb5bd8e7e9f2fc751364d292a9b055516b35c735a31b4e283c2a6115",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/001-record.patch",
       "base_commit": "edaafaa1d0715000cb44acb06ea75a0058dbd5e4",
       "upper": {
@@ -30,6 +30,49 @@
         "apps/server/src/project/AgentSessionScanner.ts"
       ],
       "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_c272734113a8",
+      "kind": "amend-refresh",
+      "patch_sha256": "dcf97fe57536855477d6b8ed94d0476d4afd776fabb2f68f5330905d46a1ab0c",
+      "git_patch_id": "759544e5f5ee5549efe9f3b85366e02f2119f561",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "e5b25de371b1bc892ab91221b02b77282921546dc0b2e8e122572e0c8a5bfbc9",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "05540954f3d579cba1fa44e093b938b43468370c",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "apps/server/src/project/AgentSessionScanner.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/project/AgentSessionScanner.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-session-import",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 4,
+          "parent_patch_sha256": "e83aa3cf5da4b70312a9941548d35134c4674974c156a3a085a81cec27545307",
+          "parent_recipe_sha256": "e168ceae7a6badeb62be1962785309552acfb95bcd8a61a329f1019615678e7c"
+        }
+      ],
       "refs": {
         "anchors": "",
         "fingerprints": "",

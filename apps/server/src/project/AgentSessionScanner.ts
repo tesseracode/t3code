@@ -1132,6 +1132,8 @@ export const make = Effect.gen(function* () {
   const excludedProjectAncestors = [
     path.join(homeDir, "Downloads"),
     path.join(homeDir, "Documents", "Codex"),
+    yield* fileSystem.realPath(baseDir).pipe(Effect.orElseSucceed(() => baseDir)),
+    yield* fileSystem.realPath(worktreesDir).pipe(Effect.orElseSucceed(() => worktreesDir)),
   ];
 
   const isExcludedProjectPath = (candidatePath: string) =>

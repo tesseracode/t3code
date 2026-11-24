@@ -1,8 +1,8 @@
 diff --git a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts
-index 21352e9f4e..b38e36a23f 100644
+index 0e7c4dcedd..88baf2896a 100644
 --- a/apps/server/src/project/AgentSessionScanner.ts
 +++ b/apps/server/src/project/AgentSessionScanner.ts
-@@ -846,6 +846,8 @@ export const make = Effect.gen(function* () {
+@@ -1132,6 +1132,8 @@ export const make = Effect.gen(function* () {
    const excludedProjectAncestors = [
      path.join(homeDir, "Downloads"),
      path.join(homeDir, "Documents", "Codex"),
