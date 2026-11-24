@@ -1,13 +1,17 @@
 import type { CopilotClient } from "@github/copilot-sdk";
-import type { ModelSelection, SelectProviderOptionDescriptor } from "@t3tools/contracts";
-import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
+import type {
+  ModelSelection,
+  ProviderOptionChoice,
+  SelectProviderOptionDescriptor,
+} from "@t3tools/contracts";
+import { getProviderOptionStatedValue } from "@t3tools/shared/model";
 
 export type ModelCatalog = Awaited<ReturnType<CopilotClient["rpc"]["models"]["list"]>>;
 export type AutoCatalog = NonNullable<ModelCatalog["auto"]>;
 
 export function routingDescriptor(auto: AutoCatalog): SelectProviderOptionDescriptor {
   const seen = new Set<string>();
-  const options = auto.tiers.flatMap((tier) => {
+  const options: Array<ProviderOptionChoice> = auto.tiers.flatMap((tier) => {
     if (
       !tier.id ||
       tier.id.length > 512 ||
@@ -34,9 +38,17 @@ export function routingDescriptor(auto: AutoCatalog): SelectProviderOptionDescri
       },
     ];
   });
+  let resetId = "provider-default";
+  while (seen.has(resetId)) resetId = `_${resetId}`;
+  options.push({
+    id: resetId,
+    label: "Provider default",
+    description: "Explicitly clear the saved routing preference.",
+    isReset: true,
+  });
   return {
     id: "autoTier",
-    label: "Routing",
+    label: auto.tiers.some((tier) => tier.type === "fusion") ? "Fusion effort" : "Routing",
     type: "select",
     options,
     ...(options.some((option) => option.id === auto.defaultTier && !option.disabledReason)
@@ -46,13 +58,16 @@ export function routingDescriptor(auto: AutoCatalog): SelectProviderOptionDescri
 }
 
 export function autoTierForSelection(selection: ModelSelection, auto?: AutoCatalog) {
-  const requested = getModelSelectionStringOptionValue(selection, "autoTier");
+  const requested = getProviderOptionStatedValue("autoTier", selection);
   if (selection.model !== "auto") {
-    if (requested)
+    if (requested !== undefined)
       throw new Error("A Copilot routing preference requires the account-advertised auto model.");
     return undefined;
   }
   if (requested === undefined) return undefined;
+  if (requested === false) return null;
+  if (typeof requested !== "string")
+    throw new Error("A Copilot routing preference must be an advertised tier or provider default.");
   if (!auto)
     throw new Error("This Copilot runtime/account does not advertise routing preferences.");
   const id = requested;

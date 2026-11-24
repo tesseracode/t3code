@@ -103,13 +103,27 @@ export function resolveClientConfiguration(
       ? bundledCliPath(runtime)
       : undefined;
   const override = configured ?? bundled;
+  const fusionEnvironment = settings.enableFusion
+    ? {
+        COPILOT_CLI_ENABLED_FEATURE_FLAGS: [
+          ...new Set([
+            ...(environment.COPILOT_CLI_ENABLED_FEATURE_FLAGS ?? "")
+              .split(",")
+              .map((flag) => flag.trim())
+              .filter(Boolean),
+            "DYNAMIC_AUTO_TIERS",
+            "HYDRAFUSION_PLAN_V2",
+          ]),
+        ].join(","),
+      }
+    : {};
   return {
     effectiveHome,
     options: {
       mode: "copilot-cli",
       workingDirectory: input.cwd,
       baseDirectory: effectiveHome,
-      env: { ...environment, COPILOT_HOME: effectiveHome },
+      env: { ...environment, ...fusionEnvironment, COPILOT_HOME: effectiveHome },
       logLevel: "error",
       ...(override
         ? {

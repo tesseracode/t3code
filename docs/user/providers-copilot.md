@@ -17,6 +17,22 @@ Requests can remain pending before they take effect; the activity log distinguis
 effective, and activating routing and shows reported model phases and timing. See
 [Activity log](activity-log.md). Explicit-model selection and defaults are unchanged.
 
+To opt in to dynamic Fusion tiers, turn on **Enable Fusion** for this provider in
+**Settings > Providers**. The setting affects new Copilot runtimes on that
+environment and is off by default. When the account advertises Fusion, the model
+picker shows **Fusion**, with a separate **Fusion effort** control for its available
+tiers, such as **Standard**, **High**, and **Max**. Names and availability come from
+your account; choosing an effort does not pin the solver or reviewer model.
+
+Choose **Provider default** in the effort control to explicitly clear a saved
+preference. Omitting a preference on reconnect instead restores the committed
+selection. A change may remain pending until the next turn.
+
+Fusion can use one model or multiple draft/review phases. The activity log shows
+reported phases and the final source model, while chat shows the committed final
+answer rather than intermediate drafts. Fusion-enabled Auto answers appear as full
+responses; ordinary model streaming remains available.
+
 The default runtime uses the bundled Copilot executable. **Binary path** can
 override it. **COPILOT_HOME path** selects the account's configuration and native
 session directory; separate provider instances can use separate directories.

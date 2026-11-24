@@ -1,92 +1,8 @@
-diff --git a/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts b/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts
-index 579c82f03..070507aaa 100644
---- a/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts
-+++ b/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts
-@@ -11,7 +11,7 @@ const layerTest = TurnItemPositionStore.layer.pipe(
-   Layer.provideMerge(SqlitePersistence.layerMemory),
- );
- 
--it.effect("reuses an item's position without attempting another allocation insert", () =>
-+it.effect("reuses positions without redundant inserts and binds late run ownership", () =>
-   Effect.gen(function* () {
-     const sql = yield* SqlClient.SqlClient;
-     const positions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
-@@ -45,11 +45,28 @@ it.effect("reuses an item's position without attempting another allocation inser
-     assert.equal(
-       yield* positions.allocate({
-         ...input,
--        runId: RunId.make("run:moved"),
--        runOrdinal: 2,
-+        turnItemId: TurnItemId.make("item:next"),
-+        runId: RunId.make("run:not-yet-known"),
-       }),
--      first,
-+      next,
-     );
-+    const associated = {
-+      ...input,
-+      runId: RunId.make("run:moved"),
-+      runOrdinal: 2,
-+    };
-+    const moved = yield* positions.allocate(associated);
-+    assert.equal(moved, 2_000_001);
-+    assert.equal(yield* positions.allocate(associated), moved);
-+    assert.equal(
-+      yield* positions.allocate({
-+        ...associated,
-+        turnItemId: TurnItemId.make("item:next"),
-+      }),
-+      moved + 1,
-+    );
-+    assert.equal(yield* positions.allocate(input), moved);
-+    assert.equal(yield* positions.allocate({ ...associated, runOrdinal: 3 }), moved);
-     assert.equal(
-       yield* positions.allocate({ ...input, threadId: ThreadId.make("thread:other") }),
-       1,
-diff --git a/apps/server/src/orchestration-v2/TurnItemPositionStore.ts b/apps/server/src/orchestration-v2/TurnItemPositionStore.ts
-index 03636b341..8ebe8c828 100644
---- a/apps/server/src/orchestration-v2/TurnItemPositionStore.ts
-+++ b/apps/server/src/orchestration-v2/TurnItemPositionStore.ts
-@@ -49,7 +49,8 @@ export const layer: Layer.Layer<TurnItemPositionStoreV2, never, SqlClient.SqlCli
-           WHERE thread_id = ${threadId} AND turn_item_id = ${turnItemId}
-           LIMIT 1
-         `;
--          if (existing[0] !== undefined) return existing[0].ordinal;
-+          if (existing[0] !== undefined && (existing[0].ordinal >= 1_000_000 || runId === null))
-+            return existing[0].ordinal;
- 
-           const runRows =
-             runId === null
-@@ -63,7 +64,23 @@ export const layer: Layer.Layer<TurnItemPositionStoreV2, never, SqlClient.SqlCli
-           const runOrdinal = suppliedRunOrdinal ?? runRows[0]?.ordinal ?? null;
-           const lowerBound = runOrdinal === null ? 0 : runOrdinal * 1_000_000;
-           const upperBound = runOrdinal === null ? 999_999 : lowerBound + 999_999;
--          yield* sql`
-+          if (existing[0] !== undefined) {
-+            if (runOrdinal === null) return existing[0].ordinal;
-+            // Late ownership evidence moves an unassociated item into its run's range.
-+            yield* sql`
-+              UPDATE orchestration_v2_turn_item_positions
-+              SET ordinal = (
-+                SELECT COALESCE(MAX(ordinal), ${lowerBound}) + 1
-+                FROM orchestration_v2_turn_item_positions
-+                WHERE thread_id = ${threadId}
-+                  AND ordinal >= ${lowerBound}
-+                  AND ordinal <= ${upperBound}
-+              )
-+              WHERE thread_id = ${threadId} AND turn_item_id = ${turnItemId}
-+                AND ordinal < 1000000
-+            `;
-+          } else
-+            yield* sql`
-           INSERT INTO orchestration_v2_turn_item_positions (thread_id, turn_item_id, ordinal)
-           SELECT
-             ${threadId},
 diff --git a/docs/user/activity-log.md b/docs/user/activity-log.md
-index 3eb3f41cb..b899877b3 100644
+index 8d5d11f429..1276d677a2 100644
 --- a/docs/user/activity-log.md
 +++ b/docs/user/activity-log.md
-@@ -30,8 +30,11 @@ Auto model-resolution entries show the selected model, not proof that it complet
+@@ -61,8 +61,11 @@ Auto model-resolution entries show the selected model, not proof that it complet
  Events without a native turn association remain visibly unassociated; late routing and phase
  events enrich existing activity rather than creating additional user turns.
  
@@ -103,7 +19,7 @@ index 3eb3f41cb..b899877b3 100644
 +activating: the routing entry shows the confirmed effective preference separately, including
 +activation failures. Intermediate Fusion drafts are not final answers and stay out of chat.
 diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
-index 7d8c907a8..dc8a0c31d 100644
+index 7d8c907a8f..dc8a0c31d2 100644
 --- a/docs/user/providers-copilot.md
 +++ b/docs/user/providers-copilot.md
 @@ -17,6 +17,22 @@ Requests can remain pending before they take effect; the activity log distinguis
@@ -130,14 +46,28 @@ index 7d8c907a8..dc8a0c31d 100644
  override it. **COPILOT_HOME path** selects the account's configuration and native
  session directory; separate provider instances can use separate directories.
 diff --git a/packages/client-runtime/src/modelTraits.test.ts b/packages/client-runtime/src/modelTraits.test.ts
-new file mode 100644
-index 000000000..781f5cda8
---- /dev/null
+index 24da035532..fa9ac097b3 100644
+--- a/packages/client-runtime/src/modelTraits.test.ts
 +++ b/packages/client-runtime/src/modelTraits.test.ts
-@@ -0,0 +1,33 @@
-+import { describe, expect, it } from "vite-plus/test";
-+import type { SelectProviderOptionDescriptor } from "@t3tools/contracts";
-+import { getPromptControlledTraits, getTraitSelectChange } from "./modelTraits.ts";
+@@ -1,7 +1,12 @@
+-import type { ProviderOptionDescriptor } from "@t3tools/contracts";
++import type { ProviderOptionDescriptor, SelectProviderOptionDescriptor } from "@t3tools/contracts";
+ import { describe, expect, it } from "vite-plus/test";
+ 
+-import { buildTraitsTriggerDisplay, getDescriptorStringValue } from "./modelTraits.ts";
++import {
++  buildTraitsTriggerDisplay,
++  getDescriptorStringValue,
++  getPromptControlledTraits,
++  getTraitSelectChange,
++} from "./modelTraits.ts";
+ 
+ describe("buildTraitsTriggerDisplay", () => {
+   it.each([
+@@ -33,3 +38,33 @@ describe("buildTraitsTriggerDisplay", () => {
+     expect(getDescriptorStringValue(descriptor)).toBe(input.value);
+   });
+ });
 +
 +describe("Fusion effort changes", () => {
 +  it("dispatches advertised IDs and explicit reset without changing the prompt", () => {
@@ -169,7 +99,7 @@ index 000000000..781f5cda8
 +  });
 +});
 diff --git a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts
-index d123a5216..74e6e6629 100644
+index d123a52161..74e6e66297 100644
 --- a/packages/client-runtime/src/work-log/modelExecution.test.ts
 +++ b/packages/client-runtime/src/work-log/modelExecution.test.ts
 @@ -19,6 +19,26 @@ const phase: OrchestrationV2ModelExecution = {
@@ -200,7 +130,7 @@ index d123a5216..74e6e6629 100644
      expect(modelExecutionSummary(phase)).toContain("actual-model · completed · 4.8s");
      const detail = modelExecutionDetail(phase);
 diff --git a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts
-index aa89b5a09..80f2577a8 100644
+index aa89b5a097..80f2577a81 100644
 --- a/packages/client-runtime/src/work-log/modelExecution.ts
 +++ b/packages/client-runtime/src/work-log/modelExecution.ts
 @@ -13,7 +13,9 @@ export function modelExecutionSummary(execution: OrchestrationV2ModelExecution):
@@ -235,7 +165,7 @@ index aa89b5a09..80f2577a8 100644
    add("Activating routing", execution.activatingPreference);
    add(
 diff --git a/packages/contracts/src/model.ts b/packages/contracts/src/model.ts
-index c677a696e..ffb4866bc 100644
+index c5c5aebd4d..067627c064 100644
 --- a/packages/contracts/src/model.ts
 +++ b/packages/contracts/src/model.ts
 @@ -13,6 +13,8 @@ export const ProviderOptionChoice = Schema.Struct({
@@ -248,10 +178,10 @@ index c677a696e..ffb4866bc 100644
  export type ProviderOptionChoice = typeof ProviderOptionChoice.Type;
  
 diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts
-index 156046a77..1099a23b1 100644
+index b31409b69a..6a184ed83c 100644
 --- a/packages/contracts/src/orchestrationV2.ts
 +++ b/packages/contracts/src/orchestrationV2.ts
-@@ -1571,6 +1571,7 @@ export const OrchestrationV2ModelExecution = Schema.Struct({
+@@ -1769,6 +1769,7 @@ export const OrchestrationV2ModelExecution = Schema.Struct({
    syntheticModel: Schema.optional(ModelExecutionText),
    requestedModel: Schema.optional(ModelExecutionText),
    requestedPreference: Schema.optional(ModelExecutionText),
@@ -260,10 +190,10 @@ index 156046a77..1099a23b1 100644
    pendingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
    activatingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
-index 124041b05..75c971b7f 100644
+index 6a2342e7fb..265c4702b9 100644
 --- a/packages/provider-copilot/src/server/adapter.test.ts
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
-@@ -106,7 +106,7 @@ function fakeSdk() {
+@@ -107,7 +107,7 @@ function fakeSdk() {
      sessionId: "native-copilot",
      send: async (message) => {
        sent.push(typeof message === "string" ? { prompt: message } : message);
@@ -272,7 +202,7 @@ index 124041b05..75c971b7f 100644
      },
      abort: async () => {
        emit("session.idle");
-@@ -331,6 +331,273 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+@@ -332,6 +332,273 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
    );
  
  describe("native Copilot V2", () => {
@@ -547,7 +477,7 @@ index 124041b05..75c971b7f 100644
      "reimports duplicate Auto resolution with a stable item identity across cold starts",
      () =>
 diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
-index 241306b16..e02ed4e4c 100644
+index c0699c5257..f0a561bc5a 100644
 --- a/packages/provider-copilot/src/server/adapter.ts
 +++ b/packages/provider-copilot/src/server/adapter.ts
 @@ -29,7 +29,10 @@ import {
@@ -578,7 +508,7 @@ index 241306b16..e02ed4e4c 100644
  const ref = (nativeId: string) => ({
    driver: COPILOT_DRIVER,
    nativeId,
-@@ -120,6 +132,7 @@ interface ActiveTurn {
+@@ -124,6 +136,7 @@ interface ActiveTurn {
    providerTurn: OrchestrationV2ProviderTurn;
    nextOrdinal: number;
    readonly items: Map<string, OrchestrationV2TurnItem>;
@@ -586,7 +516,7 @@ index 241306b16..e02ed4e4c 100644
    accepted: boolean;
    idle: boolean;
    interrupted: boolean;
-@@ -233,6 +246,9 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -237,6 +250,9 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
        >();
        const fusionOwners = new Map<string, ActiveTurn>();
        const nativeTurnOwners = new Map<string, ActiveTurn>();
@@ -596,7 +526,7 @@ index 241306b16..e02ed4e4c 100644
        let replayExecutionEvents: ReadonlyArray<SessionEvent> = [];
        let omittedReplayEvents = 0;
        const emit = (event: ProviderAdapter.ProviderAdapterV2Event) =>
-@@ -474,6 +490,8 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -478,6 +494,8 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
          );
          const now = DateTime.formatIso(yield* DateTime.now);
          const requested = getModelSelectionStringOptionValue(selection, "autoTier");
@@ -605,7 +535,7 @@ index 241306b16..e02ed4e4c 100644
          const execution: OrchestrationV2ModelExecution = {
            version: 1,
            kind: "selection",
-@@ -489,12 +507,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -493,12 +511,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                  ? current.modelId
                    ? "different-model"
                    : "unknown"
@@ -620,7 +550,7 @@ index 241306b16..e02ed4e4c 100644
            ...(current.autoTier ? { effectivePreference: current.autoTier } : {}),
            ...(current.pendingAutoTier !== undefined
              ? { pendingPreference: current.pendingAutoTier }
-@@ -512,6 +531,24 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -516,6 +535,24 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
          if (selection.model === "auto" || failure)
            yield* putExecution(`selection:${owner?.providerTurn.id ?? "current"}`, execution, owner);
        });
@@ -645,7 +575,7 @@ index 241306b16..e02ed4e4c 100644
        const recordFusion = Effect.fnUntraced(function* (event: SessionEvent, replay = false) {
          const key = fusionExecutionKey(event);
          if (!key || !native) return;
-@@ -531,26 +568,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -535,26 +572,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
              Date.parse(event.timestamp) < DateTime.toEpochMillis(owner.providerTurn.startedAt)
            )
              owner = undefined;
@@ -673,7 +603,7 @@ index 241306b16..e02ed4e4c 100644
          }
          if (
            owner &&
-@@ -1044,13 +1062,48 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1046,13 +1064,48 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
              return;
            }
            case "assistant.message_delta":
@@ -724,7 +654,7 @@ index 241306b16..e02ed4e4c 100644
              if (turn)
                yield* textEvent(
                  turn,
-@@ -1061,6 +1114,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1063,6 +1116,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                );
              return;
            case "assistant.reasoning":
@@ -732,7 +662,7 @@ index 241306b16..e02ed4e4c 100644
              if (turn)
                yield* textEvent(
                  turn,
-@@ -1547,6 +1601,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1549,6 +1603,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                cause: new Error("Copilot session is already in use by another client."),
              });
            }
@@ -743,7 +673,7 @@ index 241306b16..e02ed4e4c 100644
            const now = yield* DateTime.now;
            if (nativeId) {
              const transcript = yield* sdk("read native transcript", () => native!.getEvents()).pipe(
-@@ -1567,7 +1625,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1569,7 +1627,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                    (event.type !== "assistant.message" && event.type !== "user.message")
                  )
                    continue;
@@ -756,7 +686,7 @@ index 241306b16..e02ed4e4c 100644
                  const messageId = MessageId.make(`${open.providerSessionId}:history:${event.id}`);
                  messages.set(messageId, {
                    id: messageId,
-@@ -1674,21 +1736,17 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1676,21 +1738,17 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
              reason: "previous_turn_active",
            });
          const effort = reasoningEffort(turnInput.modelSelection);
@@ -785,7 +715,7 @@ index 241306b16..e02ed4e4c 100644
            }),
          );
          const modeResult = yield* sdk("set mode", () =>
-@@ -1722,6 +1780,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1724,6 +1782,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
            providerTurn,
            nextOrdinal: 1,
            items: new Map(),
@@ -793,7 +723,7 @@ index 241306b16..e02ed4e4c 100644
            accepted: false,
            idle: false,
            interrupted: false,
-@@ -1771,7 +1830,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1773,7 +1832,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
            attachments.push({ type: "file" as const, path, displayName: attachment.name });
          }
          history = "";
@@ -802,7 +732,7 @@ index 241306b16..e02ed4e4c 100644
            "send",
            () =>
              native!.send({
-@@ -1789,6 +1848,21 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1791,6 +1850,21 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
              }),
            ),
          );
@@ -825,7 +755,7 @@ index 241306b16..e02ed4e4c 100644
          yield* Queue.offer(inbox, { type: "accepted" });
        });
 diff --git a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts
-index 16dc73802..1273a8e83 100644
+index 16dc73802b..1273a8e835 100644
 --- a/packages/provider-copilot/src/server/client.ts
 +++ b/packages/provider-copilot/src/server/client.ts
 @@ -103,13 +103,27 @@ export function resolveClientConfiguration(
@@ -858,7 +788,7 @@ index 16dc73802..1273a8e83 100644
        ...(override
          ? {
 diff --git a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts
-index b507bbfd8..f8cc1591a 100644
+index b507bbfd80..f8cc1591a6 100644
 --- a/packages/provider-copilot/src/server/routing.test.ts
 +++ b/packages/provider-copilot/src/server/routing.test.ts
 @@ -39,11 +39,36 @@ export const autoCatalog: AutoCatalog = {
@@ -900,7 +830,7 @@ index b507bbfd8..f8cc1591a 100644
      assert.equal(descriptor.options[2]?.disabledReason, "Your account policy disables this.");
      assert.equal(descriptor.currentValue, "standard");
 diff --git a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts
-index 9bbac0183..8f77f596d 100644
+index 9bbac01836..8f77f596d8 100644
 --- a/packages/provider-copilot/src/server/routing.ts
 +++ b/packages/provider-copilot/src/server/routing.ts
 @@ -1,13 +1,17 @@
@@ -963,7 +893,7 @@ index 9bbac0183..8f77f596d 100644
      throw new Error("This Copilot runtime/account does not advertise routing preferences.");
    const id = requested;
 diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
-index 0b076b80f..0299516a6 100644
+index 0b076b80fc..0299516a66 100644
 --- a/packages/provider-copilot/src/server/status.test.ts
 +++ b/packages/provider-copilot/src/server/status.test.ts
 @@ -32,6 +32,32 @@ const skill = (
@@ -1017,7 +947,7 @@ index 0b076b80f..0299516a6 100644
        modelsFromSdk([model("auto", { policy: { state: "disabled", terms: "" } })], decode({})),
        [],
 diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts
-index 019d99146..22e77715f 100644
+index 8eb554a439..1becd05805 100644
 --- a/packages/provider-copilot/src/server/status.ts
 +++ b/packages/provider-copilot/src/server/status.ts
 @@ -27,6 +27,7 @@ export function modelsFromSdk(
@@ -1047,7 +977,7 @@ index 019d99146..22e77715f 100644
                  capabilities: createModelCapabilities({
                    optionDescriptors: [routingDescriptor(auto)],
 diff --git a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts
-index 5e8196963..a2e78004b 100644
+index 5e8196963f..a2e78004bd 100644
 --- a/packages/provider-copilot/src/settings.ts
 +++ b/packages/provider-copilot/src/settings.ts
 @@ -36,11 +36,20 @@ export const CopilotSettings = makeProviderSettingsSchema(
@@ -1073,10 +1003,10 @@ index 5e8196963..a2e78004b 100644
  );
  export type CopilotSettings = typeof CopilotSettings.Type;
 diff --git a/packages/shared/src/model.test.ts b/packages/shared/src/model.test.ts
-index 39c437997..539019dfc 100644
+index 5c82aa0bc1..0e8297990e 100644
 --- a/packages/shared/src/model.test.ts
 +++ b/packages/shared/src/model.test.ts
-@@ -36,6 +36,40 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
+@@ -38,6 +38,40 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
  });
  
  describe("descriptor helpers", () => {
@@ -1118,10 +1048,10 @@ index 39c437997..539019dfc 100644
      const descriptors = getProviderOptionDescriptors({
        caps: createModelCapabilities({
 diff --git a/packages/shared/src/model.ts b/packages/shared/src/model.ts
-index 71aa8a7be..26b7f8e82 100644
+index c48826e103..26daa07889 100644
 --- a/packages/shared/src/model.ts
 +++ b/packages/shared/src/model.ts
-@@ -214,9 +214,11 @@ function withDescriptorCurrentValue(
+@@ -232,9 +232,11 @@ function withDescriptorCurrentValue(
      return descriptor;
    }
    const currentValue =
@@ -1136,7 +1066,7 @@ index 71aa8a7be..26b7f8e82 100644
    if (!currentValue) {
      const { currentValue: _unusedCurrentValue, ...rest } = descriptor;
      return rest;
-@@ -278,9 +280,18 @@ export function getProviderOptionCurrentValue(
+@@ -324,9 +326,18 @@ export function getProviderOptionCurrentValue(
      return undefined;
    }
    const hasExplicitOption = selection?.options?.some((option) => option.id === descriptor.id);
@@ -1156,7 +1086,7 @@ index 71aa8a7be..26b7f8e82 100644
    if (descriptor.id === "variant" && selection && !hasExplicitOption) return undefined;
    if (descriptor.type === "boolean") {
      return descriptor.currentValue;
-@@ -331,7 +342,14 @@ export function buildProviderOptionSelectionsFromDescriptors(
+@@ -377,7 +388,14 @@ export function buildProviderOptionSelectionsFromDescriptors(
    for (const descriptor of descriptors) {
      const value = getProviderOptionCurrentValue(descriptor);
      if (typeof value === "string" || typeof value === "boolean") {

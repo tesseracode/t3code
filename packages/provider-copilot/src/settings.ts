@@ -36,11 +36,20 @@ export const CopilotSettings = makeProviderSettingsSchema(
         providerSettingsForm: { control: "switch" },
       }),
     ),
+    enableFusion: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(false)),
+      Schema.annotateKey({
+        title: "Enable Fusion",
+        description:
+          "Opt in to Copilot's dynamic Fusion tiers and plan-v2 runtime. Available tiers depend on your account. Existing sessions keep their runtime until reopened.",
+        providerSettingsForm: { control: "switch" },
+      }),
+    ),
     customModels: Schema.Array(CustomModelSetting).pipe(
       Schema.withDecodingDefault(Effect.succeed([])),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
   },
-  { order: ["binaryPath", "homePath", "enableConfigDiscovery"] },
+  { order: ["binaryPath", "homePath", "enableFusion", "enableConfigDiscovery"] },
 );
 export type CopilotSettings = typeof CopilotSettings.Type;
