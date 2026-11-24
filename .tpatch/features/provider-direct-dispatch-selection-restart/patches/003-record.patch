@@ -1,0 +1,88 @@
+diff --git a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts
+index 6bfd95eae1..380504a638 100644
+--- a/apps/server/src/orchestration-v2/Orchestrator.ts
++++ b/apps/server/src/orchestration-v2/Orchestrator.ts
+@@ -8314,7 +8314,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+             targetModelSelection: modelSelection,
+           })
+           .pipe(mapDispatchError(command))
+-      : null;
++      : !freshContext &&
++          activeProviderThread !== undefined &&
++          !modelSelectionsEqual(projection.thread.modelSelection, modelSelection)
++        ? yield* providerSwitchService
++            .plan({ projection, targetModelSelection: modelSelection })
++            .pipe(mapDispatchError(command))
++        : null;
+     const canResumeAcrossInstances =
+       !freshContext &&
+       isProviderSwitch &&
+@@ -8362,7 +8368,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+         ),
+       );
+       const providerSessionId =
+-        reusableProviderThread?.providerSessionId ??
++        (reusableProviderThread?.providerSessionId &&
++        !sessionsToDetach.some((session) => session.id === reusableProviderThread.providerSessionId)
++          ? reusableProviderThread.providerSessionId
++          : null) ??
+         (yield* mapDispatchError(command)(
+           providerSessionIdFor({
+             adapter,
+diff --git a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
+index 890aa9d974..55dcb56c03 100644
+--- a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
++++ b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
+@@ -745,11 +745,11 @@ it.live("Stop during a restart interrupts the turn the restart could not stop",
+   }),
+ );
+ 
+-it.live(
+-  "restarts the live session on a model change when a newer stopped session record exists",
+-  () =>
++it.live.each(["selection-command", "message-dispatch"] as const)(
++  "restarts the live session on a model change with a newer stopped session record (%s)",
++  (mode) =>
+     Effect.gen(function* () {
+-      const name = "selection-restart-dead-stopped";
++      const name = `selection-restart-dead-stopped-${mode}`;
+       const cwd = yield* checkpointWorkspace(name);
+       const threadId = ThreadId.make(`thread:${name}`);
+       const state = yield* Ref.make<RestartAdapterState>({
+@@ -855,14 +855,19 @@ it.live(
+           ],
+         });
+ 
+-        const switchCommandId = CommandId.make(`${name}:switch`);
+-        yield* orchestrator.dispatch({
+-          type: "thread.model-selection.set",
+-          commandId: switchCommandId,
+-          threadId,
+-          modelSelection: replacementSelection,
+-        });
+-        yield* worker.drain();
++        const switchCommandId = CommandId.make(
++          `${name}:${mode === "selection-command" ? "switch" : "second"}`,
++        );
++        if (mode === "selection-command") {
++          yield* orchestrator.dispatch({
++            type: "thread.model-selection.set",
++            commandId: switchCommandId,
++            threadId,
++            modelSelection: replacementSelection,
++          });
++          yield* worker.drain();
++        }
++        const second = yield* dispatch("second", replacementSelection);
+         const storedSwitchEvents = yield* eventSink
+           .readByCommandId({ commandId: switchCommandId })
+           .pipe(Stream.runCollect);
+@@ -871,8 +876,6 @@ it.live(
+             ? [stored.event.payload.providerSessionId]
+             : [],
+         );
+-
+-        const second = yield* dispatch("second", replacementSelection);
+         return {
+           projection: second,
+           captured: yield* Ref.get(state),

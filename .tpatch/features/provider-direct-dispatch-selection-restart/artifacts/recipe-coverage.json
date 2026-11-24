@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "feature": "provider-direct-dispatch-selection-restart",
+  "producer": "record",
+  "patch_present": true,
+  "recipe_present": true,
+  "recipe_decodable": true,
+  "patch_sha256": "3cd0f7dda248b63729543680714d6e0aca2363796b3e087e644a7e5d0a9ef213",
+  "recipe_sha256": "931a86d1424d74208855423448fbe54cb73b31b9115da281375fbb4ad75aea38",
+  "reference": {
+    "kind": "commit",
+    "commit": "c701ab6edc36b067f4ef11e64acf47013dd1461c",
+    "preimage_set_sha256": "371be3c1274468881e2279fa6ed56aa2a041b0ddde2fd5c2981ba76059e3e342"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "apps/server/src/orchestration-v2/Orchestrator.ts",
+      "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts"
+    ],
+    "claim_ids": []
+  },
+  "coverage_status": "complete",
+  "cross_base_status": "consumer-derivation-required",
+  "effects": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/server/src/orchestration-v2/Orchestrator.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "d46bf04434de94371859fb75a5c20b9a2c44f33c93bb66f6474b01668ef1f31f",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "a510d13fe580008fe698ba2d2eb4268eb353762732534b65f16d463f138fcc2c",
+      "patch_fragment_sha256": "98b6a91a5d967e899463a3756025ae7264fd3273fad9c148406d9bc5d0913d72",
+      "effect_sha256": "bbfa11716f904a54ea107da83686319d8f660591d72ef5e955ccc1a1c29708c0",
+      "operation_indexes": [
+        1
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "ed3f3093e4abfc8f2b290e9e8b0f16664207d442d8ff0337ac113c747804c691",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "5d7956e6be5e820527f9f52ffa349d7c5bcf2a3486499b794315305359bb0870",
+      "patch_fragment_sha256": "13e669ae26b6aa81fbc63bac1269ecbb9dbd1b5353ce01100b2a2fa6741eb48a",
+      "effect_sha256": "23292b2679f07e2c7b09e3cc79c390e23731dbf5e57cc19d5ee150e3fee0ccd8",
+      "operation_indexes": [
+        2
+      ],
+      "disposition": "represented",
+      "reason_codes": [],
+      "contextual_hint": "none"
+    }
+  ],
+  "reasons": []
+}

@@ -1,26 +1,19 @@
 # Implementation Record: provider-direct-dispatch-selection-restart
 
-**Recorded**: 2026-11-05T08:23:46Z
+**Recorded**: 2026-11-24T07:22:10Z
 **Files changed**: 2
-**Patch size**: 9132 bytes
-**Capture mode**: working-tree-all
+**Patch size**: 3837 bytes
+**Capture mode**: staged-index
 **Pathspecs**: apps/server/src/orchestration-v2/Orchestrator.ts,apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
-
-## Change Summary
-
-```
- apps/server/src/orchestration-v2/Orchestrator.ts   | 130 +++++++++++++--------
- .../SelectionRestart.integration.test.ts           |  31 ++---
- 2 files changed, 99 insertions(+), 62 deletions(-)
-```
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
+- **capture_mode**: `staged-index`
 - **pathspecs**: apps/server/src/orchestration-v2/Orchestrator.ts, apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
 - **claim_ids**: (none)
-- **base_commit**: `30fad02f12291b5383ae1403a19e1c7adb881b5f`
+- **base_commit**: `c701ab6edc36b067f4ef11e64acf47013dd1461c`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 2 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 

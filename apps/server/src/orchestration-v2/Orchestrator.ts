@@ -8314,7 +8314,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             targetModelSelection: modelSelection,
           })
           .pipe(mapDispatchError(command))
-      : null;
+      : !freshContext &&
+          activeProviderThread !== undefined &&
+          !modelSelectionsEqual(projection.thread.modelSelection, modelSelection)
+        ? yield* providerSwitchService
+            .plan({ projection, targetModelSelection: modelSelection })
+            .pipe(mapDispatchError(command))
+        : null;
     const canResumeAcrossInstances =
       !freshContext &&
       isProviderSwitch &&
@@ -8362,7 +8368,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ),
       );
       const providerSessionId =
-        reusableProviderThread?.providerSessionId ??
+        (reusableProviderThread?.providerSessionId &&
+        !sessionsToDetach.some((session) => session.id === reusableProviderThread.providerSessionId)
+          ? reusableProviderThread.providerSessionId
+          : null) ??
         (yield* mapDispatchError(command)(
           providerSessionIdFor({
             adapter,
