@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-fusion-runtime-transition",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "f567b48d8adaffdbaa8b17b6ce2ac1b37aff2d47",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "d94c8bacfa502f7dae4413b361792c39e9bcfa076221192184a33f8a7301b454",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/002-record.patch",
       "base_commit": "c69222b5429a77fb92e985d37710bff6df9c593b",
       "upper": {
@@ -41,6 +41,53 @@
           "parent_generation": 1,
           "parent_patch_sha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
           "parent_recipe_sha256": "a9f07a134e711fc1edf0c793f3aadf9739e90de32f69031776b5981c0cc24550"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_5af5b5078b26",
+      "kind": "amend-refresh",
+      "patch_sha256": "3bcbc97e9616896535fc2500d4c6f895bd4610094579ecf71a398328367a6459",
+      "git_patch_id": "f567b48d8adaffdbaa8b17b6ce2ac1b37aff2d47",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "443a4c737436d4b9456b2b6e3108a2047ac764fe81bfa25ccb2e4c9c3ea217d5",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/003-record.patch",
+      "base_commit": "80cf89b016d954686438c6c63807c85cc651394e",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "docs/user/providers-copilot.md",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/user/providers-copilot.md",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-fusion-model-selection",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c121679d7cf2d3443aeebfd7090e5c13ae8e9d3b3251fe2c561246b00e472eae",
+          "parent_recipe_sha256": "d9613039f7ece9abb67a234fbc69122e45f82fe77ab313cc73423d116ec2ebfb"
         }
       ],
       "refs": {

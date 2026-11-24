@@ -1,27 +1,19 @@
 # Implementation Record: copilot-fusion-runtime-transition
 
-**Recorded**: 2026-11-05T07:42:13Z
+**Recorded**: 2026-11-24T07:18:58Z
 **Files changed**: 3
-**Patch size**: 4216 bytes
-**Capture mode**: working-tree-all
-**Pathspecs**: packages/provider-copilot/src/server/adapter.ts,packages/provider-copilot/src/server/adapter.test.ts,docs/user/providers-copilot.md
-
-## Change Summary
-
-```
- docs/user/providers-copilot.md                     |  6 ++--
- .../provider-copilot/src/server/adapter.test.ts    | 33 ++++++++++++++++++++++
- packages/provider-copilot/src/server/adapter.ts    | 13 +++++++--
- 3 files changed, 48 insertions(+), 4 deletions(-)
-```
+**Patch size**: 4222 bytes
+**Capture mode**: staged-index
+**Pathspecs**: docs/user/providers-copilot.md,packages/provider-copilot/src/server/adapter.test.ts,packages/provider-copilot/src/server/adapter.ts
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: packages/provider-copilot/src/server/adapter.ts, packages/provider-copilot/src/server/adapter.test.ts, docs/user/providers-copilot.md
+- **capture_mode**: `staged-index`
+- **pathspecs**: docs/user/providers-copilot.md, packages/provider-copilot/src/server/adapter.test.ts, packages/provider-copilot/src/server/adapter.ts
 - **claim_ids**: (none)
-- **base_commit**: `c69222b5429a77fb92e985d37710bff6df9c593b`
+- **base_commit**: `80cf89b016d954686438c6c63807c85cc651394e`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 3 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
