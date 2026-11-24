@@ -9,7 +9,11 @@ export function modelExecutionSummary(execution: OrchestrationV2ModelExecution):
         ? ["Model telemetry gap", execution.model]
         : [
             execution.kind === "selection" ? "Model selection (requested)" : "Model routing",
-            execution.requestedModel,
+            execution.syntheticModel ?? execution.requestedModel,
+            execution.pattern,
+            execution.status === "resolved" && execution.model
+              ? `selected ${execution.model}`
+              : undefined,
             execution.effectivePreference
               ? `effective ${execution.effectivePreference}`
               : execution.requestedPreference
@@ -23,7 +27,7 @@ export function modelExecutionSummary(execution: OrchestrationV2ModelExecution):
       ? formatDuration(execution.durationMs)
       : undefined,
     execution.finalSourceModel ? `final ${execution.finalSourceModel}` : undefined,
-    execution.fallbackModel ? `fallback ${execution.fallbackModel}` : undefined,
+    execution.fallbackModel ? `planned fallback ${execution.fallbackModel}` : undefined,
     execution.gaps.length > 0 ? "telemetry gaps" : undefined,
   ]
     .filter(Boolean)
@@ -46,7 +50,10 @@ export function modelExecutionDetail(
         : "Provider-reported model phase",
   );
   add("Status", execution.status);
-  add("Model", execution.model);
+  add(
+    execution.kind === "route" ? "Selected model (not execution evidence)" : "Model",
+    execution.model,
+  );
   add("Role", execution.role);
   add("Phase kind", execution.phaseKind);
   add("Conversation scope", execution.conversationScope);
@@ -83,7 +90,7 @@ export function modelExecutionDetail(
     execution.sourceTimestamp,
   );
   add("Received", execution.receivedAt);
-  add("Fallback model", execution.fallbackModel);
+  add("Planned fallback model (not execution evidence)", execution.fallbackModel);
   add("Degraded to phase", execution.degradedToPhaseId);
   add("Final source model", execution.finalSourceModel);
   add("Final source phase", execution.finalSourcePhaseId);

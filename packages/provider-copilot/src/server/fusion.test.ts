@@ -11,6 +11,66 @@ function event(type: SessionEvent["type"], data: object, timestamp = end, id = t
 const phase = { fusionId: "fusion-a", phaseId: "primary-1", model: "same-model", role: "primary" };
 
 describe("bounded Copilot execution metadata", () => {
+  it("keeps ordinary Auto resolution as bounded selection evidence without invented turn or pattern", () => {
+    const resolved = event("session.auto_mode_resolved", {
+      chosenModel: "actual-model",
+      routingMethod: "auto_v2",
+      candidateModels: ["private-candidate"],
+      categoryScores: { private: 0.9 },
+    });
+    const metadata = normalizeFusionExecution(resolved, "session", receipt)!;
+    assert.equal(metadata.model, "actual-model");
+    assert.equal(metadata.status, "resolved");
+    assert.equal(metadata.reason, "auto_v2");
+    assert.isUndefined(metadata.fusionId);
+    assert.isUndefined(metadata.nativeTurnId);
+    assert.isUndefined(metadata.pattern);
+    assert.isUndefined(metadata.finalSourceModel);
+    assert.notInclude(JSON.stringify(metadata), "private");
+  });
+
+  it("enriches completion received before the plan without losing final source or terminal timestamps", () => {
+    const completed = normalizeFusionExecution(
+      event("session.fusion_completed", {
+        fusionId: "fusion-a",
+        turnId: "0",
+        pattern: "critique",
+        syntheticModel: "opaque-fusion",
+        outcome: "completed",
+        durationMs: 2000,
+        finalSourceModel: "actual-final",
+        finalSourcePhaseId: "revision",
+      }),
+      "session",
+      receipt,
+    )!;
+    const latePlan = normalizeFusionExecution(
+      event(
+        "session.fusion_resolved",
+        {
+          fusionId: "fusion-a",
+          turnId: "0",
+          pattern: "critique",
+          syntheticModel: "opaque-fusion",
+          contractVersion: 1,
+          primaryModel: "draft",
+          fallbackModel: "unused-fallback",
+        },
+        start,
+      ),
+      "session",
+      receipt,
+      completed,
+    )!;
+    assert.equal(latePlan.status, "completed");
+    assert.equal(latePlan.sourceTimestamp, completed.sourceTimestamp);
+    assert.equal(latePlan.finalSourceModel, "actual-final");
+    assert.equal(latePlan.endedAt, end);
+    assert.equal(latePlan.fallbackModel, "unused-fallback");
+    assert.equal(latePlan.plannedModels?.[0]?.model, "draft");
+    assert.deepEqual(latePlan.gaps, []);
+  });
+
   it("keeps overlapping repeated models separate, ignores activity, and never copies drafts or usage", () => {
     const first = event("assistant.fusion_phase_completed", {
       ...phase,
@@ -57,6 +117,8 @@ describe("bounded Copilot execution metadata", () => {
         {
           ...phase,
           pattern: "cascade",
+          phaseKind: "primary",
+          conversationScope: "root",
         },
         start,
       ),
@@ -68,6 +130,9 @@ describe("bounded Copilot execution metadata", () => {
     assert.equal(delayed.startSource, "observed");
     assert.equal(delayed.endedAt, end);
     assert.deepEqual(delayed.gaps, []);
+    assert.equal(delayed.pattern, "cascade");
+    assert.equal(delayed.phaseKind, "primary");
+    assert.equal(delayed.conversationScope, "root");
     const replay = normalizeFusionExecution(
       event("assistant.fusion_phase_completed", {
         ...phase,
@@ -80,6 +145,8 @@ describe("bounded Copilot execution metadata", () => {
     )!;
     assert.equal(replay.startSource, "observed");
     assert.equal(replay.startedAt, start);
+    assert.equal(replay.phaseKind, "primary");
+    assert.equal(replay.conversationScope, "root");
   });
 
   it("records failures without provider error text and preserves unknown durations", () => {
@@ -98,6 +165,16 @@ describe("bounded Copilot execution metadata", () => {
     assert.equal(failed.startSource, "unknown");
     assert.isUndefined(failed.durationMs);
     assert.notInclude(JSON.stringify(failed), "PRIVATE");
+    const lateStart = normalizeFusionExecution(
+      event("assistant.fusion_phase_started", { ...phase, pattern: "cascade" }, start),
+      "session",
+      receipt,
+      failed,
+    )!;
+    assert.equal(lateStart.status, "failed");
+    assert.equal(lateStart.startSource, "observed");
+    assert.isUndefined(lateStart.durationMs);
+    assert.deepEqual(lateStart.gaps, ["Usable elapsed time was not reported."]);
   });
 
   it("does not resurrect a phase from a late start after the root ended without terminal telemetry", () => {

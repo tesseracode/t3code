@@ -1,8 +1,8 @@
 diff --git a/docs/user/activity-log.md b/docs/user/activity-log.md
-index a798213fe..3eb3f41cb 100644
+index 8de5e2bc7f..8d5d11f429 100644
 --- a/docs/user/activity-log.md
 +++ b/docs/user/activity-log.md
-@@ -24,6 +24,12 @@ executed. Phase details distinguish observed from estimated starts, provider ela
+@@ -55,6 +55,12 @@ executed. Phase details distinguish observed from estimated starts, provider ela
  event and receipt timestamps, and show reported final models, fallback, failures, and telemetry
  gaps. Missing timing or model data stays unknown rather than being inferred from the request.
  
@@ -16,7 +16,7 @@ index a798213fe..3eb3f41cb 100644
  advertises them. Available preferences come from that account; unavailable choices show their
  reason. Explicit models and your default model are unchanged. You can switch back to an explicit
 diff --git a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts
-index 97b7f7957..d123a5216 100644
+index 97b7f79573..d123a52161 100644
 --- a/packages/client-runtime/src/work-log/modelExecution.test.ts
 +++ b/packages/client-runtime/src/work-log/modelExecution.test.ts
 @@ -75,11 +75,42 @@ describe("model execution presentation", () => {
@@ -64,7 +64,7 @@ index 97b7f7957..d123a5216 100644
 +  });
  });
 diff --git a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts
-index 0d1f0e605..aa89b5a09 100644
+index 0d1f0e6058..aa89b5a097 100644
 --- a/packages/client-runtime/src/work-log/modelExecution.ts
 +++ b/packages/client-runtime/src/work-log/modelExecution.ts
 @@ -9,7 +9,11 @@ export function modelExecutionSummary(execution: OrchestrationV2ModelExecution):
@@ -111,10 +111,10 @@ index 0d1f0e605..aa89b5a09 100644
    add("Final source model", execution.finalSourceModel);
    add("Final source phase", execution.finalSourcePhaseId);
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
-index 230bee4b0..124041b05 100644
+index 6ce27773c5..6a2342e7fb 100644
 --- a/packages/provider-copilot/src/server/adapter.test.ts
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
-@@ -331,6 +331,167 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+@@ -332,6 +332,167 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
    );
  
  describe("native Copilot V2", () => {
@@ -283,7 +283,7 @@ index 230bee4b0..124041b05 100644
      "bounds live phase records and exposes an overflow gap instead of silently losing telemetry",
      () =>
 diff --git a/packages/provider-copilot/src/server/fusion.test.ts b/packages/provider-copilot/src/server/fusion.test.ts
-index f0d7317eb..e857aa34e 100644
+index f0d7317eb7..e857aa34ea 100644
 --- a/packages/provider-copilot/src/server/fusion.test.ts
 +++ b/packages/provider-copilot/src/server/fusion.test.ts
 @@ -11,6 +11,66 @@ function event(type: SessionEvent["type"], data: object, timestamp = end, id = t
@@ -399,7 +399,7 @@ index f0d7317eb..e857aa34e 100644
  
    it("does not resurrect a phase from a late start after the root ended without terminal telemetry", () => {
 diff --git a/packages/provider-copilot/src/server/fusion.ts b/packages/provider-copilot/src/server/fusion.ts
-index da7eb6b0c..5e1c484b3 100644
+index da7eb6b0cf..5e1c484b34 100644
 --- a/packages/provider-copilot/src/server/fusion.ts
 +++ b/packages/provider-copilot/src/server/fusion.ts
 @@ -19,6 +19,8 @@ export function fusionExecutionKey(event: SessionEvent): string | undefined {
