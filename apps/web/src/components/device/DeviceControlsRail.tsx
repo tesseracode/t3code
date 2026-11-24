@@ -14,6 +14,7 @@ import {
   Smartphone,
   Square,
   Type,
+  Unplug,
   X,
   MoonIcon,
   SunIcon,
@@ -47,6 +48,7 @@ export function DeviceControlsRail(props: {
   onTools: () => void;
   onFloat: () => void;
   onClose: () => void;
+  onDisconnect: () => void;
   onPowerOff: () => void;
 }) {
   const { view, handle, controls } = props;
@@ -232,6 +234,10 @@ export function DeviceControlsRail(props: {
             <MenuItem onClick={props.onClose}>
               <X />
               <T>Close device panel</T>
+            </MenuItem>
+            <MenuItem onClick={props.onDisconnect}>
+              <Unplug />
+              <T>Disconnect device</T>
             </MenuItem>
             <MenuSeparator />
             <MenuItem variant="destructive" onClick={props.onPowerOff}>

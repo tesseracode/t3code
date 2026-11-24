@@ -5,15 +5,15 @@
   "patch_present": true,
   "recipe_present": true,
   "recipe_decodable": true,
-  "patch_sha256": "08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08",
-  "recipe_sha256": "72be83ab03900c276c51b6751b73e485d43ad42b062472b9d5d69126cbf72e6d",
+  "patch_sha256": "99519638903f84575a021dc734e5a2da1f1222a51c13ce675780ada7f6aaae44",
+  "recipe_sha256": "7173ec2ed47a8858ae50eef8f668814ad50764f8159ec68991638f444c84d24d",
   "reference": {
     "kind": "commit",
-    "commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
-    "preimage_set_sha256": "40a32b2ea9c464a9047caf44b22573136cbe9f563f5329d9a75ebbd67482cb84"
+    "commit": "d244440a89ea1fef8976f757aedd5a5be4462edf",
+    "preimage_set_sha256": "d9bbe5dc2ba9d3705f5fe6596631064c10b1ca47a01f152df4fc8db131296cd8"
   },
   "capture": {
-    "mode": "working-tree-all",
+    "mode": "staged-index",
     "pathspecs": [
       "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
       "apps/web/src/components/device/DeviceControlsRail.tsx",
@@ -37,12 +37,12 @@
       "new_mode": "100644",
       "preimage_observed": true,
       "preimage_present": true,
-      "preimage_sha256": "5a7d6944bc3841f8083b9c07fec38edd37e13cf497ce3995e15843f2d019b3d4",
+      "preimage_sha256": "2411f1ba90d2bae421bd8d48b30d13203c5b6c0d4abba063d980fa61748ea657",
       "postimage_observed": true,
       "postimage_present": true,
-      "postimage_sha256": "daa65cdb82b3455e16858fe468b653c44e502804494ab0ad779ed50c99d1bdb1",
-      "patch_fragment_sha256": "fd3435928e0567b346a957a142f40596914a917076e616e0f558372bb7862fcb",
-      "effect_sha256": "7fc3be13e1d642fa4f1825313c8a82197615a795aa29004ab7d3e9dac3df7977",
+      "postimage_sha256": "4c42f9a2bcc574708246c96b393ee09f13ca1b6266110d67561329c62fe8d0fd",
+      "patch_fragment_sha256": "9bb56ec474a4120aed0a9f6859283ec4904464e285e5f2231985e00cb456fbd2",
+      "effect_sha256": "edf888564b980758b5429d3bddd43bb319a127399db8e5c97a7cf95e8f75fda5",
       "operation_indexes": [
         1
       ],
@@ -61,12 +61,12 @@
       "new_mode": "100644",
       "preimage_observed": true,
       "preimage_present": true,
-      "preimage_sha256": "24dd9e4fb217bda427054006717b481fea55e751c74d2547e90c1bde5d4f3f4a",
+      "preimage_sha256": "4ea1dbf7ad1a7822991b90b5daf7dfe823f18c633fac26745d84ad611f3778a5",
       "postimage_observed": true,
       "postimage_present": true,
-      "postimage_sha256": "9e5faa81164f1f2a6808151203ecbcd78fa10813e2dab12345865193618cc55d",
-      "patch_fragment_sha256": "ea61a23a50e18354bf88c575f3f04929f28f20201a713cae09522c469c764726",
-      "effect_sha256": "c12e9d0983968af49f4df6dd8743a03c4f142e805473725fb16b802200096fd7",
+      "postimage_sha256": "f5b88559f4fd6373c3f4d038a0ef228d382e3ace6f1e59fa1235283ed324fbd6",
+      "patch_fragment_sha256": "aea30a340aa4deff3daf1da46f9fe3fe6c2d91a8235020c0874830753a3d46a9",
+      "effect_sha256": "4b9ba3546ca92baf3174842e41c7684faaa8c9de0d42569f2cbbfb465de54b36",
       "operation_indexes": [
         2
       ],
@@ -85,12 +85,12 @@
       "new_mode": "100644",
       "preimage_observed": true,
       "preimage_present": true,
-      "preimage_sha256": "3b0e05dea08ab86d76dfe64c4ae9aa0c2d6335e803ae0096a735b1f602eced58",
+      "preimage_sha256": "17cff75c64ff46b2deb539040266b5437fe030db4a03cd65ae79fbb6c6868018",
       "postimage_observed": true,
       "postimage_present": true,
-      "postimage_sha256": "956b43fbb6f22a6f026b298baa42a9497721a527443ccb718d8bccc9305ad155",
-      "patch_fragment_sha256": "d724e07736222ffef4bd9e0209f0ff7a54f01f125a27ffdfab031daf22b9742e",
-      "effect_sha256": "b6565c6953eab452dcc338888c6ad4d858cb6336fbde38d54df2229da82cd97e",
+      "postimage_sha256": "3c95033802086fe3c44d1cdc5abc0772ac22a67d2812252bd6bbb8253ddc53e2",
+      "patch_fragment_sha256": "05872f06b17f5cf0d32ba8a43614c8971b41c9ff611e4cadaf03774610f872cd",
+      "effect_sha256": "7a08d51ef7fc85885ed24b5910b6bebbe182ff7514ee6520f3e94845f0748da6",
       "operation_indexes": [
         3
       ],
@@ -109,12 +109,12 @@
       "new_mode": "100644",
       "preimage_observed": true,
       "preimage_present": true,
-      "preimage_sha256": "ec00a1f37e7493dbba6b74b678ec2d6065ed1db3400f2d915242dd78c8faedf9",
+      "preimage_sha256": "7e83c6f2e4184ff5bd0316b04cb65aee377e8d2fec6635802797ca33f6d0bc9d",
       "postimage_observed": true,
       "postimage_present": true,
-      "postimage_sha256": "44391eb6449c233d17a645d2903c2306a0ac0f98368d862820998c93379af041",
-      "patch_fragment_sha256": "1306e890305a7198f391efeba155726df16d24a5b07a1d03bf336243bdf4cfd6",
-      "effect_sha256": "3a9f532ab257aab321ab160d32c256189092685931be427d85562db546c8a4ea",
+      "postimage_sha256": "e124e98d43c0d92e803f7def9b872adf8115c2c54c88afe6ac601e521c7b81ec",
+      "patch_fragment_sha256": "9b38a5c2e00094ca33fc44f109bc2d7ef9e4811115161a75ddd0ea39e3a475a5",
+      "effect_sha256": "3cb61372e556e49810bf750689453ef37bc4e3c196bda50520c96bb4b7e07af6",
       "operation_indexes": [
         4
       ],
@@ -133,12 +133,12 @@
       "new_mode": "100644",
       "preimage_observed": true,
       "preimage_present": true,
-      "preimage_sha256": "25d6e867771f7c2664a16292d888ad98dc234d2ce007f68d91e37b18c346d05f",
+      "preimage_sha256": "1b32aaf99ee434402bece227782dbed2dd3bb252eca6869dfa48737f84efa735",
       "postimage_observed": true,
       "postimage_present": true,
-      "postimage_sha256": "ecc19200fcf2c71b5493b1ade103646dec5826505c91bd95c061affb8ebf90ea",
-      "patch_fragment_sha256": "c49f34a2fa570384b63a5d0eb736caf40e90ace45d704c9136875c1096c4a181",
-      "effect_sha256": "ef9f7fd655319a4269f227099fc43f84b310a8587065b1cf6404a42adf4c5a5b",
+      "postimage_sha256": "2b11b045bed10bd5ca03c63f2015407f5d50608e90759c3cda1445c637fc8c98",
+      "patch_fragment_sha256": "962054b6b8b951983270114ed2a2981c749df872866499b53672e4b5e52c6159",
+      "effect_sha256": "c34a8a8f51279a3e53949f48c23608042df40c3218605ccf1c1bb2d1c0736964",
       "operation_indexes": [
         5
       ],

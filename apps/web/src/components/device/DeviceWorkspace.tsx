@@ -27,6 +27,7 @@ export function DeviceWorkspace(props: {
   visible: boolean;
   onFloat: () => void;
   onClose: () => void;
+  onDisconnect: () => void;
   onPowerOff: () => void;
 }) {
   const gt = useGT();
@@ -110,6 +111,7 @@ export function DeviceWorkspace(props: {
                 onTools={() => setToolsOpen(!toolsOpen)}
                 onFloat={props.onFloat}
                 onClose={props.onClose}
+                onDisconnect={props.onDisconnect}
                 onPowerOff={props.onPowerOff}
               />
             )}

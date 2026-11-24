@@ -1,29 +1,19 @@
 # Implementation Record: device-session-release
 
-**Recorded**: 2026-11-14T03:21:52Z
+**Recorded**: 2026-11-24T07:23:27Z
 **Files changed**: 5
-**Patch size**: 7551 bytes
-**Capture mode**: working-tree-all
-**Pathspecs**: apps/web/src/components/device/DeviceControlsRail.tsx,apps/web/src/components/device/DeviceWorkspace.tsx,apps/web/src/components/device/DevicePanel.tsx,apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx,docs/user/devices.md
-
-## Change Summary
-
-```
- .../features/devices/DevicePreviewRouteScreen.tsx  | 40 ++++++++++++++++++----
- .../src/components/device/DeviceControlsRail.tsx   |  6 ++++
- apps/web/src/components/device/DevicePanel.tsx     |  7 ++--
- apps/web/src/components/device/DeviceWorkspace.tsx |  2 ++
- docs/user/devices.md                               |  5 +++
- 5 files changed, 48 insertions(+), 12 deletions(-)
-```
+**Patch size**: 7352 bytes
+**Capture mode**: staged-index
+**Pathspecs**: apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx,apps/web/src/components/device/DeviceControlsRail.tsx,apps/web/src/components/device/DevicePanel.tsx,apps/web/src/components/device/DeviceWorkspace.tsx,docs/user/devices.md
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: apps/web/src/components/device/DeviceControlsRail.tsx, apps/web/src/components/device/DeviceWorkspace.tsx, apps/web/src/components/device/DevicePanel.tsx, apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx, docs/user/devices.md
+- **capture_mode**: `staged-index`
+- **pathspecs**: apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx, apps/web/src/components/device/DeviceControlsRail.tsx, apps/web/src/components/device/DevicePanel.tsx, apps/web/src/components/device/DeviceWorkspace.tsx, docs/user/devices.md
 - **claim_ids**: (none)
-- **base_commit**: `0490e7bb2753ee455d58f9832f6ea943af81b0e0`
+- **base_commit**: `d244440a89ea1fef8976f757aedd5a5be4462edf`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 5 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 
