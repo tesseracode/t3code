@@ -28,9 +28,10 @@ import {
   STAGE_INSTALL_ARGS,
 } from "./build-desktop-artifact.ts";
 import { assertLinuxArm64PageCompatibility } from "./lib/linux-arm64-sea.ts";
-import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
+import { collectCliRuntimeExternalDependencies } from "./lib/runtime-external-dependencies.ts";
 import { signWithJsign } from "./lib/windows-jsign.ts";
 import { windowsSystemTar } from "./lib/windows-tar.ts";
+import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -145,6 +146,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     yield* fs.readFileString(path.join(input.repoRoot, "pnpm-workspace.yaml")),
   );
   const catalog = workspace.catalog ?? {};
+  const overrides = resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server");
   const serverDependencies = resolveCatalogDependencies(
     serverPackageJson.dependencies,
     catalog,
@@ -158,7 +160,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     });
   }
   const dependencies = {
-    ...selectCliRuntimeExternalDependencies(serverDependencies),
+    ...(yield* collectCliRuntimeExternalDependencies(input.repoRoot)),
     ...resolveFffNativeDependencies(input.platform, input.arch, fffNodeVersion),
   };
   const patchedDependencies = createStagePatchedDependencies(
@@ -184,7 +186,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
         arch: input.arch,
         ...(workspace.allowBuilds ? { allowBuilds: workspace.allowBuilds } : {}),
         patchedDependencies,
-        overrides: resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server"),
+        overrides,
       }),
       nodeLinker: "hoisted",
     }),
@@ -203,6 +205,13 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     }),
     "vp install --prod (cli archive runtime externals)",
   );
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: input.stageDir,
+    platform: input.platform,
+    arch: input.arch,
+    dependencies,
+    overrides,
+  });
 
   const platformKey = cliArchivePlatformKey(input.platform, input.arch);
   const prebuildsDir = path.join(input.stageDir, "node_modules/node-pty/prebuilds");

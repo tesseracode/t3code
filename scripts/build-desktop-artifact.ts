@@ -36,6 +36,8 @@ import {
   type WebAssetBrand,
 } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
+import { validateCopilotLinuxArchiveMembers } from "@t3tools/shared/copilotRuntime";
+import { COPILOT_PAYLOAD_VERSIONS, pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
 import {
   findInlinedExternalPackages,
   selectCliRuntimeExternalDependencies,
@@ -44,6 +46,8 @@ import { loadRepoEnv } from "./lib/public-config.ts";
 import { selectDesktopRuntimeExternalDependencies } from "./lib/desktop-external-packages.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 import { resolveTaggedSourceVersion } from "./lib/tagged-source-version.ts";
+import { forkPreviewBuildConfig, FORK_PREVIEW_PRODUCT_NAME } from "./lib/fork-preview.ts";
+import { collectCliRuntimeExternalDependencies } from "./lib/runtime-external-dependencies.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -65,6 +69,14 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
 const DESKTOP_APP_ID = "com.t3tools.t3code";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
+export class ForkPreviewConfigurationError extends Schema.TaggedError<ForkPreviewConfigurationError>()(
+  "ForkPreviewConfigurationError",
+  { detail: Schema.String },
+) {
+  override get message() {
+    return this.detail;
+  }
+}
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
@@ -189,6 +201,7 @@ interface BuildCliInput {
   readonly mockUpdates: Option.Option<boolean>;
   readonly mockUpdateServerPort: Option.Option<number>;
   readonly wslRuntime: Option.Option<string>;
+  readonly forkPreview?: Option.Option<boolean>;
 }
 
 function detectHostBuildPlatform(hostPlatform: string): typeof BuildPlatform.Type | undefined {
@@ -948,6 +961,7 @@ const resolvePythonForNodeGyp = Effect.fn("resolvePythonForNodeGyp")(function* (
 });
 
 interface ResolvedBuildOptions {
+  readonly forkPreview?: boolean;
   readonly platform: typeof BuildPlatform.Type;
   readonly target: string;
   readonly arch: typeof BuildArch.Type;
@@ -1585,6 +1599,19 @@ export function createStageWorkspaceConfig(input: {
   readonly overrides?: Record<string, string>;
 }): StageWorkspaceConfig {
   const { platform, arch, allowBuilds, patchedDependencies, overrides } = input;
+  // pnpm's cross-host install can include both libc variants despite the
+  // glibc target below. Exclude musl only in generated glibc stages, not source.
+  const stageOverrides =
+    platform === "linux" &&
+    overrides?.[`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`] !== undefined
+      ? {
+          ...overrides,
+          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-x64`]:
+            "-",
+          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-arm64`]:
+            "-",
+        }
+      : overrides;
   const hostOs = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
   const hostCpu = arch === "universal" ? ["arm64", "x64"] : [arch];
   // Linux AppImages require glibc native optional dependencies; tell pnpm explicitly.
@@ -1606,7 +1633,9 @@ export function createStageWorkspaceConfig(input: {
     ...(patchedDependencies && Object.keys(patchedDependencies).length > 0
       ? { patchedDependencies }
       : {}),
-    ...(overrides && Object.keys(overrides).length > 0 ? { overrides } : {}),
+    ...(stageOverrides && Object.keys(stageOverrides).length > 0
+      ? { overrides: stageOverrides }
+      : {}),
     packageExtensions: STAGE_PACKAGE_EXTENSIONS,
   };
 }
@@ -1642,6 +1671,7 @@ const AzureTrustedSigningOptionsConfig = Config.all({
 });
 
 const BuildEnvConfig = Config.all({
+  forkPreview: Config.Boolean("T3CODE_DESKTOP_FORK_PREVIEW").pipe(Config.withDefault(false)),
   platform: Config.schema(BuildPlatform, "T3CODE_DESKTOP_PLATFORM").pipe(Config.option),
   target: Config.String("T3CODE_DESKTOP_TARGET").pipe(Config.option),
   arch: Config.schema(BuildArch, "T3CODE_DESKTOP_ARCH").pipe(Config.option),
@@ -1748,6 +1778,7 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
     Option.getOrUndefined(input.wslRuntime) ?? Option.getOrUndefined(env.wslRuntime);
 
   return {
+    forkPreview: resolveBooleanFlag(input.forkPreview ?? Option.none(), env.forkPreview),
     platform,
     target,
     arch,
@@ -3082,7 +3113,16 @@ export const packWindowsServerAsar = Effect.fn("packWindowsServerAsar")(function
     try: () =>
       createPackageWithOptions(input.sourceDir, input.asarPath, {
         dot: true,
-        unpack: `{${unpackGlobs.join(",")}}`,
+        // ASAR matches absolute filenames without dot:true; an owned .t3 stage must be literal.
+        unpack: `{${unpackGlobs
+          .map(
+            (pattern) =>
+              `${input.sourceDir
+                .split(path.sep)
+                .join("/")
+                .replace(/[?*[\]{}()+@!]/g, "\\$&")}/${pattern}`,
+          )
+          .join(",")}}`,
         // glob 13 (@electron/asar 4) resolves ignores against cwd; anchor them at the source.
         globOptions: {
           cwd: input.sourceDir,
@@ -3172,6 +3212,13 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
   );
 
   yield* Effect.log("[desktop-artifact] Packing server.asar...");
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: serverStageDir,
+    platform: "win",
+    arch: input.arch,
+    dependencies: sidecarDependencies,
+    overrides: input.overrides,
+  });
   yield* fs.makeDirectory(path.dirname(input.asarPath), { recursive: true });
   yield* packWindowsServerAsar({
     sourceDir: serverStageDir,
@@ -3523,6 +3570,13 @@ export const validateWindowsPackagedPayload = Effect.fn(
         cause: new Error("WSL runtime archive is not a Linux CLI release archive"),
       });
     }
+    const copilotProblem = validateCopilotLinuxArchiveMembers(
+      members
+        .filter((member) => member.startsWith(`${stem}/`))
+        .map((member) => member.slice(stem.length + 1)),
+      input.targetArch === "arm64" ? "arm64" : "x64",
+    );
+    if (copilotProblem !== null) return yield* invalidWslRuntime(new Error(copilotProblem));
     const bundleEntry = members.find((member) => member.endsWith("/bin.mjs"));
     if (bundleEntry !== undefined) {
       return yield* invalidWslRuntime(
@@ -3641,6 +3695,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     });
   }
   const workspaceConfig = yield* readWorkspaceConfig();
+  if (
+    options.forkPreview &&
+    (options.platform === "linux" ||
+      options.signed ||
+      options.mockUpdates ||
+      !isDesktopPreviewVersion(options.version ?? desktopPackageJson.version))
+  ) {
+    return yield* new ForkPreviewConfigurationError({
+      detail:
+        "Fork desktop previews require Mac/Windows, an unsigned preview version and no mock updates.",
+    });
+  }
   const workspaceCatalog = workspaceConfig.catalog ?? {};
   const workspaceOverrides = workspaceConfig.overrides ?? {};
   const workspacePatchedDependencies = workspaceConfig.patchedDependencies ?? {};
@@ -3672,17 +3738,17 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       }),
   });
 
-  const resolvedServerDependencies = yield* Effect.try({
-    try: () => resolveCatalogDependencies(serverDependencies, workspaceCatalog, "apps/server"),
-    catch: (cause) =>
-      new DesktopBuildDependencyResolutionError({
-        kind: "server-production",
-        manifestPath: "apps/server/package.json",
-        cause,
-      }),
-  });
-  const resolvedServerRuntimeExternalDependencies = selectCliRuntimeExternalDependencies(
-    resolvedServerDependencies,
+  const resolvedServerRuntimeExternalDependencies = yield* collectCliRuntimeExternalDependencies(
+    repoRoot,
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
+        new DesktopBuildDependencyResolutionError({
+          kind: "server-production",
+          manifestPath: "apps/server/package.json",
+          cause,
+        }),
+    ),
   );
   const resolvedDesktopRuntimeDependencies = yield* Effect.try({
     try: () => resolveDesktopRuntimeDependencies(desktopPackageJson.dependencies, workspaceCatalog),
@@ -3900,7 +3966,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       ? { ...resolvedDesktopRuntimeDependencies }
       : resolveMergedStageDependencies({
           platform: options.platform,
-          serverDependencies: resolvedServerDependencies,
+          serverDependencies: resolvedServerRuntimeExternalDependencies,
           desktopDependencies: resolvedDesktopRuntimeDependencies,
           arch: options.arch,
           fffNodeVersion: serverPackageJson.dependencies["@ff-labs/fff-node"],
@@ -3914,7 +3980,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    name: options.forkPreview ? "t3code-fork-preview" : "t3code",
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
@@ -3927,7 +3993,9 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     license: "MIT",
     homepage: "https://t3.codes",
     author: "T3 Tools",
-    main: "apps/desktop/dist-electron/boot.cjs",
+    main: options.forkPreview
+      ? "fork-preview-bootstrap.cjs"
+      : "apps/desktop/dist-electron/boot.cjs",
     build: yield* createBuildConfig(
       options.platform,
       options.target,
@@ -3949,8 +4017,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       electron: electronVersion,
     },
   };
+  if (options.forkPreview) {
+    yield* fs.copyFile(
+      path.join(repoRoot, "scripts/fork-preview-bootstrap.cjs"),
+      path.join(stageAppDir, "fork-preview-bootstrap.cjs"),
+    );
+  }
 
-  const stagePackageJsonString = yield* encodeJsonString(stagePackageJson);
+  const stagePackageJsonString = yield* encodeJsonString(
+    options.forkPreview
+      ? { ...stagePackageJson, build: forkPreviewBuildConfig(stagePackageJson.build) }
+      : stagePackageJson,
+  );
   yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
   const stageWorkspaceConfig = createStageWorkspaceConfig({
     platform: options.platform,
@@ -3980,6 +4058,13 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   );
   yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
   yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
+  yield* pruneCopilotSdkServerPayload({
+    stageDir: stageAppDir,
+    platform: options.platform,
+    arch: options.arch,
+    dependencies: stageDependencies,
+    overrides: resolvedOverrides,
+  });
 
   if (options.platform === "win" && windowsServerAsarPath) {
     yield* stageWindowsServerSidecar({
@@ -4104,7 +4189,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   if (options.platform === "win") {
     yield* validateWindowsPackagedPayload({
       stageDistDir,
-      appExecutableName: `${resolveDesktopProductName(appVersion)}.exe`,
+      appExecutableName: `${options.forkPreview ? FORK_PREVIEW_PRODUCT_NAME : resolveDesktopProductName(appVersion)}.exe`,
       targetArch: options.arch,
       appVersion,
       expectWslRuntime: bundlesWslRuntime({
@@ -4228,6 +4313,12 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
   signed: Flag.Boolean("signed").pipe(
     Flag.withDescription(
       "Enable signing/notarization discovery; Windows uses Azure Trusted Signing (env: T3CODE_DESKTOP_SIGNED).",
+    ),
+    Flag.optional,
+  ),
+  forkPreview: Flag.Boolean("fork-preview").pipe(
+    Flag.withDescription(
+      "Build a separate unsigned fork preview with isolated state and no stock protocol/update registration.",
     ),
     Flag.optional,
   ),
