@@ -216,6 +216,7 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: [
+      ".tpatch/**",
       ".repos",
       ".repos/**",
       "infra/task-cache/vendor/**",

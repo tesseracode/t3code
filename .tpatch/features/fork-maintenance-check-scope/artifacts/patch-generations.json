@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "fork-maintenance-check-scope",
-  "current_generation": 2,
+  "current_generation": 3,
   "generations": [
     {
       "generation": 1,
@@ -49,7 +49,7 @@
       "git_patch_id": "3f9f90e6f330a10bb4a084f0977dd6410560d29c",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "c4fd8351b78b7c6b41254f70c7e8881c14f1b16133e277bc08e314622e3e9d92",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "patches/002-record.patch",
       "base_commit": "3f9e8448cfb55f09c0025837031bb02d63c9d59d",
       "upper": {
@@ -59,6 +59,44 @@
       },
       "capture": {
         "mode": "working-tree-all",
+        "pathspecs": [
+          ".github/scripts/ci-changes.cjs",
+          "scripts/lib/ci-changes.test.ts",
+          "vite.config.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/scripts/ci-changes.cjs",
+        "scripts/lib/ci-changes.test.ts",
+        "vite.config.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 3,
+      "generation_id": "pg_8942c7677ebc",
+      "kind": "amend-refresh",
+      "patch_sha256": "f4679084e4ab813660fd9e029140d99f461377ad4b37a5e82ed3ac1bbc88e2df",
+      "git_patch_id": "815b6236cfa64f4b07ba470097e279bfba1f3ada",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "32ae741c24e6f6b09977052728286d743d0178c4430423d973b86fd9a5481108",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/003-record.patch",
+      "base_commit": "7e85711d3ad523f3a520ca685f1b0c6a28e7b11a",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
         "pathspecs": [
           ".github/scripts/ci-changes.cjs",
           "scripts/lib/ci-changes.test.ts",

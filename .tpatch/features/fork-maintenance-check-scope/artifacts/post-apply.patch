@@ -1,5 +1,5 @@
 diff --git a/.github/scripts/ci-changes.cjs b/.github/scripts/ci-changes.cjs
-index 77a526076..cb6ae9566 100644
+index f9c8174f85..6617576abb 100644
 --- a/.github/scripts/ci-changes.cjs
 +++ b/.github/scripts/ci-changes.cjs
 @@ -7,7 +7,7 @@ const root = path.resolve(__dirname, "../..");
@@ -13,7 +13,7 @@ index 77a526076..cb6ae9566 100644
  ];
 diff --git a/scripts/lib/ci-changes.test.ts b/scripts/lib/ci-changes.test.ts
 new file mode 100644
-index 000000000..72f9eb364
+index 0000000000..72f9eb3646
 --- /dev/null
 +++ b/scripts/lib/ci-changes.test.ts
 @@ -0,0 +1,32 @@
@@ -50,19 +50,10 @@ index 000000000..72f9eb364
 +  });
 +});
 diff --git a/vite.config.ts b/vite.config.ts
-index 909becac3..e3110a792 100644
+index 912898075d..a06e1319ad 100644
 --- a/vite.config.ts
 +++ b/vite.config.ts
-@@ -154,6 +154,8 @@ export default defineConfig({
-   fmt: {
-     ignorePatterns: [
-       ".repos/**",
-+      // Preserve hash-bound patch recipes and historical evidence.
-+      ".tpatch/**",
-       "infra/task-cache/vendor/**",
-       // Macroscope requires one glob per line; Markdown formatting corrupts it.
-       ".macroscope/ignore.md",
-@@ -187,6 +189,7 @@ export default defineConfig({
+@@ -216,6 +216,7 @@ export default defineConfig({
    },
    lint: {
      ignorePatterns: [

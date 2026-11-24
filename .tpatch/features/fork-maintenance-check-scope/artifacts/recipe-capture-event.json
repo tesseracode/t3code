@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "feature": "fork-maintenance-check-scope",
+  "patch_present": true,
+  "patch_sha256": "f4679084e4ab813660fd9e029140d99f461377ad4b37a5e82ed3ac1bbc88e2df",
+  "recipe_present": true,
+  "recipe_sha256": "32ae741c24e6f6b09977052728286d743d0178c4430423d973b86fd9a5481108",
+  "reference": {
+    "kind": "commit",
+    "commit": "7e85711d3ad523f3a520ca685f1b0c6a28e7b11a",
+    "preimage_set_sha256": "5a676e873c09cb0000b2f8174de9df91b3365f1814128ff1e4cb3350ac2e653b"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      ".github/scripts/ci-changes.cjs",
+      "scripts/lib/ci-changes.test.ts",
+      "vite.config.ts"
+    ],
+    "claim_ids": []
+  },
+  "event": {
+    "patch_rewritten": true,
+    "recipe_regenerated": true,
+    "bound_artifact_edited": false,
+    "stale_marker_present": false
+  },
+  "parent_created_paths": [],
+  "observations": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": ".github/scripts/ci-changes.cjs",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "f9d6f8238dfb4d1a5152ef0b8484efd931e408762245b0e266fadfa02f8f473a",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "effed8bc022575e841f17bda12f85e4adfa786d3934b91d768a435eac764fd17",
+      "patch_fragment_sha256": "d71bad3d070f4cb1465e446c5c31886c5309be64027e8dd8b23926a51f011650"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "add",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "scripts/lib/ci-changes.test.ts",
+      "old_path": "",
+      "old_mode": "",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": false,
+      "preimage_sha256": "",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "730b70aaf90b68abf009e0f7c799e745dad96a07c7e2820a09e4e99b7444ba32",
+      "patch_fragment_sha256": "687bcd56a305273e83d79f4505af839d99b1cd946c6d293693fb71e5aef853d7"
+    },
+    {
+      "ordinal": 3,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "vite.config.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "e04c51e227d9f0316fae096a836362bfd9934009da5ffaf9441dbc8c78ab2dbe",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "7fb537cf4145d605219e3e06dc3951a95fe8dee65945c16a4b68c8fce42fe99d",
+      "patch_fragment_sha256": "a6c6d1b2593e087425f2ac31131559b5bf81feb738cd9f7793953e4e56927926"
+    }
+  ],
+  "coverage_sha256": "0d62c910f965d3f5b0726a043de7be8fab1ee73ef9a0675d1bdd47ba3fdc08d1"
+}
