@@ -16,10 +16,10 @@ index bbffc43808..a58c9c3dc3 100644
  native conversation rollback, and native forks are not exposed by this integration;
  portable handoffs remain available.
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
-index e2428debe3..0320c11d6f 100644
+index 4d80808752..1354ffeee6 100644
 --- a/packages/provider-copilot/src/server/adapter.test.ts
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
-@@ -1604,6 +1604,7 @@ describe("native Copilot V2", () => {
+@@ -1605,6 +1605,7 @@ describe("native Copilot V2", () => {
            fake.emit("assistant.message_delta", { messageId: "reply", deltaContent: "Hello" });
            fake.emit("assistant.turn_end", { turnId: "model-step" });
            fake.emit("assistant.idle");
@@ -27,7 +27,7 @@ index e2428debe3..0320c11d6f 100644
            fake.emit("session.idle", {}, "child");
            fake.emit("assistant.message", { messageId: "child", content: "Child only" }, "child");
            let snapshot = yield* drain();
-@@ -1710,12 +1711,15 @@ describe("native Copilot V2", () => {
+@@ -1711,12 +1712,15 @@ describe("native Copilot V2", () => {
        ),
    );
  
@@ -46,7 +46,7 @@ index e2428debe3..0320c11d6f 100644
            fake.session.getEvents = async () => [
              {
                type: "assistant.message",
-@@ -1740,12 +1744,32 @@ describe("native Copilot V2", () => {
+@@ -1741,12 +1745,32 @@ describe("native Copilot V2", () => {
              ["Previous response"],
            );
            yield* start();

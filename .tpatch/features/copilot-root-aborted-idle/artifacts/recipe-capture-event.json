@@ -2,16 +2,16 @@
   "schema_version": 1,
   "feature": "copilot-root-aborted-idle",
   "patch_present": true,
-  "patch_sha256": "2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963",
+  "patch_sha256": "73c1b9bcf05037f7de2a775ca41175b647fec812d1c17ba46b6b9be676f815fc",
   "recipe_present": true,
-  "recipe_sha256": "1397679380a80b9b583a88cd9437b2d017aa48a939be64ba06478aeccf0f7eb3",
+  "recipe_sha256": "ee5d0a6c2d489f1dfc3be45427b3eac9590a8f1435edbf667133113384901c4f",
   "reference": {
     "kind": "commit",
-    "commit": "3e6a6d4ee53d7f6c02109d5731df745cf997fd7c",
-    "preimage_set_sha256": "395d7e1b29f4b85c94a6dd92f72c3c9b367ad62ab4414ab9e18d9de05e00732d"
+    "commit": "82b91ce37b886151e876dbef0f959f69b375a65b",
+    "preimage_set_sha256": "94b44a96f18e3ef024c31e47aa1be371b8e1501874a1dfd693d1c678594a0fda"
   },
   "capture": {
-    "mode": "working-tree-all",
+    "mode": "staged-index",
     "pathspecs": [
       "docs/user/providers-copilot.md",
       "packages/provider-copilot/src/server/adapter.test.ts",
@@ -55,11 +55,11 @@
       "new_mode": "100644",
       "preimage_observed": true,
       "preimage_present": true,
-      "preimage_sha256": "de6fcb7281fab1739c20a0ec65b365b6fac7be71e4b8160eb8bdbce7e1960dd5",
+      "preimage_sha256": "d510f9d933ecf8722ea2b39c8488172e0e602fe9af1bbf33440f3e2070e44c8b",
       "postimage_observed": true,
       "postimage_present": true,
-      "postimage_sha256": "eda16f009e00ad09aa6df9e3eb8826d3bbe0112d3d935436d3c52061d8ecdbca",
-      "patch_fragment_sha256": "51225282bf8cb02757044bd755a4ae7cf5e7501146ac90c038cacce23feff072"
+      "postimage_sha256": "123244e50c1b2e9427802a491a19ec7f15895d3025d5558f0953a8cb9150ab93",
+      "patch_fragment_sha256": "9430fa0aa00d49fe0a6731e1691454475ad707f23a3f7cecf5883326161046d5"
     },
     {
       "ordinal": 3,
@@ -79,5 +79,5 @@
       "patch_fragment_sha256": "db02181f59b02996bdb66ebf82f6f1b2f3077ff0000b5d266607169434f54408"
     }
   ],
-  "coverage_sha256": "d694957bddf8f34feaa6b5f15e94871a2be169b543ce8537c8baf907e1202516"
+  "coverage_sha256": "f9a13c005d5a0574c8866474ad21fe3809ff56666082ca427e4ba3c1f7af693e"
 }

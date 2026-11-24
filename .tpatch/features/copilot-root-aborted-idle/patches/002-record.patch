@@ -1,0 +1,99 @@
+diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
+index bbffc43808..a58c9c3dc3 100644
+--- a/docs/user/providers-copilot.md
++++ b/docs/user/providers-copilot.md
+@@ -95,7 +95,11 @@ decision. An unconfirmed answer is not proof that the tool did not run; do not
+ repeat the action automatically.
+ 
+ Model/tool steps and subagent activity do not end your submitted turn: the root
+-native session must become idle. Background tasks remain visible independently.
++native session must become idle. An attached background shell, including a dev
++server, can keep the turn active after the assistant has answered. Stop that
++shell when it is no longer needed. **Stop** interrupts the assistant turn once
++Copilot confirms cancellation; it does not stop retained background shells.
++Background tasks remain visible independently.
+ Automatic native compaction is shown in the thread. Explicit manual compaction,
+ native conversation rollback, and native forks are not exposed by this integration;
+ portable handoffs remain available.
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index 4d80808752..1354ffeee6 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -1605,6 +1605,7 @@ describe("native Copilot V2", () => {
+           fake.emit("assistant.message_delta", { messageId: "reply", deltaContent: "Hello" });
+           fake.emit("assistant.turn_end", { turnId: "model-step" });
+           fake.emit("assistant.idle");
++          fake.emit("assistant.idle", { aborted: true }, "child");
+           fake.emit("session.idle", {}, "child");
+           fake.emit("assistant.message", { messageId: "child", content: "Child only" }, "child");
+           let snapshot = yield* drain();
+@@ -1711,12 +1712,15 @@ describe("native Copilot V2", () => {
+       ),
+   );
+ 
+-  it.effect(
+-    "resumes the same native identity after restart and emits an interrupted rather than successful turn",
+-    () =>
++  it.effect.each(["session.idle", "assistant.idle"] as const)(
++    "resumes the same native identity and confirms interruption on root %s with an attached shell",
++    (idleEvent) =>
+       provide(
+         Effect.gen(function* () {
+           const fake = fakeSdk();
++          fake.session.abort = async () => {
++            fake.emit(idleEvent, { aborted: true });
++          };
+           fake.session.getEvents = async () => [
+             {
+               type: "assistant.message",
+@@ -1741,12 +1745,32 @@ describe("native Copilot V2", () => {
+             ["Previous response"],
+           );
+           yield* start();
++          fake.setTasks({
++            tasks: [
++              {
++                id: "retained-server",
++                type: "shell",
++                status: "running",
++                description: "Retained dev server",
++                command: "fixture-service",
++                attachmentMode: "attached",
++                startedAt: "2026-10-29T00:00:00Z",
++              },
++            ],
++          });
++          fake.emit("session.background_tasks_changed");
+           const snapshot = yield* drain();
+           yield* runtime.interruptTurn({
+             providerThread: thread,
+             providerTurnId: snapshot.providerTurns[0]!.id,
+           });
+-          assert.equal((yield* drain()).providerTurns[0]?.status, "interrupted");
++          const interrupted = yield* drain();
++          assert.equal(interrupted.providerTurns[0]?.status, "interrupted");
++          assert.equal(
++            interrupted.providerThread.pendingBackgroundTasks?.[0]?.taskId,
++            "retained-server",
++          );
++          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
+         }),
+       ),
+   );
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+index 0c9d933acd..558143a4ca 100644
+--- a/packages/provider-copilot/src/server/adapter.ts
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -1188,8 +1188,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+           case "session.plan_changed":
+             yield* refreshPlan().pipe(Effect.ignore);
+             return;
++          case "assistant.idle":
+           case "session.idle":
+-            if (!turn) return;
++            if (!turn || (event.type === "assistant.idle" && !event.data.aborted)) return;
++            // Cancellation can idle the root while attached shells still defer session.idle.
++            if (event.data.aborted) turn.interrupted = true;
+             turn.idle = true;
+             yield* refreshTasks().pipe(Effect.ignore);
+             yield* terminal(turn);

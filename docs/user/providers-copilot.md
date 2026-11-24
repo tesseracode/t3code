@@ -95,7 +95,11 @@ decision. An unconfirmed answer is not proof that the tool did not run; do not
 repeat the action automatically.
 
 Model/tool steps and subagent activity do not end your submitted turn: the root
-native session must become idle. Background tasks remain visible independently.
+native session must become idle. An attached background shell, including a dev
+server, can keep the turn active after the assistant has answered. Stop that
+shell when it is no longer needed. **Stop** interrupts the assistant turn once
+Copilot confirms cancellation; it does not stop retained background shells.
+Background tasks remain visible independently.
 Automatic native compaction is shown in the thread. Explicit manual compaction,
 native conversation rollback, and native forks are not exposed by this integration;
 portable handoffs remain available.
