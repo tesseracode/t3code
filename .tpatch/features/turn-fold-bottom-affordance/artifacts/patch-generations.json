@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "feature": "turn-fold-bottom-affordance",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_d4724b37485a",
+      "kind": "record",
+      "patch_sha256": "34f0e6dfa0c5bfa44a7a9057953051d604acd22c96ac7d9ccda619dc45c6afaf",
+      "git_patch_id": "968815a6c4f39dac0d8a46dc32ea8da74c554c38",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "cfa6483d4c51bd51ba5e03cd14cb8a0eaa690f565a51a1b4ef58305a8380e952",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "cdfe5682804389e2be74a5de9b0043b6a3a03941",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+          "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+          "apps/web/src/components/chat/MessagesTimeline.tsx",
+          "apps/web/src/components/chat/timelineRowContext.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+        "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+        "apps/web/src/components/chat/MessagesTimeline.tsx",
+        "apps/web/src/components/chat/timelineRowContext.ts"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

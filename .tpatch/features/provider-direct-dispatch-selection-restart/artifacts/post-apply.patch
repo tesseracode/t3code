@@ -1,0 +1,214 @@
+diff --git a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts
+index bd5c1b23b..7439bda4a 100644
+--- a/apps/server/src/orchestration-v2/Orchestrator.ts
++++ b/apps/server/src/orchestration-v2/Orchestrator.ts
+@@ -2793,6 +2793,46 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+     return decided.success;
+   });
+ 
++  const detachProviderSession = Effect.fn("Orchestrator.detachProviderSession")(function* (input: {
++    readonly command: OrchestrationV2ServerCommand & { readonly threadId: ThreadId };
++    readonly session: OrchestrationV2ThreadProjection["providerSessions"][number];
++    readonly detail: string;
++    readonly now: DateTime.Utc;
++    readonly events: Ref.Ref<Array<OrchestrationV2DomainEvent>>;
++    readonly effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>;
++  }) {
++    yield* emit(
++      input.events,
++      input.command,
++    )({
++      type: "provider-session.detached",
++      threadId: input.command.threadId,
++      driver: input.session.driver,
++      providerInstanceId: input.session.providerInstanceId,
++      occurredAt: input.now,
++      payload: {
++        providerSessionId: input.session.id,
++        detachedAt: input.now,
++        reason: input.detail,
++      },
++    });
++    yield* Ref.update(input.effects, (existing) => [
++      ...existing,
++      {
++        id: `effect:${input.command.commandId}:provider-session.detach:${input.session.id}`,
++        commandId: input.command.commandId,
++        threadId: input.command.threadId,
++        request: {
++          type: "provider-session.detach",
++          providerSessionId: input.session.id,
++          detail: input.detail,
++          // Terminal detaches revoke MCP credentials; selection restarts must retain them.
++          ...(input.command.type === "thread.archive" ? { revokeMcpCredential: true } : {}),
++        },
++      } satisfies PendingOrchestrationEffectV2,
++    ]);
++  });
++
+   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
+     command: Extract<
+       OrchestrationV2ServerCommand,
+@@ -3866,53 +3906,22 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+       yield* Effect.forEach(
+         liveSessions,
+         (session) =>
+-          Effect.gen(function* () {
+-            yield* emit(
+-              events,
+-              command,
+-            )({
+-              type: "provider-session.detached",
+-              threadId: command.threadId,
+-              driver: session.driver,
+-              providerInstanceId: session.providerInstanceId,
+-              occurredAt: now,
+-              payload: {
+-                providerSessionId: session.id,
+-                detachedAt: now,
+-                reason:
+-                  command.type === "thread.archive"
+-                    ? "Thread archived."
+-                    : command.type === "thread.settle"
+-                      ? "Thread settled."
+-                      : command.type === "thread.metadata.update"
+-                        ? "Workspace changed."
+-                        : command.type === "thread.runtime-mode.set"
+-                          ? "Runtime mode changed."
+-                          : "Provider or model selection changed.",
+-              },
+-            });
+-            const pendingEffect = {
+-              id: `effect:${command.commandId}:provider-session.detach:${session.id}`,
+-              commandId: command.commandId,
+-              threadId: command.threadId,
+-              request: {
+-                type: "provider-session.detach",
+-                providerSessionId: session.id,
+-                detail:
+-                  command.type === "thread.archive"
+-                    ? "Thread archived."
+-                    : command.type === "thread.settle"
+-                      ? "Thread settled."
+-                      : command.type === "thread.metadata.update"
+-                        ? "Workspace changed."
+-                        : command.type === "thread.runtime-mode.set"
+-                          ? "Runtime mode changed."
+-                          : "Provider or model selection changed.",
+-                // Terminal detaches revoke MCP credentials; reattachments need other detach reasons to preserve them.
+-                ...(command.type === "thread.archive" ? { revokeMcpCredential: true } : {}),
+-              },
+-            } satisfies PendingOrchestrationEffectV2;
+-            yield* Ref.update(effects, (existing) => [...existing, pendingEffect]);
++          detachProviderSession({
++            command,
++            session,
++            events,
++            effects,
++            now,
++            detail:
++              command.type === "thread.archive"
++                ? "Thread archived."
++                : command.type === "thread.settle"
++                  ? "Thread settled."
++                  : command.type === "thread.metadata.update"
++                    ? "Workspace changed."
++                    : command.type === "thread.runtime-mode.set"
++                      ? "Runtime mode changed."
++                      : "Provider or model selection changed.",
+           }),
+         { concurrency: 1, discard: true },
+       );
+@@ -5859,8 +5868,33 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+             }),
+         ),
+       );
++      const switchPlan = modelSelectionsEqual(projection.thread.modelSelection, modelSelection)
++        ? null
++        : yield* providerSwitchService
++            .plan({ projection, targetModelSelection: modelSelection })
++            .pipe(mapDispatchError(command));
++      for (const session of projection.providerSessions) {
++        if (
++          switchPlan?.releaseProviderSessionIds.includes(session.id) &&
++          session.status !== "stopped" &&
++          session.status !== "error"
++        ) {
++          yield* detachProviderSession({
++            command,
++            session,
++            events,
++            effects,
++            now,
++            detail: "Provider or model selection changed.",
++          });
++        }
++      }
+       const providerSessionId =
+-        activeProviderThread?.providerSessionId ??
++        (activeProviderThread?.providerSessionId !== null &&
++        activeProviderThread?.providerSessionId !== undefined &&
++        !switchPlan?.releaseProviderSessionIds.includes(activeProviderThread.providerSessionId)
++          ? activeProviderThread.providerSessionId
++          : null) ??
+         (yield* mapDispatchError(command)(
+           providerSessionIdFor({
+             adapter,
+diff --git a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
+index 03cdf5e85..0d950dc6d 100644
+--- a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
++++ b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
+@@ -438,12 +438,12 @@ it.live("retries a failed selection restart session open before completing", ()
+   ),
+ );
+ 
+-it.live(
+-  "restarts the live session on a model change when a newer stopped session record exists",
+-  () =>
++it.live.each(["selection-command", "message-dispatch"] as const)(
++  "restarts the live session on a model change with a newer stopped session record (%s)",
++  (mode) =>
+     Effect.scoped(
+       Effect.gen(function* () {
+-        const name = "selection-restart-dead-stopped";
++        const name = `selection-restart-dead-stopped-${mode}`;
+         const cwd = yield* checkpointWorkspace(name);
+         const threadId = ThreadId.make(`thread:${name}`);
+         const state = yield* Ref.make<RestartAdapterState>({
+@@ -549,14 +549,19 @@ it.live(
+             ],
+           });
+ 
+-          const switchCommandId = CommandId.make(`${name}:switch`);
+-          yield* orchestrator.dispatch({
+-            type: "thread.model-selection.set",
+-            commandId: switchCommandId,
+-            threadId,
+-            modelSelection: replacementSelection,
+-          });
+-          yield* worker.drain();
++          const switchCommandId = CommandId.make(
++            `${name}:${mode === "selection-command" ? "switch" : "second"}`,
++          );
++          if (mode === "selection-command") {
++            yield* orchestrator.dispatch({
++              type: "thread.model-selection.set",
++              commandId: switchCommandId,
++              threadId,
++              modelSelection: replacementSelection,
++            });
++            yield* worker.drain();
++          }
++          const second = yield* dispatch("second", replacementSelection);
+           const storedSwitchEvents = yield* eventSink
+             .readByCommandId({ commandId: switchCommandId })
+             .pipe(Stream.runCollect);
+@@ -565,8 +570,6 @@ it.live(
+               ? [stored.event.payload.providerSessionId]
+               : [],
+           );
+-
+-          const second = yield* dispatch("second", replacementSelection);
+           return {
+             projection: second,
+             captured: yield* Ref.get(state),

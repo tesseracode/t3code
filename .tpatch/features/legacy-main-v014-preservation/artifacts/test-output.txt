@@ -1,0 +1,33 @@
+Pinned v0.1.4 main-preservation qualification
+
+Failing-first existing cases:
+- Catalog visibility: internal-only SDK rows were retained when filtering was enabled.
+- Cached visibility: an old hidden SDK row was restored after bootstrap/failed refresh.
+- Native notifications: task completion/idle notifications did not refresh task state.
+- Native commands: queue/dispatch observations were missing.
+- Rich native results: image/audio/resource blocks collapsed to a text preview.
+- Review regression: an explicit custom slug colliding with an internal SDK row disappeared.
+- Review regression: a second skill mutation entered before the first inventory was published.
+
+Final command: vp run check:changed 98213a256b
+Result: passed formatting, lint, both Knip passes, server GraphQL generation,
+33 affected-package typechecks and 225 adjacent tests in 12 files.
+No repo-wide checks were run.
+
+Real isolated client:
+- Extra-high before/after composer captures show the restored static frame.
+- Frame has a two-pixel gradient mask and no animation.
+- Low-effort reverse state has no extra-high frame.
+- Hide internal models was initially false, toggled in the client, and persisted true.
+- Both fixture threads have zero runs; no inference was started.
+
+Independent real SDK no-send skill qualification:
+- SDK 1.0.28, two isolated native sessions, synthetic fixture skill.
+- Enable/disable changes remained selected-session owned.
+- Zero assistant turns; native sessions and clients cleaned up successfully.
+- CLI version was not independently measured by this receipt.
+
+Independent review identified the custom-slug and skill-publication races above.
+Both were corrected without amending the earlier skill-control landing.
+Historical native replay limitations are not waived by these behavioral results.
+Source/main acceptance and receiving-host packaged-release qualification remain separate.

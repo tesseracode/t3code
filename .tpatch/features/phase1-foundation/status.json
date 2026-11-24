@@ -1,0 +1,80 @@
+{
+  "id": "phase1-foundation",
+  "slug": "phase1-foundation",
+  "title": "Consolidate the completed Phase 1 local-first foundation into one upstream-maintenance root. Capture the durable thread attention audit, read-only TWS v1.2.14 adapter, opaque environment-scoped TWS bindings, and GitHub Issue/Azure Boards contracts as one integrated patch on the verified Phase 0 base. Preserve granular child features as audit history but supersede them, and fold the five Copilot child records already provided by the verified Copilot root. Do not add UI, RPC, relay, push, TWS mutation, hosting provider implementations, or target-platform claims.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-09-03T10:11:24Z",
+  "updated_at": "2026-10-29T16:51:36Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-10-29T16:52:04Z",
+  "apply": {
+    "completed_at": "2026-10-29T16:51:25Z",
+    "base_commit": "8605454d5cba4ab065f43fa694e62868fe093e31",
+    "has_patch": true
+  },
+  "reconcile": {
+    "attempted_at": "2026-10-29T07:34:56Z",
+    "upstream_ref": "v0.1.3",
+    "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
+    "outcome": "blocked",
+    "labels": [
+      "blocked-by-parent"
+    ]
+  },
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    },
+    {
+      "slug": "durable-thread-attention-ledger",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "tws-readonly-cli-adapter",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "hosting-work-item-contracts",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "tws-identity-bindings",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-plan-compaction",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-skill-discovery",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-text-generation",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-tool-detail",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-turn-timing",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "session-search",
+      "kind": "soft"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-10-29T16:51:31Z",
+    "passed": false,
+    "recipe_hash_at_verify": "4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e",
+    "patch_hash_at_verify": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+    "parent_snapshot": {
+      "copilot-cli-provider": "applied"
+    }
+  }
+}

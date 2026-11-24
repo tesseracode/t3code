@@ -1,0 +1,32 @@
+{
+  "id": "copilot-auto-default-routing",
+  "slug": "copilot-auto-default-routing",
+  "title": "Restore advertised ordinary Copilot Auto selection without requiring explicit routing-tier metadata; preserve strict validation for explicit Auto/Fusion preferences. Follow-up correction to Fusion discovery, not the SDK bump.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-03T09:00:28Z",
+  "updated_at": "2026-11-03T09:04:48Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-03T09:03:37Z",
+    "base_commit": "2b383e8463042f4f2332707568dbeab9a39bfe38",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-fusion-model-selection",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-03T09:04:44Z",
+    "passed": false,
+    "recipe_hash_at_verify": "8096decffab3b3364ecf110f701f262b44ce99a1f62d212551e3eb07754ac1ad",
+    "patch_hash_at_verify": "08fb073397bbcf694f48141c4345d6376caff996ab489ae88b58483f711c8e2a",
+    "parent_snapshot": {
+      "copilot-fusion-model-selection": "applied"
+    }
+  }
+}

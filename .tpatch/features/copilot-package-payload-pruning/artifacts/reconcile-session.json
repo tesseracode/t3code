@@ -1,0 +1,143 @@
+{
+  "slug": "copilot-package-payload-pruning",
+  "title": "Prune Copilot CLI native payloads that are unreachable from T3's SDK server mode when packaging Windows plus WSL. Preserve target Windows and glibc Linux CLI executables, core runtime natives, search tools, specialized clipboard bindings, Koffi, and computer-use; remove duplicate or interactive-only natives so the Windows payload remains within the upstream 80-file budget.",
+  "outcome": "blocked",
+  "phase": "phase-4-forward-apply-conflicts",
+  "upstream_ref": "v0.0.42",
+  "upstream_commit": "719a76ca1dbf5490f1aa33ffb9966301e02be9a9",
+  "notes": [
+    "Operation-level: 0 present, 0 applicable, 3 conflicts",
+    "3-way merge would leave conflict markers in 3 file(s) — manual resolution required (re-run with --resolve to attempt provider-assisted resolution)",
+    "git: Applied patch to 'docs/operations/release.md' with conflicts.\nApplied patch to 'scripts/build-desktop-artifact.test.ts' with conflicts.\nApplied patch to 'scripts/build-desktop-artifact.ts' with conflicts.\nU docs/operations/release.md\nU scripts/build-desktop-artifact.test.ts\nU scripts/build-desktop-artifact.ts"
+  ],
+  "conflicts": [
+    "docs/operations/release.md",
+    "scripts/build-desktop-artifact.test.ts",
+    "scripts/build-desktop-artifact.ts"
+  ],
+  "labels": [
+    "blocked-by-parent"
+  ],
+  "evidence": [
+    {
+      "schema_version": 1,
+      "feature_slug": "copilot-package-payload-pruning",
+      "attempt_id": "re_d66c399035f7",
+      "upstream_ref": "v0.0.42",
+      "upstream_commit": "719a76ca1dbf5490f1aa33ffb9966301e02be9a9",
+      "base_commit": "ee3377d45c2895073315d4135ef104e53d8cb1ca",
+      "raw_reconcile_verdict": "blocked",
+      "phase": "phase-4",
+      "evidence_kind": "forward-apply",
+      "confidence": "low",
+      "matched_paths": [
+        "docs/operations/release.md",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts"
+      ],
+      "matched_operations": [],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "not-checked",
+      "requires_confirmation": true,
+      "reason_code": "phase-4-forward-apply-conflicts"
+    },
+    {
+      "schema_version": 1,
+      "feature_slug": "copilot-package-payload-pruning",
+      "attempt_id": "re_286772b4a37e",
+      "upstream_ref": "v0.0.42",
+      "upstream_commit": "719a76ca1dbf5490f1aa33ffb9966301e02be9a9",
+      "base_commit": "ee3377d45c2895073315d4135ef104e53d8cb1ca",
+      "raw_reconcile_verdict": "blocked",
+      "phase": "phase-3.5",
+      "evidence_kind": "file-novelty",
+      "confidence": "medium",
+      "matched_paths": [
+        "docs/operations/release.md",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts"
+      ],
+      "matched_operations": [],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "present",
+      "requires_confirmation": true,
+      "reason_code": "modifies-existing-files"
+    },
+    {
+      "schema_version": 1,
+      "feature_slug": "copilot-package-payload-pruning",
+      "attempt_id": "re_06e595a9e26c",
+      "upstream_ref": "v0.0.42",
+      "upstream_commit": "719a76ca1dbf5490f1aa33ffb9966301e02be9a9",
+      "base_commit": "ee3377d45c2895073315d4135ef104e53d8cb1ca",
+      "raw_reconcile_verdict": "blocked",
+      "phase": "phase-3.5",
+      "evidence_kind": "hunk-overlap",
+      "confidence": "high",
+      "matched_paths": [
+        "docs/operations/release.md",
+        "docs/operations/release.md",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/build-desktop-artifact.ts"
+      ],
+      "matched_operations": [
+        "nearby-window=3",
+        "docs/operations/release.md:old:229,10-new:229,25:edit-overlap:nearby=1",
+        "docs/operations/release.md:old:242,7-new:257,8:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.test.ts:old:1487,6-new:1710,8:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.test.ts:old:18,6-new:18,7:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.test.ts:old:245,6-new:247,227:none:nearby=0",
+        "scripts/build-desktop-artifact.test.ts:old:35,6-new:36,7:edit-overlap:nearby=2",
+        "scripts/build-desktop-artifact.ts:old:2287,6-new:2313,223:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.ts:old:2334,7-new:2577,7:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.ts:old:2511,6-new:2754,13:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.ts:old:530,6-new:530,30:edit-overlap:nearby=2",
+        "scripts/build-desktop-artifact.ts:old:87,7-new:87,7:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.ts:old:880,6-new:904,8:edit-overlap:nearby=1"
+      ],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "present",
+      "requires_confirmation": false,
+      "reason_code": "edit-overlap"
+    },
+    {
+      "schema_version": 1,
+      "feature_slug": "copilot-package-payload-pruning",
+      "attempt_id": "re_24bed85c8668",
+      "upstream_ref": "v0.0.42",
+      "upstream_commit": "719a76ca1dbf5490f1aa33ffb9966301e02be9a9",
+      "base_commit": "ee3377d45c2895073315d4135ef104e53d8cb1ca",
+      "raw_reconcile_verdict": "blocked",
+      "phase": "phase-4",
+      "evidence_kind": "blocked-classification",
+      "confidence": "medium",
+      "matched_paths": [],
+      "matched_operations": [
+        "primary=dependency-blocked",
+        "recommended_action=reconcile-or-repair-parent-first",
+        "secondary=edit-overlap: hunk-overlap edit-overlap nearby-window=3 docs/operations/release.md:old:229,10-new:229,25:edit-overlap:nearby=1 docs/operations/release.md:old:242,7-new:257,8:edit-overlap:nearby=1 scripts/build-desktop-artifact.test.ts:old:1487,6-new:1710,8:edit-overlap:nearby=1 scripts/build-desktop-artifact.test.ts:old:18,6-new:18,7:edit-overlap:nearby=1 scripts/build-desktop-artifact.test.ts:old:245,6-new:247,227:none:nearby=0 scripts/build-desktop-artifact.test.ts:old:35,6-new:36,7:edit-overlap:nearby=2 scripts/build-desktop-artifact.ts:old:2287,6-new:2313,223:edit-overlap:nearby=1 scripts/build-desktop-artifact.ts:old:2334,7-new:2577,7:edit-overlap:nearby=1 scripts/build-desktop-artifact.ts:old:2511,6-new:2754,13:edit-overlap:nearby=1 scripts/build-desktop-artifact.ts:old:530,6-new:530,30:edit-overlap:nearby=2 scripts/build-desktop-artifact.ts:old:87,7-new:87,7:edit-overlap:nearby=1 scripts/build-desktop-artifact.ts:old:880,6-new:904,8:edit-overlap:nearby=1"
+      ],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "not-checked",
+      "requires_confirmation": false,
+      "reason_code": "dependency-blocked"
+    }
+  ],
+  "blocked_category": "dependency-blocked",
+  "recommended_action": "reconcile-or-repair-parent-first",
+  "blocked_evidence": [
+    "dependency-label=blocked-by-parent"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "feature": "copilot-background-routing",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/textGeneration.ts",
+      "search": "          const effort = reasoningEffort(request.modelSelection);",
+      "replace": "          const effort = reasoningEffort(request.modelSelection);\n          const autoCatalog =\n            request.modelSelection.model === \"auto\" &&\n            typeof getProviderOptionStatedValue(\"autoTier\", request.modelSelection) === \"string\"\n              ? yield* call(\"routing discovery\", async () => (await client.rpc.models.list({})).auto, 30_000)\n              : undefined;\n          const autoTier = yield* Effect.try({\n            try: () => autoTierForSelection(request.modelSelection, autoCatalog),\n            catch: error,\n          });"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/textGeneration.test.ts",
+      "search": "    \"uses a tool-free native session, validates JSON and deletes only its owned ephemeral session\",",
+      "replace": "    \"honors routing in tool-free sessions and deletes only its owned ephemeral session\","
+    },
+    {
+      "type": "replace-in-file",
+      "path": "docs/user/providers-copilot.md",
+      "search": "A change may remain pending until the next turn.",
+      "replace": "A change may remain pending until the next turn.\n\nBackground generation, including titles and source-control text, honors the\nselected account-advertised routing preference. Unavailable preferences fail\nexplicitly rather than silently using a different tier."
+    }
+  ]
+}

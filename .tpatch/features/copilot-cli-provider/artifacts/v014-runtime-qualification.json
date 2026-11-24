@@ -1,0 +1,50 @@
+{
+  "sourceCommit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+  "threadId": "ba62d3f9-a102-4fe1-9d2a-2d21cb64178a",
+  "runId": "run:thread:ba62d3f9-a102-4fe1-9d2a-2d21cb64178a:ordinal:6",
+  "ordinal": 6,
+  "modelSelection": {
+    "instanceId": "githubCopilot",
+    "model": "gpt-6-astra"
+  },
+  "status": "completed",
+  "nativeThreadRef": {
+    "driver": "githubCopilot",
+    "nativeId": "1d073f35-cac7-4a29-a9ea-090e4594599a",
+    "strength": "strong"
+  },
+  "nativeSessionPreservedFromV013": true,
+  "permissionEffects": [
+    {
+      "effectId": "effect:56312c5b-baa8-4a05-a1d0-f064e2c96103:runtime-request.respond:provider-thread:provider:githubCopilot:native-thread:pending%3Arun%3Athread%3Aba62d3f9-a102-4fe1-9d2a-2d21cb64178a%3Aordinal%3A1:run-attempt:run:run%3Athread%3Aba62d3f9-a102-4fe1-9d2a-2d21cb64178a%3Aordinal%3A6:attempt:1:6:request:2",
+      "status": "succeeded",
+      "attemptCount": 1,
+      "lastError": null
+    },
+    {
+      "effectId": "effect:1f191895-6a3e-454b-8772-05e41ba2dcf9:runtime-request.respond:provider-thread:provider:githubCopilot:native-thread:pending%3Arun%3Athread%3Aba62d3f9-a102-4fe1-9d2a-2d21cb64178a%3Aordinal%3A1:run-attempt:run:run%3Athread%3Aba62d3f9-a102-4fe1-9d2a-2d21cb64178a%3Aordinal%3A6:attempt:1:6:request:6",
+      "status": "succeeded",
+      "attemptCount": 1,
+      "lastError": null
+    }
+  ],
+  "requestOutcomes": [
+    {
+      "status": "resolved",
+      "responseDelivery": "confirmed"
+    },
+    {
+      "status": "resolved",
+      "responseDelivery": "confirmed"
+    }
+  ],
+  "assistantMessages": [
+    "Phase one complete; starting phase two.\n",
+    "V014-native-continuity-complete"
+  ],
+  "approvalClients": [
+    "Android emulator",
+    "iOS Simulator"
+  ],
+  "desktopClientOnly": true
+}

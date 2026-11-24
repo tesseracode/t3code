@@ -1,0 +1,109 @@
+{
+  "feature": "copilot-fusion-client-presentation",
+  "baseline": "c715f234138b5f7af0e825cd67f2f0deb7a790b0",
+  "hardParent": "copilot-routing-late-telemetry",
+  "patchSha256": "1200ced90fd0e8fedeb4b3c8a5dd94de8b47e2e9d48170e2687c3bece46b4b8f",
+  "recipeSha256": "b5f235f583c9248e985a44dfa83228d8a480bbaf8f88295f9693b5f69704f2e2",
+  "canonicalReplay": "passed",
+  "allPreconditions": "passed",
+  "patchRecipeSourceAgreement": "passed",
+  "nativeAncestorVerification": "blocked",
+  "limitation": "Isolated-index exact-current-baseline proof, not native ancestor or future-upstream verification.",
+  "files": [
+    {
+      "path": "apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts",
+      "preimageHash": "sha256:c25a1a8030f791be07cc25af74c3e4cc0da4b128c19cac8ea3be1f88fd60220d",
+      "postimageSha256": "972300c6837b902d2f80daadffa816252d908eaf1c3bfcc3ee8f3ff4f1598a0e"
+    },
+    {
+      "path": "apps/server/src/orchestration-v2/TurnItemPositionStore.ts",
+      "preimageHash": "sha256:f3a2befa48fc85c7f660e417714647e0cad5f077050d50334b9799696e8391d1",
+      "postimageSha256": "bfe75dd77ee257396fdb7355411f6ec3687e5a9dfd1fe228f33236ac00fae844"
+    },
+    {
+      "path": "docs/user/activity-log.md",
+      "preimageHash": "sha256:ea74dfaa07afb03444c3330c5975412277be505a06c896b0e70fa92c0f7d08b4",
+      "postimageSha256": "05f761952671c2109c5001e9a2c9f3a57f36c1a835b699f32289b5dec02b4ae4"
+    },
+    {
+      "path": "docs/user/providers-copilot.md",
+      "preimageHash": "sha256:3e1bceaceaa0f03623cd7e2990660157cfb1087cae663fc20417102c22c47dce",
+      "postimageSha256": "ab9accb29e17ab5dc3695341f45ffb036e371796db6d8c42d34f862b452eccb5"
+    },
+    {
+      "path": "packages/client-runtime/src/modelTraits.test.ts",
+      "preimageHash": "",
+      "postimageSha256": "21ec773c55c17d921e6c83e8e10ef9b4e42e84b36816f02140ab93a46ea0fcc3"
+    },
+    {
+      "path": "packages/client-runtime/src/work-log/modelExecution.test.ts",
+      "preimageHash": "sha256:00a3c5c484c27a4ec9669956279dc1a53284543ef66498a8b9a8cbc989c02fbc",
+      "postimageSha256": "a1fcdff78fd0f09d4adea1288e563c34f8cf5013d9b3f6f33c89912a2765ef30"
+    },
+    {
+      "path": "packages/client-runtime/src/work-log/modelExecution.ts",
+      "preimageHash": "sha256:01d3656e3dfcdc0f796573c8ec808bc4d8478491364194cebca970611615f7f3",
+      "postimageSha256": "e82d27c8f50be62cf32ea4f8cc46d8d997d815464c99c61201c866280052c10a"
+    },
+    {
+      "path": "packages/contracts/src/model.ts",
+      "preimageHash": "sha256:e7ba8b321f6728d6708723b862bd8cf77090ccd08c1c3c6bd4febdbd62c4b2b9",
+      "postimageSha256": "ca26ac93c65f6c10c1bc06a3f696325bd04c6b53a7d09b1cac44cbaa59312185"
+    },
+    {
+      "path": "packages/contracts/src/orchestrationV2.ts",
+      "preimageHash": "sha256:242515a2321ca00d4f6551d5f9c7d323a47994770d0a604b46b80326beb6ead5",
+      "postimageSha256": "badca1ce004180156db0f3558b45be465e7ce99ba45c24ceee31689afdafe7b1"
+    },
+    {
+      "path": "packages/provider-copilot/src/server/adapter.test.ts",
+      "preimageHash": "sha256:2b890a410565cad5afff802952c2db13078fd074a07b65252ae2b012c68ccf60",
+      "postimageSha256": "350ccdfdfd77f0a12195f05e8c797ee71d7b0ad912b89ce85ab6663531d63f99"
+    },
+    {
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "preimageHash": "sha256:0c560108950f599f4d67e6bce3d88391f526afcc4e7275e40d1ba6da2fd13553",
+      "postimageSha256": "a025ec45689f01cc0a7c9440b25a5892721e03ba8c69ed211ea1b51c880c165a"
+    },
+    {
+      "path": "packages/provider-copilot/src/server/client.ts",
+      "preimageHash": "sha256:f899b5d24e76ce7faae0b0c14146310e5b7a26c99d067ec24c2d7756f52b1d89",
+      "postimageSha256": "f39eb9b551deae36e2a9c5af6fd5608d26187c7fcaf198503f2ed82da7f938e3"
+    },
+    {
+      "path": "packages/provider-copilot/src/server/routing.test.ts",
+      "preimageHash": "sha256:17ca964603d8ca43f9b521e213f9571ea9c855428da7e599593590146d1f44e1",
+      "postimageSha256": "8d6e96f50881fda571b363e66e2c2cb6da6f7a12c4d2252d98ceca0cd14e6770"
+    },
+    {
+      "path": "packages/provider-copilot/src/server/routing.ts",
+      "preimageHash": "sha256:6bc69cd0aef123e15d78b69b87a2c5f49b16a6ed16e33f76274e20ed1d80fe68",
+      "postimageSha256": "fbae754bb1c06c82aaa1e294f0b9ea11de6eb84286bee8e9d87be183fd23cdbd"
+    },
+    {
+      "path": "packages/provider-copilot/src/server/status.test.ts",
+      "preimageHash": "sha256:2a4be59a4f9a670824597e7daf38ccd2efc2e1e5c806347ca1cbae3ef1ac2fc8",
+      "postimageSha256": "608b0c29adde0c8f33fe65426c35aa496dd43180419d55477f171f681d0aca93"
+    },
+    {
+      "path": "packages/provider-copilot/src/server/status.ts",
+      "preimageHash": "sha256:f77f995abc5575cc925dc150769445aff34cf42768cf442550e077fd419b8d7b",
+      "postimageSha256": "ad55fc909592ca1cc0e125ace9cd3df02929011457b5f6f95419fbaa63b4d757"
+    },
+    {
+      "path": "packages/provider-copilot/src/settings.ts",
+      "preimageHash": "sha256:a21ec010005bc3300d368f0ab8249dadf66d6e76c68b9c0cd683db5081879dbf",
+      "postimageSha256": "f56ec2de59a8f314d8b509de41c1699a7ce00ad282facf5ca2349f5a5e6c0ac6"
+    },
+    {
+      "path": "packages/shared/src/model.test.ts",
+      "preimageHash": "sha256:2892b5daaeb67022e5d491b6ac92bde9f90d8a6d3fe8d40486ad0371a7e7557f",
+      "postimageSha256": "ce0648307514c4d83e21624d3d84350f538a2bc9799c39fe1e30a4efa980ba86"
+    },
+    {
+      "path": "packages/shared/src/model.ts",
+      "preimageHash": "sha256:97d9a7da390f526c94a14e8c3245be834f221a0c0ddfc0ac97c5c05421adc385",
+      "postimageSha256": "916e52afc8eb9903f28f5747b944d04e2d61a882081b7aef3bbdaabc9a405352"
+    }
+  ]
+}

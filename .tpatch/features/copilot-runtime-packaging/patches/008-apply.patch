@@ -1,0 +1,48 @@
+diff --git a/scripts/lib/cli-external-packages.test.ts b/scripts/lib/cli-external-packages.test.ts
+index b55e3a9c1..fecfd3b17 100644
+--- a/scripts/lib/cli-external-packages.test.ts
++++ b/scripts/lib/cli-external-packages.test.ts
+@@ -35,6 +35,13 @@ describe("shouldBundleCliDependency", () => {
+       "@napi-rs/keyring",
+       "@clerk/electron-passkeys",
+       "node-addon-api",
++      "@github/copilot-sdk",
++      "@github/copilot",
++      "@github/copilot-win32-x64",
++      "koffi",
++      "@koromix/koffi-linux-x64",
++      "vscode-jsonrpc/node",
++      "detect-libc",
+     ]) {
+       assert.strictEqual(shouldBundleCliDependency(id), false, id);
+     }
+diff --git a/scripts/lib/cli-external-packages.ts b/scripts/lib/cli-external-packages.ts
+index baddb437b..a8b4c71f9 100644
+--- a/scripts/lib/cli-external-packages.ts
++++ b/scripts/lib/cli-external-packages.ts
+@@ -1,6 +1,10 @@
+ /** Keep bundler externals and staged runtime dependency roots aligned. */
+ // Filesystem-loaded externals need dependencies outside the bundle.
+ export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
++  // The native SDK resolves its CLI and Koffi bindings relative to installed package files.
++  "@github/copilot",
++  "koffi",
++  "@koromix/koffi-",
+   // Cursor ships computed Webpack imports and platform helper packages.
+   "@cursor/sdk",
+   // Playwright reads package.json and browsers.json beside its runtime modules.
+@@ -30,10 +34,13 @@ const CURSOR_RUNTIME_DEPENDENCIES = [
+   "@fastify/busboy",
+ ] as const;
+ 
++const COPILOT_RUNTIME_DEPENDENCIES = ["vscode-jsonrpc", "detect-libc"] as const;
++
+ export function isRuntimeExternalCliDependency(id: string): boolean {
+   return (
+     CLI_RUNTIME_EXTERNAL_PREFIXES.some((prefix) => id.startsWith(prefix)) ||
+-    CURSOR_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`))
++    CURSOR_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`)) ||
++    COPILOT_RUNTIME_DEPENDENCIES.some((name) => id === name || id.startsWith(`${name}/`))
+   );
+ }
+ 

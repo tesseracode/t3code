@@ -1,0 +1,16 @@
+verify copilot-native-ingress-supervision — failed
+  baseline: historical-anchor @ 0490e7b (replay anchor 0c550b8) · current @ cf9ef89 (isolated index)
+  landing evidence: exact @ 0c550b8 (patch ✓ recipe ✓ base ✓)
+  ✓ [block-abort] status_loaded
+  ✓ [block] intent_files_present
+  ✓ [block] recipe_parses
+  ✓ [block] recipe_op_targets_resolve
+  ✓ [block] dep_metadata_valid
+  ⊘ [block] satisfied_by_reachable — no satisfied_by deps to check
+  ✓ [warn] dependency_gate_satisfied
+  ✗ [block] recipe_replay_clean — hard parent copilot-cli-provider landed at 132c85398c55a623f9cf72dfecff884da6554abc but its canonical patch is not present at the verification baseline; verify copilot-cli-provider first — do not re-apply it into the shadow
+  ⊘ [block] post_apply_patch_replay_clean — skipped: parent-replay aborted before V8
+  ⊘ [warn] reconcile_outcome_consistent — no Reconcile.Outcome set
+  ⊘ [block] write_file_preimage_fresh — skipped: parent-replay aborted before V10
+  ✗ [warn] recipe_generation_coverage — recipe-coverage-missing: .tpatch/features/copilot-native-ingress-supervision/artifacts/recipe-coverage.json: coverage is absent; absence is not replay authority
+error: verify failed (1 check(s) did not pass)

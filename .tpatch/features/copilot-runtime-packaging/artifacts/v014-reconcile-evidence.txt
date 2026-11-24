@@ -1,0 +1,13 @@
+Command: tpatch reconcile copilot-runtime-packaging --upstream-ref v0.1.4 --format json
+Clean starting HEAD: dde51c8e18801099e417c80dd369e3a9216af8f3
+Pinned upstream: 783581d461dc72cdd8f78fc8abb4ad536dfc4547
+Exit: 1
+STDOUT:
+
+STDERR:
+parent-generation-stale: reconcile refused for feature "copilot-runtime-packaging" because 1 hard parent generation snapshot(s) are stale:
+  - copilot-cli-provider (snapshot parent_generation=21, current generation_id=pg_46e3399bbab9)
+Run `tpatch feature patch refresh <parent>` for the stale parent or `tpatch reconcile copilot-runtime-packaging` to refresh the child dependency snapshot.
+error: parent-generation-stale: reconcile refused for feature "copilot-runtime-packaging" because 1 hard parent generation snapshot(s) are stale:
+  - copilot-cli-provider (snapshot parent_generation=21, current generation_id=pg_46e3399bbab9)
+Run `tpatch feature patch refresh <parent>` for the stale parent or `tpatch reconcile copilot-runtime-packaging` to refresh the child dependency snapshot.

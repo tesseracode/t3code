@@ -1,0 +1,72 @@
+diff --git a/.github/scripts/ci-changes.cjs b/.github/scripts/ci-changes.cjs
+index cb6ae9566..77a526076 100644
+--- a/.github/scripts/ci-changes.cjs
++++ b/.github/scripts/ci-changes.cjs
+@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, "../..");
+ 
+ const INERT = [
+   /^docs\//,
+-  /^\.(agents|cursor|vscode|devcontainer|macroscope|repos|tpatch)\//,
++  /^\.(agents|cursor|vscode|devcontainer|macroscope|repos)\//,
+   /^[^/]+\.md$/,
+   /^LICENSE$/,
+ ];
+diff --git a/scripts/lib/ci-changes.test.ts b/scripts/lib/ci-changes.test.ts
+deleted file mode 100644
+index 314d949d6..000000000
+--- a/scripts/lib/ci-changes.test.ts
++++ /dev/null
+@@ -1,32 +0,0 @@
+-import { describe, expect, it } from "vitest";
+-import { decide } from "../../.github/scripts/ci-changes.cjs";
+-
+-const packages = [
+-  { name: "@t3tools/web", dir: "apps/web", hasTest: true, deps: [] },
+-  { name: "t3", dir: "apps/server", hasTest: true, deps: [] },
+-];
+-
+-const metadata = [
+-  ".tpatch/features/example/artifacts/post-apply.patch",
+-  ".tpatch/features/example/status.json",
+-  ".tpatch/tools/generate-recipe.cjs",
+-];
+-
+-describe("administrative patch evidence", () => {
+-  it("does not select application packages for metadata-only changes", () => {
+-    expect(decide(metadata, packages, false).affected).toEqual([]);
+-  });
+-
+-  it("preserves product and dependent selection in a mixed change", () => {
+-    const source = ["apps/web/src/example.ts"];
+-    expect(decide([...metadata, ...source], packages, false)).toEqual(
+-      decide(source, packages, false),
+-    );
+-  });
+-
+-  it("keeps lookalike paths conservative", () => {
+-    expect(decide([".tpatch-other/policy.json"], packages, false).affected).toEqual(
+-      packages.map((entry) => entry.name).sort(),
+-    );
+-  });
+-});
+diff --git a/vite.config.ts b/vite.config.ts
+index e3110a792..909becac3 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -154,8 +154,6 @@ export default defineConfig({
+   fmt: {
+     ignorePatterns: [
+       ".repos/**",
+-      // Preserve hash-bound patch recipes and historical evidence.
+-      ".tpatch/**",
+       "infra/task-cache/vendor/**",
+       // Macroscope requires one glob per line; Markdown formatting corrupts it.
+       ".macroscope/ignore.md",
+@@ -189,7 +187,6 @@ export default defineConfig({
+   },
+   lint: {
+     ignorePatterns: [
+-      ".tpatch/**",
+       ".repos",
+       ".repos/**",
+       "infra/task-cache/vendor/**",

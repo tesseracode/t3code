@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "feature": "copilot-routing-late-telemetry",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_ac845dad30b8",
+      "kind": "record",
+      "patch_sha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+      "git_patch_id": "5ce26e9d45590ea474e632dd9059ceb21d60e68c",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "07508376dc320bdbcddd98b5ff33d72d3b142469",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/user/activity-log.md",
+          "packages/client-runtime/src/work-log/modelExecution.test.ts",
+          "packages/client-runtime/src/work-log/modelExecution.ts",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/fusion.test.ts",
+          "packages/provider-copilot/src/server/fusion.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/user/activity-log.md",
+        "packages/client-runtime/src/work-log/modelExecution.test.ts",
+        "packages/client-runtime/src/work-log/modelExecution.ts",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/fusion.test.ts",
+        "packages/provider-copilot/src/server/fusion.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-auto-default-routing",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "08fb073397bbcf694f48141c4345d6376caff996ab489ae88b58483f711c8e2a",
+          "parent_recipe_sha256": "6b8bc5012877e12e7a92b86536182a46a4c6f5df807dc7a0693c65b55ad8d944"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

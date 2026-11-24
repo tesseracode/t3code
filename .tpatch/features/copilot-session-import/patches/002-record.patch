@@ -1,0 +1,1999 @@
+diff --git a/apps/mobile/src/features/threads/ThreadDetailScreen.tsx b/apps/mobile/src/features/threads/ThreadDetailScreen.tsx
+index a23f06abef..377296ce80 100644
+--- a/apps/mobile/src/features/threads/ThreadDetailScreen.tsx
++++ b/apps/mobile/src/features/threads/ThreadDetailScreen.tsx
+@@ -1,4 +1,6 @@
+ import { useOpenThreadInspector } from "./thread-inspector-navigation";
++import { AGENT_SESSION_SNAPSHOT_NOTICE } from "@t3tools/contracts";
++import { AppText as Text } from "../../components/ui/AppText";
+ import { useSidebarWorkspaceTabs } from "../workspace/useSystemWorkspaceTabBar";
+ import { useWorkspaceTabs } from "../workspace/WorkspaceTabsContext";
+ import {
+@@ -1571,76 +1573,87 @@ function ThreadDetailBody(props: ThreadDetailScreenProps) {
+                     </View>
+                   ) : (
+                     <>
+-                      <ThreadComposer
+-                        isDraft={Boolean(props.draftMode)}
+-                        canOperateThread={props.canOperateThread}
+-                        reportedModelSelection={reportedModelSelection}
+-                        editorRef={composerEditorRef}
+-                        placeholder={
+-                          props.activePendingApproval
+-                            ? props.activePendingApproval.supportsFeedback
+-                              ? "Send feedback to decline this request"
+-                              : "Send a message to decline and redirect the agent"
+-                            : "Ask anything"
+-                        }
+-                        contentMaxWidth={contentMaxWidth}
+-                        draftControls={props.draftMode?.controls}
+-                        connectionState={props.connectionStateLabel}
+-                        environmentLabel={props.environmentLabel}
+-                        selectedThread={props.selectedThread}
+-                        hasCompactableConversation={
+-                          hasCompactableConversation && !props.isCompacting
+-                        }
+-                        serverConfig={props.serverConfig}
+-                        queueCount={props.selectedThreadQueueCount}
+-                        activeThreadBusy={props.activeThreadBusy}
+-                        canStopThread={props.canStopThread}
+-                        environmentId={props.environmentId}
+-                        projectCwd={props.threadCwd ?? props.projectWorkspaceRoot}
+-                        // Keep follow-ups in the draft until server creation succeeds, or rejection strands them in the outbox.
+-                        sendBlockedReason={
+-                          props.draftMode
+-                            ? props.draftMode.sendBlockedReason
+-                            : props.creationState?.kind === "preparing" &&
+-                                !props.creationState.serverOwned
+-                              ? "Starting the task…"
+-                              : null
+-                        }
+-                        interactionLocked={props.draftMode?.interactionLocked}
+-                        draftKey={props.composerDraftKey ?? undefined}
+-                        followUpBehavior={
+-                          props.activePendingApprovals.length > 0 &&
+-                          props.activePendingUserInput === null
+-                            ? "steer"
+-                            : props.followUpBehavior
+-                        }
+-                        canSteerActiveTurn={props.canSteerActiveTurn}
+-                        hidden={composerSlotHidden}
+-                        queuedEdit={
+-                          props.queuedRunEdit === null
+-                            ? null
+-                            : {
+-                                existingAttachments: props.queuedRunEdit.existingAttachments,
+-                                saving: props.isSavingQueuedEdit,
+-                                onRemoveExistingAttachment: props.onRemoveQueuedEditAttachment,
+-                              }
+-                        }
+-                        bottomInset={composerBottomInset}
+-                        onChangeDraftMessage={props.onChangeDraftMessage}
+-                        onPickDraftMedia={props.onPickDraftMedia}
+-                        onPickDraftFiles={props.onPickDraftFiles}
+-                        onNativePasteImages={props.onNativePasteImages}
+-                        onNativePasteText={props.onNativePasteText}
+-                        onRemoveDraftImage={props.onRemoveDraftImage}
+-                        onStopThread={props.onStopThread}
+-                        onResumeQueue={props.onResumeQueue}
+-                        onSendMessage={handleSendMessage}
+-                        onShowUsageLimits={showUsageLimits}
+-                        canSwitchProvider={props.canSwitchThreadProvider}
+-                        onUpdateInteractionMode={props.onUpdateThreadInteractionMode}
+-                        onHeightChange={handleComposerHeightChange}
+-                        onEditorFocusChange={handleOwnedInputFocusChange}
+-                      />
++                      {props.selectedThread.sessionSnapshot !== undefined ? (
++                        <View className="px-4 py-3">
++                          <Text className="text-sm text-muted-foreground">
++                            {AGENT_SESSION_SNAPSHOT_NOTICE}
++                          </Text>
++                          <Text className="mt-1 text-xs text-muted-foreground">
++                            Native session: {props.selectedThread.sessionSnapshot.nativeSessionId}
++                          </Text>
++                        </View>
++                      ) : (
++                        <ThreadComposer
++                          isDraft={Boolean(props.draftMode)}
++                          canOperateThread={props.canOperateThread}
++                          reportedModelSelection={reportedModelSelection}
++                          editorRef={composerEditorRef}
++                          placeholder={
++                            props.activePendingApproval
++                              ? props.activePendingApproval.supportsFeedback
++                                ? "Send feedback to decline this request"
++                                : "Send a message to decline and redirect the agent"
++                              : "Ask anything"
++                          }
++                          contentMaxWidth={contentMaxWidth}
++                          draftControls={props.draftMode?.controls}
++                          connectionState={props.connectionStateLabel}
++                          environmentLabel={props.environmentLabel}
++                          selectedThread={props.selectedThread}
++                          hasCompactableConversation={
++                            hasCompactableConversation && !props.isCompacting
++                          }
++                          serverConfig={props.serverConfig}
++                          queueCount={props.selectedThreadQueueCount}
++                          activeThreadBusy={props.activeThreadBusy}
++                          canStopThread={props.canStopThread}
++                          environmentId={props.environmentId}
++                          projectCwd={props.threadCwd ?? props.projectWorkspaceRoot}
++                          // Keep follow-ups in the draft until server creation succeeds, or rejection strands them in the outbox.
++                          sendBlockedReason={
++                            props.draftMode
++                              ? props.draftMode.sendBlockedReason
++                              : props.creationState?.kind === "preparing" &&
++                                  !props.creationState.serverOwned
++                                ? "Starting the task…"
++                                : null
++                          }
++                          interactionLocked={props.draftMode?.interactionLocked}
++                          draftKey={props.composerDraftKey ?? undefined}
++                          followUpBehavior={
++                            props.activePendingApprovals.length > 0 &&
++                            props.activePendingUserInput === null
++                              ? "steer"
++                              : props.followUpBehavior
++                          }
++                          canSteerActiveTurn={props.canSteerActiveTurn}
++                          hidden={composerSlotHidden}
++                          queuedEdit={
++                            props.queuedRunEdit === null
++                              ? null
++                              : {
++                                  existingAttachments: props.queuedRunEdit.existingAttachments,
++                                  saving: props.isSavingQueuedEdit,
++                                  onRemoveExistingAttachment: props.onRemoveQueuedEditAttachment,
++                                }
++                          }
++                          bottomInset={composerBottomInset}
++                          onChangeDraftMessage={props.onChangeDraftMessage}
++                          onPickDraftMedia={props.onPickDraftMedia}
++                          onPickDraftFiles={props.onPickDraftFiles}
++                          onNativePasteImages={props.onNativePasteImages}
++                          onNativePasteText={props.onNativePasteText}
++                          onRemoveDraftImage={props.onRemoveDraftImage}
++                          onStopThread={props.onStopThread}
++                          onResumeQueue={props.onResumeQueue}
++                          onSendMessage={handleSendMessage}
++                          onShowUsageLimits={showUsageLimits}
++                          canSwitchProvider={props.canSwitchThreadProvider}
++                          onUpdateInteractionMode={props.onUpdateThreadInteractionMode}
++                          onHeightChange={handleComposerHeightChange}
++                          onEditorFocusChange={handleOwnedInputFocusChange}
++                        />
++                      )}
+                     </>
+                   )}
+                 </View>
+diff --git a/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts b/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts
+index 0ea64764e5..e12292d56c 100644
+--- a/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts
++++ b/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts
+@@ -1,4 +1,5 @@
+ import {
++  AGENT_SESSION_SNAPSHOT_NOTICE,
+   AuthOrchestrationOperateScope,
+   CommandId,
+   EnvironmentId,
+@@ -161,6 +162,8 @@ import { appAtomRegistry } from "./atom-registry";
+ import { environmentSession } from "./session";
+ import { dispatchingQueuedMessageIdAtom, editingQueuedMessageIdsAtom } from "./use-thread-outbox";
+ import { createThreadOutboxDelivery } from "./threadOutboxDelivery";
++import { threadComposerErrorsAtom } from "./thread-composer-error";
++import { scopedThreadKey } from "../lib/scopedEntities";
+ 
+ const message = (overrides: Partial<QueuedThreadMessage> = {}): QueuedThreadMessage => ({
+   environmentId: EnvironmentId.make("secondary"),
+@@ -233,6 +236,38 @@ beforeEach(() => {
+   }));
+ });
+ 
++it("restores a persisted snapshot message before settings, upload, or provider commands", async () => {
++  setOperateGrant("secondary", true);
++  appAtomRegistry.set(state.threadShells, [
++    { ...state.thread, sessionSnapshot: { source: "githubCopilot" } },
++  ]);
++  const queued = message({
++    runtimeMode: "approval-required",
++    interactionMode: "plan",
++    text: "Recovered offline message",
++  });
++  await state.manager.enqueue(queued);
++
++  await runDrain();
++
++  expect(remaining()).toEqual([]);
++  expect(state.draftText).toContain(queued.text);
++  expect(
++    appAtomRegistry.get(threadComposerErrorsAtom)[
++      scopedThreadKey(queued.environmentId, queued.threadId)
++    ],
++  ).toMatchObject({ message: AGENT_SESSION_SNAPSHOT_NOTICE, messageId: queued.messageId });
++  for (const command of [
++    state.runtime,
++    state.interaction,
++    state.metadata,
++    state.prepare,
++    state.start,
++  ]) {
++    expect(command).not.toHaveBeenCalled();
++  }
++});
++
+ describe("queued PR checkout", () => {
+   const queuedPullRequest = () =>
+     message({
+diff --git a/apps/mobile/src/state/threadOutboxDelivery.ts b/apps/mobile/src/state/threadOutboxDelivery.ts
+index 4a20db3b9e..3c5e9c9f1f 100644
+--- a/apps/mobile/src/state/threadOutboxDelivery.ts
++++ b/apps/mobile/src/state/threadOutboxDelivery.ts
+@@ -12,6 +12,7 @@ import {
+ import { threadFamilyRead, type ThreadFamilyRead } from "@t3tools/client-runtime/state/threads";
+ import { deriveThreadTitleSeed } from "@t3tools/client-runtime/operations";
+ import {
++  AGENT_SESSION_SNAPSHOT_NOTICE,
+   AuthOrchestrationOperateScope,
+   CommandId,
+   DEFAULT_PROVIDER_INTERACTION_MODE,
+@@ -769,6 +770,9 @@ export function createThreadOutboxDelivery(): {
+     const hasAccess = () =>
+       readEnvironmentScope(queuedMessage.environmentId, AuthOrchestrationOperateScope);
+     if (!hasAccess()) return true;
++    if (thread.sessionSnapshot !== undefined) {
++      return restoreQueuedMessage(queuedMessage, AGENT_SESSION_SNAPSHOT_NOTICE);
++    }
+     const serverConfig = appAtomRegistry.get(
+       serverEnvironment.configValueAtom(queuedMessage.environmentId),
+     );
+diff --git a/apps/mobile/src/state/use-thread-composer-state.ts b/apps/mobile/src/state/use-thread-composer-state.ts
+index 4c14fb5625..123ee5726c 100644
+--- a/apps/mobile/src/state/use-thread-composer-state.ts
++++ b/apps/mobile/src/state/use-thread-composer-state.ts
+@@ -1,6 +1,6 @@
+ import { useComposerAttachmentActions } from "./use-composer-attachment-actions";
+ import * as Dialog from "../components/ui/Dialog";
+-import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
++import { AGENT_SESSION_SNAPSHOT_NOTICE, AuthOrchestrationOperateScope } from "@t3tools/contracts";
+ import { readEnvironmentScope } from "./session";
+ import { useAtomValue } from "@effect/atom-react";
+ import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
+@@ -492,6 +492,13 @@ export function useThreadComposerState() {
+       hasAttachmentsOrContext: boolean,
+     ) => Promise<boolean | "responded">,
+   ) => {
++    if (selectedThreadShell?.sessionSnapshot !== undefined) {
++      setThreadComposerError(
++        scopedThreadKey(selectedThreadShell.environmentId, selectedThreadShell.id),
++        AGENT_SESSION_SNAPSHOT_NOTICE,
++      );
++      return null;
++    }
+     if (
+       selectedThreadShell &&
+       selectedEnvironmentRuntime?.connectionState === "connected" &&
+diff --git a/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts b/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts
+index c36dfc365a..3967999e64 100644
+--- a/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts
++++ b/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts
+@@ -4,6 +4,7 @@ import {
+   MessageId,
+   EventId,
+   NodeId,
++  type OrchestrationV2ServerCommand,
+   type OrchestrationV2DomainEvent,
+   PlanId,
+   ProjectId,
+@@ -62,6 +63,150 @@ const layerTest = Layer.mergeAll(
+   ),
+ );
+ 
++it.effect(
++  "keeps imported snapshots read-only through persisted dispatch while allowing organization",
++  () =>
++    Effect.gen(function* () {
++      const orchestrator = yield* Orchestrator.OrchestratorV2;
++      const projections = yield* ProjectionStore.ProjectionStoreV2;
++      const sink = yield* EventSink.EventSinkV2;
++      const outbox = yield* EffectOutbox.EffectOutboxV2;
++      const threadId = ThreadId.make("snapshot:read-only");
++      const targetThreadId = ThreadId.make("snapshot:fork-target");
++      const now = yield* DateTime.now;
++      yield* orchestrator.dispatch({
++        type: "thread.create",
++        commandId: CommandId.make("snapshot:create"),
++        threadId,
++        projectId: ProjectId.make("snapshot:project"),
++        title: "Snapshot",
++        modelSelection,
++        runtimeMode: "full-access",
++        interactionMode: "default",
++        branch: null,
++        worktreePath: null,
++        createdBy: "system",
++        creationSource: "server",
++      });
++      const original = yield* projections.getThread(threadId);
++      yield* sink.write({
++        events: [
++          {
++            id: EventId.make("snapshot:provenance"),
++            type: "thread.metadata-updated",
++            threadId,
++            occurredAt: now,
++            payload: {
++              ...original,
++              historyOrigin: "v1_import",
++              sessionSnapshot: {
++                kind: "copilot_text_snapshot",
++                nativeSessionId: "native-id",
++                providerInstanceId: instanceId,
++                storageIdentity: "storage-digest",
++                capturedAt: DateTime.formatIso(now),
++              },
++            },
++          },
++        ],
++      });
++      const commands: ReadonlyArray<OrchestrationV2ServerCommand> = [
++        {
++          type: "message.dispatch",
++          commandId: CommandId.make("snapshot:send"),
++          threadId,
++          messageId: MessageId.make("snapshot:message"),
++          text: "Do work",
++          attachments: [],
++          createdBy: "user",
++          creationSource: "mobile",
++          dispatchMode: { type: "start_immediately" },
++        },
++        {
++          type: "provider.switch",
++          commandId: CommandId.make("snapshot:switch"),
++          threadId,
++          modelSelection,
++        },
++        {
++          type: "thread.model-selection.set",
++          commandId: CommandId.make("snapshot:model"),
++          threadId,
++          modelSelection,
++        },
++        {
++          type: "thread.runtime-mode.set",
++          commandId: CommandId.make("snapshot:mode"),
++          threadId,
++          runtimeMode: "full-access",
++        },
++        {
++          type: "thread.metadata.update",
++          commandId: CommandId.make("snapshot:title-generation"),
++          threadId,
++          regenerateTitle: true,
++        },
++        {
++          type: "thread.metadata.update",
++          commandId: CommandId.make("snapshot:workspace"),
++          threadId,
++          worktreePath: "/another-workspace",
++        },
++        {
++          type: "thread.fork",
++          commandId: CommandId.make("snapshot:fork"),
++          sourceThreadId: threadId,
++          targetThreadId,
++          sourcePoint: { type: "latest_stable" },
++          createdBy: "user",
++          creationSource: "mcp",
++        },
++        {
++          type: "thread.merge_back",
++          commandId: CommandId.make("snapshot:merge"),
++          sourceThreadId: threadId,
++          targetThreadId,
++          sourcePoint: { type: "latest_stable" },
++          createdBy: "user",
++          creationSource: "mcp",
++        },
++      ];
++      for (const command of commands) {
++        const result = yield* orchestrator.dispatch(command).pipe(Effect.result);
++        assert.isTrue(Result.isFailure(result));
++        if (Result.isFailure(result)) assert.include(result.failure.message, "read-only");
++        assert.deepEqual(yield* outbox.listByCommandId(command.commandId), []);
++      }
++      yield* orchestrator.dispatch({
++        type: "thread.metadata.update",
++        commandId: CommandId.make("snapshot:rename"),
++        threadId,
++        title: "Renamed snapshot",
++      });
++      yield* orchestrator.dispatch({
++        type: "thread.pin",
++        commandId: CommandId.make("snapshot:pin"),
++        threadId,
++      });
++      yield* orchestrator.dispatch({
++        type: "thread.archive",
++        commandId: CommandId.make("snapshot:archive"),
++        threadId,
++      });
++      yield* orchestrator.dispatch({
++        type: "thread.unarchive",
++        commandId: CommandId.make("snapshot:unarchive"),
++        threadId,
++      });
++      const shell = yield* projections.getThreadShell(threadId);
++      assert.equal(shell?.title, "Renamed snapshot");
++      assert.equal(shell?.sessionSnapshot?.nativeSessionId, "native-id");
++      const records = yield* projections.getThreadRecords(threadId, ["runs", "providerThreads"]);
++      assert.deepEqual(records.runs, []);
++      assert.deepEqual(records.providerThreads, []);
++    }).pipe(Effect.provide(layerTest)),
++);
++
+ it.effect(
+   "records approval feedback and targets only its runtime request without dispatching a parent turn",
+   () =>
+diff --git a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts
+index 7439bda4ab..4f380ce249 100644
+--- a/apps/server/src/orchestration-v2/Orchestrator.ts
++++ b/apps/server/src/orchestration-v2/Orchestrator.ts
+@@ -266,6 +266,15 @@ export class OrchestratorThreadAboveModeLimitError extends Schema.TaggedError<Or
+   }
+ }
+ 
++export class OrchestratorSnapshotReadOnlyError extends Schema.TaggedError<OrchestratorSnapshotReadOnlyError>()(
++  "OrchestratorSnapshotReadOnlyError",
++  { commandId: CommandId, threadId: ThreadId },
++) {
++  override get message(): string {
++    return "Imported Copilot snapshots are read-only; native continuation and history transfer are unavailable.";
++  }
++}
++
+ export class OrchestratorCommandPreviouslyRejectedError extends Schema.TaggedError<OrchestratorCommandPreviouslyRejectedError>()(
+   "OrchestratorCommandPreviouslyRejectedError",
+   {
+@@ -303,6 +312,7 @@ export const OrchestratorV2Error = Schema.Union([
+   OrchestratorCommandPreviouslyRejectedError,
+   OrchestratorCommandIdConflictError,
+   OrchestratorSubagentThreadReadOnlyError,
++  OrchestratorSnapshotReadOnlyError,
+   OrchestratorThreadAboveModeLimitError,
+ ]);
+ export type OrchestratorV2Error = typeof OrchestratorV2Error.Type;
+@@ -12410,6 +12420,25 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+       }),
+     );
+ 
++  const snapshotSafeCommands: ReadonlySet<OrchestrationV2ServerCommand["type"]> = new Set([
++    "thread.create",
++    "thread.visit",
++    "thread.delete",
++    "thread.archive",
++    "thread.unarchive",
++    "thread.settle",
++    "thread.unsettle",
++    "thread.snooze",
++    "thread.unsnooze",
++    "thread.auto-settle",
++    "thread.auto-settle.set",
++    "thread.pin",
++    "thread.unpin",
++    "thread.pin.reorder",
++    "thread.active.reorder",
++    "thread.mark-unread",
++    "thread.metadata.update",
++  ]);
+   const dispatchOnce = Effect.fn("orchestrationV2.dispatch.once")(function* (
+     command: OrchestrationV2ServerCommand,
+   ): Effect.fn.Return<
+@@ -12430,6 +12459,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
+       "orchestration_v2.thread_id": commandThreadId(command),
+     });
+ 
++    const metadataMayExecute =
++      command.type === "thread.metadata.update" &&
++      (command.regenerateTitle === true ||
++        command.branch !== undefined ||
++        command.worktreePath !== undefined ||
++        command.limitRecovery !== undefined);
++    if (!snapshotSafeCommands.has(command.type) || metadataMayExecute) {
++      const threadIds =
++        command.type === "thread.fork" || command.type === "thread.merge_back"
++          ? [command.sourceThreadId, command.targetThreadId]
++          : [commandThreadId(command)];
++      for (const threadId of threadIds) {
++        const shell = yield* projectionStore
++          .getThreadShell(threadId)
++          .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
++        if (shell?.sessionSnapshot !== undefined) {
++          return yield* new OrchestratorSnapshotReadOnlyError({
++            commandId: command.commandId,
++            threadId,
++          });
++        }
++      }
++    }
++
+     const events = yield* Ref.make<Array<OrchestrationV2DomainEvent>>([]);
+     const effects = yield* Ref.make<Array<PendingOrchestrationEffectV2>>([]);
+     let cancelUnsettledEffects:
+diff --git a/apps/server/src/orchestration-v2/ProjectionStore.ts b/apps/server/src/orchestration-v2/ProjectionStore.ts
+index 2a21bfae4b..58f2f8f1ee 100644
+--- a/apps/server/src/orchestration-v2/ProjectionStore.ts
++++ b/apps/server/src/orchestration-v2/ProjectionStore.ts
+@@ -1472,6 +1472,9 @@ export function threadShellFromProjection(
+     ...(projection.thread.historyOrigin === undefined
+       ? {}
+       : { historyOrigin: projection.thread.historyOrigin }),
++    ...(projection.thread.sessionSnapshot === undefined
++      ? {}
++      : { sessionSnapshot: projection.thread.sessionSnapshot }),
+     ...(projection.thread.linkOrigin === undefined
+       ? {}
+       : { linkOrigin: projection.thread.linkOrigin }),
+@@ -1754,6 +1757,9 @@ function shellFromState(input: {
+     ...(input.state.thread.historyOrigin === undefined
+       ? {}
+       : { historyOrigin: input.state.thread.historyOrigin }),
++    ...(input.state.thread.sessionSnapshot === undefined
++      ? {}
++      : { sessionSnapshot: input.state.thread.sessionSnapshot }),
+     ...(input.state.thread.linkOrigin === undefined
+       ? {}
+       : { linkOrigin: input.state.thread.linkOrigin }),
+diff --git a/apps/server/src/orchestration-v2/ThreadMessageIntake.ts b/apps/server/src/orchestration-v2/ThreadMessageIntake.ts
+index 987a1deb24..a072df34c7 100644
+--- a/apps/server/src/orchestration-v2/ThreadMessageIntake.ts
++++ b/apps/server/src/orchestration-v2/ThreadMessageIntake.ts
+@@ -23,6 +23,7 @@ function dispatchWasNotAccepted(
+     case "OrchestratorCommandPreviouslyRejectedError":
+     case "OrchestratorCommandIdConflictError":
+     case "OrchestratorSubagentThreadReadOnlyError":
++    case "OrchestratorSnapshotReadOnlyError":
+     case "OrchestratorThreadAboveModeLimitError":
+     case "ThreadManagementProviderInstanceDisabledError":
+       return true;
+diff --git a/apps/server/src/project/AgentSessionImporter.test.ts b/apps/server/src/project/AgentSessionImporter.test.ts
+index 69026f9120..e47c4b9922 100644
+--- a/apps/server/src/project/AgentSessionImporter.test.ts
++++ b/apps/server/src/project/AgentSessionImporter.test.ts
+@@ -1,4 +1,9 @@
+ import { expect, it } from "@effect/vitest";
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodeCrypto from "node:crypto";
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodePath from "node:path";
++import * as NodeServices from "@effect/platform-node/NodeServices";
+ import {
+   EventId,
+   ProjectId,
+@@ -50,7 +55,7 @@ const persistence = Layer.mergeAll(
+ function candidate(
+   modelSelection: typeof CODEX_MODEL_SELECTION,
+   providerSessionId: string,
+-  provider: "codex" | "claudeAgent" = "codex",
++  provider: "codex" | "claudeAgent" | "githubCopilot" = "codex",
+ ) {
+   const providerInstanceId = modelSelection.instanceId;
+   return {
+@@ -59,7 +64,10 @@ function candidate(
+       provider,
+       providerInstanceId,
+       providerSessionId,
+-      filePath: `/tmp/${providerInstanceId}/${providerSessionId}.jsonl`,
++      filePath:
++        provider === "githubCopilot"
++          ? `/tmp/${providerInstanceId}/session-state/${providerSessionId}/events.jsonl`
++          : `/tmp/${providerInstanceId}/${providerSessionId}.jsonl`,
+       size: 100,
+       mtimeMs: 2,
+       device: 3,
+@@ -83,11 +91,79 @@ function candidate(
+ }
+ 
+ function importId(source: ReturnType<typeof candidate>) {
++  if (source.source.provider === "githubCopilot") {
++    const home = NodeCrypto.createHash("sha256")
++      .update(NodePath.dirname(NodePath.dirname(source.source.filePath)))
++      .digest("hex");
++    return ThreadId.make(
++      `import-snapshot:${source.source.providerInstanceId}:${home}:${source.source.providerSessionId}`,
++    );
++  }
+   return ThreadId.make(
+     `import:${source.source.providerInstanceId}:${source.source.providerSessionId}`,
+   );
+ }
+ 
++it.effect(
++  "imports immutable Copilot snapshots without native ownership or resumable runtime, separating homes",
++  () =>
++    Effect.gen(function* () {
++      const projections = yield* ProjectionStore.ProjectionStoreV2;
++      const runtimes = yield* ProviderSessionRuntime.ProviderSessionRuntimeRepository;
++      const copilot = candidate(
++        { instanceId: ProviderInstanceId.make("copilot-account"), model: "gpt-6.1-sol" },
++        "native-id",
++        "githubCopilot",
++      );
++      const otherHome = {
++        ...copilot,
++        source: {
++          ...copilot.source,
++          filePath: "/another-home/session-state/native-id/events.jsonl",
++        },
++      };
++      const importer = yield* makeImporter([copilot, otherHome]);
++      expect(yield* importer.run).toEqual({ importedCount: 2, skippedCount: 0 });
++      const eventCount = importer.published.length;
++      expect(yield* importer.run).toEqual({ importedCount: 2, skippedCount: 0 });
++      expect(importer.published).toHaveLength(eventCount);
++      for (const fixture of [copilot, otherHome]) {
++        const threadId = importId(fixture);
++        const records = yield* projections.getThreadRecords(threadId, [
++          "messages",
++          "providerThreads",
++        ]);
++        expect(records.thread.sessionSnapshot).toMatchObject({
++          kind: "copilot_text_snapshot",
++          providerInstanceId: copilot.source.providerInstanceId,
++          nativeSessionId: "native-id",
++        });
++        expect(records.thread.activeProviderThreadId).toBeNull();
++        expect(records.providerThreads).toEqual([]);
++        expect(records.messages.map((message) => message.text)).toEqual(["Fix it", "Fixed"]);
++        expect(yield* runtimes.getByThreadId({ threadId })).toEqual(Option.none());
++        expect((yield* projections.getThreadShell(threadId))?.sessionSnapshot).toEqual(
++          records.thread.sessionSnapshot,
++        );
++      }
++      const changed = {
++        ...copilot,
++        thread: {
++          ...copilot.thread,
++          messages: [
++            ...copilot.thread.messages,
++            { role: "user" as const, text: "Later native message", createdAt: timestamp },
++          ],
++        },
++      };
++      const secondImport = yield* makeImporter([changed]);
++      yield* secondImport.run;
++      expect(
++        (yield* projections.getThreadRecords(importId(copilot), ["messages"])).messages,
++      ).toHaveLength(2);
++    }).pipe(Effect.provide(persistence)),
++);
++
+ const seedOwner = Effect.fn(function* (
+   source: ReturnType<typeof candidate>,
+   lifecycle: "active" | "archived" | "deleted" = "active",
+@@ -196,6 +272,7 @@ const makeImporter = Effect.fn(function* (
+   );
+   const context = yield* Layer.build(
+     AgentSessionImporter.layer.pipe(
++      Layer.provide(NodeServices.layer),
+       Layer.provide(
+         Layer.mergeAll(
+           sinkLayer,
+diff --git a/apps/server/src/project/AgentSessionImporter.ts b/apps/server/src/project/AgentSessionImporter.ts
+index 11f168ff1d..c3fcdc1066 100644
+--- a/apps/server/src/project/AgentSessionImporter.ts
++++ b/apps/server/src/project/AgentSessionImporter.ts
+@@ -24,10 +24,13 @@ import {
+ } from "@t3tools/contracts";
+ import { normalizeProjectPathForComparison } from "@t3tools/shared/path";
+ import * as Context from "effect/Context";
++import * as Crypto from "effect/Crypto";
+ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+ import * as Option from "effect/Option";
++import * as Path from "effect/Path";
++import * as Hex from "effect/encoding/Hex";
+ import * as Schema from "effect/Schema";
+ import * as Stream from "effect/Stream";
+ 
+@@ -166,6 +169,8 @@ function messageEvents(input: {
+ }
+ 
+ const make = Effect.gen(function* () {
++  const crypto = yield* Crypto.Crypto;
++  const path = yield* Path.Path;
+   const scanner = yield* AgentSessionScanner.AgentSessionScanner;
+   const orchestrator = yield* Orchestrator.OrchestratorV2;
+   const projects = yield* ProjectService.ProjectService;
+@@ -223,8 +228,25 @@ const make = Effect.gen(function* () {
+           return;
+         }
+         const source = outcome.source;
++        const isSnapshot = source.provider === "githubCopilot";
++        const storageIdentity = isSnapshot
++          ? Hex.encode(
++              yield* crypto
++                .digest(
++                  "SHA-256",
++                  new TextEncoder().encode(path.dirname(path.dirname(source.filePath))),
++                )
++                .pipe(
++                  Effect.mapError(
++                    (cause) => new AgentSessionScanError({ operation: "read-projects", cause }),
++                  ),
++                ),
++            )
++          : null;
+         const threadId = ThreadId.make(
+-          `import:${source.providerInstanceId}:${source.providerSessionId}`,
++          isSnapshot
++            ? `import-snapshot:${source.providerInstanceId}:${storageIdentity}:${source.providerSessionId}`
++            : `import:${source.providerInstanceId}:${source.providerSessionId}`,
+         );
+         if (outcome._tag === "AlreadyImported") {
+           importedThreadIds.add(threadId);
+@@ -250,23 +272,25 @@ const make = Effect.gen(function* () {
+             });
+           }
+           const driver = ProviderDriverKind.make(thread.source);
+-          const persistRuntime = runtimes.upsert(
+-            {
+-              threadId,
+-              providerName: driver,
+-              providerInstanceId: thread.providerInstanceId,
+-              adapterKey: driver,
+-              runtimeMode: DEFAULT_RUNTIME_MODE,
+-              status: "stopped",
+-              lastSeenAt: thread.updatedAt,
+-              resumeCursor:
+-                thread.source === "codex"
+-                  ? { threadId: thread.providerSessionId }
+-                  : { threadId, resume: thread.providerSessionId },
+-              runtimePayload: { cwd: project.workspaceRoot },
+-            },
+-            { onConflict: "ignore" },
+-          );
++          const persistRuntime = isSnapshot
++            ? Effect.void
++            : runtimes.upsert(
++                {
++                  threadId,
++                  providerName: driver,
++                  providerInstanceId: thread.providerInstanceId,
++                  adapterKey: driver,
++                  runtimeMode: DEFAULT_RUNTIME_MODE,
++                  status: "stopped",
++                  lastSeenAt: thread.updatedAt,
++                  resumeCursor:
++                    thread.source === "codex"
++                      ? { threadId: thread.providerSessionId }
++                      : { threadId, resume: thread.providerSessionId },
++                  runtimePayload: { cwd: project.workspaceRoot },
++                },
++                { onConflict: "ignore" },
++              );
+           const existing = yield* Effect.option(orchestrator.getThreadRecords(threadId, []));
+           if (Option.isSome(existing)) {
+             if (existing.value.thread.projectId !== input.projectId) {
+@@ -280,7 +304,7 @@ const make = Effect.gen(function* () {
+               return yield* new AgentSessionThreadModifiedError({ threadId });
+             }
+             yield* persistRuntime;
+-            yield* runtimes.recordImportedTranscript({ threadId, source });
++            if (!isSnapshot) yield* runtimes.recordImportedTranscript({ threadId, source });
+             return true;
+           }
+ 
+@@ -306,8 +330,19 @@ const make = Effect.gen(function* () {
+             worktreePath: null,
+             linkedPullRequest: null,
+             branchPullRequest: null,
+-            activeProviderThreadId: providerThreadId,
++            activeProviderThreadId: isSnapshot ? null : providerThreadId,
+             historyOrigin: "v1_import",
++            ...(storageIdentity === null
++              ? {}
++              : {
++                  sessionSnapshot: {
++                    kind: "copilot_text_snapshot" as const,
++                    providerInstanceId: thread.providerInstanceId,
++                    nativeSessionId: thread.providerSessionId,
++                    storageIdentity,
++                    capturedAt: DateTime.formatIso(yield* DateTime.now),
++                  },
++                }),
+             lineage: {
+               parentThreadId: null,
+               relationshipToParent: null,
+@@ -352,7 +387,7 @@ const make = Effect.gen(function* () {
+           };
+ 
+           const committed = yield* eventSink.write({
+-            unlessNativeThreadOwned: providerThread,
++            ...(isSnapshot ? {} : { unlessNativeThreadOwned: providerThread }),
+             events: [
+               {
+                 id: EventId.make(`${IMPORT_EVENT_PREFIX}:thread:${threadId}:created`),
+@@ -365,20 +400,26 @@ const make = Effect.gen(function* () {
+               ...thread.messages.flatMap((message, index) =>
+                 messageEvents({ threadId, index, message }),
+               ),
+-              {
+-                id: EventId.make(`${IMPORT_EVENT_PREFIX}:provider-thread:${providerThreadId}`),
+-                type: "provider-thread.updated",
+-                threadId,
+-                driver,
+-                providerInstanceId: thread.providerInstanceId,
+-                occurredAt: updatedAt,
+-                payload: providerThread,
+-              },
++              ...(isSnapshot
++                ? []
++                : [
++                    {
++                      id: EventId.make(
++                        `${IMPORT_EVENT_PREFIX}:provider-thread:${providerThreadId}`,
++                      ),
++                      type: "provider-thread.updated" as const,
++                      threadId,
++                      driver,
++                      providerInstanceId: thread.providerInstanceId,
++                      occurredAt: updatedAt,
++                      payload: providerThread,
++                    },
++                  ]),
+             ],
+           });
+           if (committed.length === 0) return null;
+           yield* persistRuntime;
+-          yield* runtimes.recordImportedTranscript({ threadId, source });
++          if (!isSnapshot) yield* runtimes.recordImportedTranscript({ threadId, source });
+           return true;
+         }).pipe(
+           Effect.catch((cause) =>
+diff --git a/apps/server/src/project/AgentSessionScanner.test.ts b/apps/server/src/project/AgentSessionScanner.test.ts
+index baf0f27f9e..2bca64817c 100644
+--- a/apps/server/src/project/AgentSessionScanner.test.ts
++++ b/apps/server/src/project/AgentSessionScanner.test.ts
+@@ -65,6 +65,10 @@ const layerScannerTest = (input: ScannerTestInput) =>
+               driver: ProviderDriverKind.make("codex"),
+               config: { homePath: input.codexHomePath },
+             },
++            [ProviderInstanceId.make("githubCopilot")]: {
++              driver: ProviderDriverKind.make("githubCopilot"),
++              enabled: false,
++            },
+             ...input.providerInstances,
+           },
+         }),
+@@ -235,6 +239,217 @@ const makeFileIdentityFixture = Effect.fn("AgentSessionScanner.test.makeFileIden
+ 
+ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
+   describe("scan", () => {
++    it.effect("rejects a Copilot transcript atomically replaced while its descriptor is read", () =>
++      Effect.gen(function* () {
++        const path = yield* Path.Path;
++        const fs = yield* FileSystem.FileSystem;
++        const claudeHomePath = yield* makeTempDir("t3code-replace-claude-");
++        const codexHomePath = yield* makeTempDir("t3code-replace-codex-");
++        const copilotHome = yield* makeTempDir("t3code-replace-copilot-");
++        const workspaceRoot = yield* makeTempDir("t3code-replace-workspace-");
++        const mtimeMs = Date.parse("2026-09-01T10:00:00.000Z");
++        yield* TestClock.setTime(mtimeMs);
++        const filePath = path.join(copilotHome, "session-state", "native-id", "events.jsonl");
++        const contents = [
++          {
++            type: "session.start",
++            data: { sessionId: "native-id", version: 1, context: { cwd: workspaceRoot } },
++          },
++          { type: "session.handoff", data: { context: "Saved plan" } },
++          { type: "user.message", data: { content: "Preserved prompt" } },
++        ]
++          .map((record, index) =>
++            JSON.stringify({
++              ...record,
++              id: `event-${index}`,
++              parentId: index === 0 ? null : `event-${index - 1}`,
++              timestamp: "2026-09-01T10:00:00.000Z",
++            }),
++          )
++          .join("\n");
++        for (const target of [filePath, `${filePath}.replacement`]) {
++          yield* writeTranscript({ filePath: target, contents, mtimeMs });
++        }
++        const canonicalFilePath = yield* fs.realPath(filePath);
++        let replaceDuringRead = false;
++        let replacements = 0;
++        const fileSystem = FileSystem.FileSystem.of({
++          ...fs,
++          open: (target, options) =>
++            fs.open(target, options).pipe(
++              Effect.map((file) => ({
++                ...file,
++                stat: file.stat,
++                readAlloc: (size: number) =>
++                  file.readAlloc(size).pipe(
++                    Effect.tap(() =>
++                      Effect.gen(function* () {
++                        if (target !== canonicalFilePath || !replaceDuringRead) return;
++                        replaceDuringRead = false;
++                        replacements++;
++                        yield* fs.rename(`${filePath}.replacement`, filePath);
++                      }),
++                    ),
++                  ),
++              })),
++            ),
++        });
++        yield* Effect.gen(function* () {
++          const scanner = yield* AgentSessionScanner.AgentSessionScanner;
++          yield* scanner.scan;
++          const original = yield* scanner.recentThreads(workspaceRoot).pipe(Stream.runCollect);
++          expect(original[0]?._tag).toBe("Importable");
++          replaceDuringRead = true;
++          const replaced = yield* scanner.recentThreads(workspaceRoot).pipe(Stream.runCollect);
++          expect(replacements).toBe(1);
++          expect(replaced.map((outcome) => outcome._tag)).toEqual(["Skipped"]);
++        }).pipe(
++          Effect.provide(
++            layerScannerTest({
++              claudeHomePath,
++              codexHomePath,
++              providerInstances: {
++                [ProviderInstanceId.make("copilot")]: {
++                  driver: ProviderDriverKind.make("githubCopilot"),
++                  enabled: true,
++                  config: { homePath: copilotHome },
++                },
++              },
++            }),
++          ),
++          Effect.provideService(FileSystem.FileSystem, fileSystem),
++        );
++      }).pipe(Effect.scoped),
++    );
++    it.effect(
++      "discovers configured Copilot homes without crossing session symlinks and reads bounded immutable text",
++      () =>
++        Effect.gen(function* () {
++          const path = yield* Path.Path;
++          const fs = yield* FileSystem.FileSystem;
++          const claudeHomePath = yield* makeTempDir("t3code-copilot-claude-");
++          const codexHomePath = yield* makeTempDir("t3code-copilot-codex-");
++          const copilotHome = yield* makeTempDir("t3code-copilot-account-");
++          const secondHome = yield* makeTempDir("t3code-copilot-other-");
++          const workspaceRoot = yield* makeTempDir("t3code-copilot-workspace-");
++          const mtimeMs = Date.parse("2026-09-01T10:00:00.000Z");
++          yield* TestClock.setTime(mtimeMs);
++          const fixture = (sessionId: string) =>
++            [
++              {
++                type: "session.start",
++                data: {
++                  sessionId,
++                  version: 1,
++                  selectedModel: "gpt-6.1-sol",
++                  context: { cwd: workspaceRoot },
++                },
++              },
++              ...Array.from({ length: 205 }, (_, index) => ({
++                type: index % 2 ? "assistant.message" : "user.message",
++                data: { content: `Message ${index}` },
++              })),
++            ]
++              .map((record, index) =>
++                JSON.stringify({
++                  ...record,
++                  id: `event-${index}`,
++                  parentId: index === 0 ? null : `event-${index - 1}`,
++                  timestamp: "2026-09-01T10:00:00.000Z",
++                }),
++              )
++              .join("\n");
++          for (const home of [copilotHome, secondHome]) {
++            yield* writeTranscript({
++              filePath: path.join(home, "session-state", "native-id", "events.jsonl"),
++              contents: fixture("native-id"),
++              mtimeMs,
++            });
++          }
++          yield* writeTranscript({
++            filePath: path.join(copilotHome, "session-state", "corrupt", "events.jsonl"),
++            contents: fixture("corrupt") + "\n{",
++            mtimeMs,
++          });
++          yield* fs.symlink(
++            path.join(secondHome, "session-state", "native-id"),
++            path.join(copilotHome, "session-state", "external"),
++          );
++          const input = {
++            claudeHomePath,
++            codexHomePath,
++            workspaceRoot,
++            providerInstances: {
++              [ProviderInstanceId.make("copilot-a")]: {
++                driver: ProviderDriverKind.make("githubCopilot"),
++                enabled: true,
++                config: { homePath: copilotHome },
++              },
++              [ProviderInstanceId.make("copilot-b")]: {
++                driver: ProviderDriverKind.make("githubCopilot"),
++                enabled: true,
++                environment: [{ name: "COPILOT_HOME", value: secondHome, sensitive: false }],
++              },
++              [ProviderInstanceId.make("copilot-disabled")]: {
++                driver: ProviderDriverKind.make("githubCopilot"),
++                enabled: false,
++                config: { homePath: secondHome },
++              },
++            },
++          };
++          const before = yield* fs.readFileString(
++            path.join(copilotHome, "session-state", "native-id", "events.jsonl"),
++          );
++          const scan = yield* runScan(input);
++          expect(scan.candidates).toHaveLength(1);
++          expect(scan.candidates[0]?.sources).toEqual(["githubCopilot"]);
++          expect(scan.candidates[0]?.threadCount).toBe(3);
++          const outcomes = yield* runRecentThreadOutcomes(input);
++          const threads = outcomes.flatMap((outcome) =>
++            outcome._tag === "Importable" ? [outcome.thread] : [],
++          );
++          expect(threads.map((thread) => thread.providerInstanceId).sort()).toEqual([
++            "copilot-a",
++            "copilot-b",
++          ]);
++          expect(outcomes.filter((outcome) => outcome._tag === "Skipped")).toHaveLength(1);
++          for (const thread of threads) {
++            expect(thread.providerSessionId).toBe("native-id");
++            expect(thread.messages).toHaveLength(200);
++            expect(thread.messages[0]?.text).toBe("Message 0");
++            expect(thread.messages[1]?.text).toBe("Message 6");
++            expect(thread.messages.at(-1)?.text).toBe("Message 204");
++          }
++          expect(
++            yield* fs.readFileString(
++              path.join(copilotHome, "session-state", "native-id", "events.jsonl"),
++            ),
++          ).toBe(before);
++          yield* Effect.gen(function* () {
++            const scanner = yield* AgentSessionScanner.AgentSessionScanner;
++            yield* scanner.scan;
++            const externalHome = yield* makeTempDir("t3code-copilot-replacement-");
++            const externalSession = path.join(externalHome, "native-id");
++            yield* writeTranscript({
++              filePath: path.join(externalSession, "events.jsonl"),
++              contents: fixture("native-id"),
++              mtimeMs,
++            });
++            const file = path.join(copilotHome, "session-state", "native-id", "events.jsonl");
++            yield* fs.rename(file, `${file}.saved`);
++            yield* fs.symlink(path.join(externalSession, "events.jsonl"), file);
++            const directory = path.join(secondHome, "session-state", "native-id");
++            yield* fs.rename(directory, `${directory}.saved`);
++            yield* fs.symlink(externalSession, directory);
++            const replaced = yield* scanner.recentThreads(workspaceRoot).pipe(Stream.runCollect);
++            expect(Array.from(replaced).map((outcome) => outcome._tag)).toEqual([
++              "Skipped",
++              "Skipped",
++              "Skipped",
++            ]);
++          }).pipe(Effect.provide(layerScannerTest(input)));
++        }).pipe(Effect.scoped),
++    );
+     it.effect("reads Claude project cwds from transcripts, newest first", () =>
+       Effect.gen(function* () {
+         const path = yield* Path.Path;
+@@ -1625,6 +1840,134 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
+ });
+ 
+ describe("parseAgentSessionTranscript", () => {
++  it("reads only committed root Copilot text and rejects invalid snapshot identities", () => {
++    const records = [
++      {
++        type: "session.start",
++        data: {
++          sessionId: "copilot-session",
++          version: 1,
++          selectedModel: "auto",
++          context: { cwd: "/workspace" },
++        },
++      },
++      { type: "user.message", data: { content: "First prompt" } },
++      { type: "user.message", agentId: "child", data: { content: "Private child prompt" } },
++      { type: "assistant.message_delta", data: { content: "Fragment" } },
++      { type: "assistant.message", data: { content: "Uncommitted draft", fusion: {} } },
++      {
++        type: "assistant.message",
++        data: { content: "Child commit", fusion: { commitId: "c", conversationScope: "child" } },
++      },
++      {
++        type: "assistant.message",
++        data: {
++          content: "Root answer",
++          model: "gpt-6.1-sol",
++          fusion: { commitId: "c", conversationScope: "root" },
++        },
++      },
++      { type: "session.title_changed", ephemeral: true, data: { title: "Native title" } },
++    ].map((event, index) => ({
++      ...event,
++      id: `event-${index}`,
++      parentId: index === 0 ? null : `event-${index - 1}`,
++      timestamp: `2026-09-01T10:00:0${index}.000Z`,
++    }));
++    const parse = (events: ReadonlyArray<unknown>, suffix = "") =>
++      AgentSessionScanner.parseAgentSessionTranscript({
++        source: "githubCopilot",
++        providerInstanceId: ProviderInstanceId.make("copilot-account"),
++        fallbackSessionId: "copilot-session",
++        lastActiveAtMs: Date.parse(timestampForCopilot),
++        contents: events.map((event) => JSON.stringify(event)).join("\n") + suffix,
++      });
++    const timestampForCopilot = "2026-09-01T10:00:09.000Z";
++    const thread = parse(records);
++    expect(thread?.providerSessionId).toBe("copilot-session");
++    expect(thread?.title).toBe("Native title");
++    expect(thread?.model).toBe("auto");
++    expect(thread?.messages.map((message) => [message.role, message.text])).toEqual([
++      ["user", "First prompt"],
++      ["assistant", "Root answer"],
++    ]);
++    expect(parse(records, "\n{")).toBeNull();
++    expect(parse(records.slice(1))).toBeNull();
++    expect(
++      parse([
++        { ...records[0], data: { sessionId: "wrong-session", version: 1 } },
++        ...records.slice(1),
++      ]),
++    ).toBeNull();
++    expect(
++      parse([
++        { ...records[0], data: { sessionId: "copilot-session", version: 99 } },
++        ...records.slice(1),
++      ]),
++    ).toBeNull();
++    const resume = {
++      id: "resume",
++      parentId: "event-6",
++      timestamp: timestampForCopilot,
++      type: "session.resume",
++      data: { selectedModel: "resumed-selection" },
++    };
++    expect(parse([...records, resume])?.model).toBe("resumed-selection");
++    expect(
++      parse([
++        ...records,
++        resume,
++        {
++          ...resume,
++          id: "change",
++          parentId: "resume",
++          type: "session.model_change",
++          data: { newModel: "changed-selection" },
++        },
++      ])?.model,
++    ).toBe("changed-selection");
++    const handoff = {
++      ...resume,
++      type: "session.handoff",
++      data: { context: "Continue the saved plan", target: "other-agent" },
++    };
++    expect(parse([...records, handoff])?.messages).toEqual(thread?.messages);
++    const deselected = {
++      ...resume,
++      type: "session.model_deselected",
++      data: { reason: "provider_withdrawn" },
++    };
++    expect(parse([...records, deselected])?.model).toBeNull();
++    expect(
++      parse([
++        ...records,
++        deselected,
++        { ...resume, id: "after-deselection", parentId: "resume", data: {} },
++      ])?.model,
++    ).toBeNull();
++    expect(
++      parse([
++        ...records,
++        handoff,
++        { ...resume, id: "after-handoff", parentId: "resume", data: { selectedModel: "auto" } },
++      ])?.model,
++    ).toBe("auto");
++    for (const invalid of [
++      { data: {} },
++      { timestamp: undefined },
++      { timestamp: "not-a-date" },
++      { parentId: "missing-event" },
++      { parentId: null },
++      { parentId: undefined },
++      { id: "event-0" },
++    ]) {
++      expect(parse([records[0], { ...records[1], ...invalid }, ...records.slice(2)])).toBeNull();
++    }
++    // Hidden child events still participate in the persisted chronological chain.
++    expect(
++      parse([...records.slice(0, 2), { ...records[2], parentId: "missing" }, ...records.slice(3)]),
++    ).toBeNull();
++  });
+   it.each([false, true])(
+     "handles the exact record limit and an interior blank overflow=%s",
+     (overflow) => {
+diff --git a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts
+index 9c26b187a5..21352e9f4e 100644
+--- a/apps/server/src/project/AgentSessionScanner.ts
++++ b/apps/server/src/project/AgentSessionScanner.ts
+@@ -27,6 +27,7 @@ import * as Stream from "effect/Stream";
+ import { isBareGitConfig, parseOriginUrlFromGitConfig } from "@t3tools/shared/git";
+ import * as HostProcess from "@t3tools/shared/HostProcess";
+ import { normalizeProjectPathForComparison } from "@t3tools/shared/path";
++import { CopilotSettings } from "@t3tools/provider-copilot/settings";
+ import { repositoryPathFromRemoteUrl } from "@t3tools/source-control-core/server/SourceControlProvider";
+ 
+ import * as ServerConfig from "../config.ts";
+@@ -77,6 +78,10 @@ const CodexTurnMetadata = Schema.Struct({
+ });
+ 
+ const TranscriptRecord = Schema.Struct({
++  id: Schema.optional(Schema.String),
++  parentId: Schema.optional(Schema.NullOr(Schema.String)),
++  agentId: Schema.optional(Schema.String),
++  ephemeral: Schema.optional(Schema.Boolean),
+   type: Schema.optional(Schema.String),
+   timestamp: Schema.optional(Schema.String),
+   cwd: Schema.optional(Schema.String),
+@@ -87,6 +92,24 @@ const TranscriptRecord = Schema.Struct({
+   isMeta: Schema.optional(Schema.Boolean),
+   isCompactSummary: Schema.optional(Schema.Boolean),
+   message: Schema.optional(TranscriptMessage),
++  data: Schema.optional(
++    Schema.Struct({
++      sessionId: Schema.optional(Schema.String),
++      version: Schema.optional(Schema.Number),
++      selectedModel: Schema.optional(Schema.String),
++      newModel: Schema.optional(Schema.String),
++      model: Schema.optional(Schema.String),
++      title: Schema.optional(Schema.String),
++      content: Schema.optional(Schema.String),
++      context: Schema.optional(Schema.Struct({ cwd: Schema.optional(Schema.String) })),
++      fusion: Schema.optional(
++        Schema.Struct({
++          commitId: Schema.optional(Schema.String),
++          conversationScope: Schema.optional(Schema.String),
++        }),
++      ),
++    }),
++  ),
+   payload: Schema.optional(
+     Schema.Struct({
+       id: Schema.optional(Schema.String),
+@@ -104,13 +127,84 @@ const TranscriptRecord = Schema.Struct({
+ 
+ const decodeClaudeSettings = Schema.decodeUnknownOption(ClaudeSettings);
+ const decodeCodexSettings = Schema.decodeUnknownOption(CodexSettings);
++const decodeCopilotSettings = Schema.decodeUnknownOption(CopilotSettings);
+ const decodeTranscriptRecord = Schema.decodeUnknownOption(Schema.fromJsonString(TranscriptRecord));
+ const decodeTranscriptValue = Schema.decodeUnknownOption(TranscriptRecord);
+ const selectTranscriptPath = createTranscriptJsonSelector(TranscriptRecord);
+ const decodeCodexTurnMetadata = Schema.decodeUnknownOption(CodexTurnMetadata);
++const decodeCopilotEnvelope = Schema.decodeUnknownOption(
++  Schema.Struct({
++    id: Schema.NonEmptyString,
++    parentId: Schema.NullOr(Schema.NonEmptyString),
++    timestamp: Schema.DateTimeUtcFromString,
++    type: Schema.NonEmptyString,
++  }),
++);
+ 
+ type DecodedTranscriptRecord = typeof TranscriptRecord.Type;
+ 
++const CopilotTranscriptRecord = Schema.Struct({
++  id: TranscriptRecord.fields.id,
++  parentId: TranscriptRecord.fields.parentId,
++  agentId: TranscriptRecord.fields.agentId,
++  ephemeral: TranscriptRecord.fields.ephemeral,
++  type: TranscriptRecord.fields.type,
++  timestamp: TranscriptRecord.fields.timestamp,
++  data: Schema.optional(Schema.Unknown),
++});
++const decodeCopilotRecord = Schema.decodeUnknownOption(CopilotTranscriptRecord);
++const decodeCopilotJsonRecord = Schema.decodeUnknownOption(
++  Schema.fromJsonString(CopilotTranscriptRecord),
++);
++const copilotDataSchemas = {
++  "session.start": Schema.Struct({
++    sessionId: Schema.String,
++    version: Schema.Number,
++    selectedModel: Schema.optional(Schema.String),
++    context: Schema.optional(Schema.Struct({ cwd: Schema.optional(Schema.String) })),
++  }),
++  "session.resume": Schema.Struct({ selectedModel: Schema.optional(Schema.String) }),
++  "session.model_change": Schema.Struct({ newModel: Schema.NonEmptyString }),
++  "session.title_changed": Schema.Struct({ title: Schema.NonEmptyString }),
++  "user.message": Schema.Struct({ content: Schema.String }),
++  "assistant.message": Schema.Struct({
++    content: Schema.String,
++    fusion: Schema.optional(
++      Schema.Struct({
++        commitId: Schema.optional(Schema.String),
++        conversationScope: Schema.optional(Schema.String),
++      }),
++    ),
++  }),
++};
++
++function normalizeCopilotRecord(
++  record: typeof CopilotTranscriptRecord.Type,
++): Option.Option<DecodedTranscriptRecord> {
++  const { data: rawData, ...envelope } = record;
++  const schema = Object.hasOwn(copilotDataSchemas, record.type ?? "")
++    ? copilotDataSchemas[record.type as keyof typeof copilotDataSchemas]
++    : undefined;
++  if (schema === undefined || (record.ephemeral && record.type !== "session.title_changed")) {
++    return Option.some(envelope);
++  }
++  return Schema.decodeUnknownOption(schema)(rawData).pipe(
++    Option.map((data) => ({ ...envelope, data })),
++  );
++}
++
++function decodeSessionRecord(
++  source: AgentSessionSource,
++  value: unknown,
++  json = false,
++): Option.Option<DecodedTranscriptRecord> {
++  return source === "githubCopilot"
++    ? (json ? decodeCopilotJsonRecord : decodeCopilotRecord)(value).pipe(
++        Option.flatMap(normalizeCopilotRecord),
++      )
++    : (json ? decodeTranscriptRecord : decodeTranscriptValue)(value);
++}
++
+ interface AgentSessionTranscriptMetadata {
+   readonly source: AgentSessionSource;
+   readonly providerInstanceId: ProviderInstanceId;
+@@ -167,14 +261,21 @@ interface RawCandidate {
+   readonly transcripts: ReadonlyArray<{
+     readonly filePath: string;
+     readonly mtimeMs: number | null;
++    readonly copilotOrigin?: CopilotTranscriptOrigin;
+   }>;
+ }
+ 
++interface CopilotTranscriptOrigin {
++  readonly canonicalRoot: string;
++  readonly identity: TranscriptIdentity;
++}
++
+ interface TranscriptCandidate {
+   readonly filePath: string;
+   readonly mtimeMs: number;
+   readonly providerInstanceId: ProviderInstanceId;
+   readonly size: number;
++  readonly copilotOrigin?: CopilotTranscriptOrigin;
+ }
+ 
+ interface MetadataReadBudget {
+@@ -294,7 +395,11 @@ export function parseAgentSessionTranscript(
+   lines = splitTranscriptRecords(input.contents, MAX_IMPORT_RECORDS + 1),
+ ): AgentSessionThread | null {
+   if (lines.length > MAX_IMPORT_RECORDS) return null;
+-  const records = lines.flatMap((line) => Option.toArray(decodeTranscriptRecord(line)));
++  const decoded = lines
++    .filter((line) => line.trim().length > 0)
++    .map((line) => decodeSessionRecord(input.source, line, true));
++  if (input.source === "githubCopilot" && decoded.some(Option.isNone)) return null;
++  const records = decoded.flatMap(Option.toArray);
+   const claudeFields =
+     input.source === "claudeAgent"
+       ? records.reduce(foldClaudeFields, emptyClaudeFields)
+@@ -307,6 +412,7 @@ function parseAgentSessionRecords(
+   records: ReadonlyArray<DecodedTranscriptRecord>,
+   claudeFields: ClaudeFields,
+ ): AgentSessionThread | null {
++  if (input.source === "githubCopilot") return parseCopilotRecords(input, records);
+   const fallbackTimestamp = DateTime.formatIso(DateTime.makeUnsafe(input.lastActiveAtMs));
+   // Claude filenames are session IDs. Codex rollout filenames include extra
+   // timestamp text, so only transcript metadata can provide a resumable ID.
+@@ -498,8 +604,100 @@ function parseAgentSessionRecords(
+   };
+ }
+ 
++function parseCopilotRecords(
++  input: AgentSessionTranscriptMetadata,
++  records: ReadonlyArray<DecodedTranscriptRecord>,
++): AgentSessionThread | null {
++  const start = records.find((record) => record.type === "session.start" && !record.agentId);
++  if (
++    records[0] !== start ||
++    start?.data?.version !== 1 ||
++    start.data.sessionId !== input.fallbackSessionId ||
++    records.some((record) => record.type === "session.snapshot_rewind")
++  )
++    return null;
++  let title: string | undefined;
++  let model = start.data.selectedModel ?? null;
++  const messages: Array<AgentSessionThreadMessage> = [];
++  const seen = new Set<string>();
++  const fallback = DateTime.formatIso(DateTime.makeUnsafe(input.lastActiveAtMs));
++  let predecessor: string | null = null;
++  for (const record of records) {
++    const envelope = decodeCopilotEnvelope(record);
++    if (Option.isNone(envelope)) return null;
++    if (record.ephemeral) {
++      if (record.type === "session.title_changed" && !record.agentId) {
++        if (!record.data?.title?.trim()) return null;
++        title = record.data.title.trim();
++      }
++      continue;
++    }
++    const event = envelope.value;
++    if (seen.has(event.id) || event.parentId !== predecessor) return null;
++    seen.add(event.id);
++    predecessor = event.id;
++    if (
++      (record.type === "user.message" || record.type === "assistant.message") &&
++      record.data?.content === undefined
++    )
++      return null;
++    if (record.agentId) continue;
++    if (record.type === "session.start" && record !== start) return null;
++    if (record.type === "session.title_changed") {
++      if (!record.data?.title?.trim()) return null;
++      title = record.data.title.trim();
++    }
++    if (record.type === "session.model_change") {
++      if (!record.data?.newModel?.trim()) return null;
++      model = record.data.newModel;
++    }
++    if (record.type === "session.model_deselected") model = null;
++    if (record.type === "session.resume") {
++      if (record.data === undefined) return null;
++      model = record.data.selectedModel ?? model;
++    }
++    if (record.type !== "user.message" && record.type !== "assistant.message") continue;
++    const text = record.data?.content;
++    if (text === undefined || !text.trim()) continue;
++    const fusion = record.data?.fusion;
++    if (
++      record.type === "assistant.message" &&
++      fusion !== undefined &&
++      (fusion.commitId === undefined ||
++        (fusion.conversationScope !== undefined && fusion.conversationScope !== "root"))
++    )
++      continue;
++    messages.push({
++      role: record.type === "user.message" ? "user" : "assistant",
++      text,
++      createdAt: DateTime.formatIso(event.timestamp),
++    });
++  }
++  const firstUser = messages.find((message) => message.role === "user");
++  if (firstUser === undefined) return null;
++  const retained =
++    messages.length <= MAX_IMPORTED_MESSAGES
++      ? messages
++      : [firstUser, ...messages.slice(-(MAX_IMPORTED_MESSAGES - 1))];
++  return {
++    source: input.source,
++    providerInstanceId: input.providerInstanceId,
++    providerSessionId: input.fallbackSessionId,
++    title: title ?? deriveTitle(input.source, firstUser.text) ?? "Imported Copilot history",
++    model,
++    createdAt: normalizeTimestamp(start.timestamp, retained[0]?.createdAt ?? fallback),
++    updatedAt: fallback,
++    messages: retained,
++  };
++}
++
+ function extractDecodedCwd(record: DecodedTranscriptRecord): string | null {
+-  const cwd = record.cwd?.trim() || record.payload?.cwd?.trim();
++  const cwd =
++    record.cwd?.trim() ||
++    record.payload?.cwd?.trim() ||
++    (record.type === "session.start" && !record.agentId
++      ? record.data?.context?.cwd?.trim()
++      : undefined);
+   return cwd && cwd.length > 0 ? cwd : null;
+ }
+ 
+@@ -507,6 +705,7 @@ function shouldRetainDecodedRecord(
+   source: AgentSessionSource,
+   record: DecodedTranscriptRecord,
+ ): boolean {
++  if (source === "githubCopilot") return true;
+   if (source === "claudeAgent") {
+     if (isHiddenClaudeRecord(record) || (record.type !== "user" && record.type !== "assistant")) {
+       return false;
+@@ -557,6 +756,10 @@ function extractCwd(line: string, source: AgentSessionSource): string | null | f
+   if (typeof parsed !== "object" || parsed === null) return null;
+ 
+   const record = parsed as Record<string, unknown>;
++  if (source === "githubCopilot") {
++    const decoded = decodeSessionRecord(source, record);
++    return Option.isSome(decoded) ? extractDecodedCwd(decoded.value) : null;
++  }
+   if (typeof record.cwd === "string" && record.cwd.trim().length > 0) {
+     return record.cwd;
+   }
+@@ -722,6 +925,29 @@ export const make = Effect.gen(function* () {
+     } as const;
+   });
+ 
++  const validateCopilotOrigin = Effect.fn("AgentSessionScanner.validateCopilotOrigin")(function* (
++    filePath: string,
++    origin: CopilotTranscriptOrigin | undefined,
++    stats: FileSystem.File.Info,
++  ) {
++    if (origin === undefined) return true;
++    const realFile = yield* fileSystem.realPath(filePath).pipe(Effect.option);
++    const currentStats = yield* statOption(filePath);
++    if (
++      Option.isSome(realFile) &&
++      Option.isSome(currentStats) &&
++      realFile.value === filePath &&
++      path.dirname(path.dirname(realFile.value)) === origin.canonicalRoot &&
++      sameTranscriptIdentity(origin.identity, transcriptIdentity(filePath, stats)) &&
++      sameTranscriptIdentity(origin.identity, transcriptIdentity(filePath, currentStats.value))
++    )
++      return true;
++    yield* Effect.logWarning("Copilot transcript changed or escaped its discovered session root", {
++      filePath,
++    });
++    return false;
++  });
++
+   const readCwd = Effect.fn("AgentSessionScanner.readCwd")(function* (
+     source: AgentSessionSource,
+     transcript: TranscriptCandidate,
+@@ -741,6 +967,14 @@ export const make = Effect.gen(function* () {
+       fileSystem.open(transcript.filePath, { flag: "r" }).pipe(
+         Effect.flatMap((file) =>
+           Effect.gen(function* () {
++            if (
++              !(yield* validateCopilotOrigin(
++                transcript.filePath,
++                transcript.copilotOrigin,
++                yield* file.stat,
++              ))
++            )
++              return null;
+             const decoder = new TextDecoder();
+             let remaining = "";
+             let bytesRead = 0;
+@@ -810,6 +1044,7 @@ export const make = Effect.gen(function* () {
+     expected: ReturnType<typeof transcriptIdentity>,
+     recordLimit: number,
+     source: AgentSessionSource,
++    copilotOrigin?: CopilotTranscriptOrigin,
+   ) {
+     if (expected.size > MAX_IMPORTED_TRANSCRIPT_BYTES) return null;
+ 
+@@ -817,7 +1052,11 @@ export const make = Effect.gen(function* () {
+       fileSystem.open(filePath, { flag: "r" }).pipe(
+         Effect.flatMap((file) =>
+           Effect.gen(function* () {
+-            if (!sameTranscriptIdentity(expected, transcriptIdentity(filePath, yield* file.stat))) {
++            const openedStats = yield* file.stat;
++            if (
++              !sameTranscriptIdentity(expected, transcriptIdentity(filePath, openedStats)) ||
++              !(yield* validateCopilotOrigin(filePath, copilotOrigin, openedStats))
++            ) {
+               return null;
+             }
+             const records: Array<DecodedTranscriptRecord> = [];
+@@ -843,7 +1082,8 @@ export const make = Effect.gen(function* () {
+               reader.write(decoder.decode());
+               recordCount += 1;
+               if (recordCount > recordLimit) return false;
+-              const decoded = decodeTranscriptValue(reader.finish());
++              const decoded = decodeSessionRecord(source, reader.finish());
++              if (source === "githubCopilot" && Option.isNone(decoded)) return false;
+               if (Option.isSome(decoded)) {
+                 if (Option.isNone(cwd)) cwd = Option.fromNullOr(extractDecodedCwd(decoded.value));
+                 if (source === "claudeAgent") {
+@@ -887,7 +1127,9 @@ export const make = Effect.gen(function* () {
+             }
+ 
+             if (recordStarted && !(yield* Effect.try(finishRecord))) return null;
+-            return sameTranscriptIdentity(expected, transcriptIdentity(filePath, yield* file.stat))
++            const finalStats = yield* file.stat;
++            return sameTranscriptIdentity(expected, transcriptIdentity(filePath, finalStats)) &&
++              (yield* validateCopilotOrigin(filePath, copilotOrigin, finalStats))
+               ? { records, recordCount, cwd, claudeFields }
+               : null;
+           }),
+@@ -1030,6 +1272,38 @@ export const make = Effect.gen(function* () {
+     },
+   );
+ 
++  const discoverCopilotTranscripts = Effect.fn("AgentSessionScanner.discoverCopilotTranscripts")(
++    function* (homePath: string, providerInstanceId: ProviderInstanceId, operationBudget: number) {
++      const sessionsDir = path.join(homePath, "session-state");
++      const root = yield* fileSystem.realPath(sessionsDir).pipe(Effect.option);
++      if (Option.isNone(root)) return { transcripts: [], truncated: false };
++      const entries = yield* listDirectory(root.value);
++      const transcripts: Array<TranscriptCandidate> = [];
++      let remaining = operationBudget - 1;
++      for (const entry of entries) {
++        if (remaining < 2) break;
++        remaining -= 2;
++        const filePath = path.join(root.value, entry, "events.jsonl");
++        const realFile = yield* fileSystem.realPath(filePath).pipe(Effect.option);
++        if (Option.isNone(realFile) || realFile.value !== filePath) continue;
++        const stats = yield* statOption(filePath);
++        if (Option.isNone(stats) || stats.value.type !== "File" || Option.isNone(stats.value.mtime))
++          continue;
++        transcripts.push({
++          filePath,
++          mtimeMs: stats.value.mtime.value.getTime(),
++          providerInstanceId,
++          size: Number(stats.value.size),
++          copilotOrigin: {
++            canonicalRoot: root.value,
++            identity: transcriptIdentity(filePath, stats.value),
++          },
++        });
++      }
++      return { transcripts, truncated: entries.length * 2 > operationBudget - 1 };
++    },
++  );
++
+   const groupTranscriptsByCwd = Effect.fn("AgentSessionScanner.groupTranscriptsByCwd")(function* (
+     source: AgentSessionSource,
+     transcripts: ReadonlyArray<TranscriptCandidate>,
+@@ -1041,7 +1315,7 @@ export const make = Effect.gen(function* () {
+         cwd: string;
+         providerInstanceId: ProviderInstanceId;
+         lastActiveAtMs: number;
+-        transcripts: Array<{ filePath: string; mtimeMs: number }>;
++        transcripts: Array<TranscriptCandidate>;
+       }
+     >();
+ 
+@@ -1081,7 +1355,7 @@ export const make = Effect.gen(function* () {
+     const raw: Array<RawCandidate> = [];
+     let truncated = false;
+ 
+-    for (const source of ["claudeAgent", "codex"] as const) {
++    for (const source of ["claudeAgent", "codex", "githubCopilot"] as const) {
+       const instances: Array<{
+         readonly instanceId: ProviderInstanceId;
+         readonly config: ProviderInstanceConfig;
+@@ -1111,7 +1385,12 @@ export const make = Effect.gen(function* () {
+       const homes: Array<{ homePath: string; providerInstanceId: ProviderInstanceId }> = [];
+       const seenHomes = new Set<string>();
+       for (const { instanceId, config: instance } of instances) {
+-        const homeVariable = source === "claudeAgent" ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME";
++        const homeVariable =
++          source === "claudeAgent"
++            ? "CLAUDE_CONFIG_DIR"
++            : source === "codex"
++              ? "CODEX_HOME"
++              : "COPILOT_HOME";
+         const environmentHome =
+           instance.environment?.findLast((variable) => variable.name === homeVariable)?.value ??
+           hostEnvironment[homeVariable];
+@@ -1121,7 +1400,7 @@ export const make = Effect.gen(function* () {
+           const config = decodeClaudeSettings(instance.config ?? {});
+           if (Option.isNone(config)) continue;
+           homePath = resolveClaudeConfigDir(config.value.homePath, environmentHome);
+-        } else {
++        } else if (source === "codex") {
+           const config = decodeCodexSettings(instance.config ?? {});
+           if (Option.isNone(config)) continue;
+           const codexSettings =
+@@ -1134,6 +1413,21 @@ export const make = Effect.gen(function* () {
+             Effect.provideService(Path.Path, path),
+           );
+           homePath = layout.sharedHomePath;
++        } else {
++          const config = decodeCopilotSettings(instance.config ?? {});
++          if (Option.isNone(config)) continue;
++          const environment = {
++            ...hostEnvironment,
++            ...Object.fromEntries(
++              instance.environment?.map(({ name, value }) => [name, value]) ?? [],
++            ),
++          };
++          const hostHome = environment.HOME || environment.USERPROFILE || homeDir;
++          const configured =
++            config.value.homePath.trim() ||
++            environmentHome?.trim() ||
++            path.join(hostHome, ".copilot");
++          homePath = path.resolve(expandHomePath(configured, hostHome));
+         }
+ 
+         const homeKey = `${source}\0${yield* directoryIdentity(homePath)}`;
+@@ -1155,7 +1449,9 @@ export const make = Effect.gen(function* () {
+         }
+         const discovered = yield* source === "claudeAgent"
+           ? discoverClaudeTranscripts(home.homePath, home.providerInstanceId, operationBudget)
+-          : discoverCodexTranscripts(home.homePath, home.providerInstanceId, operationBudget);
++          : source === "codex"
++            ? discoverCodexTranscripts(home.homePath, home.providerInstanceId, operationBudget)
++            : discoverCopilotTranscripts(home.homePath, home.providerInstanceId, operationBudget);
+         truncated ||= discovered.truncated;
+         transcriptCandidates.push(...discovered.transcripts);
+       }
+@@ -1372,6 +1668,14 @@ export const make = Effect.gen(function* () {
+           if (Option.isNone(stats) || stats.value.type !== "File") {
+             return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
+           }
++          if (
++            !(yield* validateCopilotOrigin(
++              transcript.filePath,
++              transcript.copilotOrigin,
++              stats.value,
++            ))
++          )
++            return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
+           const identity = transcriptIdentity(transcript.filePath, stats.value);
+           const completedSource = completed?.find(
+             (source) =>
+@@ -1401,6 +1705,7 @@ export const make = Effect.gen(function* () {
+             identity,
+             recordsRemaining,
+             candidate.source,
++            transcript.copilotOrigin,
+           );
+           if (snapshot === null) {
+             return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
+@@ -1422,7 +1727,10 @@ export const make = Effect.gen(function* () {
+             {
+               source: candidate.source,
+               providerInstanceId: candidate.providerInstanceId,
+-              fallbackSessionId: path.basename(transcript.filePath, ".jsonl"),
++              fallbackSessionId:
++                candidate.source === "githubCopilot"
++                  ? path.basename(path.dirname(transcript.filePath))
++                  : path.basename(transcript.filePath, ".jsonl"),
+               lastActiveAtMs: transcript.mtimeMs,
+             },
+             snapshot.records,
+diff --git a/apps/web/src/components/ChatView.tsx b/apps/web/src/components/ChatView.tsx
+index d6d3e09536..58a6837187 100644
+--- a/apps/web/src/components/ChatView.tsx
++++ b/apps/web/src/components/ChatView.tsx
+@@ -1,4 +1,5 @@
+ import { workspaceAreaProps } from "../lib/workspaceFocus";
++import { AGENT_SESSION_SNAPSHOT_NOTICE } from "@t3tools/contracts";
+ import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+ import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
+ import { queuedRunEditBlockedReason } from "@t3tools/client-runtime/queued-run-edit";
+@@ -3458,7 +3459,14 @@ export default function ChatView(props: ChatViewProps) {
+                               onOpenParent={parentThreadLink?.open ?? null}
+                             />
+                           ) : null}
+-                          {!composerMounted ? null : (
++                          {serverThread?.sessionSnapshot !== undefined ? (
++                            <div className="px-4 py-3 text-sm text-muted-foreground" role="note">
++                              <p>{AGENT_SESSION_SNAPSHOT_NOTICE}</p>
++                              <p className="mt-1 break-all font-mono text-xs">
++                                Native session: {serverThread.sessionSnapshot.nativeSessionId}
++                              </p>
++                            </div>
++                          ) : !composerMounted ? null : (
+                             <ChatComposer
+                               canOperateThread={canOperateThread}
+                               reportedModelSelection={reportedModelSelection}
+diff --git a/apps/web/src/components/onboarding/WelcomeWizard.tsx b/apps/web/src/components/onboarding/WelcomeWizard.tsx
+index 50d65192c0..01bc69176a 100644
+--- a/apps/web/src/components/onboarding/WelcomeWizard.tsx
++++ b/apps/web/src/components/onboarding/WelcomeWizard.tsx
+@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/react";
+ import { useAtomValue } from "@effect/atom-react";
+ import type {
+   AgentSessionProjectCandidate,
++  AgentSessionSource,
+   EnvironmentId,
+   ProjectId,
+   ProviderInstanceId,
+@@ -1403,7 +1404,7 @@ function ImportStep({
+         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6">
+           <Spinner size="lg" tone="muted" />
+           <p className="text-center text-sm text-muted-foreground">
+-            Looking for projects from Claude Code and Codex…
++            Looking for projects from Claude Code, Codex and Copilot CLI…
+           </p>
+         </div>
+         <div className="flex justify-end">
+@@ -1418,7 +1419,7 @@ function ImportStep({
+   return (
+     <StepShell
+       title="Import your projects"
+-      description="Import projects and conversations from Claude Code and Codex on your selected computers."
++      description="Import projects and conversations from your selected computers. Copilot CLI history is a read-only text snapshot; native continuation is unavailable."
+     >
+       {candidates.length > 0 ? (
+         <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+@@ -1480,7 +1481,7 @@ function ImportStep({
+                   </div>
+                 ) : scanCandidates.length === 0 ? (
+                   <p className="py-2 text-sm text-muted-foreground">
+-                    No existing Claude Code or Codex projects found.
++                    No existing Claude Code, Codex or Copilot CLI projects found.
+                   </p>
+                 ) : null}
+                 {scan.data?.truncated ? (
+@@ -1720,14 +1721,14 @@ function ImportRowMeta({
+   threadCount,
+   lastActiveAt,
+ }: {
+-  readonly sources: ReadonlyArray<"claudeAgent" | "codex"> | null;
++  readonly sources: ReadonlyArray<AgentSessionSource> | null;
+   readonly threadCount: number;
+   readonly lastActiveAt: string | null;
+ }) {
+   const relative = lastActiveAt === null ? null : formatRelativeTime(lastActiveAt);
+   const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
+   return (
+-    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
++    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
+       <span className="flex size-4 items-center justify-center">
+         {sources?.includes("claudeAgent") ? (
+           <span role="img" aria-label="Claude Code">
+@@ -1750,6 +1751,17 @@ function ImportRowMeta({
+           </span>
+         ) : null}
+       </span>
++      <span className="flex size-4 items-center justify-center">
++        {sources?.includes("githubCopilot") ? (
++          <span role="img" aria-label="Copilot CLI (read-only snapshot)">
++            <ProviderInstanceIcon
++              driverKind={ProviderDriverKind.make("githubCopilot")}
++              displayName="Copilot CLI"
++              iconClassName="size-3"
++            />
++          </span>
++        ) : null}
++      </span>
+       <span className="text-right">{threadCount}</span>
+       <span className="text-right whitespace-nowrap">{age}</span>
+     </span>
+diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
+index 8dc98ce1e4..bbffc43808 100644
+--- a/docs/user/providers-copilot.md
++++ b/docs/user/providers-copilot.md
+@@ -61,7 +61,28 @@ The picker does not currently expose enable/disable controls.
+ 
+ Native conversations resume after reconnecting. If another client already owns a
+ native session, T3 Code refuses to take it over. Close that client before retrying.
+-Older imported conversations may continue in a fresh native session.
++
++### Import existing CLI history
++
++Use **Import projects** in the welcome wizard on the computer that stores your
++Copilot CLI sessions. Import reads the configured account directory without
++starting a provider or taking ownership of a native session. Imported threads
++can also be viewed from connected web, desktop and mobile clients; mobile does
++not yet offer the import picker.
++
++Copilot imports are immutable, read-only text snapshots. They retain the native
++session ID, model and message times, but omit tool activity, attachments and
++possibly older messages. Titles fall back to the first prompt when a native rename
++is not recorded in the journal. A model withdrawn by the provider is not retained
++as the snapshot's selected model. Importing again does not refresh an existing snapshot.
++Invalid journals and files changed since discovery are skipped. Stop activity
++in the CLI and scan again before retrying an import of a changing session.
++Native continuation and copying snapshot context into a new conversation are
++not supported: the current SDK cannot guarantee exclusive admission against
++another CLI controller. Closing a window or an old activity timestamp does not
++establish that ownership was released.
++An offline message recovered for a snapshot is returned to the mobile draft with
++a read-only explanation, without uploading attachments or starting a provider.
+ 
+ Plan mode uses Copilot's native planning flow. Tool approvals and questions appear
+ in the thread. Restricted modes ask before tools run; **Auto-accept edits** allows
+diff --git a/docs/user/welcome-wizard.md b/docs/user/welcome-wizard.md
+index d4604fa7e6..e8941993d3 100644
+--- a/docs/user/welcome-wizard.md
++++ b/docs/user/welcome-wizard.md
+@@ -59,7 +59,8 @@ terminal metadata while the terminal process can use them.
+ 
+ ## Import your projects
+ 
+-T3 Code finds directories that Claude Code or Codex has used. Git repositories
++T3 Code finds directories that Claude Code, Codex or an enabled Copilot CLI
++account has used. Git repositories
+ are listed first, newest activity on top. When the remote is on GitHub, the
+ group shows the repository as `owner/name`. Clones with the same remote share
+ one group. Directories that are not git repositories sit under "Other folders".
+@@ -76,6 +77,10 @@ projects it found and warns when projects or conversations may be missing.
+ 
+ Imported projects include Codex and Claude conversations active within the last
+ 30 days. You can continue those conversations in T3 Code.
++Copilot CLI conversations from that period are imported as read-only text
++snapshots, not resumable native sessions. They remain viewable on connected
++clients, including mobile. See [Copilot CLI history](providers-copilot.md#import-existing-cli-history)
++for limitations.
+ 
+ Conversation import is best effort. T3 Code keeps the first user prompt and the
+ newest remaining visible user and assistant messages, with 200 messages total.
+diff --git a/packages/client-runtime/src/state/models.ts b/packages/client-runtime/src/state/models.ts
+index ac40471a85..86e72dedb0 100644
+--- a/packages/client-runtime/src/state/models.ts
++++ b/packages/client-runtime/src/state/models.ts
+@@ -151,6 +151,7 @@ export interface EnvironmentThreadShell {
+   /** The thread in a linked environment that delegated this one, if one did. */
+   readonly delegatedFrom: OrchestrationV2ThreadShell["delegatedFrom"] | null;
+   readonly activeProviderThreadId: OrchestrationV2ThreadShell["activeProviderThreadId"];
++  readonly sessionSnapshot?: OrchestrationV2ThreadShell["sessionSnapshot"];
+   readonly latestRun: ThreadRunSummary | null;
+   readonly runtime: ThreadRuntimeSummary | null;
+   readonly blockedOnThreadWait?: boolean;
+@@ -304,6 +305,7 @@ export function presentThreadShell(
+     linkOrigin: thread.linkOrigin ?? null,
+     delegatedFrom: thread.delegatedFrom ?? null,
+     activeProviderThreadId: thread.activeProviderThreadId,
++    ...(thread.sessionSnapshot === undefined ? {} : { sessionSnapshot: thread.sessionSnapshot }),
+     latestRun,
+     runtime,
+     blockedOnThreadWait: thread.blockedOnThreadWait ?? false,
+diff --git a/packages/client-runtime/src/state/threadWorkflows.ts b/packages/client-runtime/src/state/threadWorkflows.ts
+index 9e13b669a1..9c308a244a 100644
+--- a/packages/client-runtime/src/state/threadWorkflows.ts
++++ b/packages/client-runtime/src/state/threadWorkflows.ts
+@@ -94,6 +94,7 @@ function resolveThreadProviderSession(projection: Projection): ProviderSession |
+ 
+ export function threadSupportsProviderHandoff(projection: Projection | null | undefined): boolean {
+   if (projection == null) return false;
++  if (projection.thread.sessionSnapshot !== undefined) return false;
+   const session = resolveThreadProviderSession(projection);
+   if (session !== null) {
+     return session.capabilities.sessions.supportsProviderSwitchingViaHandoff;
+diff --git a/packages/contracts/src/agentSessions.ts b/packages/contracts/src/agentSessions.ts
+index a60d702d9a..e7beae7e0d 100644
+--- a/packages/contracts/src/agentSessions.ts
++++ b/packages/contracts/src/agentSessions.ts
+@@ -2,9 +2,21 @@ import * as Schema from "effect/Schema";
+ import { IsoDateTime, NonNegativeInt, ProjectId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+ import { ProviderInstanceId } from "./providerInstance.ts";
+ 
+-export const AgentSessionSource = Schema.Literals(["claudeAgent", "codex"]);
++export const AgentSessionSource = Schema.Literals(["claudeAgent", "codex", "githubCopilot"]);
+ export type AgentSessionSource = typeof AgentSessionSource.Type;
+ 
++export const AgentSessionSnapshot = Schema.Struct({
++  kind: Schema.Literal("copilot_text_snapshot"),
++  providerInstanceId: ProviderInstanceId,
++  nativeSessionId: Schema.String,
++  storageIdentity: Schema.String,
++  capturedAt: IsoDateTime,
++});
++export type AgentSessionSnapshot = typeof AgentSessionSnapshot.Type;
++
++export const AGENT_SESSION_SNAPSHOT_NOTICE =
++  "Read-only Copilot history snapshot. Tools, attachments and possibly older messages are omitted. Native continuation is unavailable because exclusive session ownership cannot be guaranteed.";
++
+ export const AgentSessionImportSource = Schema.Struct({
+   provider: AgentSessionSource,
+   providerInstanceId: ProviderInstanceId,
+diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts
+index 1099a23b1c..b836d6b2f3 100644
+--- a/packages/contracts/src/orchestrationV2.ts
++++ b/packages/contracts/src/orchestrationV2.ts
+@@ -1,4 +1,5 @@
+ import { OrchestrationMessageContext } from "./composerContext.ts";
++import { AgentSessionSnapshot } from "./agentSessions.ts";
+ import { withRecordIdTable } from "./orchestrationV2IdTable.ts";
+ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+@@ -449,6 +450,7 @@ export const OrchestrationV2AppThread = Schema.Struct({
+   branchPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+   activeProviderThreadId: Schema.NullOr(ProviderThreadId),
+   historyOrigin: Schema.optional(OrchestrationV2ThreadHistoryOrigin),
++  sessionSnapshot: Schema.optional(AgentSessionSnapshot),
+   linkOrigin: Schema.optional(OrchestrationV2LinkOrigin),
+   delegatedFrom: Schema.optional(OrchestrationV2DelegatedFrom),
+   lineage: OrchestrationV2AppThreadLineage,
+@@ -2090,6 +2092,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
+   forkedFrom: Schema.NullOr(OrchestrationV2AppThread.fields.forkedFrom),
+   activeProviderThreadId: Schema.NullOr(ProviderThreadId),
+   historyOrigin: Schema.optional(OrchestrationV2ThreadHistoryOrigin),
++  sessionSnapshot: Schema.optional(AgentSessionSnapshot),
+   linkOrigin: Schema.optional(OrchestrationV2LinkOrigin),
+   delegatedFrom: Schema.optional(OrchestrationV2DelegatedFrom),
+   latestRunId: Schema.NullOr(RunId),

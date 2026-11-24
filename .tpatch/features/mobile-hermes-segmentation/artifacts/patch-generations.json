@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "feature": "mobile-hermes-segmentation",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_cf9aa9782ab9",
+      "kind": "record",
+      "patch_sha256": "83bb716203ee0edbc2d814ea8e77a5f2230d796d06839543c8fc9e246ffadf03",
+      "git_patch_id": "9f86aa82735d72cfc2473ad4798ed4aab23b90ad",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "e93f88ae0fd6d1e842bc0eba670fd09ffa88562fea5d06c8b379bd9c5b1a88b0",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "bc9eeb9a6f5e3fe2e6d58d9c1b14d5ed93d6c2be",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/mobile/README.md",
+        "apps/mobile/index.ts",
+        "apps/mobile/package.json",
+        "apps/mobile/src/polyfills.test.ts",
+        "apps/mobile/src/polyfills.ts",
+        "pnpm-lock.yaml"
+      ],
+      "dependencies": [],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "0c550b84876fc1a74692dadb74c99aa9b46dcf99",
+  "baseCommit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+  "pinnedUpstream": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "sdkVersion": "1.0.28",
+  "scope": "Source-qualified candidate for a fault-injected native-ingress stall mechanism; not attribution or closure of issue 42.",
+  "validation": [
+    {
+      "command": "vp test run packages/provider-copilot/src/server/adapter.test.ts -t 'fails its stream and drains'",
+      "when": "Before the product correction, on the validated main implementation with the new regression.",
+      "result": "Failed: the public event consumer never received a terminal stream outcome; the existing 60000ms project ceiling ended the test."
+    },
+    {
+      "command": "vp test run packages/provider-copilot/src/server/adapter.test.ts",
+      "when": "After the product correction.",
+      "result": "Passed: all 38 adapter cases."
+    },
+    {
+      "command": "vp run check:changed",
+      "when": "After the final formatted product correction, before landing.",
+      "result": "Passed: format, lint, both Knip passes, 10 affected package typechecks, and all 38 adjacent adapter tests."
+    }
+  ],
+  "runtimeTranscript": {
+    "kind": "Observed assertions from the executed adapter regression with a disposable fake native SDK; not a real provider or client run.",
+    "steps": [
+      "Resume the fake native-copilot identity and admit one prompt.",
+      "Request abort; the fake emits model_change followed by session.idle.",
+      "Hold and then reject the routing-state read while a drain is pending.",
+      "The public event stream fails with ProviderAdapterEventStreamError retaining ProviderAdapterProtocolError and the original injected error.",
+      "The pending drain and a later drain fail with that same stream-error instance.",
+      "The fake resumed identity is unchanged and the admitted-prompt count remains one."
+    ]
+  },
+  "independentProofs": {
+    "canonicalSourceCoverage": "canonical-source-proof.json",
+    "maintainedRoots": 31,
+    "canonicalReplayExact": true,
+    "includesFileModes": true,
+    "unexplainedProductDifferences": [],
+    "actualLandingCanonicalAndRecipe": "current-root-proof.json",
+    "canonicalRecipeLandingExact": true
+  },
+  "nativeVerification": {
+    "report": "native-after-landing.json",
+    "command": "tpatch verify copilot-native-ingress-supervision --no-write --json",
+    "result": "failed",
+    "failedAt": "parent-landing-drift",
+    "parent": "copilot-cli-provider",
+    "historicalLanding": "132c85398c55a623f9cf72dfecff884da6554abc",
+    "currentLandingEvidence": "exact",
+    "currentCanonicalMaterialization": "materialized-clean",
+    "waiver": false
+  },
+  "notClaimed": [
+    "The receiving-host issue 42 incident has this cause.",
+    "A full orchestration fallback-steer or queued-message recovery was reproduced by this adapter-only regression.",
+    "Historical native verification passed.",
+    "A native retry, prompt resend, reconnect, or replacement conversation was added.",
+    "The candidate is merged to main, packaged, deployed, or installed."
+  ]
+}

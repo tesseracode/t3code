@@ -1,0 +1,32 @@
+{
+  "id": "copilot-context-occupancy",
+  "slug": "copilot-context-occupancy",
+  "title": "Separate native context occupancy from cumulative Copilot billing tokens during history handoff admission, and retain the original failure when native replacement is unsupported. Preserve saved native history and identity; no automatic fresh conversation or truncation. Track issue #39.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-05T07:48:26Z",
+  "updated_at": "2026-11-05T07:54:20Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-05T07:53:05Z",
+    "base_commit": "f03693d6a4b53e4fc16278203a247ccf946b6bef",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-05T07:54:16Z",
+    "passed": false,
+    "recipe_hash_at_verify": "0bf00cf07a300913c3b2c64a51ea969c685a721991d384611fb8cd6caeed7d58",
+    "patch_hash_at_verify": "7fe62a01cbd83a1ec1f97964d78e917664e728ab97e410cd54e12dd17a4b82aa",
+    "parent_snapshot": {
+      "copilot-cli-provider": "applied"
+    }
+  }
+}

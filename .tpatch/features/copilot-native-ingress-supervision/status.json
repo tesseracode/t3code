@@ -1,0 +1,31 @@
+{
+  "id": "copilot-native-ingress-supervision",
+  "slug": "copilot-native-ingress-supervision",
+  "title": "Prevent a failed Copilot native event consumer from leaving an open public event stream and blocked drain receipts. Reproduce the failure during interruption with a rejected routing-state read before native idle, then propagate a typed fatal stream error and the original cause without retry, prompt resend or native replacement. Preserve intentional scope shutdown, native identity, late event ownership, permissions and background-work semantics. This is a causal injected-failure mechanism relevant to #42, not proof of that reported incident.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-06T08:41:18Z",
+  "updated_at": "2026-11-06T08:50:05Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-06T08:50:05Z",
+    "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "stable-main-preservation-v014",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-routing-late-telemetry",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-idle-agent-completion",
+      "kind": "hard"
+    }
+  ]
+}

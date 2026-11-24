@@ -1,0 +1,15 @@
+# Test run — 2026-10-03T14:12:42Z
+# Command: ./node_modules/.bin/vp test run apps/mobile/src/polyfills.test.ts
+# Directory: /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-mobile-devices
+
+[1m[2mnote:[0m[0m You are running [94m`vp test`[39m as a Vite+ built-in command. If you meant to run the test npm script, use [94m`vpr test`[39m instead.
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-mobile-devices[39m
+
+ [32m✓[39m apps/mobile/src/polyfills.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 267[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 07:12:41
+[2m   Duration [22m 369ms[2m (transform 150ms, setup 34ms, import 7ms, tests 267ms, environment 0ms)[22m
+

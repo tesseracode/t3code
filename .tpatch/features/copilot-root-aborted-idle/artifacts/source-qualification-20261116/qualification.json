@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+  "frozenMain": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+  "pinnedUpstream": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "candidateBranch": "tpatch/overnight-reliability-20261115",
+  "candidateStatus": "WIP: source acceptance blocked by two independent provenance findings",
+  "sourceQualified": false,
+  "sdkVersion": "1.0.28",
+  "scope": "Source candidate only. Main promotion and all receiving-runtime, packaging and installation gates remain separate.",
+  "validation": [
+    {
+      "command": "vp test run packages/provider-copilot/src/server/adapter.test.ts -t 'confirms interruption on root'",
+      "when": "Frozen regression extension applied before the product correction.",
+      "result": "Expected failure: root assistant.idle with aborted=true left the turn running instead of interrupted. Session-idle variant passed."
+    },
+    {
+      "command": "vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/textGeneration.test.ts",
+      "result": "Passed: 44 tests, including 39 adapter cases."
+    },
+    {
+      "command": "vp run --filter @t3tools/provider-copilot --cache typecheck",
+      "result": "Passed."
+    },
+    {
+      "command": "vp test run apps/server/src/project/AgentSessionScanner.test.ts apps/server/src/project/AgentSessionImporter.test.ts apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts apps/server/src/orchestration-v2/ProviderSessionManager.test.ts apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts apps/server/src/orchestration-v2/RunExecutionService.test.ts apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts apps/server/src/device/DeviceService.test.ts apps/server/src/device/DeviceMultiHost.test.ts",
+      "result": "Passed: 281 tests in 10 files."
+    },
+    {
+      "command": "vp run check:changed",
+      "result": "Passed: format, lint, both Knip passes, server GraphQL generation, 33 affected-package typechecks and 441 tests in 20 adjacent files."
+    }
+  ],
+  "adapterRuntimeTranscript": {
+    "kind": "Executed deterministic fake-SDK regression assertions, not a real provider or client run.",
+    "steps": [
+      "Resume the same native identity and admit a user turn.",
+      "Expose a retained attached shell as running background work.",
+      "Interrupt; the fixture emits only the selected root idle event with aborted=true.",
+      "Both root session.idle and root assistant.idle variants terminalize as interrupted.",
+      "The retained shell task ID and pending-background-work guard remain present.",
+      "Ordinary assistant.idle, assistant.turn_end and aborted child assistant.idle leave the root running until root session.idle.",
+      "Existing ingress-failure propagation, admission, identity and ownership regressions pass."
+    ]
+  },
+  "replay": {
+    "command": "node .tpatch/features/copilot-root-aborted-idle/artifacts/source-qualification-20261116/prove-candidate.mjs",
+    "report": "candidate-replay-proof.json",
+    "currentRoots": 7,
+    "currentRootCanonicalRecipeLandingExact": true,
+    "allParsedLandingTrailersMatch": true,
+    "changedParentGenerations": [],
+    "historicalScannerDependency": "Original scanner manifest has no dependency snapshot. Its status hard parent copilot-session-import generation 3 is unchanged byte-for-byte from the scanner recorded base; original records were not rewritten.",
+    "mainCompositionCanonicalAndRecipeExact": true,
+    "fullPinnedUpstreamCanonicalRoots": 37,
+    "fullPinnedUpstreamCanonicalExact": true,
+    "includesFileModes": true,
+    "unexplainedProductDifferences": [],
+    "excluded": [
+      ".tpatch administrative metadata only"
+    ],
+    "method": "Strict whole-section forward application; only already-materialized historical file sections permit a strict reverse check. No fuzz, three-way application, discarded context or product exclusions. Each composed root also independently reproduces its exact original landing from its recorded base through both complete canonical patch and recipe.",
+    "historicalPostimages": [
+      "windows-preview-zip-artifact: .github/workflows/fork-native-preview.yml",
+      "linux-runtime-libatomic-prerequisite: docs/operations/fork-native-preview.md"
+    ],
+    "preliminaryWholePatchAttempt": "A forward-only whole-patch reconstruction stopped at the already-materialized Windows preview workflow section. The retained per-section proof strictly reverse-checks that exact postimage and the Linux prerequisite documentation postimage; all remaining sections forward-apply and the final product tree and modes match exactly."
+  },
+  "nativeVerification": {
+    "tool": "tpatch v0.19.0",
+    "commandPattern": "tpatch verify <slug> --no-write --json",
+    "reports": "native-<slug>.json and native-<slug>.stderr",
+    "passed": [
+      "device-session-release",
+      "copilot-session-import",
+      "scanner-canonical-path-exclusion",
+      "workspace-handoff-recovery"
+    ],
+    "failed": [
+      "copilot-native-ingress-supervision",
+      "copilot-text-generation-failure-diagnostics",
+      "copilot-root-aborted-idle"
+    ],
+    "failedAt": "parent-landing-drift",
+    "historicalParent": "copilot-cli-provider",
+    "historicalLanding": "132c85398c55a623f9cf72dfecff884da6554abc",
+    "currentLandingEvidence": "exact",
+    "waiver": false,
+    "policy": "The documented historical-baseline limitation is preserved as failure, not relabeled passed. Acceptance requires the independent exact source/mode proof and review."
+  },
+  "independentReview": {
+    "status": "completed-with-provenance-blockers",
+    "model": "GPT-6.1 Sol",
+    "harness": "GitHub Copilot through T3 Code",
+    "productCodeFindings": [],
+    "result": "independent-review/result.json",
+    "review": "independent-review/review.md",
+    "independentReplay": "independent-review/replay.json",
+    "independentProcedure": "independent-review/replay.py",
+    "independentProcedurePortability": "The original independently authored script is preserved privately with SHA-256 48434d705fec7888a2c12039a129d9c7b121c7d724c425b9cbfb95d966c8a3a9. The committed copy changes only its machine-specific frozen patch input to the TPATCH_INTENDED_PATCH environment variable; the frozen input SHA-256 is 6817e90ec92168870f3bccea2c7e884529d06cbf823bb53ae33b819b839e9c2d. No other review procedure or evidence was changed.",
+    "independentProviderTests": "44 passed",
+    "findings": [
+      {
+        "priority": "P2",
+        "feature": "copilot-native-ingress-supervision",
+        "parent": "copilot-routing-late-telemetry",
+        "capturedAndParentManifestRecipeSha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df",
+        "actualAndParentLandingRecipeSha256": "d2ea728ea2927fa958e78ffff9414a9183a27d5cf44f879525c89a0995c4b4d5",
+        "disposition": "Unresolved inherited checksum discrepancy, already present at frozen main. Exact product replay does not repair it or turn it into the known historical verifier exception. Preserve records; a future authorized native generation repair must refresh affected dependent snapshots."
+      },
+      {
+        "priority": "P3",
+        "feature": "scanner-canonical-path-exclusion",
+        "parent": "copilot-session-import",
+        "disposition": "Unresolved missing dependency-generation snapshot. Original status declares the hard edge but the generation dependencies array is empty. Independent base comparison proves unchanged generation 3 and exact bytes, not a captured attestation. Capture the edge on the next authorized scanner generation refresh."
+      }
+    ]
+  },
+  "preservedWarnings": [
+    "satisfied_by is only valid for upstream_merged parents: copilot-package-payload-pruning -> windows-portable-packaging-tests parent state blocked."
+  ],
+  "boundaries": [
+    "No new real Copilot Stop/restart or paid-provider test turn; receiving-runtime qualification remains open for #44.",
+    "Import is read-only. Native continuation and external-native-owner handoff remain blocked for #33.",
+    "Workspace recovery covers intentional detach/cleanup, not blanket transient stream retries or attribution of every #42 incident.",
+    "The preserved diagnostics boundary commit retains provider-transient-stream-recovery in pre-implementation analyzed state; no generic recovery implementation was added.",
+    "Existing source-built native Electron #43 evidence applies only to unchanged Disconnect UI. No new GUI or device session was started.",
+    "No main/master promotion, upstream reconciliation, PR, tag, publication, signing, installation, deployment or live database change."
+  ]
+}

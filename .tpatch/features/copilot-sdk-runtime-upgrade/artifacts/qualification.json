@@ -1,0 +1,138 @@
+{
+  "feature": "copilot-sdk-runtime-upgrade",
+  "scope": "isolated worktree; not deployed",
+  "verdict": "offline-native-macos-arm64-and-x64-pass; client-fixture-presentation-pass; rollout-blocked",
+  "versions": {
+    "sdk": "1.0.28",
+    "nativeRuntimeReported": "1.0.105",
+    "protocolReported": 3,
+    "koffi": "3.3.1",
+    "vscodeJsonrpc": "8.2.1",
+    "zod": "4.4.3",
+    "node": "24.19.0"
+  },
+  "checks": [
+    {
+      "command": "vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/driver.test.ts packages/provider-copilot/src/server/textGeneration.test.ts scripts/lib/copilot-payload.test.ts packages/shared/src/copilotRuntime.test.ts scripts/lib/cli-external-packages.test.ts scripts/build-desktop-artifact.test.ts",
+      "result": "passed through tpatch test --command: 8 files, 123 tests on final code"
+    },
+    {
+      "command": "vp test run packages/shared/src/copilotRuntime.test.ts scripts/lib/copilot-payload.test.ts scripts/lib/cli-external-packages.test.ts",
+      "result": "passed: 3 files, 47 tests after the final changes"
+    },
+    {
+      "command": "vp run typecheck",
+      "cwd": "packages/provider-copilot",
+      "result": "passed"
+    },
+    {
+      "command": "vp run typecheck",
+      "cwd": "packages/shared",
+      "result": "passed"
+    },
+    {
+      "command": "tsc --noEmit -p scripts/tsconfig.json",
+      "result": "passed: scripts scope"
+    },
+    {
+      "command": "vp lint packages/provider-copilot/src/server/client.ts packages/provider-copilot/src/server/adapter.ts packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/status.test.ts packages/provider-copilot/src/server/tools.ts scripts/lib/copilot-payload.ts scripts/lib/copilot-payload.test.ts scripts/lib/cli-external-packages.test.ts scripts/build-desktop-artifact.ts scripts/build-desktop-artifact.test.ts packages/shared/src/copilotRuntime.ts packages/shared/src/copilotRuntime.test.ts",
+      "result": "passed; final changed closure/test files rechecked"
+    },
+    {
+      "method": "Targeted vp fmt on changed TypeScript/manifests, followed by final whitespace checks",
+      "result": "passed"
+    },
+    {
+      "command": "vp pack",
+      "cwd": "apps/server",
+      "result": "passed: final isolated server bundle built after the mode-receipt change"
+    },
+    {
+      "method": "createRequire rooted at apps/server/dist followed by require('@github/copilot-sdk')",
+      "result": "passed without user-created source-server SDK symlink; persistent regression test added"
+    },
+    {
+      "method": "SDK start/getStatus/stop/forceStop with explicit staged native wrapper, useLoggedInUser=false and disposable empty HOME/COPILOT_HOME",
+      "result": "passed twice: worktree dependencies and production-only dependency stage; runtime 1.0.105, protocol 3; no session or model inference created"
+    },
+    {
+      "method": "pruneCopilotSdkServerPayload against real production-only darwin-arm64 dependency stage",
+      "result": "passed after preserving the actual MSAL/OneAuth companion libraries; zero native files removed on arm64"
+    },
+    {
+      "method": "SHA-512 integrity verification and native-member inspection of published darwin-x64, win32-x64, win32-arm64, linux-x64 and linux-arm64 archives",
+      "result": "passed layout inspection only; no target execution claim"
+    },
+    {
+      "method": "Real SDK/native runtime with useLoggedInUser=false, private disposable HOME/COPILOT_HOME and a loopback OpenAI-compatible inference fixture",
+      "result": "passed native session creation, fixture conversation, explicit save, native stop/start and cold resume retaining the transcript; no authenticated account or vendor inference used",
+      "caveat": "An empty session without a user turn was not resumable after disconnect even with explicit save. Persistence qualification used a real local fixture turn; no regression attribution is established."
+    },
+    {
+      "method": "Real native deferred permission callback returns no-result, then permissions.handlePendingPermissionRequest returns success for approve-once",
+      "result": "passed; harmless printf tool completed with exit 0. Native ask_user invoked the actual onUserInputRequest callback."
+    },
+    {
+      "method": "Hold a received loopback inference request until native session.abort acknowledges cancellation",
+      "result": "passed active native cancellation without sleeps or real inference"
+    },
+    {
+      "method": "Portable qualify-native.mjs executed on actual macOS arm64 and Intel x64",
+      "result": "Both passed startup, fixture conversation, save/cold resume, deferred permission receipt and inert shell completion, user input and active cancellation.",
+      "scriptSha256": "be1bcc2395754230f8c52011662b0cded33958c3364fc583b26bc5038861570f",
+      "arm64": { "node": "24.19.0", "receipt": "native-macos-arm64.jsonl" },
+      "x64": { "os": "macOS 15.7.7", "node": "24.15.0", "receipt": "native-macos-x64.txt" },
+      "scope": "Native SDK only; neither a packaged application nor authenticated Fusion execution."
+    },
+    {
+      "method": "Approved account discovery using both existing identities and separate disposable native homes",
+      "result": "Both authenticated; runtime 1.0.105 returned 20 model IDs including auto, but no catalog.auto. No routing tier was invented and no vendor inference was sent.",
+      "receipts": [
+        "../../copilot-fusion-model-selection/artifacts/account-catalog-default.jsonl",
+        "../../copilot-fusion-model-selection/artifacts/account-catalog-personal.jsonl"
+      ]
+    },
+    {
+      "method": "Approved isolated web and Android projection-fixture presentation",
+      "result": "Routing, observed duration, unknown start, fallback/final model and telemetry-gap details displayed. Web reload and Android process restart retained the seeded history.",
+      "scope": "Synthetic persisted projection items, not real provider Fusion delivery. See Fusion client-presentation.json."
+    },
+    {
+      "method": "Unsigned isolated Mac x64 desktop build preflight",
+      "result": "Blocked before building: Homebrew Rust 1.97.1 lacks the x86_64-apple-darwin standard-library target on the arm64 build host.",
+      "scope": "No packaged artifact was produced or executed; native Intel SDK success does not satisfy this gate."
+    },
+    {
+      "method": "Strict SDK 1.0.28 license manifest generation",
+      "result": "Restored by the separate copilot-sdk-v1-license-notices leaf with exact package/version overrides. All 28 focused license tests passed and actual Metro startup/bundling succeeded without bypassing validation."
+    }
+  ],
+  "remainingGates": [
+    "Account/runtime eligibility advertising enabled Auto/Fusion routing tiers; discovery completed but neither identity advertises catalog.auto",
+    "Authenticated-account session/CLI continuity and native-store rollback safety beyond disposable offline fixture coverage",
+    "Packaged Electron and standalone target execution, including Mac x64, Windows and WSL/Linux; current Mac arm64 evidence is SDK/payload-only",
+    "Actual authenticated Fusion event delivery, model attribution and callback behavior",
+    "Native tpatch verification of overlapping hard-parent postimages; manual composition is not a native pass"
+  ],
+  "offlineImplementationApproval": "Maintainer explicitly approved proceeding with offline Fusion implementation while all unavailable target/account gates continue to block rollout.",
+  "unavailableTargets": {
+    "macosX64": "Actual Intel Mac reached over authorized SSH and native SDK execution passed; packaged execution remains unqualified. Local cross-build preflight lacks the x64 Rust standard library.",
+    "windowsLinux": "No direct target access established; portable harness is committed for the maintainer's Windows/WSL/Ubuntu agents."
+  },
+  "replayRepair": {
+    "result": "SDK verification passes against provider and superseding packaging root before SDK landing",
+    "packagingRoot": "copilot-runtime-packaging-replay",
+    "historicalRoot": "copilot-runtime-packaging",
+    "baseline": "ba951f958e8cd3cb6582f7902171f573621407a7",
+    "anchor": "81304b7e5be0c234ef9261602395185b72bc731b",
+    "method": "Explicit reconstructed baseline plus native supersession; original commits and generations retained; both prerequisites remain hard",
+    "tpatchRelease": "v0.17.0 inspected; no replay-anchor or cross-base repair support"
+  },
+  "constraints": {
+    "paidInference": false,
+    "productionProfileChanged": false,
+    "deployedAppChanged": false,
+    "providerDefaultsChanged": false,
+    "historicalMigrationCleanup": false
+  }
+}

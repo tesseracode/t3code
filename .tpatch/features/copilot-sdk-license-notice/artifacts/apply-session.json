@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-sdk-license-notice",
+  "completed_at": "2026-10-29T16:47:20Z",
+  "base_commit": "8605454d5cba4ab065f43fa694e62868fe093e31",
+  "has_patch": true,
+  "validation_status": "needs_review",
+  "validation_notes": "Source inspected; all other license JSON unchanged; integrated manifest generation pending."
+}

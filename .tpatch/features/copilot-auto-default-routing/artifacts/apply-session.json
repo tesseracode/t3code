@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-auto-default-routing",
+  "completed_at": "2026-11-03T09:03:37Z",
+  "base_commit": "2b383e8463042f4f2332707568dbeab9a39bfe38",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "34 focused routing/discovery/adapter tests, provider typecheck and scoped lint; native Auto fixture evidence established absence of tier metadata does not block plain Auto"
+}

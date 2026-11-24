@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-cli-provider",
+  "completed_at": "2026-10-29T16:30:04Z",
+  "base_commit": "2a79a1b73b15bdd0aa093967855a8a92fd5799d9",
+  "has_patch": true,
+  "validation_status": "needs_review",
+  "validation_notes": "Full source replay and per-file manual inspection; behavioral tests explicitly deferred until all maintained roots integrate. Required reconcile was blocked despite exit 0. v014 central registry, device instruction signature and safe forced-replacement refusal resolved manually."
+}

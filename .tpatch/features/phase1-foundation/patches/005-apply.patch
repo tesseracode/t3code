@@ -1,0 +1,1905 @@
+diff --git a/apps/server/src/orchestration/Layers/CurrentRequestAttention.test.ts b/apps/server/src/orchestration/Layers/CurrentRequestAttention.test.ts
+index 3d93f5b92..0493195c2 100644
+--- a/apps/server/src/orchestration/Layers/CurrentRequestAttention.test.ts
++++ b/apps/server/src/orchestration/Layers/CurrentRequestAttention.test.ts
+@@ -5,6 +5,7 @@ import {
+   type OrchestrationEvent,
+   ProjectId,
+   ProviderInstanceId,
++  type ProviderLifecycleEvidence,
+   ThreadId,
+   TurnId,
+ } from "@t3tools/contracts";
+@@ -95,6 +96,7 @@ const fixture = Effect.gen(function* () {
+       turnId?: TurnId | null;
+       historyImport?: boolean;
+       project?: boolean;
++      responseMode?: "message";
+     } = {},
+   ) {
+     const threadId = options.threadId ?? ThreadId.make("thread");
+@@ -113,6 +115,7 @@ const fixture = Effect.gen(function* () {
+             summary: "private original summary",
+             payload: {
+               requestId,
++              ...(options.responseMode ? { responseMode: options.responseMode } : {}),
+               detail: "private command/error",
+               questions: ["private question"],
+             },
+@@ -126,10 +129,427 @@ const fixture = Effect.gen(function* () {
+   });
+   const list = (threadId = ThreadId.make("thread")) =>
+     attention.listByThreadId({ threadId, limit: 100 });
+-  return { sql, store, pipeline, attention, projectionState, append, thread, activity, list, base };
++  const lifecycle = Effect.fn("test.attentionLifecycle")(function* (
++    transition: ProviderLifecycleEvidence["transition"],
++    options: {
++      turnId?: TurnId | null;
++      providerKey?: string;
++      project?: boolean;
++      historyImport?: boolean;
++      occurredAt?: string;
++      providerEventId?: EventId;
++    } = {},
++  ) {
++    const threadId = ThreadId.make("thread");
++    const event = base(threadId);
++    const turnId = options.turnId === undefined ? TurnId.make("turn") : options.turnId;
++    const providerKey = options.providerKey ?? "githubCopilot";
++    return yield* append(
++      {
++        ...event,
++        ...(options.occurredAt ? { occurredAt: options.occurredAt } : {}),
++        type: "thread.session-set",
++        metadata: options.historyImport ? { historyImport: true } : {},
++        payload: {
++          threadId,
++          session: {
++            threadId,
++            status:
++              transition === "failed"
++                ? "error"
++                : transition === "disconnected"
++                  ? "stopped"
++                  : transition === "interrupted"
++                    ? "interrupted"
++                    : transition === "completed"
++                      ? "ready"
++                      : transition,
++            providerName: "githubCopilot",
++            providerInstanceId: ProviderInstanceId.make(providerKey),
++            runtimeMode: "approval-required",
++            activeTurnId: transition === "running" ? turnId : null,
++            lastError: transition === "failed" ? "private provider failure text" : null,
++            updatedAt: event.occurredAt,
++          },
++          lifecycle: {
++            providerEventId: options.providerEventId ?? event.eventId,
++            providerKey,
++            turnId,
++            transition,
++            ...(transition === "failed" ? { failureReason: "provider_failed" as const } : {}),
++          },
++        },
++      },
++      options.project ?? true,
++    );
++  });
++  const summary = () =>
++    attention.getSummary(ThreadId.make("thread")).pipe(Effect.map(Option.getOrThrow));
++  return {
++    sql,
++    store,
++    pipeline,
++    attention,
++    projectionState,
++    append,
++    thread,
++    activity,
++    list,
++    base,
++    lifecycle,
++    summary,
++  };
+ });
+ 
+ describe("current request attention", () => {
++  it.effect(
++    "persists a disconnect across disk reopen and resolves it after explicit same-turn recovery",
++    () =>
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const path = yield* Path.Path;
++        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-awareness-restart-" });
++        const dbPath = path.join(directory, "state.sqlite");
++        const before = yield* Effect.gen(function* () {
++          const f = yield* fixture;
++          yield* f.thread();
++          yield* f.lifecycle("running");
++          yield* f.lifecycle("disconnected");
++          return { rows: yield* f.list(), summary: yield* f.summary() };
++        }).pipe(Effect.provide(Layer.fresh(makeLayer(dbPath))));
++        yield* Effect.gen(function* () {
++          const f = yield* fixture;
++          assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, before);
++          yield* f.pipeline.bootstrap;
++          assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, before);
++          const threadId = ThreadId.make("thread");
++          yield* f.append({
++            eventId: EventId.make("recovered-after-restart"),
++            commandId: CommandId.make("restart-command"),
++            aggregateKind: "thread",
++            aggregateId: threadId,
++            occurredAt: "2026-09-27T00:00:01Z",
++            causationEventId: null,
++            correlationId: null,
++            metadata: {},
++            type: "thread.session-set",
++            payload: {
++              threadId,
++              session: {
++                threadId,
++                status: "running",
++                providerName: "githubCopilot",
++                runtimeMode: "approval-required",
++                activeTurnId: TurnId.make("turn"),
++                lastError: null,
++                updatedAt: "2026-09-27T00:00:01Z",
++              },
++              lifecycle: {
++                providerEventId: EventId.make("running-after-restart"),
++                providerKey: "githubCopilot",
++                turnId: TurnId.make("turn"),
++                transition: "running",
++              },
++            },
++          });
++          const recovered = { rows: yield* f.list(), summary: yield* f.summary() };
++          assert.equal(recovered.summary.disconnectCount, 0);
++          assert.equal(recovered.summary.phase, "running");
++          assert.equal(recovered.rows[0]?.reasonCode, "provider_recovered");
++          yield* f.attention.reset;
++          yield* f.pipeline.bootstrap;
++          assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, recovered);
++        }).pipe(Effect.provide(Layer.fresh(makeLayer(dbPath))));
++      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
++  );
++
++  it.effect("keeps message-mode questions actionable after native turn completion", () =>
++    Effect.gen(function* () {
++      const f = yield* fixture;
++      yield* f.thread();
++      yield* f.lifecycle("running");
++      yield* f.activity("user-input.requested", "callback");
++      yield* f.activity("user-input.requested", "message", { responseMode: "message" });
++      yield* f.lifecycle("completed");
++      assert.equal(
++        (yield* f.list()).find((row) => row.requestId === "callback")?.status,
++        "resolved",
++      );
++      assert.equal((yield* f.list()).find((row) => row.requestId === "message")?.status, "open");
++      assert.equal((yield* f.summary()).phase, "waiting_for_input");
++      yield* f.activity("user-input.requested", "late-message", { responseMode: "message" });
++      assert.equal((yield* f.summary()).inputCount, 2);
++      yield* f.activity("user-input.resolved", "message");
++      yield* f.activity("user-input.resolved", "late-message");
++      assert.equal((yield* f.summary()).phase, "completed");
++      const expected = { rows: yield* f.list(), summary: yield* f.summary() };
++      yield* f.attention.reset;
++      yield* f.pipeline.bootstrap;
++      assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, expected);
++    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect("bounds summary output and counts overflow without limiting the detail set", () =>
++    Effect.gen(function* () {
++      const f = yield* fixture;
++      yield* f.thread();
++      yield* f.sql`WITH RECURSIVE requests(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM requests WHERE n < 1001)
++        INSERT INTO projection_thread_attention_current
++          (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code, revision,
++           source_event_id, source_sequence, opened_at, updated_at, resolved_at)
++        SELECT printf('%064x', n), 'project', 'thread', 'turn', printf('req-%d',n),
++          'approval', 'open', 'approval_requested', 1, printf('event-%d',n), n,
++          '2026-09-27T00:00:00.000Z', '2026-09-27T00:00:00.000Z', NULL FROM requests`;
++      yield* f.lifecycle("running");
++      const saturated = yield* f.summary();
++      assert.equal(saturated.approvalCount, 999);
++      assert.isTrue(saturated.countsOverflowed);
++      assert.lengthOf(yield* f.list(), 100);
++      yield* f.sql`UPDATE projection_thread_attention_current
++        SET status = 'resolved', reason_code = 'request_resolved', resolved_at = updated_at
++        WHERE request_id IN ('req-1', 'req-2')`;
++      yield* f.lifecycle("running");
++      const exact = yield* f.summary();
++      assert.equal(exact.approvalCount, 999);
++      assert.isFalse(exact.countsOverflowed);
++      assert.equal(exact.revision, saturated.revision + 1);
++      yield* f.lifecycle("completed");
++      assert.equal((yield* f.summary()).approvalCount, 0);
++    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect("ignores replayed provider observations and late pre-recovery errors", () =>
++    Effect.gen(function* () {
++      const f = yield* fixture;
++      yield* f.thread();
++      yield* f.lifecycle("running", { occurredAt: "2026-09-27T00:00:01Z" });
++      const eventId = EventId.make("failed-observation");
++      yield* f.lifecycle("failed", {
++        providerEventId: eventId,
++        occurredAt: "2026-09-27T00:00:02Z",
++      });
++      yield* f.lifecycle("running", { occurredAt: "2026-09-27T00:00:03Z" });
++      const recovered = { rows: yield* f.list(), summary: yield* f.summary() };
++      yield* f.lifecycle("failed", {
++        providerEventId: eventId,
++        occurredAt: "2026-09-27T00:00:04Z",
++      });
++      yield* f.lifecycle("disconnected", { occurredAt: "2026-09-27T00:00:01Z" });
++      assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, recovered);
++      yield* f.lifecycle("running", {
++        turnId: TurnId.make("other"),
++        providerKey: "other",
++        occurredAt: "2026-09-27T00:00:04Z",
++      });
++      yield* f.lifecycle("failed", {
++        turnId: TurnId.make("other"),
++        providerKey: "other",
++        occurredAt: "2026-09-27T00:00:05Z",
++      });
++      assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, recovered);
++      yield* f.attention.reset;
++      yield* f.pipeline.bootstrap;
++      assert.deepEqual({ rows: yield* f.list(), summary: yield* f.summary() }, recovered);
++    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect("projects bounded phases and completes only the matching turn's requests", () =>
++    Effect.gen(function* () {
++      const f = yield* fixture;
++      yield* f.thread();
++      assert.equal((yield* f.summary()).phase, null);
++      yield* f.lifecycle("starting");
++      assert.equal((yield* f.summary()).phase, "starting");
++      yield* f.lifecycle("running");
++      assert.equal((yield* f.summary()).phase, "running");
++      yield* f.activity("approval.requested", "approve");
++      yield* f.activity("user-input.requested", "input");
++      yield* f.activity("approval.requested", "other-turn", { turnId: TurnId.make("other") });
++      const waiting = yield* f.summary();
++      assert.equal(waiting.phase, "waiting_for_approval");
++      assert.equal(waiting.approvalCount, 2);
++      assert.equal(waiting.inputCount, 1);
++      yield* f.activity("provider.approval.respond.failed", "approve");
++      assert.deepEqual(yield* f.summary(), waiting);
++      yield* f.lifecycle("completed");
++      const rows = yield* f.list();
++      assert.equal(rows.find((row) => row.requestId === "other-turn")?.status, "open");
++      assert.isTrue(
++        rows.filter((row) => row.turnId === "turn").every((row) => row.status === "resolved"),
++      );
++      assert.equal((yield* f.summary()).approvalCount, 1);
++      yield* f.activity("approval.resolved", "other-turn", { turnId: TurnId.make("other") });
++      assert.equal((yield* f.summary()).phase, "completed");
++      assert.equal((yield* f.summary()).failureCount, 0);
++      const completed = yield* f.summary();
++      yield* f.lifecycle("starting");
++      yield* f.lifecycle("running");
++      yield* f.lifecycle("failed");
++      yield* f.activity("approval.requested", "late");
++      assert.deepEqual(yield* f.summary(), completed);
++      assert.isFalse((yield* f.list()).some((row) => row.requestId === "late"));
++    }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect(
++    "opens scoped failures and resolves them only on matching recovery, never unrelated work or seen state",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* fixture;
++        yield* f.thread();
++        yield* f.lifecycle("running");
++        yield* f.activity("approval.requested");
++        const failedEvent = yield* f.lifecycle("failed");
++        const failure = (yield* f.list()).find((row) => row.kind === "failure")!;
++        assert.equal(failure.status, "open");
++        assert.equal(failure.reasonCode, "provider_failed");
++        assert.notMatch(Object.values(failure).join(" "), /private/);
++        assert.equal((yield* f.summary()).phase, "failed");
++        assert.equal((yield* f.summary()).approvalCount, 0);
++        yield* f.pipeline.projectEvent(failedEvent);
++        yield* f.lifecycle("failed");
++        assert.deepEqual(
++          (yield* f.list()).find((row) => row.kind === "failure"),
++          failure,
++        );
++        yield* f.lifecycle("ready");
++        yield* f.activity("client.attention.seen");
++        assert.equal((yield* f.list()).find((row) => row.kind === "failure")?.status, "open");
++        yield* f.lifecycle("running");
++        assert.equal(
++          (yield* f.list()).find((row) => row.kind === "failure")?.reasonCode,
++          "provider_recovered",
++        );
++        yield* f.lifecycle("failed");
++        const secondFailure = (yield* f.list()).find(
++          (row) => row.kind === "failure" && row.status === "open",
++        )!;
++        assert.notEqual(secondFailure.attentionId, failure.attentionId);
++        yield* f.lifecycle("running", { turnId: TurnId.make("new") });
++        yield* f.lifecycle("completed", { turnId: TurnId.make("new") });
++        assert.equal((yield* f.summary()).phase, "completed");
++        assert.equal((yield* f.summary()).failureCount, 1);
++        assert.equal(
++          (yield* f.list()).find((row) => row.attentionId === secondFailure.attentionId)?.status,
++          "open",
++        );
++      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect(
++    "distinguishes active provider loss, matching reconnect, client network loss and intentional stop",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* fixture;
++        yield* f.thread();
++        yield* f.lifecycle("disconnected");
++        assert.equal((yield* f.summary()).disconnectCount, 0);
++        yield* f.lifecycle("running");
++        const running = yield* f.summary();
++        yield* f.activity("client.connection.lost");
++        assert.deepEqual(yield* f.summary(), running);
++        yield* f.activity("user-input.requested");
++        yield* f.lifecycle("disconnected");
++        const stale = yield* f.summary();
++        assert.equal(stale.phase, "stale");
++        assert.equal(stale.disconnectCount, 1);
++        assert.equal(stale.inputCount, 1);
++        yield* f.lifecycle("ready");
++        yield* f.lifecycle("running", { turnId: null });
++        assert.deepEqual(yield* f.summary(), stale);
++        yield* f.lifecycle("running");
++        assert.equal((yield* f.summary()).disconnectCount, 0);
++        assert.equal((yield* f.summary()).phase, "waiting_for_input");
++        const threadId = ThreadId.make("thread");
++        yield* f.append({
++          ...f.base(threadId),
++          type: "thread.session-stop-requested",
++          payload: { threadId, createdAt: "2026-09-27T00:00:00.000Z" },
++        });
++        yield* f.lifecycle("disconnected", { turnId: null });
++        assert.equal((yield* f.summary()).disconnectCount, 0);
++        assert.equal((yield* f.summary()).phase, null);
++        assert.equal((yield* f.summary()).inputCount, 0);
++      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect(
++    "rolls back failure rows, turn evidence, summary and cursor together and rebuilds deterministically",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* fixture;
++        yield* f.thread();
++        yield* f.lifecycle("running");
++        const before = yield* f.summary();
++        const event = yield* f.lifecycle("failed", { project: false });
++        yield* f.sql`CREATE TRIGGER fail_summary BEFORE UPDATE ON projection_thread_awareness
++        WHEN NEW.phase = 'failed' BEGIN SELECT RAISE(ABORT, 'test rollback'); END`;
++        assert.equal((yield* f.pipeline.projectEvent(event).pipe(Effect.result))._tag, "Failure");
++        assert.deepEqual(yield* f.summary(), before);
++        assert.deepEqual(yield* f.list(), []);
++        const cursor = yield* f.projectionState.getByProjector({
++          projector: CURRENT_ATTENTION_PROJECTOR,
++        });
++        assert.isTrue(Option.isSome(cursor) && cursor.value.lastAppliedSequence < event.sequence);
++        yield* f.sql`DROP TRIGGER fail_summary`;
++        yield* f.pipeline.projectEvent(event);
++        const state = { summary: yield* f.summary(), rows: yield* f.list() };
++        yield* f.attention.reset;
++        yield* f.pipeline.bootstrap;
++        assert.deepEqual({ summary: yield* f.summary(), rows: yield* f.list() }, state);
++        yield* f.lifecycle("completed", { historyImport: true });
++        assert.deepEqual({ summary: yield* f.summary(), rows: yield* f.list() }, state);
++        const threadId = ThreadId.make("thread");
++        yield* f.append({
++          ...f.base(threadId),
++          type: "thread.reverted",
++          payload: { threadId, turnCount: 0 },
++        });
++        assert.equal((yield* f.summary()).failureCount, 0);
++        yield* f.lifecycle("failed");
++        assert.equal((yield* f.summary()).failureCount, 0);
++      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
++  it.effect(
++    "clears lifecycle state on deletion/recreation without recreating a prior failure",
++    () =>
++      Effect.gen(function* () {
++        const f = yield* fixture;
++        const threadId = ThreadId.make("thread");
++        yield* f.thread();
++        yield* f.lifecycle("running");
++        yield* f.lifecycle("failed");
++        const oldFailure = (yield* f.list())[0]!;
++        yield* f.append({
++          ...f.base(threadId),
++          type: "thread.deleted",
++          payload: { threadId, deletedAt: "2026-09-27T00:00:00.000Z" },
++        });
++        yield* f.lifecycle("failed");
++        assert.isTrue(Option.isNone(yield* f.attention.getSummary(threadId)));
++        assert.deepEqual(yield* f.list(), []);
++        yield* f.thread();
++        assert.equal((yield* f.summary()).phase, null);
++        yield* f.lifecycle("running");
++        yield* f.lifecycle("failed");
++        assert.notEqual((yield* f.list())[0]?.attentionId, oldFailure.attentionId);
++        const projectId = ProjectId.make("project");
++        yield* f.append({
++          ...f.base(threadId),
++          aggregateKind: "project",
++          aggregateId: projectId,
++          type: "project.deleted",
++          payload: { projectId, deletedAt: "2026-09-27T00:00:00.000Z" },
++        });
++        assert.isTrue(Option.isNone(yield* f.attention.getSummary(threadId)));
++        yield* f.attention.reset;
++        yield* f.pipeline.bootstrap;
++        assert.isTrue(Option.isNone(yield* f.attention.getSummary(threadId)));
++        assert.deepEqual(yield* f.list(), []);
++      }).pipe(Effect.provide(Layer.fresh(makeLayer()))),
++  );
++
+   it.effect("isolates multiple kinds, threads and turns; revisions change only materially", () =>
+     Effect.gen(function* () {
+       const f = yield* fixture;
+diff --git a/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.test.ts b/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.test.ts
+index 062a91f8c..ad7700cf2 100644
+--- a/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.test.ts
++++ b/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.test.ts
+@@ -35,6 +35,7 @@ import * as Option from "effect/Option";
+ import * as PubSub from "effect/PubSub";
+ import * as Scope from "effect/Scope";
+ import * as Stream from "effect/Stream";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
+ import * as Tracer from "effect/Tracer";
+ import { it as effectIt } from "@effect/vitest";
+ import { afterEach, describe, expect, it } from "vite-plus/test";
+@@ -412,6 +413,26 @@ describe("ProviderRuntimeIngestion", () => {
+             .pipe(Effect.map(Option.getOrThrow)),
+         ),
+       emit: provider.emit,
++      readAttention: () =>
++        testRuntime.runPromise(
++          Effect.gen(function* () {
++            const sql = yield* SqlClient.SqlClient;
++            return {
++              summaries: yield* sql<{
++                readonly phase: string | null;
++                readonly failure_count: number;
++                readonly disconnect_count: number;
++              }>`
++            SELECT phase, failure_count, disconnect_count FROM projection_thread_awareness WHERE thread_id = 'thread-1'`,
++              items: yield* sql<{
++                readonly kind: string;
++                readonly status: string;
++                readonly reason_code: string;
++              }>`
++            SELECT kind, status, reason_code FROM projection_thread_attention_lifecycle WHERE thread_id = 'thread-1' ORDER BY kind`,
++            };
++          }),
++        ),
+       advanceClock: (ms: number) => {
+         clockOffsetMs += ms;
+       },
+@@ -422,6 +443,88 @@ describe("ProviderRuntimeIngestion", () => {
+     };
+   }
+ 
++  it("persists accepted provider lifecycle scope through the decider into attention", async () => {
++    const harness = await createHarness();
++    const base = {
++      provider: ProviderDriverKind.make("codex"),
++      threadId: asThreadId("thread-1"),
++      createdAt: "2026-01-01T00:00:00.000Z",
++    };
++    const turnId = asTurnId("lifecycle-turn");
++    await harness.emitAndDrain([
++      { ...base, type: "turn.started", eventId: asEventId("life-start"), turnId, payload: {} },
++    ]);
++    expect((await harness.readAttention()).summaries[0]?.phase).toBe("running");
++    await harness.emitAndDrain([
++      {
++        ...base,
++        type: "runtime.error",
++        eventId: asEventId("life-loss"),
++        turnId,
++        payload: { class: "transport_error", message: "private transport detail" },
++      },
++    ]);
++    expect((await harness.readAttention()).summaries[0]).toMatchObject({
++      phase: "stale",
++      disconnect_count: 1,
++    });
++    await harness.emitAndDrain([
++      {
++        ...base,
++        type: "session.state.changed",
++        eventId: asEventId("life-reconnect"),
++        turnId,
++        payload: { state: "running" },
++      },
++    ]);
++    expect((await harness.readAttention()).summaries[0]).toMatchObject({
++      phase: "running",
++      disconnect_count: 0,
++    });
++    await harness.emitAndDrain([
++      {
++        ...base,
++        type: "turn.completed",
++        eventId: asEventId("life-failed"),
++        turnId,
++        payload: { state: "failed", errorMessage: "private failure" },
++      },
++    ]);
++    expect((await harness.readAttention()).summaries[0]).toMatchObject({
++      phase: "failed",
++      failure_count: 1,
++    });
++    await harness.emitAndDrain([
++      {
++        ...base,
++        type: "turn.completed",
++        eventId: asEventId("life-old-complete"),
++        turnId: asTurnId("unrelated"),
++        payload: { state: "completed" },
++      },
++    ]);
++    expect((await harness.readAttention()).summaries[0]?.failure_count).toBe(1);
++    await harness.emitAndDrain([
++      { ...base, type: "turn.started", eventId: asEventId("life-retry"), turnId, payload: {} },
++    ]);
++    await harness.emitAndDrain([
++      {
++        ...base,
++        type: "turn.completed",
++        eventId: asEventId("life-complete"),
++        turnId,
++        payload: { state: "completed" },
++      },
++    ]);
++    const final = await harness.readAttention();
++    expect(final.summaries[0]).toMatchObject({
++      phase: "completed",
++      failure_count: 0,
++      disconnect_count: 0,
++    });
++    expect(final.items.every((item) => item.status === "resolved")).toBe(true);
++  });
++
+   it("maps turn started/completed events into thread session updates", async () => {
+     const harness = await createHarness();
+     const now = "2026-01-01T00:00:00.000Z";
+diff --git a/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts b/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts
+index ee4d08c36..27d52e990 100644
+--- a/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts
++++ b/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts
+@@ -1,3 +1,4 @@
++import { providerLifecycleEvidence } from "../providerLifecycle.ts";
+ import {
+   ApprovalRequestId,
+   CommandId,
+@@ -1606,6 +1607,7 @@ const make = Effect.gen(function* () {
+       const now = event.createdAt;
+       const eventTurnId = toTurnId(event.turnId);
+       const activeTurnId = thread.session?.activeTurnId ?? null;
++      const lifecycle = providerLifecycleEvidence(event, activeTurnId);
+       const isTerminalTurn = event.type === "turn.completed" || event.type === "turn.aborted";
+       const isCompactedThreadState =
+         event.type === "thread.state.changed" && event.payload.state === "compacted";
+@@ -1751,6 +1753,7 @@ const make = Effect.gen(function* () {
+             type: "thread.session.set",
+             commandId: yield* providerCommandId(event, "thread-session-set"),
+             threadId: thread.id,
++            ...(lifecycle ? { lifecycle } : {}),
+             session: {
+               threadId: thread.id,
+               status,
+@@ -2047,6 +2050,7 @@ const make = Effect.gen(function* () {
+             type: "thread.session.set",
+             commandId: yield* providerCommandId(event, "runtime-error-session-set"),
+             threadId: thread.id,
++            ...(lifecycle ? { lifecycle } : {}),
+             session: {
+               threadId: thread.id,
+               status: "error",
+diff --git a/apps/server/src/orchestration/decider.ts b/apps/server/src/orchestration/decider.ts
+index 86be0610f..9521a81e6 100644
+--- a/apps/server/src/orchestration/decider.ts
++++ b/apps/server/src/orchestration/decider.ts
+@@ -1868,6 +1868,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
+         payload: {
+           threadId: command.threadId,
+           session: command.session,
++          ...(command.lifecycle ? { lifecycle: command.lifecycle } : {}),
+         },
+       };
+       // Only a session coming alive is activity worth waking a settled thread
+diff --git a/apps/server/src/orchestration/providerLifecycle.test.ts b/apps/server/src/orchestration/providerLifecycle.test.ts
+new file mode 100644
+index 000000000..4adc695fe
+--- /dev/null
++++ b/apps/server/src/orchestration/providerLifecycle.test.ts
+@@ -0,0 +1,125 @@
++import { describe, expect, it } from "vite-plus/test";
++import {
++  ClientOrchestrationCommand,
++  EventId,
++  ProviderDriverKind,
++  ProviderInstanceId,
++  ProviderLifecycleEvidence,
++  ThreadId,
++  TurnId,
++  type ProviderRuntimeEvent,
++} from "@t3tools/contracts";
++import * as Schema from "effect/Schema";
++import { providerLifecycleEvidence } from "./providerLifecycle.ts";
++
++const isClientCommand = Schema.is(ClientOrchestrationCommand);
++const decodeEvidence = Schema.decodeUnknownSync(ProviderLifecycleEvidence);
++describe("provider lifecycle evidence", () => {
++  for (const provider of [
++    "codex",
++    "claude",
++    "cursor",
++    "grok",
++    "opencode",
++    "antigravity",
++    "githubCopilot",
++  ]) {
++    it(`maps ${provider}'s normalized lifecycle without exposing provider text`, () => {
++      const base = {
++        eventId: EventId.make("provider-event"),
++        threadId: ThreadId.make("thread"),
++        provider: ProviderDriverKind.make(provider),
++        providerInstanceId: ProviderInstanceId.make(`${provider}-account`),
++        createdAt: "2026-09-27T00:00:00Z",
++      };
++      const active = TurnId.make("active");
++      const events: ReadonlyArray<readonly [ProviderRuntimeEvent, string | undefined]> = [
++        [{ ...base, type: "turn.started", payload: {} }, "running"],
++        [
++          { ...base, type: "turn.completed", turnId: active, payload: { state: "completed" } },
++          "completed",
++        ],
++        [
++          {
++            ...base,
++            type: "turn.completed",
++            turnId: active,
++            payload: { state: "failed", errorMessage: "private" },
++          },
++          "failed",
++        ],
++        [
++          { ...base, type: "turn.completed", turnId: active, payload: { state: "cancelled" } },
++          "interrupted",
++        ],
++        [
++          { ...base, type: "turn.aborted", turnId: active, payload: { reason: "private" } },
++          "interrupted",
++        ],
++        [
++          { ...base, type: "session.exited", payload: { reason: "private", exitKind: "error" } },
++          "disconnected",
++        ],
++        [{ ...base, type: "session.state.changed", payload: { state: "running" } }, "running"],
++        [{ ...base, type: "session.state.changed", payload: { state: "ready" } }, "ready"],
++        [{ ...base, type: "session.state.changed", payload: { state: "waiting" } }, undefined],
++        [
++          {
++            ...base,
++            type: "runtime.error",
++            payload: { message: "private", class: "transport_error" },
++          },
++          "disconnected",
++        ],
++        [
++          {
++            ...base,
++            type: "runtime.error",
++            payload: { message: "private", class: "provider_error" },
++          },
++          "failed",
++        ],
++      ];
++      for (const [event, transition] of events) {
++        const evidence = providerLifecycleEvidence(event, active);
++        expect(evidence?.transition).toBe(transition);
++        if (evidence) {
++          expect(decodeEvidence(evidence)).toEqual(evidence);
++          expect(evidence.turnId).toBe(active);
++          expect(evidence.providerKey).toBe(`${provider}-account`);
++          expect(Object.values(evidence).join(" ")).not.toContain("private");
++        }
++      }
++      const unknown = providerLifecycleEvidence(
++        { ...base, type: "runtime.error", payload: { message: "private" } },
++        null,
++      );
++      expect(unknown?.turnId).toBeNull();
++    });
++  }
++  it("does not accept lifecycle authority through the client command union", () => {
++    expect(
++      isClientCommand({
++        type: "thread.session.set",
++        commandId: "client-forged",
++        threadId: "thread",
++        createdAt: "2026-09-27T00:00:00Z",
++        session: {
++          threadId: "thread",
++          status: "stopped",
++          providerName: "codex",
++          runtimeMode: "approval-required",
++          activeTurnId: null,
++          lastError: null,
++          updatedAt: "2026-09-27T00:00:00Z",
++        },
++        lifecycle: {
++          providerEventId: "fake",
++          providerKey: "codex",
++          turnId: "turn",
++          transition: "disconnected",
++        },
++      }),
++    ).toBe(false);
++  });
++});
+diff --git a/apps/server/src/orchestration/providerLifecycle.ts b/apps/server/src/orchestration/providerLifecycle.ts
+new file mode 100644
+index 000000000..e29dc070e
+--- /dev/null
++++ b/apps/server/src/orchestration/providerLifecycle.ts
+@@ -0,0 +1,70 @@
++import type { ProviderLifecycleEvidence, ProviderRuntimeEvent, TurnId } from "@t3tools/contracts";
++
++const lifecycleTypes = new Set<ProviderRuntimeEvent["type"]>([
++  "turn.started",
++  "turn.completed",
++  "turn.aborted",
++  "session.exited",
++  "session.started",
++  "thread.started",
++  "session.state.changed",
++  "runtime.error",
++]);
++/** Keep the accepted provider signal's scope when the ordinary session snapshot clears it. */
++export function providerLifecycleEvidence(
++  event: ProviderRuntimeEvent,
++  activeTurnId: TurnId | null,
++): ProviderLifecycleEvidence | undefined {
++  if (!lifecycleTypes.has(event.type)) return undefined;
++  const base = {
++    providerEventId: event.eventId,
++    providerKey: event.providerInstanceId ?? event.provider,
++    turnId: event.turnId ?? activeTurnId,
++  };
++  switch (event.type) {
++    case "turn.started":
++      return { ...base, transition: "running" };
++    case "turn.completed":
++      return {
++        ...base,
++        transition:
++          event.payload.state === "failed"
++            ? "failed"
++            : event.payload.state === "interrupted" || event.payload.state === "cancelled"
++              ? "interrupted"
++              : "completed",
++        ...(event.payload.state === "failed" ? { failureReason: "provider_failed" as const } : {}),
++      };
++    case "turn.aborted":
++      return { ...base, transition: "interrupted" };
++    case "session.exited":
++      return { ...base, transition: "disconnected" };
++    case "session.started":
++    case "thread.started":
++      return { ...base, transition: "ready" };
++    case "session.state.changed":
++      switch (event.payload.state) {
++        case "starting":
++        case "ready":
++        case "running":
++          return { ...base, transition: event.payload.state };
++        case "error":
++          return { ...base, transition: "failed", failureReason: "provider_failed" };
++        case "stopped":
++          return { ...base, transition: "disconnected" };
++        case "waiting":
++          return undefined;
++      }
++      break;
++    case "runtime.error":
++      return {
++        ...base,
++        transition: event.payload.class === "transport_error" ? "disconnected" : "failed",
++        ...(event.payload.class === "transport_error"
++          ? {}
++          : { failureReason: "runtime_failed" as const }),
++      };
++    default:
++      return undefined;
++  }
++}
+diff --git a/apps/server/src/persistence/ForkMigrations.test.ts b/apps/server/src/persistence/ForkMigrations.test.ts
+index 219cc3683..31314c0ef 100644
+--- a/apps/server/src/persistence/ForkMigrations.test.ts
++++ b/apps/server/src/persistence/ForkMigrations.test.ts
+@@ -10,6 +10,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
+ import { migrationManifest, runMigrations } from "./Migrations.ts";
+ import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.ts";
+ import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
++import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
+ 
+ const attentionName = "ProjectionThreadAttentionAudit";
+ const twsName = "TwsBindings";
+@@ -133,6 +134,7 @@ it.effect("fresh installs keep upstream and fork histories in separate namespace
+         { migration_id: 44, name: attentionName },
+         { migration_id: 45, name: twsName },
+         { migration_id: 46, name: "ProjectionThreadAttentionCurrent" },
++        { migration_id: 47, name: "ProjectionThreadAwareness" },
+       ],
+     );
+     assert.deepEqual(yield* runMigrations(), []);
+@@ -150,7 +152,7 @@ it.effect("upstream-only databases add fork state without rerunning upstream mig
+       original,
+     );
+ 
+-    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 3);
++    assert.lengthOf(yield* sql`SELECT * FROM t3code_fork_migrations`, 4);
+   }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+ );
+ 
+@@ -183,6 +185,65 @@ it.effect(
+     }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
+ );
+ 
++it.effect("upgrades ATT-01 atomically and resets only its derived rows and replay cursor", () =>
++  Effect.gen(function* () {
++    const sql = yield* SqlClient.SqlClient;
++    yield* runMigrations({ toMigrationInclusive: 52 });
++    yield* AttentionAudit;
++    yield* TwsBindings;
++    yield* CurrentAttention;
++    yield* sql`INSERT INTO t3code_fork_migrations (migration_id, name, created_at)
++      VALUES (44, ${attentionName}, ${originalTimestamp}), (45, ${twsName}, ${originalTimestamp}),
++        (46, 'ProjectionThreadAttentionCurrent', ${originalTimestamp})`;
++    yield* sql`INSERT INTO projection_state (projector, last_applied_sequence, updated_at)
++      VALUES ('projection.thread-attention-current', 12, '2026-09-27T00:00:00Z'),
++        ('projection.thread-attention-audit', 12, '2026-09-27T00:00:00Z')`;
++    yield* sql`INSERT INTO projection_thread_attention_audit
++      (event_id, thread_id, kind, sequence, occurred_at)
++      VALUES ('audit', 'thread', 'approval.requested', 12, '2026-09-27T00:00:00Z')`;
++    yield* sql`INSERT INTO projection_thread_attention_context
++      (thread_id, project_id, incarnation_event_id, is_deleted) VALUES ('thread', 'project', 'create', 0)`;
++    yield* sql`INSERT INTO projection_thread_attention_current
++      (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code, revision,
++       source_event_id, source_sequence, opened_at, updated_at, resolved_at)
++      VALUES (${"a".repeat(64)}, 'project', 'thread', 'turn', 'request', 'approval', 'open',
++        'approval_requested', 1, 'audit', 12, '2026-09-27T00:00:00Z', '2026-09-27T00:00:00Z', NULL)`;
++    const previous = yield* sql`SELECT * FROM projection_thread_attention_current`;
++    const cursors = yield* sql`SELECT * FROM projection_state ORDER BY projector`;
++    const history = yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`;
++    yield* sql`CREATE TRIGGER reject_awareness BEFORE INSERT ON t3code_fork_migrations
++      WHEN NEW.migration_id = 47 BEGIN SELECT RAISE(ABORT, 'blocked upgrade'); END`;
++    assert.isTrue(Exit.isFailure(yield* runMigrations().pipe(Effect.exit)));
++    assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_current`, previous);
++    assert.deepEqual(yield* sql`SELECT * FROM projection_state ORDER BY projector`, cursors);
++    assert.deepEqual(
++      yield* sql`SELECT * FROM t3code_fork_migrations ORDER BY migration_id`,
++      history,
++    );
++    assert.deepEqual(
++      yield* sql`SELECT name FROM sqlite_master WHERE name = 'projection_thread_awareness'`,
++      [],
++    );
++    yield* sql`DROP TRIGGER reject_awareness`;
++    yield* runMigrations();
++    assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_current`, []);
++    assert.deepEqual(yield* sql`SELECT * FROM projection_thread_attention_context`, []);
++    assert.deepEqual(
++      yield* sql`SELECT * FROM projection_state WHERE projector = 'projection.thread-attention-current'`,
++      [],
++    );
++    assert.lengthOf(yield* sql`SELECT * FROM projection_thread_attention_audit`, 1);
++    assert.deepEqual(
++      yield* sql`SELECT * FROM t3code_fork_migrations WHERE migration_id <= 46 ORDER BY migration_id`,
++      history,
++    );
++    yield* sql`INSERT INTO projection_state (projector, last_applied_sequence, updated_at)
++      VALUES ('projection.thread-attention-current', 12, '2026-09-27T00:00:00Z')`;
++    yield* runMigrations();
++    assert.deepEqual(yield* sql`SELECT * FROM projection_state ORDER BY projector`, cursors);
++  }).pipe(Effect.provide(NodeSqliteClient.layerMemory())),
++);
++
+ it.effect("does not reinterpret new fork migration IDs as historical upstream collisions", () =>
+   Effect.gen(function* () {
+     const sql = yield* SqlClient.SqlClient;
+diff --git a/apps/server/src/persistence/ForkMigrations.ts b/apps/server/src/persistence/ForkMigrations.ts
+index 19697f49d..5720c50cb 100644
+--- a/apps/server/src/persistence/ForkMigrations.ts
++++ b/apps/server/src/persistence/ForkMigrations.ts
+@@ -5,6 +5,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
+ import AttentionAudit from "./ForkMigrations/044_ProjectionThreadAttentionAudit.ts";
+ import TwsBindings from "./ForkMigrations/045_TwsBindings.ts";
+ import CurrentAttention from "./ForkMigrations/046_ProjectionThreadAttentionCurrent.ts";
++import ThreadAwareness from "./ForkMigrations/047_ProjectionThreadAwareness.ts";
+ import Upstream0044 from "./Migrations/044_ClearAutomaticProjectModelDefaults.ts";
+ import Upstream0045 from "./Migrations/045_ProjectionProjectsAutoPull.ts";
+ 
+@@ -13,6 +14,7 @@ const forkEntries = [
+   [44, "ProjectionThreadAttentionAudit", AttentionAudit],
+   [45, "TwsBindings", TwsBindings],
+   [46, "ProjectionThreadAttentionCurrent", CurrentAttention],
++  [47, "ProjectionThreadAwareness", ThreadAwareness],
+ ] as const;
+ const run = Migrator.make({});
+ 
+@@ -41,6 +43,97 @@ const locatorColumns = [
+ ];
+ const lifecycleColumns = ["first_seen_at", "last_seen_at", "retired_at"];
+ const tables: ReadonlyArray<TableShape> = [
++  {
++    name: "projection_thread_attention_lifecycle",
++    migration: 47,
++    columns: [
++      "attention_id",
++      "project_id",
++      "thread_id",
++      "turn_id",
++      "provider_key",
++      "kind",
++      "status",
++      "reason_code",
++      "revision",
++      "source_event_id",
++      "source_sequence",
++      "opened_at",
++      "updated_at",
++      "resolved_at",
++    ],
++    nullable: ["resolved_at"],
++    primaryKey: ["attention_id"],
++    integerColumns: ["revision", "source_sequence"],
++    indexes: [
++      "idx_attention_lifecycle_thread",
++      "idx_attention_lifecycle_open",
++      "idx_attention_lifecycle_project",
++    ],
++  },
++  {
++    name: "projection_thread_awareness",
++    migration: 47,
++    columns: [
++      "thread_id",
++      "project_id",
++      "turn_id",
++      "reported_turn_id",
++      "provider_key",
++      "base_phase",
++      "pending_start",
++      "stop_requested",
++      "lifecycle_observed_at",
++      "phase",
++      "approval_count",
++      "input_count",
++      "failure_count",
++      "disconnect_count",
++      "counts_overflowed",
++      "revision",
++      "source_event_id",
++      "source_sequence",
++      "updated_at",
++    ],
++    nullable: [
++      "turn_id",
++      "reported_turn_id",
++      "provider_key",
++      "base_phase",
++      "phase",
++      "lifecycle_observed_at",
++    ],
++    primaryKey: ["thread_id"],
++    integerColumns: [
++      "pending_start",
++      "stop_requested",
++      "approval_count",
++      "input_count",
++      "failure_count",
++      "disconnect_count",
++      "counts_overflowed",
++      "revision",
++      "source_sequence",
++    ],
++    indexes: ["idx_thread_awareness_project"],
++  },
++  {
++    name: "projection_thread_attention_turns",
++    migration: 47,
++    columns: ["thread_id", "provider_key", "turn_id", "phase", "source_sequence"],
++    nullable: [],
++    primaryKey: ["thread_id", "provider_key", "turn_id"],
++    integerColumns: ["source_sequence"],
++    indexes: [],
++  },
++  {
++    name: "projection_thread_attention_observations",
++    migration: 47,
++    columns: ["thread_id", "provider_key", "provider_event_id"],
++    nullable: [],
++    primaryKey: ["thread_id", "provider_key", "provider_event_id"],
++    indexes: [],
++  },
+   {
+     name: "projection_thread_attention_context",
+     migration: 46,
+@@ -171,13 +264,17 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
+ ) {
+   const sql = yield* SqlClient.SqlClient;
+   for (const table of tables) {
++    const indexes =
++      table.name === "projection_thread_attention_current" && applied.has(47)
++        ? [...table.indexes, "idx_attention_current_open_counts"]
++        : table.indexes;
+     const objects = yield* sql<{
+       readonly name: string;
+       readonly type: string;
+       readonly tbl_name: string;
+     }>`
+       SELECT name, type, tbl_name FROM sqlite_master
+-      WHERE name = ${table.name} OR ${sql.in("name", table.indexes)}
++      WHERE name = ${table.name} OR ${sql.in("name", indexes)}
+     `;
+     if (!applied.has(table.migration)) {
+       if (objects.length > 0) return yield* badState(`unrecorded objects for ${table.name}`);
+@@ -192,12 +289,18 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
+       readonly notnull: number;
+       readonly pk: number;
+     }>`SELECT name, type, "notnull", pk FROM pragma_table_info(${table.name}) ORDER BY cid`;
++    const turnPolicyColumns =
++      table.name === "projection_thread_attention_current" && applied.has(47)
++        ? ["resolves_with_turn"]
++        : [];
++    const expectedColumns = [...table.columns, ...turnPolicyColumns];
++    const integerColumns = new Set([...(table.integerColumns ?? []), ...turnPolicyColumns]);
+     if (
+-      columns.length !== table.columns.length ||
++      columns.length !== expectedColumns.length ||
+       columns.some(
+         (column, index) =>
+-          column.name !== table.columns[index] ||
+-          column.type !== (table.integerColumns?.includes(column.name) ? "INTEGER" : "TEXT") ||
++          column.name !== expectedColumns[index] ||
++          column.type !== (integerColumns.has(column.name) ? "INTEGER" : "TEXT") ||
+           column.notnull !== (table.nullable.includes(column.name) ? 0 : 1) ||
+           column.pk !== Math.max(0, table.primaryKey.indexOf(column.name) + 1),
+       )
+@@ -232,7 +335,7 @@ const validateForkSchema = Effect.fn("validateForkSchema")(function* (
+       return yield* badState(`foreign-key mismatch in ${table.name}`);
+     }
+     if (
+-      table.indexes.some(
++      indexes.some(
+         (name) =>
+           !objects.some(
+             (object) =>
+diff --git a/apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts b/apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts
+new file mode 100644
+index 000000000..01e8e39ce
+--- /dev/null
++++ b/apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts
+@@ -0,0 +1,50 @@
++import * as Effect from "effect/Effect";
++import * as SqlClient from "effect/unstable/sql/SqlClient";
++
++export default Effect.gen(function* () {
++  const sql = yield* SqlClient.SqlClient;
++  yield* sql`ALTER TABLE projection_thread_attention_current
++    ADD COLUMN resolves_with_turn INTEGER NOT NULL DEFAULT 1 CHECK (resolves_with_turn IN (0, 1))`;
++  yield* sql`CREATE TABLE projection_thread_attention_lifecycle (
++    attention_id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, thread_id TEXT NOT NULL,
++    turn_id TEXT NOT NULL, provider_key TEXT NOT NULL,
++    kind TEXT NOT NULL CHECK (kind IN ('failure', 'disconnect')),
++    status TEXT NOT NULL CHECK (status IN ('open', 'resolved')),
++    reason_code TEXT NOT NULL CHECK (reason_code IN (
++      'provider_failed', 'runtime_failed', 'provider_disconnected', 'provider_recovered',
++      'turn_completed', 'turn_interrupted', 'thread_reverted'
++    )),
++    revision INTEGER NOT NULL CHECK (revision > 0), source_event_id TEXT NOT NULL,
++    source_sequence INTEGER NOT NULL, opened_at TEXT NOT NULL, updated_at TEXT NOT NULL,
++    resolved_at TEXT,
++    CHECK ((status = 'open' AND resolved_at IS NULL) OR (status = 'resolved' AND resolved_at IS NOT NULL))
++  )`;
++  yield* sql`CREATE INDEX idx_attention_lifecycle_thread ON projection_thread_attention_lifecycle(thread_id, attention_id)`;
++  yield* sql`CREATE UNIQUE INDEX idx_attention_lifecycle_open ON projection_thread_attention_lifecycle(thread_id, provider_key, turn_id, kind) WHERE status = 'open'`;
++  yield* sql`CREATE INDEX idx_attention_lifecycle_project ON projection_thread_attention_lifecycle(project_id)`;
++  yield* sql`CREATE INDEX idx_attention_current_open_counts ON projection_thread_attention_current(thread_id, status, kind)`;
++  yield* sql`CREATE TABLE projection_thread_awareness (
++    thread_id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, turn_id TEXT, reported_turn_id TEXT,
++    provider_key TEXT, base_phase TEXT, pending_start INTEGER NOT NULL, stop_requested INTEGER NOT NULL,
++    lifecycle_observed_at TEXT,
++    phase TEXT, approval_count INTEGER NOT NULL, input_count INTEGER NOT NULL,
++    failure_count INTEGER NOT NULL, disconnect_count INTEGER NOT NULL, counts_overflowed INTEGER NOT NULL,
++    revision INTEGER NOT NULL, source_event_id TEXT NOT NULL, source_sequence INTEGER NOT NULL,
++    updated_at TEXT NOT NULL
++  )`;
++  yield* sql`CREATE INDEX idx_thread_awareness_project ON projection_thread_awareness(project_id)`;
++  yield* sql`CREATE TABLE projection_thread_attention_turns (
++    thread_id TEXT NOT NULL, provider_key TEXT NOT NULL, turn_id TEXT NOT NULL,
++    phase TEXT NOT NULL CHECK (phase IN ('running','completed','failed','stale','interrupted')),
++    source_sequence INTEGER NOT NULL,
++    PRIMARY KEY (thread_id, provider_key, turn_id)
++  )`;
++  yield* sql`CREATE TABLE projection_thread_attention_observations (
++    thread_id TEXT NOT NULL, provider_key TEXT NOT NULL, provider_event_id TEXT NOT NULL,
++    PRIMARY KEY (thread_id, provider_key, provider_event_id)
++  )`;
++  // The expanded reducer must replay from the event stream, not consume ATT-01's final rows as historical state.
++  yield* sql`DELETE FROM projection_thread_attention_current`;
++  yield* sql`DELETE FROM projection_thread_attention_context`;
++  yield* sql`DELETE FROM projection_state WHERE projector = 'projection.thread-attention-current'`;
++});
+diff --git a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
+index 8a1b5bb2e..639889e31 100644
+--- a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
++++ b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts
+@@ -1,12 +1,16 @@
+ // @effect-diagnostics nodeBuiltinImport:off
+ import * as NodeCrypto from "node:crypto";
++import { compareDateTimeStrings } from "@t3tools/shared/dateTime";
+ import {
+   ApprovalRequestId,
++  ATTENTION_SUMMARY_COUNT_LIMIT,
+   EventId,
+   type OrchestrationEvent,
+   ProjectId,
+   RequestAttentionKind,
+-  RequestAttentionItem,
++  ThreadAttentionItem,
++  ThreadAwarenessSummary,
++  type ThreadAwarenessPhase,
+   ThreadId,
+   TurnId,
+ } from "@t3tools/contracts";
+@@ -43,6 +47,7 @@ const isActivityKind = Schema.is(ActivityKind);
+ const requestIdentity = Schema.decodeUnknownOption(
+   Schema.Struct({
+     requestId: Schema.optional(ApprovalRequestId),
++    responseMode: Schema.optional(Schema.Unknown),
+   }),
+ );
+ const encodeIdentity = Schema.encodeEffect(
+@@ -50,6 +55,9 @@ const encodeIdentity = Schema.encodeEffect(
+     Schema.Tuple([EventId, RequestAttentionKind, ApprovalRequestId, Schema.NullOr(TurnId)]),
+   ),
+ );
++const encodeLifecycleIdentity = Schema.encodeEffect(
++  Schema.fromJsonString(Schema.Array(Schema.String)),
++);
+ 
+ const make = Effect.gen(function* () {
+   const sql = yield* SqlClient.SqlClient;
+@@ -68,18 +76,41 @@ const make = Effect.gen(function* () {
+   });
+   const list = SqlSchema.findAll({
+     Request: ListCurrentAttentionInput,
+-    Result: RequestAttentionItem,
++    Result: ThreadAttentionItem,
+     execute: ({ threadId, limit, afterAttentionId }) => sql`
+       SELECT attention_id AS "attentionId", project_id AS "projectId", thread_id AS "threadId",
+         turn_id AS "turnId", request_id AS "requestId", kind, status, reason_code AS "reasonCode",
+         revision, source_event_id AS "sourceEventId", source_sequence AS "sourceSequence",
+-        opened_at AS "openedAt", updated_at AS "updatedAt", resolved_at AS "resolvedAt"
+-      FROM projection_thread_attention_current
++        opened_at AS "openedAt", updated_at AS "updatedAt", resolved_at AS "resolvedAt", title
++      FROM (
++        SELECT attention_id, project_id, thread_id, turn_id, request_id, kind, status,
++          reason_code, revision, source_event_id, source_sequence, opened_at, updated_at, resolved_at,
++          NULL AS title FROM projection_thread_attention_current
++        UNION ALL
++        SELECT attention_id, project_id, thread_id, turn_id, NULL AS request_id, kind, status,
++          reason_code, revision, source_event_id, source_sequence, opened_at, updated_at, resolved_at,
++          CASE kind WHEN 'failure' THEN 'Agent failed' ELSE 'Provider disconnected' END AS title
++        FROM projection_thread_attention_lifecycle
++      )
+       WHERE thread_id = ${threadId} AND attention_id > ${afterAttentionId ?? ""}
+       ORDER BY attention_id ASC LIMIT ${limit}
+     `,
+   });
+-  const project = Effect.fn("ProjectionThreadAttentionCurrent.project")(function* (
++  const readSummary = SqlSchema.findOneOption({
++    Request: ThreadId,
++    Result: Schema.Struct({
++      ...ThreadAwarenessSummary.fields,
++      countsOverflowed: Schema.Literals([0, 1]),
++    }),
++    execute: (threadId) => sql`
++      SELECT thread_id AS "threadId", project_id AS "projectId", reported_turn_id AS "turnId", phase,
++        approval_count AS "approvalCount", input_count AS "inputCount", failure_count AS "failureCount",
++        disconnect_count AS "disconnectCount", counts_overflowed AS "countsOverflowed",
++        revision, source_event_id AS "sourceEventId", source_sequence AS "sourceSequence", updated_at AS "updatedAt"
++      FROM projection_thread_awareness WHERE thread_id = ${threadId}
++    `,
++  });
++  const applyRequests = Effect.fn("ProjectionThreadAttentionCurrent.applyRequests")(function* (
+     event: OrchestrationEvent,
+   ) {
+     if (event.type === "thread.activity-appended") {
+@@ -92,11 +123,6 @@ const make = Effect.gen(function* () {
+     ) {
+       return;
+     }
+-    const cursor = yield* sql<{ readonly sequence: number }>`
+-      SELECT last_applied_sequence AS sequence FROM projection_state
+-      WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}
+-    `;
+-    if ((cursor[0]?.sequence ?? 0) >= event.sequence) return;
+     switch (event.type) {
+       case "thread.created":
+         yield* sql`DELETE FROM projection_thread_attention_current WHERE thread_id = ${event.payload.threadId}`;
+@@ -151,7 +177,19 @@ const make = Effect.gen(function* () {
+         }
+         if (thread.value.isDeleted === 1) return;
+         const turnId = event.payload.activity.turnId;
++        const resolvesWithTurn =
++          transition.kind !== "user_input" ||
++          Option.isNone(decoded) ||
++          decoded.value.responseMode !== "message";
+         if (transition.action === "open") {
++          if (turnId !== null && resolvesWithTurn) {
++            const terminal = yield* sql`
++              SELECT 1 FROM projection_thread_attention_turns
++              WHERE thread_id = ${event.payload.threadId} AND turn_id = ${turnId}
++                AND phase IN ('completed', 'interrupted', 'failed') LIMIT 1
++            `;
++            if (terminal.length > 0) return;
++          }
+           const identity = yield* encodeIdentity([
+             thread.value.incarnationEventId,
+             transition.kind,
+@@ -162,11 +200,11 @@ const make = Effect.gen(function* () {
+           yield* sql`
+             INSERT INTO projection_thread_attention_current
+               (attention_id, project_id, thread_id, turn_id, request_id, kind, status, reason_code,
+-               revision, source_event_id, source_sequence, opened_at, updated_at, resolved_at)
++               revision, source_event_id, source_sequence, opened_at, updated_at, resolved_at, resolves_with_turn)
+             VALUES (${attentionId}, ${thread.value.projectId}, ${event.payload.threadId}, ${turnId},
+               ${requestId}, ${transition.kind}, 'open',
+               ${transition.kind === "approval" ? "approval_requested" : "user_input_requested"},
+-              1, ${event.eventId}, ${event.sequence}, ${event.occurredAt}, ${event.occurredAt}, NULL)
++              1, ${event.eventId}, ${event.sequence}, ${event.occurredAt}, ${event.occurredAt}, NULL, ${resolvesWithTurn ? 1 : 0})
+             ON CONFLICT (attention_id) DO NOTHING
+           `;
+           return;
+@@ -211,6 +249,305 @@ const make = Effect.gen(function* () {
+       }
+     }
+   });
++
++  interface AwarenessState {
++    readonly thread_id: string;
++    readonly turn_id: string | null;
++    readonly provider_key: string | null;
++    readonly base_phase: ThreadAwarenessPhase | null;
++    readonly pending_start: number;
++    readonly stop_requested: number;
++    readonly lifecycle_observed_at: string | null;
++  }
++  const refreshSummary = Effect.fn("CurrentAttention.refreshSummary")(function* (
++    threadId: ThreadId,
++    event: OrchestrationEvent,
++  ) {
++    const states =
++      yield* sql<AwarenessState>`SELECT * FROM projection_thread_awareness WHERE thread_id = ${threadId}`;
++    const state = states[0];
++    if (!state) return;
++    const counts = yield* sql<{ readonly kind: string; readonly count: number }>`
++      SELECT 'approval' AS kind, COUNT(*) AS count FROM (
++        SELECT 1 FROM projection_thread_attention_current
++        WHERE thread_id = ${threadId} AND status = 'open' AND kind = 'approval'
++        LIMIT ${ATTENTION_SUMMARY_COUNT_LIMIT + 1})
++      UNION ALL
++      SELECT 'user_input', COUNT(*) FROM (
++        SELECT 1 FROM projection_thread_attention_current
++        WHERE thread_id = ${threadId} AND status = 'open' AND kind = 'user_input'
++        LIMIT ${ATTENTION_SUMMARY_COUNT_LIMIT + 1})
++      UNION ALL
++      SELECT 'failure', COUNT(*) FROM (
++        SELECT 1 FROM projection_thread_attention_lifecycle
++        WHERE thread_id = ${threadId} AND status = 'open' AND kind = 'failure'
++        LIMIT ${ATTENTION_SUMMARY_COUNT_LIMIT + 1})
++      UNION ALL
++      SELECT 'disconnect', COUNT(*) FROM (
++        SELECT 1 FROM projection_thread_attention_lifecycle
++        WHERE thread_id = ${threadId} AND status = 'open' AND kind = 'disconnect'
++        LIMIT ${ATTENTION_SUMMARY_COUNT_LIMIT + 1})
++    `;
++    const count = (kind: string) =>
++      Math.min(ATTENTION_SUMMARY_COUNT_LIMIT, counts.find((row) => row.kind === kind)?.count ?? 0);
++    const approvals = count("approval"),
++      inputs = count("user_input");
++    const failures = count("failure"),
++      disconnects = count("disconnect");
++    const overflow = counts.some((row) => row.count > ATTENTION_SUMMARY_COUNT_LIMIT) ? 1 : 0;
++    const phase =
++      state.base_phase === "failed" || state.base_phase === "stale"
++        ? state.base_phase
++        : approvals > 0
++          ? "waiting_for_approval"
++          : inputs > 0
++            ? "waiting_for_input"
++            : state.pending_start
++              ? "starting"
++              : state.base_phase;
++    yield* sql`
++      UPDATE projection_thread_awareness SET phase = ${phase}, approval_count = ${approvals},
++        reported_turn_id = ${state.turn_id},
++        input_count = ${inputs}, failure_count = ${failures}, disconnect_count = ${disconnects},
++        counts_overflowed = ${overflow}, revision = revision + 1, source_event_id = ${event.eventId},
++        source_sequence = ${event.sequence}, updated_at = ${event.occurredAt}
++      WHERE thread_id = ${threadId} AND (
++        phase IS NOT ${phase} OR reported_turn_id IS NOT ${state.turn_id}
++        OR approval_count != ${approvals} OR input_count != ${inputs}
++        OR failure_count != ${failures} OR disconnect_count != ${disconnects} OR counts_overflowed != ${overflow}
++      )
++    `;
++  });
++
++  const applyLifecycle = Effect.fn("CurrentAttention.applyLifecycle")(function* (
++    event: Extract<OrchestrationEvent, { type: "thread.session-set" }>,
++  ) {
++    const evidence = event.payload.lifecycle;
++    if (!evidence) return;
++    const threadId = event.payload.threadId;
++    const states =
++      yield* sql<AwarenessState>`SELECT * FROM projection_thread_awareness WHERE thread_id = ${threadId}`;
++    const state = states[0];
++    if (!state) return;
++    const owner = yield* context(threadId);
++    if (Option.isNone(owner) || owner.value.isDeleted) return;
++    const observed = yield* sql`
++      INSERT INTO projection_thread_attention_observations (thread_id, provider_key, provider_event_id)
++      VALUES (${threadId}, ${evidence.providerKey}, ${evidence.providerEventId})
++      ON CONFLICT DO NOTHING RETURNING provider_event_id
++    `;
++    if (observed.length === 0) return;
++    if (
++      state.lifecycle_observed_at !== null &&
++      compareDateTimeStrings(event.occurredAt, state.lifecycle_observed_at) < 0
++    )
++      return;
++    if (evidence.transition === "starting") {
++      if (state.base_phase === "completed" && !state.pending_start) return;
++      if (
++        evidence.turnId !== null &&
++        state.turn_id !== null &&
++        (evidence.turnId !== state.turn_id || evidence.providerKey !== state.provider_key)
++      )
++        return;
++      yield* sql`UPDATE projection_thread_awareness SET pending_start = 1, lifecycle_observed_at = ${event.occurredAt}
++        WHERE thread_id = ${threadId}`;
++      return;
++    }
++    if (evidence.transition === "ready") return;
++    const turnId =
++      evidence.turnId ??
++      (state.stop_requested && state.provider_key === evidence.providerKey ? state.turn_id : null);
++    // A provider state without an attributable turn is not proof about another turn.
++    if (turnId === null) return;
++    const turns = yield* sql<{ readonly phase: string; readonly source_sequence: number }>`
++      SELECT phase, source_sequence FROM projection_thread_attention_turns
++      WHERE thread_id = ${threadId} AND provider_key = ${evidence.providerKey} AND turn_id = ${turnId}
++    `;
++    const turn = turns[0];
++    if (turn?.phase === "completed" || turn?.phase === "interrupted") return;
++    const current = state.turn_id === turnId && state.provider_key === evidence.providerKey;
++    if (
++      !current &&
++      state.turn_id !== null &&
++      (evidence.transition !== "running" || (turn !== undefined && !state.pending_start))
++    )
++      return;
++    if (
++      evidence.transition === "running" &&
++      !current &&
++      state.base_phase === "running" &&
++      !state.pending_start
++    )
++      return;
++    let transition = evidence.transition;
++    if (transition === "disconnected") {
++      if (state.stop_requested && current) transition = "interrupted";
++      else if (!current || turn?.phase !== "running") return;
++    }
++    const phase = transition === "disconnected" ? "stale" : transition;
++    yield* sql`
++      INSERT INTO projection_thread_attention_turns (thread_id, provider_key, turn_id, phase, source_sequence)
++      VALUES (${threadId}, ${evidence.providerKey}, ${turnId}, ${phase}, ${event.sequence})
++      ON CONFLICT (thread_id, provider_key, turn_id) DO UPDATE SET phase = excluded.phase,
++        source_sequence = excluded.source_sequence
++    `;
++    if (transition === "running" || transition === "completed") {
++      yield* sql`
++        UPDATE projection_thread_attention_lifecycle SET status = 'resolved',
++          reason_code = ${transition === "running" ? "provider_recovered" : "turn_completed"},
++          revision = revision + 1, source_event_id = ${event.eventId}, source_sequence = ${event.sequence},
++          updated_at = ${event.occurredAt}, resolved_at = ${event.occurredAt}
++        WHERE thread_id = ${threadId} AND provider_key = ${evidence.providerKey}
++          AND turn_id = ${turnId} AND status = 'open'
++      `;
++    }
++    if (transition === "completed" || transition === "failed" || transition === "interrupted") {
++      yield* sql`
++        UPDATE projection_thread_attention_current SET status = 'resolved', reason_code = 'request_resolved',
++          revision = revision + 1, source_event_id = ${event.eventId}, source_sequence = ${event.sequence},
++          updated_at = ${event.occurredAt}, resolved_at = ${event.occurredAt}
++        WHERE thread_id = ${threadId} AND turn_id = ${turnId} AND status = 'open' AND resolves_with_turn = 1
++      `;
++      if (transition === "interrupted") {
++        yield* sql`
++          UPDATE projection_thread_attention_lifecycle SET status = 'resolved', reason_code = 'turn_interrupted',
++            revision = revision + 1, source_event_id = ${event.eventId}, source_sequence = ${event.sequence},
++            updated_at = ${event.occurredAt}, resolved_at = ${event.occurredAt}
++          WHERE thread_id = ${threadId} AND provider_key = ${evidence.providerKey} AND turn_id = ${turnId}
++            AND kind = 'disconnect' AND status = 'open'
++        `;
++      }
++    }
++    if (transition === "failed" || transition === "disconnected") {
++      const kind = transition === "failed" ? "failure" : "disconnect";
++      const reason =
++        kind === "failure"
++          ? (evidence.failureReason ?? "provider_failed")
++          : "provider_disconnected";
++      const existing = yield* sql<{ readonly attention_id: string; readonly reason_code: string }>`
++        SELECT attention_id, reason_code FROM projection_thread_attention_lifecycle
++        WHERE thread_id = ${threadId} AND provider_key = ${evidence.providerKey} AND turn_id = ${turnId}
++          AND kind = ${kind} AND status = 'open'
++      `;
++      if (existing[0]) {
++        if (existing[0].reason_code !== reason)
++          yield* sql`
++          UPDATE projection_thread_attention_lifecycle SET reason_code = ${reason}, revision = revision + 1,
++            source_event_id = ${event.eventId}, source_sequence = ${event.sequence}, updated_at = ${event.occurredAt}
++          WHERE attention_id = ${existing[0].attention_id}
++        `;
++      } else {
++        const identity = yield* encodeLifecycleIdentity([
++          owner.value.incarnationEventId,
++          kind,
++          evidence.providerKey,
++          turnId,
++          event.eventId,
++        ]);
++        const id = NodeCrypto.createHash("sha256").update(identity).digest("hex");
++        yield* sql`
++          INSERT INTO projection_thread_attention_lifecycle
++            (attention_id, project_id, thread_id, turn_id, provider_key, kind, status, reason_code,
++             revision, source_event_id, source_sequence, opened_at, updated_at, resolved_at)
++          VALUES (${id}, ${owner.value.projectId}, ${threadId}, ${turnId}, ${evidence.providerKey}, ${kind},
++            'open', ${reason}, 1, ${event.eventId}, ${event.sequence}, ${event.occurredAt}, ${event.occurredAt}, NULL)
++        `;
++      }
++    }
++    // Old failures stay independently visible when a different turn starts.
++    yield* sql`
++      UPDATE projection_thread_awareness SET turn_id = ${turnId}, provider_key = ${evidence.providerKey},
++        lifecycle_observed_at = ${event.occurredAt},
++        base_phase = ${transition === "interrupted" ? null : phase},
++        pending_start = ${transition !== "completed" ? 0 : state.pending_start},
++        stop_requested = ${transition === "interrupted" || transition === "completed" ? 0 : state.stop_requested}
++      WHERE thread_id = ${threadId}
++    `;
++  });
++
++  const project = Effect.fn("ProjectionThreadAttentionCurrent.project")(function* (
++    event: OrchestrationEvent,
++  ) {
++    if (event.metadata.historyImport === true && event.type !== "thread.created") return;
++    if (event.type === "thread.session-set" && event.payload.lifecycle === undefined) return;
++    if (event.type === "thread.activity-appended" && !isActivityKind(event.payload.activity.kind))
++      return;
++    if (
++      event.type !== "thread.activity-appended" &&
++      ![
++        "thread.created",
++        "thread.deleted",
++        "project.deleted",
++        "thread.reverted",
++        "thread.session-set",
++        "thread.turn-start-requested",
++        "thread.session-stop-requested",
++        "thread.turn-interrupt-requested",
++      ].includes(event.type)
++    )
++      return;
++    const cursor = yield* sql<{ readonly sequence: number }>`
++      SELECT last_applied_sequence AS sequence FROM projection_state WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}
++    `;
++    if ((cursor[0]?.sequence ?? 0) >= event.sequence) return;
++    yield* applyRequests(event);
++    switch (event.type) {
++      case "thread.created":
++        yield* sql`DELETE FROM projection_thread_attention_observations WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`DELETE FROM projection_thread_attention_lifecycle WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`DELETE FROM projection_thread_attention_turns WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`DELETE FROM projection_thread_awareness WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`INSERT INTO projection_thread_awareness
++          (thread_id, project_id, turn_id, provider_key, base_phase, pending_start, stop_requested, phase,
++           approval_count, input_count, failure_count, disconnect_count, counts_overflowed,
++           revision, source_event_id, source_sequence, updated_at)
++          VALUES (${event.payload.threadId}, ${event.payload.projectId}, NULL, NULL, NULL, 0, 0, NULL,
++            0, 0, 0, 0, 0, 1, ${event.eventId}, ${event.sequence}, ${event.occurredAt})`;
++        return;
++      case "project.deleted":
++        yield* sql`DELETE FROM projection_thread_attention_observations WHERE thread_id IN
++          (SELECT thread_id FROM projection_thread_awareness WHERE project_id = ${event.payload.projectId})`;
++        yield* sql`DELETE FROM projection_thread_attention_turns WHERE thread_id IN
++          (SELECT thread_id FROM projection_thread_awareness WHERE project_id = ${event.payload.projectId})`;
++        yield* sql`DELETE FROM projection_thread_attention_lifecycle WHERE project_id = ${event.payload.projectId}`;
++        yield* sql`DELETE FROM projection_thread_awareness WHERE project_id = ${event.payload.projectId}`;
++        return;
++      case "thread.deleted":
++        yield* sql`DELETE FROM projection_thread_attention_observations WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`DELETE FROM projection_thread_attention_lifecycle WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`DELETE FROM projection_thread_attention_turns WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`DELETE FROM projection_thread_awareness WHERE thread_id = ${event.payload.threadId}`;
++        return;
++      case "thread.reverted":
++        yield* sql`UPDATE projection_thread_attention_lifecycle SET status = 'resolved', reason_code = 'thread_reverted',
++          revision = revision + 1, source_event_id = ${event.eventId}, source_sequence = ${event.sequence},
++          updated_at = ${event.occurredAt}, resolved_at = ${event.occurredAt}
++          WHERE thread_id = ${event.payload.threadId} AND status = 'open'`;
++        yield* sql`UPDATE projection_thread_attention_turns SET phase = 'interrupted', source_sequence = ${event.sequence}
++          WHERE thread_id = ${event.payload.threadId}`;
++        yield* sql`UPDATE projection_thread_awareness SET base_phase = NULL, pending_start = 0, stop_requested = 0
++          WHERE thread_id = ${event.payload.threadId}`;
++        break;
++      case "thread.turn-start-requested":
++        yield* sql`UPDATE projection_thread_awareness SET pending_start = 1, stop_requested = 0 WHERE thread_id = ${event.payload.threadId}`;
++        break;
++      case "thread.session-stop-requested":
++        yield* sql`UPDATE projection_thread_awareness SET stop_requested = 1 WHERE thread_id = ${event.payload.threadId}`;
++        break;
++      case "thread.turn-interrupt-requested":
++        yield* sql`UPDATE projection_thread_awareness SET stop_requested = 1 WHERE thread_id = ${event.payload.threadId}
++          AND (${event.payload.turnId ?? null} IS NULL OR turn_id = ${event.payload.turnId ?? null})`;
++        break;
++      case "thread.session-set":
++        yield* applyLifecycle(event);
++        break;
++      default:
++        break;
++    }
++    if (event.aggregateKind === "thread")
++      yield* refreshSummary(ThreadId.make(event.aggregateId), event);
++  });
+   const mapError = (operation: string) => (cause: unknown) =>
+     Schema.isSchemaError(cause)
+       ? toPersistenceDecodeError(operation)(cause)
+@@ -218,11 +555,20 @@ const make = Effect.gen(function* () {
+   return ProjectionThreadAttentionCurrentRepository.of({
+     project: (event) => project(event).pipe(Effect.mapError(mapError("CurrentAttention.project"))),
+     listByThreadId: (input) => list(input).pipe(Effect.mapError(mapError("CurrentAttention.list"))),
++    getSummary: (threadId) =>
++      readSummary(threadId).pipe(
++        Effect.map(Option.map((row) => ({ ...row, countsOverflowed: row.countsOverflowed === 1 }))),
++        Effect.mapError(mapError("CurrentAttention.getSummary")),
++      ),
+     reset: sql
+       .withTransaction(
+         Effect.gen(function* () {
+           yield* sql`DELETE FROM projection_thread_attention_current`;
+           yield* sql`DELETE FROM projection_thread_attention_context`;
++          yield* sql`DELETE FROM projection_thread_attention_lifecycle`;
++          yield* sql`DELETE FROM projection_thread_attention_turns`;
++          yield* sql`DELETE FROM projection_thread_attention_observations`;
++          yield* sql`DELETE FROM projection_thread_awareness`;
+           yield* sql`DELETE FROM projection_state WHERE projector = ${CURRENT_ATTENTION_PROJECTOR}`;
+         }),
+       )
+diff --git a/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts
+index c67a4afeb..bfa2525b0 100644
+--- a/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts
++++ b/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts
+@@ -2,11 +2,13 @@ import {
+   AttentionId,
+   type OrchestrationEvent,
+   PositiveInt,
+-  type RequestAttentionItem,
++  type ThreadAttentionItem,
++  type ThreadAwarenessSummary,
+   ThreadId,
+ } from "@t3tools/contracts";
+ import * as Context from "effect/Context";
+ import type * as Effect from "effect/Effect";
++import type * as Option from "effect/Option";
+ import * as Schema from "effect/Schema";
+ import type { ProjectionRepositoryError } from "../Errors.ts";
+ 
+@@ -24,7 +26,10 @@ export class ProjectionThreadAttentionCurrentRepository extends Context.Service<
+     readonly project: (event: OrchestrationEvent) => Effect.Effect<void, ProjectionRepositoryError>;
+     readonly listByThreadId: (
+       input: typeof ListCurrentAttentionInput.Type,
+-    ) => Effect.Effect<ReadonlyArray<RequestAttentionItem>, ProjectionRepositoryError>;
++    ) => Effect.Effect<ReadonlyArray<ThreadAttentionItem>, ProjectionRepositoryError>;
++    readonly getSummary: (
++      threadId: ThreadId,
++    ) => Effect.Effect<Option.Option<ThreadAwarenessSummary>, ProjectionRepositoryError>;
+     /** Clears only this projection and its cursor; pipeline bootstrap replays the durable event store. */
+     readonly reset: Effect.Effect<void, ProjectionRepositoryError>;
+   }
+diff --git a/docs/internals/overview.md b/docs/internals/overview.md
+index 10cfdd278..ac0f70b8b 100644
+--- a/docs/internals/overview.md
++++ b/docs/internals/overview.md
+@@ -88,7 +88,7 @@ Keep this upgrade path when reconciling future releases; never remove old
+ records just to satisfy a newer manifest. Explicit migration bounds used by
+ tests build upstream-only fixtures; normal startup also runs fork migrations.
+ 
+-### Current request attention
++### Current attention and lifecycle awareness
+ 
+ Current approval/input attention is separate from the compact audit. Rebuild
+ it from persisted orchestration events, not audit rows or the latest thread
+@@ -102,8 +102,42 @@ Resolved identities stay closed. Turn-scoped identities distinguish reused
+ request IDs; an unscoped reply is ignored with a warning when history makes
+ its target ambiguous. Revert resolves remaining requests; deletion removes
+ current rows, recreation starts a new incarnation, and imported history never
+-creates actionable requests. Completion, failure and disconnect awareness
+-are separate follow-up work.
++creates actionable requests.
++
++Accepted provider lifecycle observations travel as an optional, bounded
++`lifecycle` field on existing session-set events. The provider boundary retains
++the originating turn before the ordinary session snapshot clears it; no prompt,
++raw error or command text is copied into awareness. Legacy events without that
++evidence remain unknown rather than interpreting any `stopped` status as a
++provider disconnect or any `ready` status as a completed turn.
++
++The current projection stores failure/disconnect items separately from request
++rows, plus bounded thread counts and an explicit unknown (`null`) phase.
++Detail reads merge both item kinds; counts saturate at 999 with an overflow
++flag and never replace the detail set. Provider observations are deduplicated
++inside the same projection transaction, and older provider timestamps cannot
++roll back recovered lifecycle state. Terminal turn tombstones reject late
++reopens. Client WebSocket loss does not enter this provider-evidence path.
++
++| Accepted transition | Resolution policy |
++|---|---|
++| Running for the same provider/turn | Resolve its failure/disconnect as recovered; a different turn leaves older items open |
++| Turn completion | Resolve only that turn's callback requests and matching failure/disconnect; create no completion item |
++| Turn failure | Close obsolete native callback requests; open/update its static failure item |
++| Provider exit/transport loss while that turn is running | Open disconnect and mark stale, unless an explicit stop/interruption was requested |
++| Intentional interruption/stop followed by provider exit | Close obsolete callback requests and disconnect, without inventing successful completion or clearing a failure |
++| Ready/reconnect without attributable running-turn evidence | Do not resolve an item |
++| Revert/delete/recreation | Revert resolves open items; deletion purges state; recreation starts a new incarnation |
++
++Message-mode questions may outlive the originating turn. Preserve them until a
++canonical answer/dismissal or explicit revert/delete instead of treating every
++question as a native callback. A source event can change multiple items and the
++summary; source event IDs therefore are not unique across attention rows.
++
++Fork migration 47 resets only the derived attention state/cursor so the expanded
++reducer can replay the durable event stream with its new semantics. Audit and
++other projection cursors stay intact. It does not synthesize missing lifecycle
++evidence for historical events.
+ 
+ Rows and the internal projection cursor share the existing event/receipt
+ transaction. Replay emits no notification; future delivery must publish only
+diff --git a/packages/contracts/src/attention.test.ts b/packages/contracts/src/attention.test.ts
+index cebcaaa2a..383f1101d 100644
+--- a/packages/contracts/src/attention.test.ts
++++ b/packages/contracts/src/attention.test.ts
+@@ -1,8 +1,15 @@
+ import { describe, expect, it } from "vite-plus/test";
+ import * as Schema from "effect/Schema";
+-import { AttentionId, RequestAttentionItem } from "./attention.ts";
++import {
++  AttentionId,
++  RequestAttentionItem,
++  ThreadAttentionItem,
++  ThreadAwarenessSummary,
++} from "./attention.ts";
+ const decodeItem = Schema.decodeUnknownSync(RequestAttentionItem);
+ const decodeId = Schema.decodeUnknownSync(AttentionId);
++const decodeAttention = Schema.decodeUnknownSync(ThreadAttentionItem);
++const decodeSummary = Schema.decodeUnknownSync(ThreadAwarenessSummary);
+ 
+ const row = {
+   attentionId: "a".repeat(64),
+@@ -21,6 +28,36 @@ const row = {
+   resolvedAt: null,
+ };
+ describe("current request attention contracts", () => {
++  it("requires bounded lifecycle summaries and redacted static lifecycle item titles", () => {
++    const summary = {
++      projectId: row.projectId,
++      threadId: row.threadId,
++      turnId: null,
++      phase: "failed",
++      approvalCount: 999,
++      inputCount: 0,
++      failureCount: 1,
++      disconnectCount: 0,
++      countsOverflowed: true,
++      revision: 1,
++      sourceEventId: row.sourceEventId,
++      sourceSequence: row.sourceSequence,
++      updatedAt: row.updatedAt,
++    };
++    expect(decodeSummary(summary)).toEqual(summary);
++    expect(() => decodeSummary({ ...summary, approvalCount: 1000 })).toThrow();
++    expect(() => decodeSummary({ ...summary, failureCount: -1 })).toThrow();
++    const lifecycle = {
++      ...row,
++      turnId: "turn",
++      requestId: null,
++      kind: "failure",
++      title: "Agent failed",
++      reasonCode: "provider_failed",
++    };
++    expect(decodeAttention({ ...lifecycle, detail: "private tool output" })).toEqual(lifecycle);
++    expect(() => decodeAttention({ ...lifecycle, title: "private tool output" })).toThrow();
++  });
+   it("accepts bounded request state without storing prompts, commands or raw failure details", () => {
+     const decoded = decodeItem({
+       ...row,
+diff --git a/packages/contracts/src/attention.ts b/packages/contracts/src/attention.ts
+index 056520d9e..e6490266e 100644
+--- a/packages/contracts/src/attention.ts
++++ b/packages/contracts/src/attention.ts
+@@ -8,6 +8,7 @@ import {
+   ProjectId,
+   ThreadId,
+   TurnId,
++  TrimmedNonEmptyString,
+ } from "./baseSchemas.ts";
+ 
+ export const AttentionId = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/)).pipe(
+@@ -47,3 +48,79 @@ export const RequestAttentionItem = Schema.Union([
+   }),
+ ]);
+ export type RequestAttentionItem = typeof RequestAttentionItem.Type;
++
++export const ProviderLifecycleEvidence = Schema.Struct({
++  providerEventId: EventId,
++  providerKey: TrimmedNonEmptyString,
++  turnId: Schema.NullOr(TurnId),
++  transition: Schema.Literals([
++    "starting",
++    "ready",
++    "running",
++    "completed",
++    "failed",
++    "disconnected",
++    "interrupted",
++  ]),
++  failureReason: Schema.optional(Schema.Literals(["provider_failed", "runtime_failed"])),
++});
++export type ProviderLifecycleEvidence = typeof ProviderLifecycleEvidence.Type;
++
++const lifecycleFields = {
++  ...fields,
++  turnId: TurnId,
++  requestId: Schema.Null,
++  kind: Schema.Literals(["failure", "disconnect"]),
++  title: Schema.Literals(["Agent failed", "Provider disconnected"]),
++};
++export const LifecycleAttentionItem = Schema.Union([
++  Schema.Struct({
++    ...lifecycleFields,
++    status: Schema.Literal("open"),
++    reasonCode: Schema.Literals(["provider_failed", "runtime_failed", "provider_disconnected"]),
++    resolvedAt: Schema.Null,
++  }),
++  Schema.Struct({
++    ...lifecycleFields,
++    status: Schema.Literal("resolved"),
++    reasonCode: Schema.Literals([
++      "provider_recovered",
++      "turn_completed",
++      "turn_interrupted",
++      "thread_reverted",
++    ]),
++    resolvedAt: IsoDateTime,
++  }),
++]);
++export type LifecycleAttentionItem = typeof LifecycleAttentionItem.Type;
++export const ThreadAttentionItem = Schema.Union([RequestAttentionItem, LifecycleAttentionItem]);
++export type ThreadAttentionItem = typeof ThreadAttentionItem.Type;
++
++export const ThreadAwarenessPhase = Schema.Literals([
++  "starting",
++  "running",
++  "waiting_for_approval",
++  "waiting_for_input",
++  "completed",
++  "failed",
++  "stale",
++]);
++export type ThreadAwarenessPhase = typeof ThreadAwarenessPhase.Type;
++export const ATTENTION_SUMMARY_COUNT_LIMIT = 999;
++const Count = NonNegativeInt.check(Schema.isLessThanOrEqualTo(ATTENTION_SUMMARY_COUNT_LIMIT));
++export const ThreadAwarenessSummary = Schema.Struct({
++  threadId: ThreadId,
++  projectId: ProjectId,
++  turnId: Schema.NullOr(TurnId),
++  phase: Schema.NullOr(ThreadAwarenessPhase),
++  approvalCount: Count,
++  inputCount: Count,
++  failureCount: Count,
++  disconnectCount: Count,
++  countsOverflowed: Schema.Boolean,
++  revision: PositiveInt,
++  sourceEventId: EventId,
++  sourceSequence: NonNegativeInt,
++  updatedAt: IsoDateTime,
++});
++export type ThreadAwarenessSummary = typeof ThreadAwarenessSummary.Type;
+diff --git a/packages/contracts/src/orchestration.ts b/packages/contracts/src/orchestration.ts
+index 7b8017614..fd70e7834 100644
+--- a/packages/contracts/src/orchestration.ts
++++ b/packages/contracts/src/orchestration.ts
+@@ -4,6 +4,7 @@ import * as SchemaIssue from "effect/SchemaIssue";
+ import * as SchemaTransformation from "effect/SchemaTransformation";
+ import * as Struct from "effect/Struct";
+ import { OrchestrationMessageContext } from "./composerContext.ts";
++import { ProviderLifecycleEvidence } from "./attention.ts";
+ import { ProviderOptionSelections } from "./model.ts";
+ import { RepositoryIdentity, ThreadEnvMode } from "./environment.ts";
+ import {
+@@ -1438,6 +1439,7 @@ const ThreadSessionSetCommand = Schema.Struct({
+   commandId: CommandId,
+   threadId: ThreadId,
+   session: OrchestrationSession,
++  lifecycle: Schema.optional(ProviderLifecycleEvidence),
+   createdAt: IsoDateTime,
+ });
+ 
+@@ -1889,6 +1891,7 @@ export const ThreadSessionStopRequestedPayload = Schema.Struct({
+ export const ThreadSessionSetPayload = Schema.Struct({
+   threadId: ThreadId,
+   session: OrchestrationSession,
++  lifecycle: Schema.optional(ProviderLifecycleEvidence),
+ });
+ 
+ export const ThreadProposedPlanUpsertedPayload = Schema.Struct({
+diff --git a/packages/shared/src/agentAwareness.ts b/packages/shared/src/agentAwareness.ts
+index 77c7c845d..7a835674c 100644
+--- a/packages/shared/src/agentAwareness.ts
++++ b/packages/shared/src/agentAwareness.ts
+@@ -3,16 +3,10 @@ import type {
+   OrchestrationProjectShell,
+   OrchestrationThreadShell,
+   ThreadId,
++  ThreadAwarenessPhase,
+ } from "@t3tools/contracts";
+ 
+-export type AgentAwarenessPhase =
+-  | "starting"
+-  | "running"
+-  | "waiting_for_approval"
+-  | "waiting_for_input"
+-  | "completed"
+-  | "failed"
+-  | "stale";
++export type AgentAwarenessPhase = ThreadAwarenessPhase;
+ 
+ export interface AgentAwarenessState {
+   readonly environmentId: EnvironmentId;

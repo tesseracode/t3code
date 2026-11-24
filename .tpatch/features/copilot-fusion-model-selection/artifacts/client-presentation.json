@@ -1,0 +1,46 @@
+{
+  "sourceLanding": "1ac0398c61b6124415d7c450856e5b6afe2d6a7c",
+  "date": "2026-11-02",
+  "scope": "Approved disposable environment seeded from the release-launch fixture; model history inserted as synthetic projection fixtures while the owned server was stopped.",
+  "vendorInference": false,
+  "productionStateChanged": false,
+  "web": {
+    "result": "passed",
+    "client": "Fresh paired browser context against the feature worktree development app",
+    "asserted": [
+      "Requested fixture-fusion, effective fixture-standard and pending fixture-fusion remain distinct.",
+      "Routing state explicitly says it is not proof of model execution.",
+      "Observed model fixture-actual-model reports provider elapsed 4.8s.",
+      "Observed start, provider event time and receipt time remain distinct.",
+      "Unknown start and absent duration are not fabricated.",
+      "Failed fixture-original-model exposes fallback, final source model and a visible telemetry gap.",
+      "Persisted fixture summaries and expanded observed timing remain after a full page reload."
+    ],
+    "accountStatus": "Settings correctly says this account/runtime does not advertise Auto or Fusion routing; 19 explicit choices remain."
+  },
+  "android": {
+    "result": "passed",
+    "device": "Owned disposable Pixel 10 AVD, Android 16 / API 36.1 arm64-v8a",
+    "developmentClientFingerprint": "8006860c656de3319b4b47d3bab69506af6a0809",
+    "nativeBuild": "Reused a matching cached development client; loaded this worktree's Metro bundle.",
+    "interaction": "Fresh single-use pairing route; UIAutomator semantic text/content descriptions and current node bounds.",
+    "asserted": [
+      "Seeded Release launch check thread is present in the intended environment.",
+      "Expanded routing details show requested/effective/pending separately.",
+      "Expanded observed phase shows 4.8s, observed start and distinct receipt timestamp.",
+      "Expanded failed phase shows unknown start, fallback, final model and telemetry gap.",
+      "After force-stop and relaunch, reopening the same bundle restores pairing and persisted history without a new credential."
+    ]
+  },
+  "ios": {
+    "result": "automation-blocked",
+    "developmentClientFingerprint": "953468b560e21a2a7cfb6d86a69eda1e061efb8a",
+    "observed": "Compatible T3 Code Dev installed and launched on the owned iPhone 17 Pro simulator.",
+    "blocker": "AXe expects Xcode.app/Contents/Developer/Library/PrivateFrameworks/SimulatorKit.framework; this Xcode has it in Contents/SharedFrameworks. No global Xcode changes or coordinate-click fallback were used."
+  },
+  "limitations": [
+    "Direct projection fixtures prove presentation and client restoration, not provider event delivery or event-sourced writes.",
+    "Neither account advertised routing tiers; real Fusion selection/execution remains unqualified.",
+    "No packaged Electron application was exercised."
+  ]
+}

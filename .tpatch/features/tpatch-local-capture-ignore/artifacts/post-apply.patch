@@ -1,0 +1,12 @@
+diff --git a/.gitignore b/.gitignore
+index b6b793e02..601a11642 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -16,6 +16,7 @@ build/
+ release/
+ release-mock/
+ .t3
++.tpatch/local/
+ .idea/
+ apps/web/.playwright
+ apps/web/playwright-report

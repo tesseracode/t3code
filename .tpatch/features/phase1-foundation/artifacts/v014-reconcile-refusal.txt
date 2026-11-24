@@ -1,0 +1,20 @@
+Command: tpatch reconcile phase1-foundation --upstream-ref v0.1.4 --format json
+Working tree: clean, HEAD 8605454d5, tpatch v0.16.0
+Exit: 1
+JSON stdout: empty
+Actual stderr:
+warning: parent-generation-stale: feature "phase1-foundation" has stale soft parent "session-search" (snapshot parent_generation=9, current generation_id=pg_b03a657c573c); run `tpatch feature patch refresh session-search` or `tpatch reconcile phase1-foundation` to refresh the dependency snapshot.
+parent-generation-stale: reconcile refused for feature "phase1-foundation" because 1 hard parent generation snapshot(s) are stale:
+  - copilot-cli-provider (snapshot parent_generation=16, current generation_id=pg_46e3399bbab9)
+Run `tpatch feature patch refresh <parent>` for the stale parent or `tpatch reconcile phase1-foundation` to refresh the child dependency snapshot.
+error: parent-generation-stale: reconcile refused for feature "phase1-foundation" because 1 hard parent generation snapshot(s) are stale:
+  - copilot-cli-provider (snapshot parent_generation=16, current generation_id=pg_46e3399bbab9)
+Run `tpatch feature patch refresh <parent>` for the stale parent or `tpatch reconcile phase1-foundation` to refresh the child dependency snapshot.
+
+Supported recovery:
+tpatch apply phase1-foundation --mode started --note 'Manual replay on v0.1.4 actual base 8605454d5; reconcile refused stale hard parent snapshot16 vs pg_46e3399bbab9. Preserve refusal; do not rewrite parent history.'
+Exit: 0
+Output: Feature phase1-foundation marked as implementing
+
+No parent metadata or generation manifest was manually rewritten.
+git apply --3way of authoritative canonical patch 89822db2cae70bd24f730fb49d2c99c055edd4d2c6af3a3fe4e56abaffe36ad8 exited 1 with actual conflicts only in packages/client-runtime/src/rpc/client.ts and packages/contracts/src/rpc.ts. Manual resolution adds the attention/TWS methods without restoring retired codexAuthCallbackSubscribe or projects.list/add/remove APIs.

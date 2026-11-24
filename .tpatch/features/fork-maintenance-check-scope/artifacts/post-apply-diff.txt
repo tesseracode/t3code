@@ -1,0 +1,3 @@
+ .github/scripts/ci-changes.cjs | 2 +-
+ vite.config.ts                 | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)

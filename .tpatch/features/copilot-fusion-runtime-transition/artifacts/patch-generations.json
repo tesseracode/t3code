@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "feature": "copilot-fusion-runtime-transition",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_549275417675",
+      "kind": "record",
+      "patch_sha256": "faa9f5dc40c9044ce53aff0f03303d24d1bbec95b51b591405ad8bb35ff532d8",
+      "git_patch_id": "f567b48d8adaffdbaa8b17b6ce2ac1b37aff2d47",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "d94c8bacfa502f7dae4413b361792c39e9bcfa076221192184a33f8a7301b454",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "c69222b5429a77fb92e985d37710bff6df9c593b",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/user/providers-copilot.md",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/user/providers-copilot.md",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-fusion-model-selection",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
+          "parent_recipe_sha256": "a9f07a134e711fc1edf0c793f3aadf9739e90de32f69031776b5981c0cc24550"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

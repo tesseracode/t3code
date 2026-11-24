@@ -1,0 +1,11 @@
+ .tpatch/FEATURES.md                                |   2 +-
+ .../session-search/artifacts/apply-recipe.json     |  62 +++-
+ .../session-search/artifacts/apply-session.json    |   8 +-
+ .../session-search/artifacts/manual-validation.md  |   6 +-
+ .../artifacts/patch-generations.json               |  68 ++++-
+ .../session-search/artifacts/post-apply-diff.txt   |  30 +-
+ .../session-search/artifacts/post-apply.patch      | 331 ++++++++++++---------
+ .tpatch/features/session-search/record.md          |  43 +--
+ .tpatch/features/session-search/spec.md            |   9 +-
+ .tpatch/features/session-search/status.json        |  20 +-
+ 10 files changed, 347 insertions(+), 232 deletions(-)

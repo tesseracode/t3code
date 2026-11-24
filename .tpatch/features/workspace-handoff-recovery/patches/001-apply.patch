@@ -1,0 +1,365 @@
+diff --git a/apps/server/src/orchestration-v2/ProviderSessionManager.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.ts
+index df2ee630df..04fc67336e 100644
+--- a/apps/server/src/orchestration-v2/ProviderSessionManager.ts
++++ b/apps/server/src/orchestration-v2/ProviderSessionManager.ts
+@@ -506,12 +506,20 @@ export const layerWithOptions = (
+       const failSubscribers = Effect.fn("ProviderSessionManager.failSubscribers")(function* (
+         entry: LiveSessionEntry,
+         detail: string,
++        detachedThreadId?: ThreadId,
+       ) {
+-        const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+-          driver: entry.runtime.driver,
+-          providerSessionId: entry.runtime.providerSessionId,
+-          cause: detail,
+-        });
++        const error =
++          detachedThreadId === undefined
++            ? new ProviderAdapter.ProviderAdapterEventStreamError({
++                driver: entry.runtime.driver,
++                providerSessionId: entry.runtime.providerSessionId,
++                cause: detail,
++              })
++            : new ProviderAdapter.ProviderAdapterSessionDetached({
++                driver: entry.runtime.driver,
++                providerSessionId: entry.runtime.providerSessionId,
++                threadId: detachedThreadId,
++              });
+         const subscribers = yield* Ref.getAndSet(entry.eventSubscribers, new Map());
+         yield* Effect.forEach(
+           subscribers.values(),
+@@ -998,6 +1006,7 @@ export const layerWithOptions = (
+                     yield* failSubscribers(
+                       entry,
+                       input.detail ?? `Provider session released: ${input.reason}.`,
++                      input.reason === "manual_shutdown" ? input.detachedThreadId : undefined,
+                     );
+                   }
+                   const closeExit = yield* closeScopeWithin(entry.scope, {
+diff --git a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts
+index ceb5c9aff7..0150bd405a 100644
+--- a/apps/server/src/orchestration-v2/RunExecutionService.ts
++++ b/apps/server/src/orchestration-v2/RunExecutionService.ts
+@@ -555,6 +555,9 @@ export const RunExecutionServiceV2Error = Schema.Union([
+ ]);
+ export type RunExecutionServiceV2Error = typeof RunExecutionServiceV2Error.Type;
+ 
++const isRunExecutionIngestError = Schema.is(RunExecutionIngestError);
++const isSessionDetached = Schema.is(ProviderAdapter.ProviderAdapterSessionDetached);
++
+ export interface RunExecutionServiceV2StartRootRunInput {
+   readonly commandId: CommandId;
+   readonly appThread: OrchestrationV2AppThread;
+@@ -1492,16 +1495,24 @@ export const layer: Layer.Layer<
+             }),
+           ),
+           // Server shutdown interrupts the subscription and leaves the run to
+-          // restart recovery; every other failure fails the run.
++          // restart recovery. Explicit detach interrupts only its owning thread.
+           Effect.catchCauseIf(
+             (cause) => !Cause.hasInterruptsOnly(cause),
+             (cause) =>
+               Effect.gen(function* () {
+                 const completedAt = yield* DateTime.now;
+-                yield* Effect.logWarning("orchestration V2 provider event ingestion failed", {
+-                  runId: input.run.id,
+-                  cause,
+-                });
++                const ingestError = Cause.squash(cause);
++                const detached =
++                  isRunExecutionIngestError(ingestError) &&
++                  isSessionDetached(ingestError.cause) &&
++                  ingestError.cause.providerSessionId === input.providerSessionId &&
++                  ingestError.cause.threadId === input.run.threadId;
++                if (!detached) {
++                  yield* Effect.logWarning("orchestration V2 provider event ingestion failed", {
++                    runId: input.run.id,
++                    cause,
++                  });
++                }
+                 if (yield* Ref.get(rootRunFinalized)) return;
+                 const providerThread = yield* Ref.get(latestProviderThread);
+                 const routing = yield* Ref.get(eventRouting);
+@@ -1557,10 +1568,27 @@ export const layer: Layer.Layer<
+                   openRunOwnedSubagents: openSubagents,
+                   ...(abandonedProviderTurn === null ? {} : { abandonedProviderTurn }),
+                   completedAt,
+-                  terminal: makeFailedTerminalEvent(
+-                    makeProviderFailure({ cause: Cause.squash(cause), class: "unknown" }),
+-                    latestItemOrdinal + 1,
+-                  ),
++                  terminal: detached
++                    ? {
++                        type: "turn.terminal",
++                        driver: input.providerThread.driver,
++                        providerThreadId: input.providerThread.id,
++                        providerTurnId:
++                          routing.rootProviderTurnId ??
++                          input.attempt.providerTurnId ??
++                          idAllocator.derive.providerTurn({
++                            driver: input.providerThread.driver,
++                            nativeTurnId: `detached:${input.attempt.id}`,
++                          }),
++                        runOrdinal: input.run.ordinal,
++                        status: "interrupted",
++                        failure: null,
++                        threadDisposition: "reusable",
++                      }
++                    : makeFailedTerminalEvent(
++                        makeProviderFailure({ cause: ingestError, class: "unknown" }),
++                        latestItemOrdinal + 1,
++                      ),
+                   failureItemPersisted: false,
+                   refreshAfterTurn,
+                 }).pipe(
+diff --git a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
+index 0d950dc6d4..9b7a28302d 100644
+--- a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
++++ b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
+@@ -29,6 +29,7 @@ import * as EffectWorker from "./EffectWorker.ts";
+ import * as EventSink from "./EventSink.ts";
+ import * as Orchestrator from "./Orchestrator.ts";
+ import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
++import * as ProviderSessionManager from "./ProviderSessionManager.ts";
+ import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
+ import { checkpointWorkspace } from "@t3tools/provider-testing/replayWorkspace";
+ import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+@@ -279,6 +280,171 @@ function makeRestartAdapter(
+   };
+ }
+ 
++it.live.each(["workspace-detach", "unexpected-close"] as const)(
++  "preserves queued continuation semantics after %s",
++  (termination) =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const cwd = yield* checkpointWorkspace(`handoff-${termination}`);
++        const nextCwd = yield* checkpointWorkspace(`handoff-${termination}-next`);
++        const threadId = ThreadId.make(`thread:handoff-${termination}`);
++        const state = yield* Ref.make<RestartAdapterState>({
++          activeTurn: null,
++          opened: [],
++          started: [],
++          closedSessionCount: 0,
++          failedReplacementOpen: false,
++        });
++        yield* Effect.gen(function* () {
++          const orchestrator = yield* Orchestrator.OrchestratorV2;
++          const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
++          const eventSink = yield* EventSink.EventSinkV2;
++          const sessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
++          yield* orchestrator.dispatch({
++            type: "thread.create",
++            createdBy: "user",
++            creationSource: "web",
++            commandId: CommandId.make("handoff:create"),
++            threadId,
++            projectId: ProjectId.make("project:handoff"),
++            title: "Workspace handoff",
++            modelSelection: initialSelection,
++            runtimeMode: "full-access",
++            interactionMode: "default",
++            branch: null,
++            worktreePath: cwd,
++          });
++          const running = yield* eventSink.stream({ threadId }).pipe(
++            Stream.filter(
++              ({ event }) =>
++                event.type === "provider-turn.updated" && event.payload.status === "running",
++            ),
++            Stream.take(1),
++            Stream.runDrain,
++            Effect.forkScoped,
++          );
++          yield* orchestrator.dispatch({
++            type: "message.dispatch",
++            createdBy: "user",
++            creationSource: "web",
++            commandId: CommandId.make("handoff:first"),
++            threadId,
++            messageId: MessageId.make("handoff:first"),
++            text: "Start work",
++            attachments: [],
++            modelSelection: initialSelection,
++            dispatchMode: { type: "start_immediately" },
++          });
++          yield* Fiber.join(running);
++          yield* worker.drain();
++          const before = yield* orchestrator.getThreadProjection(threadId);
++          const firstRun = before.runs[0]!;
++          const firstThread = before.providerThreads[0]!;
++          const continuationResolved = yield* eventSink
++            .stream({
++              threadId,
++              afterSequence: yield* eventSink.latestSequence({ threadId }),
++            })
++            .pipe(
++              Stream.filter(
++                ({ event }) =>
++                  (event.type === "run.updated" &&
++                    event.payload.ordinal === 2 &&
++                    event.payload.queueHeld === true) ||
++                  (event.type === "provider-turn.updated" &&
++                    event.payload.ordinal === 2 &&
++                    event.payload.status === "running"),
++              ),
++              Stream.take(1),
++              Stream.runDrain,
++              Effect.forkScoped,
++            );
++          const terminal = yield* eventSink
++            .stream({
++              threadId,
++              afterSequence: yield* eventSink.latestSequence({ threadId }),
++            })
++            .pipe(
++              Stream.filter(
++                ({ event }) =>
++                  event.type === "run.updated" &&
++                  event.payload.id === firstRun.id &&
++                  (event.payload.status === "interrupted" || event.payload.status === "failed"),
++              ),
++              Stream.take(1),
++              Stream.runDrain,
++              Effect.forkScoped,
++            );
++          if (termination === "workspace-detach") {
++            yield* orchestrator.dispatch({
++              type: "thread.metadata.update",
++              commandId: CommandId.make("handoff:bind"),
++              threadId,
++              worktreePath: nextCwd,
++              expectedWorktreePath: cwd,
++              branch: "candidate",
++            });
++          }
++          yield* orchestrator.dispatch({
++            type: "message.dispatch",
++            createdBy: "agent",
++            creationSource: "mcp",
++            commandId: CommandId.make("handoff:continue"),
++            threadId,
++            messageId: MessageId.make("handoff:continue"),
++            text: "Continue preserved work",
++            attachments: [],
++            modelSelection: initialSelection,
++            dispatchMode: { type: "queue_after_active" },
++          });
++          if (termination === "unexpected-close") {
++            assert.isNotNull(firstThread.providerSessionId);
++            yield* sessions.close(firstThread.providerSessionId!);
++          }
++          yield* worker.drain();
++          yield* Fiber.join(terminal);
++          yield* Fiber.join(continuationResolved);
++          yield* worker.drain();
++          const after = yield* orchestrator.getThreadProjection(threadId);
++          const captured = yield* Ref.get(state);
++          if (termination === "workspace-detach") {
++            assert.equal(after.thread.worktreePath, nextCwd);
++            assert.deepEqual(
++              after.runs.map((run) => run.status),
++              ["interrupted", "running"],
++            );
++            assert.deepEqual(
++              captured.started.map((turn) => turn.cwd),
++              [cwd, nextCwd],
++            );
++            assert.lengthOf(after.providerThreads, 1);
++            assert.deepEqual(
++              after.providerThreads[0]?.nativeThreadRef,
++              firstThread.nativeThreadRef,
++            );
++            assert.isFalse(after.turnItems.some((item) => item.type === "error"));
++            assert.isFalse(after.runs.some((run) => run.queueHeld));
++          } else {
++            assert.deepEqual(
++              after.runs.map((run) => run.status),
++              ["failed", "queued"],
++            );
++            assert.isTrue(after.runs[1]?.queueHeld);
++            assert.lengthOf(captured.started, 1);
++            assert.isTrue(after.turnItems.some((item) => item.type === "error"));
++          }
++        }).pipe(
++          Effect.provide(
++            ProviderReplayHarness.layerWithRegistry(
++              { name: `handoff-${termination}` },
++              ProviderAdapterRegistry.layerSingle(makeRestartAdapter(state, exclusiveCapabilities)),
++            ),
++          ),
++        );
++      }),
++    ),
++);
++
+ it.live("retries a failed selection restart session open before completing", () =>
+   Effect.scoped(
+     Effect.gen(function* () {
+diff --git a/docs/internals/providers.md b/docs/internals/providers.md
+index 3f90328793..75bdef49f4 100644
+--- a/docs/internals/providers.md
++++ b/docs/internals/providers.md
+@@ -11,6 +11,15 @@ session or catalog state. For a new driver, start with [adding a provider](./add
+ 
+ ## Process and account isolation
+ 
++An exclusive session's explicit last-thread detach sends
++`ProviderAdapterSessionDetached` to its consumers. Run execution accepts that
++signal only for the matching session and app thread, and finalizes the current
++attempt as interrupted under the usual atomic fence. It still interrupts native
++work and performs normal cleanup. The signal is distinct from unexpected stream
++failure, which continues to fail the run and hold same-provider queued work.
++Server shutdown still interrupts ingestion for restart recovery. Shared-session
++detach retains its per-thread interruption and unload path.
++
+ The `githubCopilot` driver in
+ [`packages/provider-copilot`](../../packages/provider-copilot/src/server/driver.ts)
+ uses SDK 1.0.8 in `copilot-cli` mode with the reviewed CLI 1.0.75 dependency closure.
+diff --git a/docs/user/source-control.md b/docs/user/source-control.md
+index 815e5dd066..5b28a2444a 100644
+--- a/docs/user/source-control.md
++++ b/docs/user/source-control.md
+@@ -10,6 +10,13 @@ rebases, the files Git brought in are left out. A file stays in the list when th
+ committed it, or fixed a conflict in it. Use the branch comparison to review everything that changed
+ against your base branch. Restore still returns the complete saved workspace.
+ 
++## Move a thread into a worktree
++
++Moving an active thread into a worktree stops its old provider session. That turn
++appears as interrupted rather than as a provider failure. If the move includes
++a continuation message, it can run automatically in the new workspace without
++requiring **Resume queue**. A genuine provider failure still pauses queued work.
++
+ ## Connect an account
+ 
+ Install Git and configure authentication on the machine running your T3 Code server. For a remote
+diff --git a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts
+index 928fa7ab46..f1f1bb04ce 100644
+--- a/packages/provider-core/src/server/ProviderAdapter.ts
++++ b/packages/provider-core/src/server/ProviderAdapter.ts
+@@ -354,6 +354,16 @@ export class ProviderAdapterEventStreamError extends Schema.TaggedError<Provider
+   }
+ }
+ 
++// An explicit last-thread detach ends that execution without reporting a provider failure.
++export class ProviderAdapterSessionDetached extends Schema.TaggedError<ProviderAdapterSessionDetached>()(
++  "ProviderAdapterSessionDetached",
++  {
++    driver: ProviderDriverKind,
++    providerSessionId: ProviderSessionId,
++    threadId: ThreadId,
++  },
++) {}
++
+ // Only fixed reasons reach failure messages; detail can contain private configuration.
+ const ProviderAdapterFailureReason = Schema.Literals([
+   "previous_turn_active",
+@@ -391,6 +401,7 @@ export const ProviderAdapterV2Error = Schema.Union([
+   ProviderAdapterInterruptError,
+   ProviderAdapterRuntimeRequestResponseError,
+   ProviderAdapterEventStreamError,
++  ProviderAdapterSessionDetached,
+   ProviderAdapterProtocolError,
+ ]);
+ export type ProviderAdapterV2Error = typeof ProviderAdapterV2Error.Type;

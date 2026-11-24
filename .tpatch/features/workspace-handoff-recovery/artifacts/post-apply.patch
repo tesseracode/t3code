@@ -1,0 +1,827 @@
+diff --git a/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts
+index 9ae9ddce81..b314a87c6a 100644
+--- a/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts
++++ b/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts
+@@ -336,6 +336,7 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
+     readonly hasPendingBackgroundWorkForThread?: Effect.Effect<boolean>;
+     readonly backgroundTasksEndWithProcess?: boolean;
+     readonly hangSessionScopeClose?: boolean;
++    readonly failSessionScopeClose?: boolean;
+     readonly startTurn?: Effect.Effect<void>;
+     readonly beforeUnload?: Effect.Effect<void>;
+     readonly spawnBeforeOpen?: boolean;
+@@ -347,7 +348,13 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
+     Ref.update(state, (current) => ({
+       ...current,
+       closeCount: current.closeCount + 1,
+-    })),
++    })).pipe(
++      Effect.andThen(
++        options.failSessionScopeClose
++          ? Effect.die("simulated provider teardown failure")
++          : Effect.void,
++      ),
++    ),
+   );
+   // Register after countClose to wedge teardown before its finalizer, matching a provider stream that never yields.
+   const hangClose = Effect.addFinalizer(() =>
+@@ -483,6 +490,7 @@ function layerTest(input: {
+   readonly hasPendingBackgroundWorkForThread?: Effect.Effect<boolean>;
+   readonly backgroundTasksEndWithProcess?: boolean;
+   readonly hangSessionScopeClose?: boolean;
++  readonly failSessionScopeClose?: boolean;
+   readonly startTurn?: Effect.Effect<void>;
+   readonly beforeUnload?: Effect.Effect<void>;
+   readonly spawnBeforeOpen?: boolean;
+@@ -518,6 +526,9 @@ function layerTest(input: {
+       ...(input.hangSessionScopeClose === undefined
+         ? {}
+         : { hangSessionScopeClose: input.hangSessionScopeClose }),
++      ...(input.failSessionScopeClose === undefined
++        ? {}
++        : { failSessionScopeClose: input.failSessionScopeClose }),
+       ...(input.startTurn === undefined ? {} : { startTurn: input.startTurn }),
+       ...(input.beforeUnload === undefined ? {} : { beforeUnload: input.beforeUnload }),
+       ...(input.spawnBeforeOpen === undefined ? {} : { spawnBeforeOpen: input.spawnBeforeOpen }),
+@@ -1707,57 +1718,76 @@ it.effect("ProviderSessionManagerV2 fails browser access closed for a missing pr
+   }),
+ );
+ 
+-it.effect("ProviderSessionManagerV2 revokes MCP credentials when release persistence fails", () =>
+-  Effect.gen(function* () {
+-    const state = yield* Ref.make(emptyState);
+-    const mcpConfigs = yield* Ref.make<
+-      ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
+-    >([]);
+-    const effect = Effect.gen(function* () {
+-      const eventSink = yield* EventSink.EventSinkV2;
+-      const idAllocator = yield* IdAllocator.IdAllocatorV2;
+-      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+-      const registry = yield* McpSessionRegistry.McpSessionRegistry;
+-      const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+-      const now = yield* DateTime.now;
+-      const threadId = ThreadId.make("thread-provider-session-manager-mcp-release-failure");
+-      const providerSessionId = yield* idAllocator.allocate.providerSession({
+-        providerInstanceId: modelSelection.instanceId,
+-        threadId,
+-      });
+-
+-      yield* eventSink.write({
+-        events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
+-      });
+-      yield* manager.open({
+-        threadId,
+-        providerSessionId,
+-        modelSelection,
+-        runtimePolicy,
+-      });
++it.effect.each(["close", "detach"] as const)(
++  "ProviderSessionManagerV2 revokes MCP credentials and ends subscribers when %s cleanup fails",
++  (release) =>
++    Effect.gen(function* () {
++      const state = yield* Ref.make(emptyState);
++      const mcpConfigs = yield* Ref.make<
++        ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
++      >([]);
++      const effect = Effect.gen(function* () {
++        const eventSink = yield* EventSink.EventSinkV2;
++        const idAllocator = yield* IdAllocator.IdAllocatorV2;
++        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
++        const registry = yield* McpSessionRegistry.McpSessionRegistry;
++        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
++        const now = yield* DateTime.now;
++        const threadId = ThreadId.make("thread-provider-session-manager-mcp-release-failure");
++        const providerSessionId = yield* idAllocator.allocate.providerSession({
++          providerInstanceId: modelSelection.instanceId,
++          threadId,
++        });
+ 
+-      const captured = (yield* Ref.get(mcpConfigs))[0];
+-      const token = captured?.authorizationHeader.replace(/^Bearer\s+/, "");
+-      assert.isDefined(token);
+-      assert.isDefined(yield* registry.resolve(token!));
++        yield* eventSink.write({
++          events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
++        });
++        const runtime = yield* manager.open({
++          threadId,
++          providerSessionId,
++          modelSelection,
++          runtimePolicy,
++        });
+ 
+-      const closeError = yield* manager.close(providerSessionId).pipe(Effect.flip);
+-      assert.equal(closeError._tag, "ProviderSessionCloseError");
+-      assert.isUndefined(yield* mcpSessions.read(threadId));
+-      assert.isUndefined(yield* registry.resolve(token!));
+-    });
++        const captured = (yield* Ref.get(mcpConfigs))[0];
++        const token = captured?.authorizationHeader.replace(/^Bearer\s+/, "");
++        assert.isDefined(token);
++        assert.isDefined(yield* registry.resolve(token!));
++
++        const subscription = yield* runtime.subscribeEvents!;
++        const closeError = yield* (
++          release === "close"
++            ? manager.close(providerSessionId)
++            : manager.detach({ providerSessionId, threadId, revokeMcpCredential: true })
++        ).pipe(Effect.flip);
++        assert.equal(
++          closeError._tag,
++          release === "close" ? "ProviderSessionCloseError" : "ProviderSessionReleaseError",
++        );
++        assert.isUndefined(yield* mcpSessions.read(threadId));
++        assert.isUndefined(yield* registry.resolve(token!));
++        const streamError = yield* subscription.events.pipe(Stream.runDrain, Effect.flip);
++        assert.equal(
++          streamError._tag,
++          release === "detach"
++            ? "ProviderAdapterSessionDetached"
++            : "ProviderAdapterEventStreamError",
++        );
++      });
+ 
+-    yield* effect.pipe(
+-      Effect.provide(
+-        layerTest({
+-          state,
+-          idleTimeoutMs: 1_000,
+-          mcpConfigs,
+-          failReleaseEventWrites: true,
+-        }),
+-      ),
+-    );
+-  }),
++      yield* effect.pipe(
++        Effect.provide(
++          layerTest({
++            state,
++            idleTimeoutMs: 1_000,
++            mcpConfigs,
++            failReleaseEventWrites: release === "close",
++            failSessionScopeClose: release === "detach",
++            capabilities: ExclusiveCapabilities,
++          }),
++        ),
++      );
++    }),
+ );
+ 
+ it.effect(
+diff --git a/apps/server/src/orchestration-v2/ProviderSessionManager.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.ts
+index df2ee630df..04fc67336e 100644
+--- a/apps/server/src/orchestration-v2/ProviderSessionManager.ts
++++ b/apps/server/src/orchestration-v2/ProviderSessionManager.ts
+@@ -506,12 +506,20 @@ export const layerWithOptions = (
+       const failSubscribers = Effect.fn("ProviderSessionManager.failSubscribers")(function* (
+         entry: LiveSessionEntry,
+         detail: string,
++        detachedThreadId?: ThreadId,
+       ) {
+-        const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+-          driver: entry.runtime.driver,
+-          providerSessionId: entry.runtime.providerSessionId,
+-          cause: detail,
+-        });
++        const error =
++          detachedThreadId === undefined
++            ? new ProviderAdapter.ProviderAdapterEventStreamError({
++                driver: entry.runtime.driver,
++                providerSessionId: entry.runtime.providerSessionId,
++                cause: detail,
++              })
++            : new ProviderAdapter.ProviderAdapterSessionDetached({
++                driver: entry.runtime.driver,
++                providerSessionId: entry.runtime.providerSessionId,
++                threadId: detachedThreadId,
++              });
+         const subscribers = yield* Ref.getAndSet(entry.eventSubscribers, new Map());
+         yield* Effect.forEach(
+           subscribers.values(),
+@@ -998,6 +1006,7 @@ export const layerWithOptions = (
+                     yield* failSubscribers(
+                       entry,
+                       input.detail ?? `Provider session released: ${input.reason}.`,
++                      input.reason === "manual_shutdown" ? input.detachedThreadId : undefined,
+                     );
+                   }
+                   const closeExit = yield* closeScopeWithin(entry.scope, {
+diff --git a/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts
+index 7a922d79c7..bb6ac6d223 100644
+--- a/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts
++++ b/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts
+@@ -279,7 +279,7 @@ function makeLocalCommandHarness(input: {
+   readonly writeFailure?: unknown;
+   readonly failReadsAfterRunning?: boolean;
+   readonly previousTurn?: {
+-    readonly runStatus: "failed" | "completed";
++    readonly runStatus: "failed" | "completed" | "interrupted";
+     readonly turnStatus: "running" | "completed" | "interrupted";
+     readonly differentThread?: boolean;
+     readonly liveSession?: boolean;
+@@ -948,26 +948,28 @@ effectIt.effect(
+     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+ );
+ 
+-effectIt.effect("recovers an abandoned failed turn before continuing its native conversation", () =>
+-  Effect.gen(function* () {
+-    const harness = makeLocalCommandHarness({
+-      text: "Continue",
+-      previousTurn: { runStatus: "failed", turnStatus: "running" },
+-    });
++effectIt.effect.each(["failed", "interrupted"] as const)(
++  "recovers an abandoned %s turn before continuing its native conversation",
++  (runStatus) =>
++    Effect.gen(function* () {
++      const harness = makeLocalCommandHarness({
++        text: "Continue",
++        previousTurn: { runStatus, turnStatus: "running" },
++      });
+ 
+-    yield* harness.start;
++      yield* harness.start;
+ 
+-    expect(harness.interruptTurn).toHaveBeenCalledOnce();
+-    expect(harness.projection().runs.at(-1)?.status).toBe("running");
+-    expect(harness.projection().providerTurns[0]).toMatchObject({
+-      status: "interrupted",
+-      completedAt: expect.anything(),
+-    });
+-    expect(harness.startRootRun).toHaveBeenCalledOnce();
+-    expect(harness.startRootRun.mock.calls[0]?.[0].providerThread.nativeThreadRef?.nativeId).toBe(
+-      "existing-native-conversation",
+-    );
+-  }),
++      expect(harness.interruptTurn).toHaveBeenCalledOnce();
++      expect(harness.projection().runs.at(-1)?.status).toBe("running");
++      expect(harness.projection().providerTurns[0]).toMatchObject({
++        status: "interrupted",
++        completedAt: expect.anything(),
++      });
++      expect(harness.startRootRun).toHaveBeenCalledOnce();
++      expect(harness.startRootRun.mock.calls[0]?.[0].providerThread.nativeThreadRef?.nativeId).toBe(
++        "existing-native-conversation",
++      );
++    }),
+ );
+ 
+ effectIt.effect.each([
+@@ -987,34 +989,38 @@ effectIt.effect.each([
+   }),
+ );
+ 
+-effectIt.effect("does not start another turn when abandoned-turn cleanup fails", () =>
+-  Effect.gen(function* () {
+-    const harness = makeLocalCommandHarness({
+-      text: "Continue",
+-      previousTurn: { runStatus: "failed", turnStatus: "running", interruptFailure: true },
+-    });
++effectIt.effect.each(["failed", "interrupted"] as const)(
++  "does not start another turn when abandoned %s turn cleanup fails",
++  (runStatus) =>
++    Effect.gen(function* () {
++      const harness = makeLocalCommandHarness({
++        text: "Continue",
++        previousTurn: { runStatus, turnStatus: "running", interruptFailure: true },
++      });
+ 
+-    yield* harness.start;
++      yield* harness.start;
+ 
+-    expect(harness.interruptTurn).toHaveBeenCalledOnce();
+-    expect(harness.startRootRun).not.toHaveBeenCalled();
+-    expect(harness.projection().runs.at(-1)?.status).toBe("failed");
+-  }),
++      expect(harness.interruptTurn).toHaveBeenCalledOnce();
++      expect(harness.startRootRun).not.toHaveBeenCalled();
++      expect(harness.projection().runs.at(-1)?.status).toBe("failed");
++    }),
+ );
+ 
+-effectIt.effect("retries abandoned-turn cleanup without failing the continuation early", () =>
+-  Effect.gen(function* () {
+-    const harness = makeLocalCommandHarness({
+-      text: "Continue",
+-      previousTurn: { runStatus: "failed", turnStatus: "running", interruptFailure: true },
+-    });
++effectIt.effect.each(["failed", "interrupted"] as const)(
++  "retries abandoned %s turn cleanup without failing the continuation early",
++  (runStatus) =>
++    Effect.gen(function* () {
++      const harness = makeLocalCommandHarness({
++        text: "Continue",
++        previousTurn: { runStatus, turnStatus: "running", interruptFailure: true },
++      });
+ 
+-    const error = yield* harness.startWithRetry.pipe(Effect.flip);
++      const error = yield* harness.startWithRetry.pipe(Effect.flip);
+ 
+-    expect(error._tag).toBe("ProviderTurnStartError");
+-    expect(harness.projection().runs.at(-1)?.status).toBe("starting");
+-    expect(harness.open).not.toHaveBeenCalled();
+-  }),
++      expect(error._tag).toBe("ProviderTurnStartError");
++      expect(harness.projection().runs.at(-1)?.status).toBe("starting");
++      expect(harness.open).not.toHaveBeenCalled();
++    }),
+ );
+ 
+ effectIt.effect("does not start the continuation if recording recovery fails", () =>
+diff --git a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts
+index b04e72bba8..3209070cf8 100644
+--- a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts
++++ b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts
+@@ -646,18 +646,18 @@ export const layer: Layer.Layer<
+       const existingSessionProjection = projection.providerSessions.find(
+         (candidate) => candidate.id === providerSessionId,
+       );
+-      const failedRuns = new Map(
++      const terminalRuns = new Map(
+         projection.runs
+           .filter(
+             (previous) =>
+               previous.ordinal < run.ordinal &&
+               previous.providerThreadId === providerThread.id &&
+-              previous.status === "failed",
++              (previous.status === "failed" || previous.status === "interrupted"),
+           )
+           .map((previous) => [previous.activeAttemptId, previous] as const),
+       );
+       const abandonedTurns = projection.providerTurns.flatMap((turn) => {
+-        const previous = failedRuns.get(turn.runAttemptId);
++        const previous = terminalRuns.get(turn.runAttemptId);
+         return turn.providerThreadId === providerThread.id &&
+           turn.status === "running" &&
+           previous !== undefined &&
+@@ -669,7 +669,7 @@ export const layer: Layer.Layer<
+       if (abandonedTurn !== undefined) {
+         const liveSession = yield* providerSessions.get(providerSessionId);
+         if (Option.isSome(liveSession)) {
+-          // Older versions could fail the run without stopping its provider.
++          // Failed cleanup can leave a failed or interrupted run's provider active.
+           // Recover that exact turn before reusing its native conversation.
+           const recovered = yield* Effect.result(
+             liveSession.value.interruptTurn({
+diff --git a/apps/server/src/orchestration-v2/RunExecutionService.test.ts b/apps/server/src/orchestration-v2/RunExecutionService.test.ts
+index 394cc1527c..dd786b0169 100644
+--- a/apps/server/src/orchestration-v2/RunExecutionService.test.ts
++++ b/apps/server/src/orchestration-v2/RunExecutionService.test.ts
+@@ -2572,6 +2572,126 @@ it.effect("refreshes pull requests after a provider stream exits with an error",
+   }),
+ );
+ 
++it.effect(
++  "does not start native work after detachment settles during startup context loading",
++  () =>
++    Effect.gen(function* () {
++      const finalized = yield* Deferred.make<void>();
++      const stillCurrent = yield* Ref.make(true);
++      const starts = yield* Ref.make(0);
++      const interrupts = yield* Ref.make(0);
++      const key = "workspace-detach-during-startup";
++      const result = yield* captureRootRunTermination({
++        key,
++        initialProviderTurnId: null,
++        shouldFinalizeRun: () => Effect.succeed(true),
++        shouldStartProviderTurn: () => Ref.get(stillCurrent),
++        appContext: Deferred.await(finalized).pipe(Effect.as([])),
++        startTurn: () => Ref.update(starts, (count) => count + 1),
++        interruptTurn: () => Ref.update(interrupts, (count) => count + 1),
++        events: (ids) =>
++          Stream.fail(
++            new ProviderAdapter.ProviderAdapterSessionDetached({
++              driver,
++              providerSessionId: ProviderSessionId.make(`session:${key}`),
++              threadId: ids.threadId,
++            }),
++          ),
++        refreshAfterTurn: Ref.set(stillCurrent, false).pipe(
++          Effect.andThen(Deferred.succeed(finalized, undefined)),
++        ),
++      });
++      assert.deepEqual(result.observed, ["run:interrupted", "pull-requests-refreshed"]);
++      assert.equal(yield* Ref.get(starts), 0);
++      assert.equal(yield* Ref.get(interrupts), 0);
++      assert.isFalse(result.written.some((item) => item.type === "error"));
++    }),
++);
++
++it.effect.each([
++  "matching",
++  "interrupt-failure",
++  "other-session",
++  "other-thread",
++  "ownership-lost",
++] as const)("fences intentional workspace detachment for %s", (scenario) =>
++  Effect.gen(function* () {
++    const key = `workspace-detach:${scenario}`;
++    const now = yield* DateTime.now;
++    const interrupts = yield* Ref.make(0);
++    const result = yield* captureRootRunTermination({
++      key,
++      shouldFinalizeRun: () => Effect.succeed(true),
++      rejectTerminalWrite: scenario === "ownership-lost",
++      events: (ids) =>
++        Stream.concat(
++          Stream.make({
++            type: "provider_turn.updated" as const,
++            driver,
++            providerTurn: {
++              id: ids.rootProviderTurnId,
++              providerThreadId: ids.providerThreadId,
++              nodeId: ids.rootNodeId,
++              runAttemptId: ids.attemptId,
++              nativeTurnRef: null,
++              ordinal: 1,
++              status: "running" as const,
++              startedAt: now,
++              completedAt: null,
++            },
++          }),
++          Stream.fail(
++            new ProviderAdapter.ProviderAdapterSessionDetached({
++              driver,
++              providerSessionId: ProviderSessionId.make(
++                scenario === "other-session" ? "unrelated-session" : `session:${key}`,
++              ),
++              threadId:
++                scenario === "other-thread" ? ThreadId.make("unrelated-thread") : ids.threadId,
++            }),
++          ),
++        ),
++      interruptTurn: (input) =>
++        Ref.update(interrupts, (count) => count + 1).pipe(
++          Effect.andThen(
++            scenario === "interrupt-failure"
++              ? Effect.fail(
++                  new ProviderAdapter.ProviderAdapterInterruptError({
++                    driver,
++                    providerThreadId: input.providerThread.id,
++                    providerTurnId: input.providerTurnId,
++                    cause: "simulated cleanup failure",
++                  }),
++                )
++              : Effect.void,
++          ),
++        ),
++    });
++    assert.equal(yield* Ref.get(interrupts), 1);
++    if (scenario === "ownership-lost") {
++      assert.deepEqual(result.finalEvents, []);
++      assert.deepEqual(result.observed, []);
++      return;
++    }
++    const mismatch = scenario === "other-session" || scenario === "other-thread";
++    assert.deepEqual(result.observed, [
++      mismatch ? "run:failed" : "run:interrupted",
++      "pull-requests-refreshed",
++    ]);
++    assert.equal(
++      result.written.some((item) => item.type === "error"),
++      mismatch,
++    );
++    const repaired = result.finalEvents.find((event) => event.type === "provider-turn.updated");
++    if (scenario === "interrupt-failure") {
++      assert.isUndefined(repaired);
++    } else {
++      assert.equal(repaired?.payload.status, "interrupted");
++      assert.isNotNull(repaired?.payload.completedAt);
++    }
++  }),
++);
++
+ it.effect.each(["failure", "defect", "interrupt-failure", "ownership-lost"] as const)(
+   "stops the live provider and background work before settling an ingestion %s",
+   (failureMode) =>
+diff --git a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts
+index ceb5c9aff7..0150bd405a 100644
+--- a/apps/server/src/orchestration-v2/RunExecutionService.ts
++++ b/apps/server/src/orchestration-v2/RunExecutionService.ts
+@@ -555,6 +555,9 @@ export const RunExecutionServiceV2Error = Schema.Union([
+ ]);
+ export type RunExecutionServiceV2Error = typeof RunExecutionServiceV2Error.Type;
+ 
++const isRunExecutionIngestError = Schema.is(RunExecutionIngestError);
++const isSessionDetached = Schema.is(ProviderAdapter.ProviderAdapterSessionDetached);
++
+ export interface RunExecutionServiceV2StartRootRunInput {
+   readonly commandId: CommandId;
+   readonly appThread: OrchestrationV2AppThread;
+@@ -1492,16 +1495,24 @@ export const layer: Layer.Layer<
+             }),
+           ),
+           // Server shutdown interrupts the subscription and leaves the run to
+-          // restart recovery; every other failure fails the run.
++          // restart recovery. Explicit detach interrupts only its owning thread.
+           Effect.catchCauseIf(
+             (cause) => !Cause.hasInterruptsOnly(cause),
+             (cause) =>
+               Effect.gen(function* () {
+                 const completedAt = yield* DateTime.now;
+-                yield* Effect.logWarning("orchestration V2 provider event ingestion failed", {
+-                  runId: input.run.id,
+-                  cause,
+-                });
++                const ingestError = Cause.squash(cause);
++                const detached =
++                  isRunExecutionIngestError(ingestError) &&
++                  isSessionDetached(ingestError.cause) &&
++                  ingestError.cause.providerSessionId === input.providerSessionId &&
++                  ingestError.cause.threadId === input.run.threadId;
++                if (!detached) {
++                  yield* Effect.logWarning("orchestration V2 provider event ingestion failed", {
++                    runId: input.run.id,
++                    cause,
++                  });
++                }
+                 if (yield* Ref.get(rootRunFinalized)) return;
+                 const providerThread = yield* Ref.get(latestProviderThread);
+                 const routing = yield* Ref.get(eventRouting);
+@@ -1557,10 +1568,27 @@ export const layer: Layer.Layer<
+                   openRunOwnedSubagents: openSubagents,
+                   ...(abandonedProviderTurn === null ? {} : { abandonedProviderTurn }),
+                   completedAt,
+-                  terminal: makeFailedTerminalEvent(
+-                    makeProviderFailure({ cause: Cause.squash(cause), class: "unknown" }),
+-                    latestItemOrdinal + 1,
+-                  ),
++                  terminal: detached
++                    ? {
++                        type: "turn.terminal",
++                        driver: input.providerThread.driver,
++                        providerThreadId: input.providerThread.id,
++                        providerTurnId:
++                          routing.rootProviderTurnId ??
++                          input.attempt.providerTurnId ??
++                          idAllocator.derive.providerTurn({
++                            driver: input.providerThread.driver,
++                            nativeTurnId: `detached:${input.attempt.id}`,
++                          }),
++                        runOrdinal: input.run.ordinal,
++                        status: "interrupted",
++                        failure: null,
++                        threadDisposition: "reusable",
++                      }
++                    : makeFailedTerminalEvent(
++                        makeProviderFailure({ cause: ingestError, class: "unknown" }),
++                        latestItemOrdinal + 1,
++                      ),
+                   failureItemPersisted: false,
+                   refreshAfterTurn,
+                 }).pipe(
+diff --git a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
+index 0d950dc6d4..9b7a28302d 100644
+--- a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
++++ b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts
+@@ -29,6 +29,7 @@ import * as EffectWorker from "./EffectWorker.ts";
+ import * as EventSink from "./EventSink.ts";
+ import * as Orchestrator from "./Orchestrator.ts";
+ import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
++import * as ProviderSessionManager from "./ProviderSessionManager.ts";
+ import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
+ import { checkpointWorkspace } from "@t3tools/provider-testing/replayWorkspace";
+ import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+@@ -279,6 +280,171 @@ function makeRestartAdapter(
+   };
+ }
+ 
++it.live.each(["workspace-detach", "unexpected-close"] as const)(
++  "preserves queued continuation semantics after %s",
++  (termination) =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const cwd = yield* checkpointWorkspace(`handoff-${termination}`);
++        const nextCwd = yield* checkpointWorkspace(`handoff-${termination}-next`);
++        const threadId = ThreadId.make(`thread:handoff-${termination}`);
++        const state = yield* Ref.make<RestartAdapterState>({
++          activeTurn: null,
++          opened: [],
++          started: [],
++          closedSessionCount: 0,
++          failedReplacementOpen: false,
++        });
++        yield* Effect.gen(function* () {
++          const orchestrator = yield* Orchestrator.OrchestratorV2;
++          const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
++          const eventSink = yield* EventSink.EventSinkV2;
++          const sessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
++          yield* orchestrator.dispatch({
++            type: "thread.create",
++            createdBy: "user",
++            creationSource: "web",
++            commandId: CommandId.make("handoff:create"),
++            threadId,
++            projectId: ProjectId.make("project:handoff"),
++            title: "Workspace handoff",
++            modelSelection: initialSelection,
++            runtimeMode: "full-access",
++            interactionMode: "default",
++            branch: null,
++            worktreePath: cwd,
++          });
++          const running = yield* eventSink.stream({ threadId }).pipe(
++            Stream.filter(
++              ({ event }) =>
++                event.type === "provider-turn.updated" && event.payload.status === "running",
++            ),
++            Stream.take(1),
++            Stream.runDrain,
++            Effect.forkScoped,
++          );
++          yield* orchestrator.dispatch({
++            type: "message.dispatch",
++            createdBy: "user",
++            creationSource: "web",
++            commandId: CommandId.make("handoff:first"),
++            threadId,
++            messageId: MessageId.make("handoff:first"),
++            text: "Start work",
++            attachments: [],
++            modelSelection: initialSelection,
++            dispatchMode: { type: "start_immediately" },
++          });
++          yield* Fiber.join(running);
++          yield* worker.drain();
++          const before = yield* orchestrator.getThreadProjection(threadId);
++          const firstRun = before.runs[0]!;
++          const firstThread = before.providerThreads[0]!;
++          const continuationResolved = yield* eventSink
++            .stream({
++              threadId,
++              afterSequence: yield* eventSink.latestSequence({ threadId }),
++            })
++            .pipe(
++              Stream.filter(
++                ({ event }) =>
++                  (event.type === "run.updated" &&
++                    event.payload.ordinal === 2 &&
++                    event.payload.queueHeld === true) ||
++                  (event.type === "provider-turn.updated" &&
++                    event.payload.ordinal === 2 &&
++                    event.payload.status === "running"),
++              ),
++              Stream.take(1),
++              Stream.runDrain,
++              Effect.forkScoped,
++            );
++          const terminal = yield* eventSink
++            .stream({
++              threadId,
++              afterSequence: yield* eventSink.latestSequence({ threadId }),
++            })
++            .pipe(
++              Stream.filter(
++                ({ event }) =>
++                  event.type === "run.updated" &&
++                  event.payload.id === firstRun.id &&
++                  (event.payload.status === "interrupted" || event.payload.status === "failed"),
++              ),
++              Stream.take(1),
++              Stream.runDrain,
++              Effect.forkScoped,
++            );
++          if (termination === "workspace-detach") {
++            yield* orchestrator.dispatch({
++              type: "thread.metadata.update",
++              commandId: CommandId.make("handoff:bind"),
++              threadId,
++              worktreePath: nextCwd,
++              expectedWorktreePath: cwd,
++              branch: "candidate",
++            });
++          }
++          yield* orchestrator.dispatch({
++            type: "message.dispatch",
++            createdBy: "agent",
++            creationSource: "mcp",
++            commandId: CommandId.make("handoff:continue"),
++            threadId,
++            messageId: MessageId.make("handoff:continue"),
++            text: "Continue preserved work",
++            attachments: [],
++            modelSelection: initialSelection,
++            dispatchMode: { type: "queue_after_active" },
++          });
++          if (termination === "unexpected-close") {
++            assert.isNotNull(firstThread.providerSessionId);
++            yield* sessions.close(firstThread.providerSessionId!);
++          }
++          yield* worker.drain();
++          yield* Fiber.join(terminal);
++          yield* Fiber.join(continuationResolved);
++          yield* worker.drain();
++          const after = yield* orchestrator.getThreadProjection(threadId);
++          const captured = yield* Ref.get(state);
++          if (termination === "workspace-detach") {
++            assert.equal(after.thread.worktreePath, nextCwd);
++            assert.deepEqual(
++              after.runs.map((run) => run.status),
++              ["interrupted", "running"],
++            );
++            assert.deepEqual(
++              captured.started.map((turn) => turn.cwd),
++              [cwd, nextCwd],
++            );
++            assert.lengthOf(after.providerThreads, 1);
++            assert.deepEqual(
++              after.providerThreads[0]?.nativeThreadRef,
++              firstThread.nativeThreadRef,
++            );
++            assert.isFalse(after.turnItems.some((item) => item.type === "error"));
++            assert.isFalse(after.runs.some((run) => run.queueHeld));
++          } else {
++            assert.deepEqual(
++              after.runs.map((run) => run.status),
++              ["failed", "queued"],
++            );
++            assert.isTrue(after.runs[1]?.queueHeld);
++            assert.lengthOf(captured.started, 1);
++            assert.isTrue(after.turnItems.some((item) => item.type === "error"));
++          }
++        }).pipe(
++          Effect.provide(
++            ProviderReplayHarness.layerWithRegistry(
++              { name: `handoff-${termination}` },
++              ProviderAdapterRegistry.layerSingle(makeRestartAdapter(state, exclusiveCapabilities)),
++            ),
++          ),
++        );
++      }),
++    ),
++);
++
+ it.live("retries a failed selection restart session open before completing", () =>
+   Effect.scoped(
+     Effect.gen(function* () {
+diff --git a/docs/internals/providers.md b/docs/internals/providers.md
+index 3f90328793..9570a07827 100644
+--- a/docs/internals/providers.md
++++ b/docs/internals/providers.md
+@@ -11,6 +11,18 @@ session or catalog state. For a new driver, start with [adding a provider](./add
+ 
+ ## Process and account isolation
+ 
++An exclusive session's explicit last-thread detach sends
++`ProviderAdapterSessionDetached` to its consumers. Run execution accepts that
++signal only for the matching session and app thread, and finalizes the current
++attempt as interrupted under the usual atomic fence. It still interrupts native
++work and performs normal cleanup. The signal is distinct from unexpected stream
++failure, which continues to fail the run and hold same-provider queued work.
++Server shutdown still interrupts ingestion for restart recovery. Shared-session
++detach retains its per-thread interruption and unload path.
++If native interruption fails, the provider turn stays running in the projection.
++The next start repairs abandoned turns from both failed and interrupted runs
++before resuming the same native conversation; unsuccessful repair blocks startup.
++
+ The `githubCopilot` driver in
+ [`packages/provider-copilot`](../../packages/provider-copilot/src/server/driver.ts)
+ uses SDK 1.0.8 in `copilot-cli` mode with the reviewed CLI 1.0.75 dependency closure.
+diff --git a/docs/user/source-control.md b/docs/user/source-control.md
+index 815e5dd066..2a2a05510c 100644
+--- a/docs/user/source-control.md
++++ b/docs/user/source-control.md
+@@ -10,6 +10,15 @@ rebases, the files Git brought in are left out. A file stays in the list when th
+ committed it, or fixed a conflict in it. Use the branch comparison to review everything that changed
+ against your base branch. Restore still returns the complete saved workspace.
+ 
++## Move a thread into a worktree
++
++Moving an active thread into a worktree stops its old provider session. That turn
++appears as interrupted rather than as a provider failure. If the move includes
++a continuation message, it can run automatically in the new workspace without
++requiring **Resume queue**. A genuine provider failure still pauses queued work.
++If stopping the old provider fails, the continuation must recover that turn before
++starting; it will not silently run alongside abandoned work.
++
+ ## Connect an account
+ 
+ Install Git and configure authentication on the machine running your T3 Code server. For a remote
+diff --git a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts
+index 928fa7ab46..f1f1bb04ce 100644
+--- a/packages/provider-core/src/server/ProviderAdapter.ts
++++ b/packages/provider-core/src/server/ProviderAdapter.ts
+@@ -354,6 +354,16 @@ export class ProviderAdapterEventStreamError extends Schema.TaggedError<Provider
+   }
+ }
+ 
++// An explicit last-thread detach ends that execution without reporting a provider failure.
++export class ProviderAdapterSessionDetached extends Schema.TaggedError<ProviderAdapterSessionDetached>()(
++  "ProviderAdapterSessionDetached",
++  {
++    driver: ProviderDriverKind,
++    providerSessionId: ProviderSessionId,
++    threadId: ThreadId,
++  },
++) {}
++
+ // Only fixed reasons reach failure messages; detail can contain private configuration.
+ const ProviderAdapterFailureReason = Schema.Literals([
+   "previous_turn_active",
+@@ -391,6 +401,7 @@ export const ProviderAdapterV2Error = Schema.Union([
+   ProviderAdapterInterruptError,
+   ProviderAdapterRuntimeRequestResponseError,
+   ProviderAdapterEventStreamError,
++  ProviderAdapterSessionDetached,
+   ProviderAdapterProtocolError,
+ ]);
+ export type ProviderAdapterV2Error = typeof ProviderAdapterV2Error.Type;

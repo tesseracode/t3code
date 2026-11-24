@@ -1,0 +1,35 @@
+{
+  "id": "copilot-skill-controls-v014",
+  "slug": "copilot-skill-controls-v014",
+  "title": "Preserve the existing main-only Copilot skill enable/disable RPC capability on the v0.1.4 native provider architecture. Route through typed instance/session-owned skills RPCs, preserve explicit provider session ownership, publish fresh workspace skill snapshots, surface unsupported/missing/ambiguous/native errors, and apply destination-environment provider-management authorization. Supersede the obsolete adapter and RPC-registration roots without restoring obsolete Vite origins or adding new UI.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-06T05:16:36Z",
+  "updated_at": "2026-11-06T05:28:56Z",
+  "last_command": "record",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-06T05:27:40Z",
+    "base_commit": "e6d01c63390dbba90f74557ef877f44a6893a375",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-skill-controls",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-skill-controls-ws-rpc",
+      "kind": "supersedes"
+    },
+    {
+      "slug": "copilot-sdk-runtime-upgrade",
+      "kind": "hard"
+    }
+  ]
+}

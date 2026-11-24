@@ -1,0 +1,29 @@
+{
+  "targetTag": "v0.1.3",
+  "targetCommit": "d2c440312e5f39d59827ed466838a623516454d6",
+  "absorbingCommit": "de343914273eceb852a1d1d739cd1d38df7796ee",
+  "codeEvidence": [
+    "packages/contracts/src/project.ts: ProjectMonogramText has no grapheme-count/Intl dependency during snapshot decoding",
+    "apps/server/src/orchestration-v2/ProjectCommands.ts: server command boundary uses Intl.Segmenter and rejects more than two graphemes",
+    "apps/mobile/src/lib/projectIcon.ts: mobile glyph counting handles combining marks without Intl.Segmenter",
+    "apps/mobile/index.ts: preserve the upstream render-counter first import; no additional bootstrap import is required"
+  ],
+  "executedProof": {
+    "node": "26.12.1",
+    "freshContractsImportWithSegmenterUndefined": "passed",
+    "combiningMarksAndTwoCharacterMonograms": "passed",
+    "WhitespaceSnapshotRejection": "passed",
+    "longSnapshotMonogramRemainsDecodable": "passed, validation intentionally belongs to the server",
+    "serverCommandAcceptsTwoUnicodeGraphemes": "passed",
+    "serverCommandRejectsThreeGraphemes": "passed",
+    "polyfillInstalled": false,
+    "databaseWrites": 0,
+    "providerTurns": 0
+  },
+  "decision": "Prefer upstream's server-boundary validation rather than reintroducing the polyfill or old snapshot constraint.",
+  "limitations": [
+    "This is executable JavaScript/schema and command-boundary evidence, not a native device qualification.",
+    "Integrated simulator/client evidence remains a candidate promotion gate.",
+    "Historical polyfill artifacts and the genuine blocked mechanical replay attempt remain intact."
+  ]
+}

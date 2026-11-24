@@ -1,0 +1,4 @@
+ docs/user/providers-copilot.md                     |   4 +
+ .../src/server/textGeneration.test.ts              | 256 +++++++++++++++++----
+ .../provider-copilot/src/server/textGeneration.ts  |  28 ++-
+ 3 files changed, 237 insertions(+), 51 deletions(-)

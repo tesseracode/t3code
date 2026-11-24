@@ -1,0 +1,65 @@
+{
+  "target": "edee604cdf3ef0fbc6ef96708e0c73022a7162cb",
+  "results": [
+    {
+      "slug": "fork-patch-flow-convention",
+      "base": "b898dfc62539010245036d8ed4b5675f77136deb",
+      "landing": "d60fde10f6c9a2c42b8133404657f6f89c564d59",
+      "paths": [
+        "docs/internals/fork-maintenance.md",
+        "docs/operations/patch-flow.md"
+      ],
+      "patchSha256": "3f0b49bc0d03de3d9779dba837a6daf6d01a687eefdf041e768b6068ee3f928f",
+      "recipeSha256": "07230a117a509df23c551305faa973f8906f01ba2e1eb85562108adc6e1e1829",
+      "canonicalTree": "30a7a5cce1497f880bddcb70a0894354f8ba1612",
+      "recipeTree": "30a7a5cce1497f880bddcb70a0894354f8ba1612",
+      "includesFileModes": true,
+      "residual": [],
+      "exact": true
+    },
+    {
+      "slug": "stable-main-preservation-v014",
+      "base": "5751f36722f20c9e974433092d55dfe85e017ed5",
+      "landing": "86965cd32c0ff1e8adcf82b6280c5203bb7e05a3",
+      "paths": [
+        "README.md",
+        "apps/server/src/auth/RpcAuthorization.test.ts",
+        "apps/server/src/auth/RpcAuthorization.ts",
+        "apps/server/src/observability/RpcInstrumentation.ts",
+        "apps/server/src/provider/ProviderRegistry.test.ts",
+        "apps/server/src/provider/ProviderRegistry.ts",
+        "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+        "apps/server/src/provider/testUtils/providerRegistryMock.ts",
+        "apps/server/src/serverSettings.test.ts",
+        "apps/server/src/ws.ts",
+        "apps/web/src/components/chat/composerProviderState.tsx",
+        "apps/web/src/index.css",
+        "docs/user/providers-copilot.md",
+        "packages/client-runtime/src/state/commandPermissions.test.ts",
+        "packages/contracts/src/clientRpcPermissions.ts",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/server.ts",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-copilot/src/server/driver.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/status.ts",
+        "packages/provider-copilot/src/settings.ts",
+        "packages/provider-core/src/server/ProviderAdapter.ts",
+        "packages/provider-core/src/server/driver.ts"
+      ],
+      "patchSha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+      "recipeSha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f",
+      "canonicalTree": "cf3d69306663f3656e6e9ac423c4752d4384faf2",
+      "recipeTree": "cf3d69306663f3656e6e9ac423c4752d4384faf2",
+      "includesFileModes": true,
+      "residual": [],
+      "exact": true
+    }
+  ],
+  "exact": true,
+  "method": "Independent strict whole-canonical forward application and direct execution of committed write-file recipes from each exact recorded landing parent.",
+  "excluded": [
+    ".tpatch administrative metadata only"
+  ]
+}

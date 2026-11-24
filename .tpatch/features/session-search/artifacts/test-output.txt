@@ -1,0 +1,14 @@
+# Test run — 2026-10-29T08:04:52Z
+# Command: vp test run packages/shared/src/threadSearch.test.ts packages/shared/src/threadFindText.test.ts apps/server/src/orchestration-v2/ThreadFind.test.ts apps/web/src/components/chat/threadFindStore.test.ts apps/web/src/components/chat/MessagesTimeline.logic.test.ts apps/web/src/components/chat/threadFindHighlights.browser.test.tsx apps/web/src/components/chat/ThreadFindBar.browser.test.tsx apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
+# Directory: /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-search
+
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-search
+
+
+ Test Files  8 passed (8)
+      Tests  153 passed (153)
+   Start at  01:04:41
+   Duration  10.25s (transform 40%, worker 27%, import 18%, tests 9%, setup 5%)
+

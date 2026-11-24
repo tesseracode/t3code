@@ -1,0 +1,130 @@
+{
+  "slug": "windows-portable-packaging-tests",
+  "title": "Backport authoritative upstream Windows portability fixes for desktop packaging tests: do not execute text .exe fixtures in host-native probes, accept native path separators, and skip symlink fixtures only when the host cannot create symlinks.",
+  "outcome": "blocked",
+  "phase": "phase-4-forward-apply-conflicts",
+  "upstream_ref": "v0.1.3",
+  "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
+  "notes": [
+    "Operation-level: 0 present, 0 applicable, 3 conflicts",
+    "3-way merge would leave conflict markers in 2 file(s) — manual resolution required (re-run with --resolve to attempt provider-assisted resolution)",
+    "git: Applied patch to 'packages/shared/package.json' cleanly.\nPerforming three-way merge...\nApplied patch to 'packages/shared/src/testing/symlinks.ts' with conflicts.\nApplied patch to 'scripts/build-desktop-artifact.test.ts' with conflicts.\nU packages/shared/src/testing/symlinks.ts\nU scripts/build-desktop-artifact.test.ts"
+  ],
+  "conflicts": [
+    "packages/shared/src/testing/symlinks.ts",
+    "scripts/build-desktop-artifact.test.ts"
+  ],
+  "evidence": [
+    {
+      "schema_version": 1,
+      "feature_slug": "windows-portable-packaging-tests",
+      "attempt_id": "re_0188b688f901",
+      "upstream_ref": "v0.1.3",
+      "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
+      "base_commit": "1910f22c210836cde7e13e9d7fcae0819d431c2a",
+      "raw_reconcile_verdict": "blocked",
+      "phase": "phase-4",
+      "evidence_kind": "forward-apply",
+      "confidence": "low",
+      "matched_paths": [
+        "packages/shared/src/testing/symlinks.ts",
+        "scripts/build-desktop-artifact.test.ts"
+      ],
+      "matched_operations": [],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "not-checked",
+      "requires_confirmation": true,
+      "reason_code": "phase-4-forward-apply-conflicts"
+    },
+    {
+      "schema_version": 1,
+      "feature_slug": "windows-portable-packaging-tests",
+      "attempt_id": "re_51aee7d347db",
+      "upstream_ref": "v0.1.3",
+      "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
+      "base_commit": "1910f22c210836cde7e13e9d7fcae0819d431c2a",
+      "raw_reconcile_verdict": "blocked",
+      "phase": "phase-3.5",
+      "evidence_kind": "file-novelty",
+      "confidence": "medium",
+      "matched_paths": [
+        "packages/shared/package.json",
+        "packages/shared/src/testing/symlinks.ts",
+        "scripts/build-desktop-artifact.test.ts"
+      ],
+      "matched_operations": [],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "present",
+      "requires_confirmation": true,
+      "reason_code": "mixed-additive"
+    },
+    {
+      "schema_version": 1,
+      "feature_slug": "windows-portable-packaging-tests",
+      "attempt_id": "re_859574213484",
+      "upstream_ref": "v0.1.3",
+      "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
+      "base_commit": "1910f22c210836cde7e13e9d7fcae0819d431c2a",
+      "raw_reconcile_verdict": "blocked",
+      "phase": "phase-3.5",
+      "evidence_kind": "hunk-overlap",
+      "confidence": "high",
+      "matched_paths": [
+        "packages/shared/package.json",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.test.ts"
+      ],
+      "matched_operations": [
+        "nearby-window=3",
+        "packages/shared/package.json:old:215,6-new:215,10:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.test.ts:old:1155,7-new:1159,7:edit-overlap:nearby=2",
+        "scripts/build-desktop-artifact.test.ts:old:1395,7-new:1399,7:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.test.ts:old:1886,7-new:1890,7:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.test.ts:old:79,6-new:79,7:edit-overlap:nearby=2",
+        "scripts/build-desktop-artifact.test.ts:old:812,6-new:813,9:edit-overlap:nearby=3",
+        "scripts/build-desktop-artifact.test.ts:old:840,7-new:844,7:edit-overlap:nearby=1",
+        "scripts/build-desktop-artifact.test.ts:old:859,7-new:863,7:edit-overlap:nearby=3"
+      ],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "present",
+      "requires_confirmation": false,
+      "reason_code": "edit-overlap"
+    },
+    {
+      "schema_version": 1,
+      "feature_slug": "windows-portable-packaging-tests",
+      "attempt_id": "re_d81e146a1253",
+      "upstream_ref": "v0.1.3",
+      "upstream_commit": "d2c440312e5f39d59827ed466838a623516454d6",
+      "base_commit": "1910f22c210836cde7e13e9d7fcae0819d431c2a",
+      "raw_reconcile_verdict": "blocked",
+      "phase": "phase-4",
+      "evidence_kind": "blocked-classification",
+      "confidence": "medium",
+      "matched_paths": [],
+      "matched_operations": [
+        "primary=edit-overlap",
+        "recommended_action=human-or-provider-resolution",
+        "secondary=clean-additive: file-novelty mixed-additive"
+      ],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "not-checked",
+      "requires_confirmation": false,
+      "reason_code": "edit-overlap"
+    }
+  ],
+  "blocked_category": "edit-overlap",
+  "recommended_action": "human-or-provider-resolution",
+  "blocked_evidence": [
+    "hunk-overlap edit-overlap nearby-window=3 packages/shared/package.json:old:215,6-new:215,10:edit-overlap:nearby=1 scripts/build-desktop-artifact.test.ts:old:1155,7-new:1159,7:edit-overlap:nearby=2 scripts/build-desktop-artifact.test.ts:old:1395,7-new:1399,7:edit-overlap:nearby=1 scripts/build-desktop-artifact.test.ts:old:1886,7-new:1890,7:edit-overlap:nearby=1 scripts/build-desktop-artifact.test.ts:old:79,6-new:79,7:edit-overlap:nearby=2 scripts/build-desktop-artifact.test.ts:old:812,6-new:813,9:edit-overlap:nearby=3 scripts/build-desktop-artifact.test.ts:old:840,7-new:844,7:edit-overlap:nearby=1 scripts/build-desktop-artifact.test.ts:old:859,7-new:863,7:edit-overlap:nearby=3"
+  ]
+}

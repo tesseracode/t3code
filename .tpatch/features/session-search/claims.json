@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "feature": "session-search",
+  "claims": [
+    {
+      "claim_id": "089ba3a11f9f",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/ThreadFindBar.tsx",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "0a88fcdec2c0",
+      "kind": "path",
+      "value": "packages/shared/src/threadSearch.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "0dbbfa08b8cd",
+      "kind": "path",
+      "value": "docs/internals/thread-find.md",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "1a0c852220c7",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/threadFindHighlights.browser.test.tsx",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "37266c79e7c9",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/threadFindHighlights.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "40ef1091c2e6",
+      "kind": "path",
+      "value": "packages/shared/src/threadSearch.test.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "4c2885453c77",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "4e2039c3171c",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/TimelineWorkGroupRows.tsx",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "54595c312940",
+      "kind": "path",
+      "value": "apps/server/src/orchestration-v2/ThreadFind.test.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "54784062d2a7",
+      "kind": "path",
+      "value": "docs/user/keybindings.md",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "6ca92b5d1a73",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/MessagesTimeline.tsx",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "80e5b4e6c07c",
+      "kind": "path",
+      "value": "packages/shared/src/threadFindText.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "8a318fbc7e8e",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/threadFindPosition.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "a29524a12c0b",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/timelineRowContext.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "c81cbe0301cc",
+      "kind": "path",
+      "value": "packages/contracts/src/orchestrationV2.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "dce6027f6673",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "dfeecdf09dfd",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/ThreadFindBar.browser.test.tsx",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "e2814b3e4f84",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/useThreadFind.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "e6242ce95da8",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/useThreadFindNavigation.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "ef68523f664a",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/useThreadFindPositionReader.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "f194dd5a26c6",
+      "kind": "path",
+      "value": "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+      "mode": "advisory",
+      "source": "manual"
+    },
+    {
+      "claim_id": "f7f46551b469",
+      "kind": "path",
+      "value": "apps/server/src/orchestration-v2/ThreadFind.ts",
+      "mode": "advisory",
+      "source": "manual"
+    }
+  ]
+}

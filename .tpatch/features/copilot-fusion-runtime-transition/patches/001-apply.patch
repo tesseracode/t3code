@@ -1,0 +1,84 @@
+diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
+index dc8a0c31d..d85e9e861 100644
+--- a/docs/user/providers-copilot.md
++++ b/docs/user/providers-copilot.md
+@@ -18,8 +18,10 @@ effective, and activating routing and shows reported model phases and timing. Se
+ [Activity log](activity-log.md). Explicit-model selection and defaults are unchanged.
+ 
+ To opt in to dynamic Fusion tiers, turn on **Enable Fusion** for this provider in
+-**Settings > Providers**. The setting affects new Copilot runtimes on that
+-environment and is off by default. When the account advertises Fusion, the model
++**Settings > Providers**. The setting is off by default on each environment.
++Changing an explicit routing preference renews the Copilot runtime and resumes
++the same native conversation, so existing chats receive the updated setting.
++When the account advertises Fusion, the model
+ picker shows **Fusion**, with a separate **Fusion effort** control for its available
+ tiers, such as **Standard**, **High**, and **Max**. Names and availability come from
+ your account; choosing an effort does not pin the solver or reviewer model.
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index 75c971b7f..f95b73f92 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -331,6 +331,39 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+   );
+ 
+ describe("native Copilot V2", () => {
++  it.effect("renews routing preferences without replacing ordinary model switches", () =>
++    provide(
++      Effect.gen(function* () {
++        const adapter = yield* makeAdapter({ instanceId, settings, environment: {} });
++        const auto: ModelSelection = { instanceId, model: "auto" };
++        const high: ModelSelection = {
++          ...auto,
++          options: [{ id: "autoTier", value: "hydrafusion" }],
++        };
++        const max: ModelSelection = {
++          ...auto,
++          options: [{ id: "autoTier", value: "hydrafusion-max" }],
++        };
++        for (const [current, target, type] of [
++          [selection, max, "restart_session"],
++          [auto, max, "restart_session"],
++          [high, max, "restart_session"],
++          [max, max, "apply_on_next_turn"],
++          [max, selection, "apply_on_next_turn"],
++          [selection, auto, "apply_on_next_turn"],
++        ] as const) {
++          assert.deepEqual(
++            yield* adapter.planSelectionTransition({
++              current,
++              target,
++              sessionCapabilities: yield* adapter.getCapabilities(),
++            }),
++            { type },
++          );
++        }
++      }),
++    ),
++  );
+   it.effect.each(["single", "cascade", "critique"])(
+     "publishes only committed root %s output before late plan telemetry",
+     (pattern) =>
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+index e02ed4e4c..f4af96c19 100644
+--- a/packages/provider-copilot/src/server/adapter.ts
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -204,8 +204,16 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+     getCapabilities: Effect.fn("CopilotAdapter.getCapabilities")(() =>
+       Effect.succeed(capabilities),
+     ),
+-    planSelectionTransition: Effect.fn("CopilotAdapter.planSelectionTransition")(() =>
+-      Effect.succeed(turnScopedSelectionTransition()),
++    planSelectionTransition: Effect.fn("CopilotAdapter.planSelectionTransition")(({ current, target }) =>
++      Effect.succeed(
++        target.model === "auto" &&
++          typeof getProviderOptionStatedValue("autoTier", target) === "string" &&
++          (current.model !== "auto" ||
++            getProviderOptionStatedValue("autoTier", current) !==
++              getProviderOptionStatedValue("autoTier", target))
++          ? { type: "restart_session" as const }
++          : turnScopedSelectionTransition(),
++      ),
+     ),
+     openSession: Effect.fn("CopilotAdapter.openSession")(function* (open) {
+       const cwd = open.runtimePolicy.cwd ?? host.paths.cwd;

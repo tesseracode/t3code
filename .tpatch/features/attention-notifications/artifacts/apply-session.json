@@ -1,0 +1,9 @@
+{
+  "slug": "attention-notifications",
+  "completed_at": "2026-10-29T16:55:41Z",
+  "base_commit": "4de99f4a515055662ccd5d59f6f705b2ff973bd4",
+  "has_patch": true,
+  "operator_notes": "Complete canonical 28-path attention replay plus adapted existing audio fixture; preserve v014 linked-subagent subscriptions and new-only sidebar, raw no-default settings patch schemas.",
+  "validation_status": "needs_review",
+  "validation_notes": "Every materialized source path inspected after root; product tests, builds and integrated visual/reviewer passes deferred until all roots integrate per maintainer."
+}

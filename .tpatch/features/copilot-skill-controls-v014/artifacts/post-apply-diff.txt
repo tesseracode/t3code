@@ -1,0 +1,17 @@
+ apps/server/src/auth/RpcAuthorization.test.ts      |  48 +++++++
+ apps/server/src/auth/RpcAuthorization.ts           |   1 +
+ .../server/src/observability/RpcInstrumentation.ts |   1 +
+ apps/server/src/provider/ProviderRegistry.test.ts  |  40 +++++-
+ apps/server/src/provider/ProviderRegistry.ts       |  55 ++++++++
+ .../src/provider/providerMaintenanceRunner.test.ts |   1 +
+ .../src/provider/testUtils/providerRegistryMock.ts |   1 +
+ apps/server/src/ws.ts                              |   2 +
+ docs/user/providers-copilot.md                     |   3 +-
+ .../src/state/commandPermissions.test.ts           |  12 +-
+ packages/contracts/src/clientRpcPermissions.ts     |   2 +
+ packages/contracts/src/rpc.ts                      |  10 ++
+ packages/contracts/src/server.ts                   |  35 +++++
+ .../provider-copilot/src/server/adapter.test.ts    | 150 ++++++++++++++++++++-
+ packages/provider-copilot/src/server/adapter.ts    |  72 +++++++++-
+ .../provider-core/src/server/ProviderAdapter.ts    |   5 +
+ 16 files changed, 427 insertions(+), 11 deletions(-)

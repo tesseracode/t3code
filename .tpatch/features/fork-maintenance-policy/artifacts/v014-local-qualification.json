@@ -1,0 +1,103 @@
+{
+  "sourceCommit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+  "sourceEquivalentTestCommit": "9effd4b019d1be3968f549c02e45ded83c52c83b",
+  "upstreamBase": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "candidateVersion": "0.1.4-preview.20261029.1",
+  "exactReplay": {
+    "record": "v014-candidate-exact-replay.json",
+    "rootCount": 11,
+    "tree": "226936033452d479986dff3779db6584e39a4342",
+    "residualSourceOrModes": [],
+    "excluded": [".tpatch/ administrative metadata"]
+  },
+  "changedChecks": {
+    "command": "vp run check:changed v0.1.4",
+    "exitCode": 0,
+    "node": "26.12.1",
+    "pnpm": "12.14.0",
+    "format": "passed",
+    "lint": "passed",
+    "knipPasses": 2,
+    "graphql": "passed",
+    "unusedPatches": "passed",
+    "typecheckedPackages": 37,
+    "testFiles": 72,
+    "passedTests": 764,
+    "skippedTests": 13,
+    "environmentAdjustment": "TMPDIR resolves to the real macOS temp path, avoiding /var versus /private/var alias mismatch",
+    "fullRepositoryTestSuite": "not run"
+  },
+  "nativeCopilot": {
+    "executionBoundary": "isolated source backend; packaged Mac client and native mobile clients",
+    "sdkVersion": "1.0.8",
+    "cliVersion": "1.0.75",
+    "actualModel": "gpt-6-astra",
+    "nativeSessionId": "1d073f35-cac7-4a29-a9ea-090e4594599a",
+    "sameSessionAsV013": true,
+    "newRealTurns": 1,
+    "stdoutOnlyCommands": 2,
+    "approvalClients": ["Android emulator", "iOS Simulator"],
+    "confirmedFirstAttemptResponses": 2,
+    "responseErrors": 0,
+    "emptyAssistantMessagesInNewTurn": 0,
+    "runRemainedActiveAtSecondApproval": true,
+    "finalStatus": "completed",
+    "finalActionableCount": 0
+  },
+  "observedClientBehavior": {
+    "coldSkillSelectionAndRemoval": "passed",
+    "dollarSkillAndSlashModelMenus": "passed",
+    "planMenu": "default-off Legacy client preference, unchanged from installed baseline",
+    "clipboard": "runbooks/check.txt:1",
+    "composerWidths": [710, 1126, 710],
+    "narrowViewport": 600,
+    "newAndExistingShortcut": "Meta+Enter; two persisted completed local devReplay runs",
+    "activitySearch": "2/3 match; active CSS highlight targets the actual printf v014-phase-two summary",
+    "seenUnseen": "reversible; real approval remains actionable"
+  },
+  "macDesktop": {
+    "packagedUi": "passed",
+    "title": "T3 Code Fork Preview",
+    "origin": "t3code://app/",
+    "freshProfile": true,
+    "stockImportSkipped": true,
+    "keychainAvailabilityConfirmedByUser": true,
+    "localOffColdRestartRemoteRetained": true,
+    "localOnRestartRemoteRetained": true,
+    "packagedProviderInference": "not run; packaged profile providers disabled",
+    "originalUserBackendPreserved": true
+  },
+  "mobile": {
+    "ios": "Debug Simulator: boot, pair, history and real native approval passed",
+    "iosAutomation": "isolated AXe 1.8.0 plus Xcode 27 DeviceHub; no Xcode modification",
+    "androidDebug": "emulator boot, pair, history and real native approval passed",
+    "androidStandalone": "ARM64 Release, development identity/debug certificate, embedded JS, OTA disabled; cold launch and new server data with Metro stopped passed",
+    "physicalPhoneInstalls": 0
+  },
+  "buildOnlyCi": {
+    "url": "https://github.com/tesseracode/t3code/actions/runs/40928076911",
+    "linuxX64": "passed",
+    "windowsX64": "passed",
+    "windowsPackagedFiles": 64,
+    "windowsSidecarNatives": 21,
+    "attemptsPerTarget": 1,
+    "approvedLimitPerTarget": 4
+  },
+  "independentReview": {
+    "model": "gpt-6.1-sol",
+    "result": "No significant issues found in reviewed changes and demonstrated local paths",
+    "notificationFinding": "Fixed in attention-policy-completion-watermarks; four failing-before/passing-after browser-coordinator cases"
+  },
+  "notQualified": [
+    "Windows/WSL/Ubuntu receiving hosts",
+    "physical-phone installation",
+    "physical iOS release and iOS without Metro",
+    "old Intel Mac runtime compatibility",
+    "real OS notification or push delivery",
+    "full off-screen long-plan scenario",
+    "cross-machine peer delegation",
+    "computer use",
+    "all-green tpatch historical verifier"
+  ],
+  "promotion": "No main merge, PR, release tag or live upgrade"
+}

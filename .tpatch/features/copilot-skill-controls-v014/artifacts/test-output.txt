@@ -1,0 +1,27 @@
+Scope: restore the existing stable-main skill-control RPC on the pinned v0.1.4 architecture.
+
+Failing first:
+vp test run packages/provider-copilot/src/server/adapter.test.ts -t 'preserves skill ownership'
+FAILED: Copilot instance skill controls are missing.
+
+Focused behavior:
+vp test run packages/provider-copilot/src/server/adapter.test.ts apps/server/src/provider/ProviderRegistry.test.ts apps/server/src/auth/RpcAuthorization.test.ts packages/client-runtime/src/state/commandPermissions.test.ts
+PASSED: 115 tests, 4 files.
+
+Final affected acceptance:
+vp run check:changed 98213a256b069ed510aa07f92c6632fc5f9ef146
+PASSED: format, lint, both Knip passes, server GraphQL generation check,
+33 affected-package typechecks, and 151 adjacent tests in 8 files.
+
+Deterministic runtime observations (native SDK fixture, not a live account):
+No initialized owner: rejected as session_unavailable.
+One owner: disable removed its enabled skill inventory; enable restored it.
+Two owners without a selector: rejected as session_required without mutation.
+Explicit second owner: only that owner's native skill and inventory changed.
+Native refusal: operation_failed retained its cause and the previous inventory.
+Closed owner scopes: removed from selection; all closed returned session_unavailable.
+Registry publication preserved existing commands during a failed health probe.
+Read-only RPC authority did not enter the handler; provider-management authority did.
+
+No paid turn, installed-client qualification, live account/profile write,
+deployment, or package release is claimed by these fixture observations.

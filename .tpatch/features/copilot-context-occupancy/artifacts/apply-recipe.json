@@ -1,0 +1,29 @@
+{
+  "feature": "copilot-context-occupancy",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-core/src/server/ProviderAdapter.ts",
+      "search": "  readonly canReuseContextUsage?: (previous: ModelSelection, next: ModelSelection) => boolean;",
+      "replace": "  readonly canReuseContextUsage?: (previous: ModelSelection, next: ModelSelection) => boolean;\n  /** False when turn usage is cumulative billing rather than native context occupancy. */\n  readonly turnUsageIsContextUsage?: boolean;\n  readonly supportsNativeThreadReplacement?: boolean;"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "search": "        hasPendingBackgroundWork: Effect.sync(() => [...tasks.values()].some(isPendingTask)),",
+      "replace": "        hasPendingBackgroundWork: Effect.sync(() => [...tasks.values()].some(isPendingTask)),\n        turnUsageIsContextUsage: false,\n        supportsNativeThreadReplacement: false,"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+      "search": "        const measuredContext = latestNativeContextUsage(projection, providerThread);",
+      "replace": "        const measuredContext = session.turnUsageIsContextUsage === false\n          ? undefined\n          : latestNativeContextUsage(projection, providerThread);"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+      "search": "    \"prior-images-telemetry-native\",",
+      "replace": "    \"prior-images-telemetry-native\",\n    \"prior-images-cumulative-native\","
+    }
+  ]
+}

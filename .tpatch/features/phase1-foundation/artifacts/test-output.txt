@@ -1,0 +1,14 @@
+# Test run — 2026-10-29T09:16:09Z
+# Command: PATH=/Users/jdbencardinop/.nvm/versions/node/v26.12.1/bin:$PATH node_modules/.bin/vp test run apps/server/src/orchestration-v2/FoundationProjection.test.ts apps/server/src/persistence/ForkMigrations.test.ts packages/contracts/src/attention.test.ts packages/client-runtime/src/state/attentionNotifications.test.ts
+# Directory: /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-foundation
+
+note: You are running `vp test` as a Vite+ built-in command. If you meant to run the test npm script, use `vpr test` instead.
+
+ RUN  v5.0.5 /Users/jdbencardinop/.copilot/session-state/50928e5b-1f64-4f2b-8676-e4f50b580c1a/files/worktrees/t3code-v013-foundation
+
+
+ Test Files  4 passed (4)
+      Tests  39 passed (39)
+   Start at  02:16:03
+   Duration  5.63s (transform 55%, tests 16%, setup 16%, import 14%)
+

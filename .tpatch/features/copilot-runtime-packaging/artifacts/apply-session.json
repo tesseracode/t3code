@@ -1,0 +1,9 @@
+{
+  "slug": "copilot-runtime-packaging",
+  "completed_at": "2026-10-29T16:53:51Z",
+  "base_commit": "dde51c8e18801099e417c80dd369e3a9216af8f3",
+  "has_patch": true,
+  "operator_notes": "Resolved two three-way import conflicts; retained native SDK 1.0.8 / CLI 1.0.75 / Koffi 3.3.1, upstream boot recovery and release/self-containment gates.",
+  "validation_status": "needs_review",
+  "validation_notes": "Full 31-path manual v0.1.4 source replay reviewed; project tests/builds/UI/provider turns/CI intentionally deferred until primary full-set integration. Actual reconcile refusal retained; no parent metadata fabrication."
+}

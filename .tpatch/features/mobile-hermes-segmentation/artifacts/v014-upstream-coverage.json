@@ -1,0 +1,17 @@
+{
+  "targetTag": "v0.1.4",
+  "targetCommit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "absorbingCommit": "de343914273eceb852a1d1d739cd1d38df7796ee",
+  "absorbingCommitReachable": true,
+  "disposition": "retain upstream_merged; do not replay the obsolete polyfill",
+  "sourceInspection": [
+    "packages/contracts/src/project.ts:76-80 retains snapshot validation without Intl.Segmenter",
+    "No Segmenter or grapheme references were found in packages/contracts/src/*.ts",
+    "apps/server/src/orchestration-v2/ProjectCommands.ts:104,173-177 retains two-grapheme validation at the server boundary",
+    "apps/mobile/src/lib/projectIcon.ts:10-13 counts mobile glyphs without Intl.Segmenter",
+    "apps/mobile/index.ts:1-19 retains upstream render/behavior/observability bootstrap order without the obsolete polyfill"
+  ],
+  "validation": "Source and ancestry inspection only; executable schema and native-client checks follow full integration.",
+  "priorEvidence": "v013-upstream-coverage.json",
+  "historicalArtifactsPreserved": true
+}

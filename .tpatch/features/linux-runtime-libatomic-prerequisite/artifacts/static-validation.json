@@ -1,0 +1,32 @@
+{
+  "scope": "Documentation only; no runtime, binary, package installation or global configuration change.",
+  "checks": [
+    {
+      "command": "vp fmt --check docs/user/install.md docs/operations/fork-native-preview.md",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "tpatch record linux-runtime-libatomic-prerequisite",
+      "result": "canonical patch round-trips cleanly; 2 documentation files"
+    },
+    {
+      "command": "tpatch verify linux-runtime-libatomic-prerequisite",
+      "result": "blocked: hard parent copilot-runtime-packaging canonical footprint is no longer present at baseline 4a5ad9255c after the legitimate earlier Windows ZIP child",
+      "limitation": "Known parent-baseline verifier limitation; no parent reapplication or fabricated verification evidence. Independent combined replay is required."
+    }
+  ],
+  "independentReview": {
+    "model": "GPT-6.1 Sol",
+    "harness": "GitHub Copilot CLI code-review agent",
+    "result": "No significant issues found in the reviewed changes."
+  },
+  "runtimeEvidenceBoundary": {
+    "pristineUbuntu2404Wsl": "Missing libatomic.so.1 blocked startup; not passed.",
+    "dedicatedDependencyVariant": "Standard signed libatomic1 and declared dependencies installed only in the owned test distro; loader resolution improved.",
+    "fullManagedRuntimeQualification": "Separate receiving-host gate; not certified by this documentation change."
+  }
+}

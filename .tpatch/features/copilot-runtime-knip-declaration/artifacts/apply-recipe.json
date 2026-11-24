@@ -1,0 +1,11 @@
+{
+  "feature": "copilot-runtime-knip-declaration",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "knip.jsonc",
+      "search": "      \"ignoreDependencies\": [\"@effect/platform-node-shared\", \"@t3tools/web\", \"@napi-rs/keyring\"],",
+      "replace": "      \"ignoreDependencies\": [\n        \"@effect/platform-node-shared\",\n        \"@t3tools/web\",\n        \"@napi-rs/keyring\",\n        \"@github/copilot-sdk\",\n      ],"
+    }
+  ]
+}

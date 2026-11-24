@@ -1,0 +1,15 @@
+ README.md                                          |   3 +
+ apps/server/src/provider/ProviderRegistry.test.ts  |  11 +-
+ apps/server/src/provider/ProviderRegistry.ts       | 125 +++++++++++-----
+ apps/server/src/serverSettings.test.ts             |  12 +-
+ .../src/components/chat/composerProviderState.tsx  |  12 +-
+ apps/web/src/index.css                             |  26 +++-
+ docs/user/providers-copilot.md                     |   4 +
+ .../provider-copilot/src/server/adapter.test.ts    | 161 +++++++++++++++++++-
+ packages/provider-copilot/src/server/adapter.ts    | 162 +++++++++++++++++++--
+ packages/provider-copilot/src/server/driver.ts     |   3 +-
+ .../provider-copilot/src/server/status.test.ts     |  20 ++-
+ packages/provider-copilot/src/server/status.ts     | 136 +++++++++--------
+ packages/provider-copilot/src/settings.ts          |  18 ++-
+ packages/provider-core/src/server/driver.ts        |   2 +
+ 14 files changed, 564 insertions(+), 131 deletions(-)

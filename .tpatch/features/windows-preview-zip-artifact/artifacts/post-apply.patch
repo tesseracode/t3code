@@ -1,0 +1,51 @@
+diff --git a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml
+index 532aa76c6..a8e2ba045 100644
+--- a/.github/workflows/fork-native-preview.yml
++++ b/.github/workflows/fork-native-preview.yml
+@@ -7,6 +7,14 @@ on:
+         description: Unsigned preview version (leave empty for a unique run version)
+         required: false
+         type: string
++      windows_target:
++        description: Windows delivery format (ZIP supports side-by-side validation)
++        required: true
++        default: nsis
++        type: choice
++        options:
++          - nsis
++          - zip
+ 
+ permissions:
+   contents: read
+@@ -85,6 +93,7 @@ jobs:
+         shell: pwsh
+         working-directory: C:\t3\s
+     env:
++      WINDOWS_TARGET: ${{ inputs.windows_target || 'nsis' }}
+       TEMP: C:\t3\tmp
+       TMP: C:\t3\tmp
+       TMPDIR: C:\t3\tmp
+@@ -136,18 +145,20 @@ jobs:
+           if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected.sha256) { throw 'WSL digest mismatch' }
+           node scripts/update-release-package-versions.ts $env:PREVIEW_VERSION
+           if ($LASTEXITCODE -ne 0) { throw 'Version transform failed' }
+-      - name: Build isolated unsigned Windows installer
++      - name: Build isolated unsigned Windows preview
+         run: |
+-          node scripts/build-desktop-artifact.ts --platform win --arch x64 --target nsis --fork-preview --build-version $env:PREVIEW_VERSION --wsl-runtime "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz" --output-dir C:\t3\release --keep-stage --verbose
++          if ($env:WINDOWS_TARGET -notin @('nsis', 'zip')) { throw 'Unsupported Windows preview target' }
++          node scripts/build-desktop-artifact.ts --platform win --arch x64 --target $env:WINDOWS_TARGET --fork-preview --build-version $env:PREVIEW_VERSION --wsl-runtime "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz" --output-dir C:\t3\release --keep-stage --verbose
+           if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed' }
+           node scripts/fork-preview-manifest.mjs --directory C:\t3\release --target windows-x64 --version $env:PREVIEW_VERSION --wsl-archive "C:\t3\wsl\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz"
+           if ($LASTEXITCODE -ne 0) { throw 'Manifest verification failed' }
+-      - name: Upload installer and provenance
++      - name: Upload Windows preview and provenance
+         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+         with:
+           name: fork-preview-windows-x64
+           path: |
+             C:\t3\release\*.exe
++            C:\t3\release\*.zip
+             C:\t3\release\manifest.json
+             C:\t3\release\SHA256SUMS
+           if-no-files-found: error

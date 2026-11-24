@@ -1,0 +1,17 @@
+verify scanner-canonical-path-exclusion — passed
+  baseline: historical-anchor @ edaafaa (replay anchor d7ff2a4) · current @ cf9ef89 (isolated index)
+  landing evidence: exact @ d7ff2a4 (patch ✓ recipe ✓ base ✓)
+  ✓ [block-abort] status_loaded
+  ✓ [block] intent_files_present
+  ✓ [block] recipe_parses
+  ✓ [block] recipe_op_targets_resolve
+  ✓ [block] dep_metadata_valid
+  ⊘ [block] satisfied_by_reachable — no satisfied_by deps to check
+  ✓ [warn] dependency_gate_satisfied
+  ✓ [block] recipe_replay_clean
+  ✓ [block] post_apply_patch_replay_clean
+  ⊘ [warn] reconcile_outcome_consistent — no Reconcile.Outcome set
+  ✓ [block] write_file_preimage_fresh
+  ✓ [block] recipe_generation_coverage
+  ! [warn] later-touch — later-touch: later feature scanner-canonical-path-exclusion touched apps/server/src/project/AgentSessionScanner.ts after copilot-session-import was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)
+  ! [warn] later-touch — later-touch: later feature copilot-root-aborted-idle touched docs/user/providers-copilot.md after copilot-session-import was recorded; replaying this write-file would silently revert it — review before any replay (ADR-029 D5/D6, warning-class)

@@ -1,0 +1,4787 @@
+diff --git a/apps/mobile/package.json b/apps/mobile/package.json
+index bdb4c8ebf..9d384e074 100644
+--- a/apps/mobile/package.json
++++ b/apps/mobile/package.json
+@@ -74,6 +74,7 @@
+     "@t3tools/mobile-source-text": "file:./modules/t3-source-text",
+     "@t3tools/mobile-terminal-native": "file:./modules/t3-terminal",
+     "@t3tools/provider-acp-registry": "workspace:*",
++    "@t3tools/provider-copilot": "workspace:*",
+     "@t3tools/provider-core": "workspace:*",
+     "@t3tools/provider-cursor": "workspace:*",
+     "@t3tools/provider-fx": "workspace:*",
+diff --git a/apps/mobile/src/lib/providerClients.ts b/apps/mobile/src/lib/providerClients.ts
+index 2a62b5fdc..32930d1d5 100644
+--- a/apps/mobile/src/lib/providerClients.ts
++++ b/apps/mobile/src/lib/providerClients.ts
+@@ -4,6 +4,7 @@ import { makeProviderClientRegistry } from "@t3tools/provider-core/client";
+ import { cursorClient } from "@t3tools/provider-cursor/client";
+ import { fxClient } from "@t3tools/provider-fx/client";
+ import { grokClient } from "@t3tools/provider-grok/client";
++import { copilotClient } from "@t3tools/provider-copilot/client";
+ import { museClient } from "@t3tools/provider-muse/client";
+ import { openCodeClient } from "@t3tools/provider-opencode/client";
+ import { piClient } from "@t3tools/provider-pi/client";
+@@ -11,6 +12,7 @@ import { piClient } from "@t3tools/provider-pi/client";
+ const providerClients = makeProviderClientRegistry([
+   cursorClient,
+   grokClient,
++  copilotClient,
+   fxClient,
+   museClient,
+   openCodeClient,
+diff --git a/apps/server/package.json b/apps/server/package.json
+index f8e6671b3..021cde6f0 100644
+--- a/apps/server/package.json
++++ b/apps/server/package.json
+@@ -43,6 +43,7 @@
+     "@opencode-ai/sdk": "^1.3.15",
+     "@t3tools/provider-acp": "workspace:*",
+     "@t3tools/provider-acp-registry": "workspace:*",
++    "@t3tools/provider-copilot": "workspace:*",
+     "@t3tools/provider-core": "workspace:*",
+     "@t3tools/provider-cursor": "workspace:*",
+     "@t3tools/provider-fx": "workspace:*",
+diff --git a/apps/server/src/provider/builtInDrivers.ts b/apps/server/src/provider/builtInDrivers.ts
+index 76819ce99..c82fefd5e 100644
+--- a/apps/server/src/provider/builtInDrivers.ts
++++ b/apps/server/src/provider/builtInDrivers.ts
+@@ -8,6 +8,7 @@ import { CodexDriver, type CodexDriverEnv } from "./Drivers/CodexDriver.ts";
+ import { CursorDriver, type CursorDriverEnv } from "@t3tools/provider-cursor/server";
+ import { FxDriver, type FxDriverEnv } from "@t3tools/provider-fx/server";
+ import { GrokDriver, type GrokDriverEnv } from "@t3tools/provider-grok/server";
++import { CopilotDriver, type CopilotDriverEnv } from "@t3tools/provider-copilot/server";
+ import { OpenCodeDriver, type OpenCodeDriverEnv } from "@t3tools/provider-opencode/server";
+ import { MuseDriver, type MuseDriverEnv } from "@t3tools/provider-muse/server";
+ import { PiDriver, type PiDriverEnv } from "@t3tools/provider-pi/server";
+@@ -24,6 +25,7 @@ export type BuiltInDriversEnv =
+   | CursorDriverEnv
+   | FxDriverEnv
+   | GrokDriverEnv
++  | CopilotDriverEnv
+   | OpenCodeDriverEnv
+   | PiDriverEnv
+   | MuseDriverEnv;
+@@ -33,6 +35,7 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
+   ClaudeDriver,
+   CursorDriver,
+   GrokDriver,
++  CopilotDriver,
+   FxDriver,
+   OpenCodeDriver,
+   AntigravityDriver,
+diff --git a/apps/server/src/serverSettings.test.ts b/apps/server/src/serverSettings.test.ts
+index bd985cab2..3187067d5 100644
+--- a/apps/server/src/serverSettings.test.ts
++++ b/apps/server/src/serverSettings.test.ts
+@@ -867,6 +867,61 @@ it.layer(NodeServices.layer)("server settings", (it) => {
+     }).pipe(Effect.provide(layerServerSettings())),
+   );
+ 
++  it.effect("migrates legacy Copilot settings to the native GitHub Copilot driver", () =>
++    Effect.gen(function* () {
++      const serverConfig = yield* ServerConfig.ServerConfig;
++      const fileSystem = yield* FileSystem.FileSystem;
++      const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
++      yield* fileSystem.writeFileString(
++        serverConfig.settingsPath,
++        JSON.stringify({
++          providers: {
++            copilot: { enabled: true, homePath: "/legacy-account", enableConfigDiscovery: false },
++            githubCopilot: { enabled: false, homePath: "/canonical-account" },
++          },
++        }),
++      );
++      const settings = yield* serverSettings.getSettings;
++      assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("githubCopilot")], {
++        driver: ProviderDriverKind.make("githubCopilot"),
++        enabled: false,
++        config: { homePath: "/canonical-account" },
++      });
++      assert.isUndefined(settings.providerInstances[ProviderInstanceId.make("copilot")]);
++    }).pipe(Effect.provide(layerServerSettings())),
++  );
++
++  it.effect(
++    "preserves legacy Copilot instance ids while migrating their native driver and account settings",
++    () =>
++      Effect.gen(function* () {
++        const serverConfig = yield* ServerConfig.ServerConfig;
++        const fileSystem = yield* FileSystem.FileSystem;
++        const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
++        yield* fileSystem.writeFileString(
++          serverConfig.settingsPath,
++          JSON.stringify({
++            providerInstances: {
++              copilot_work: {
++                driver: "copilot",
++                enabled: true,
++                config: { homePath: "/work-account" },
++              },
++            },
++          }),
++        );
++        const settings = yield* serverSettings.getSettings;
++        assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("copilot_work")], {
++          driver: ProviderDriverKind.make("githubCopilot"),
++          enabled: true,
++          config: { homePath: "/work-account" },
++        });
++        const persisted = yield* fileSystem.readFileString(serverConfig.settingsPath);
++        assert.include(persisted, '"githubCopilot"');
++        assert.notInclude(persisted, '"driver": "copilot"');
++      }).pipe(Effect.provide(layerServerSettings())),
++  );
++
+   it.effect("enables previously used optional providers while migrating legacy settings", () =>
+     Effect.gen(function* () {
+       const serverConfig = yield* ServerConfig.ServerConfig;
+diff --git a/apps/server/src/serverSettings.ts b/apps/server/src/serverSettings.ts
+index 3131c84d8..9b5e23e09 100644
+--- a/apps/server/src/serverSettings.ts
++++ b/apps/server/src/serverSettings.ts
+@@ -74,7 +74,12 @@ const textDecoder = new TextDecoder();
+ const foldProviderInstanceEnabledFlags = (settings: ServerSettings): ServerSettings => {
+   let changed = false;
+   const providerInstances: Record<string, ProviderInstanceConfig> = {};
+-  for (const [instanceId, instance] of Object.entries(settings.providerInstances)) {
++  for (const [instanceId, previous] of Object.entries(settings.providerInstances)) {
++    const instance =
++      previous.driver === "copilot"
++        ? { ...previous, driver: ProviderDriverKind.make("githubCopilot") }
++        : previous;
++    if (instance !== previous) changed = true;
+     const config = instance.config;
+     // Leave malformed flags for driver schema validation rather than silently repairing them.
+     if (
+@@ -368,6 +373,11 @@ function migrateLegacyProviderSettings(
+   }
+ 
+   const legacyEntries = new Map(Object.entries(legacyProviders));
++  // The native SDK driver replaces the original opt-in Copilot driver, not the ACP registry.
++  if (!legacyEntries.has("githubCopilot") && legacyEntries.has("copilot")) {
++    legacyEntries.set("githubCopilot", legacyEntries.get("copilot"));
++  }
++  legacyEntries.delete("copilot");
+   for (const driver of HISTORY_RESTORED_DRIVERS) {
+     if (!legacyEntries.has(driver)) legacyEntries.set(driver, {});
+   }
+@@ -735,6 +745,9 @@ const make = Effect.gen(function* () {
+             ),
+           );
+ 
++    const needsCopilotDriverMigration = Object.values(settings.providerInstances).some(
++      (instance) => instance.driver === "copilot",
++    );
+     const loaded = foldProviderInstanceEnabledFlags(
+       legacyProviders === undefined
+         ? settings
+@@ -773,6 +786,7 @@ const make = Effect.gen(function* () {
+       : folded;
+     if (
+       migrated !== loaded ||
++      needsCopilotDriverMigration ||
+       (settingsFileTrusted && legacyProviders !== undefined) ||
+       hasLegacySourceControl
+     ) {
+diff --git a/apps/web/package.json b/apps/web/package.json
+index 5ae86a8a7..99ff20b97 100644
+--- a/apps/web/package.json
++++ b/apps/web/package.json
+@@ -35,6 +35,7 @@
+     "@t3tools/client-runtime": "workspace:*",
+     "@t3tools/contracts": "workspace:*",
+     "@t3tools/provider-acp-registry": "workspace:*",
++    "@t3tools/provider-copilot": "workspace:*",
+     "@t3tools/provider-core": "workspace:*",
+     "@t3tools/provider-cursor": "workspace:*",
+     "@t3tools/provider-fx": "workspace:*",
+diff --git a/apps/web/src/components/settings/providerDriverMeta.ts b/apps/web/src/components/settings/providerDriverMeta.ts
+index 552fc0d28..7e28be9c8 100644
+--- a/apps/web/src/components/settings/providerDriverMeta.ts
++++ b/apps/web/src/components/settings/providerDriverMeta.ts
+@@ -9,6 +9,7 @@ import { makeProviderClientRegistry } from "@t3tools/provider-core/client";
+ import { cursorClient } from "@t3tools/provider-cursor/client";
+ import { fxClient } from "@t3tools/provider-fx/client";
+ import { grokClient } from "@t3tools/provider-grok/client";
++import { copilotClient } from "@t3tools/provider-copilot/client";
+ import { museClient } from "@t3tools/provider-muse/client";
+ import { openCodeClient } from "@t3tools/provider-opencode/client";
+ import { piClient } from "@t3tools/provider-pi/client";
+@@ -28,6 +29,7 @@ export const providerClients = makeProviderClientRegistry([
+   },
+   cursorClient,
+   grokClient,
++  copilotClient,
+   fxClient,
+   openCodeClient,
+   {
+diff --git a/docs/internals/providers.md b/docs/internals/providers.md
+index 4121a349d..25469266c 100644
+--- a/docs/internals/providers.md
++++ b/docs/internals/providers.md
+@@ -11,6 +11,37 @@ session or catalog state. For a new driver, start with [adding a provider](./add
+ 
+ ## Process and account isolation
+ 
++The `githubCopilot` driver in
++[`packages/provider-copilot`](../../packages/provider-copilot/src/server/driver.ts)
++uses SDK 1.0.8 in `copilot-cli` mode with the reviewed CLI 1.0.75 dependency closure.
++Each V2 session owns one native client/thread. The SDK owns session paths under
++the instance's resolved Copilot home; T3 never rewrites native transcripts or
++claims unsupported rollback/fork capabilities. Resume disables pending-work
++continuation and refuses `alreadyInUse` without aborting the other owner.
++Legacy `copilot` settings migrate to this driver while existing instance IDs survive.
++
++Permissions use the native `permission.requested` ID and await
++`permissions.handlePendingPermissionRequest().success`; false or failed RPCs stay
++unconfirmed. The SDK permission handler returns `no-result` for active turns so
++it cannot send a second decision. Identical retries reuse only a previously
++successful native receipt on that runtime. Startup/closed requests remain denied
++through the SDK handler. Questions and plan approval retain the SDK callback
++handoff boundary; that callback alone is not a native RPC acknowledgement.
++The adapter never re-emits app-owned reply resolution or delivery state.
++Reply ownership is marked before awaiting native delivery. Answered requests stay
++out of pending snapshots, terminal cleanup, and stale turn-item publication even
++when the receipt fails or root idle arrives first. Identical in-flight permission
++replies share one receipt; conflicting replies are rejected.
++
++Only a root `session.idle` successfully terminates a user turn.
++`assistant.turn_end`, `assistant.idle`, and all child events are non-terminal.
++Task snapshots update V2 native subagents and pending background work separately;
++upstream V2 retains queueing and delegation ownership. Project skills travel
++through `snapshotForCwd` and the existing workspace-snapshot transport, never an
++instance-global union. Cold scans use metadata-only `skills.discover`, not hidden
++native sessions or MCP initialization. Background text generation disables tools, skills, MCP,
++and config discovery and deletes only its owned ephemeral session.
++
+ The `opencode` driver probes the installed version and runs the 1.x or 2.x runtime. OpenCode's MCP
+ registrations are directory-scoped, while T3's MCP connection is thread-scoped, so threads in one
+ directory must not share one T3 MCP entry.
+diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
+new file mode 100644
+index 000000000..a2fdbc7e3
+--- /dev/null
++++ b/docs/user/providers-copilot.md
+@@ -0,0 +1,43 @@
++# GitHub Copilot
++
++Enable **GitHub Copilot** in **Settings > Providers** on the environment running
++your project. It uses the native Copilot SDK and your existing Copilot account,
++not the ACP registry or a separately billed hosted model service.
++
++Sign in on that environment with `copilot login`, then refresh provider status.
++Models and reasoning options come from your account's available catalog.
++
++The default runtime uses the bundled Copilot executable. **Binary path** can
++override it. **COPILOT_HOME path** selects the account's configuration and native
++session directory; separate provider instances can use separate directories.
++Configuration, credentials, and sessions stay on the environment, including when
++you connect from the web app, desktop, or mobile.
++
++## Project configuration and skills
++
++**Discover project configuration** loads the project's native MCP servers,
++instructions, and skills. The skill picker uses the current project's discovered
++skills, not a combined list from unrelated projects. Disabled and agent-only
++skills are not offered as user commands.
++
++## Conversations and permissions
++
++Native conversations resume after reconnecting. If another client already owns a
++native session, T3 Code refuses to take it over. Close that client before retrying.
++Older imported conversations may continue in a fresh native session.
++
++Plan mode uses Copilot's native planning flow. Tool approvals and questions appear
++in the thread. Restricted modes ask before tools run; **Auto-accept edits** allows
++file changes, and **Full access** allows tool requests without prompting.
++Only one-time approval is offered; Copilot's account-wide permission rules remain
++under its own control.
++
++Permission answers wait for the native runtime to acknowledge applying the
++decision. An unconfirmed answer is not proof that the tool did not run; do not
++repeat the action automatically.
++
++Model/tool steps and subagent activity do not end your submitted turn: the root
++native session must become idle. Background tasks remain visible independently.
++Automatic native compaction is shown in the thread. Explicit manual compaction,
++native conversation rollback, and native forks are not exposed by this integration;
++portable handoffs remain available.
+diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts
+index 74acdb2a8..c7c847df3 100644
+--- a/packages/contracts/src/settings.ts
++++ b/packages/contracts/src/settings.ts
+@@ -1280,7 +1280,7 @@ export const providerInstanceConfigEnabledFlag = (config: unknown): boolean | un
+ 
+ // Must match each driver's enabled decoding default.
+ const DEFAULT_DISABLED_PROVIDER_DRIVERS: ReadonlySet<ProviderDriverKind> = new Set(
+-  ["cursor", "grok", "fx", "muse", "pi", "opencode", "antigravity"].map((driver) =>
++  ["cursor", "grok", "fx", "muse", "pi", "opencode", "antigravity", "githubCopilot"].map((driver) =>
+     ProviderDriverKind.make(driver),
+   ),
+ );
+diff --git a/packages/provider-copilot/package.json b/packages/provider-copilot/package.json
+new file mode 100644
+index 000000000..82babd6eb
+--- /dev/null
++++ b/packages/provider-copilot/package.json
+@@ -0,0 +1,27 @@
++{
++  "name": "@t3tools/provider-copilot",
++  "private": true,
++  "type": "module",
++  "exports": {
++    "./client": "./src/client.ts",
++    "./settings": "./src/settings.ts",
++    "./server": "./src/server.ts",
++    "./testing": "./src/testing.ts"
++  },
++  "scripts": {
++    "typecheck": "tsc --noEmit",
++    "test": "vp test run --config ../../vite.config.ts --dir ."
++  },
++  "dependencies": {
++    "@github/copilot-sdk": "1.0.8",
++    "@t3tools/contracts": "workspace:*",
++    "@t3tools/provider-core": "workspace:*",
++    "@t3tools/shared": "workspace:*",
++    "effect": "catalog:"
++  },
++  "devDependencies": {
++    "@effect/vitest": "catalog:",
++    "@types/node": "catalog:",
++    "vite-plus": "catalog:"
++  }
++}
+diff --git a/packages/provider-copilot/src/client.ts b/packages/provider-copilot/src/client.ts
+new file mode 100644
+index 000000000..2a91413bd
+--- /dev/null
++++ b/packages/provider-copilot/src/client.ts
+@@ -0,0 +1,18 @@
++import { ProviderDriverKind } from "@t3tools/contracts";
++import { defineProviderClient } from "@t3tools/provider-core/client";
++import { CopilotSettings } from "./settings.ts";
++
++export const copilotClient = defineProviderClient({
++  driverKind: ProviderDriverKind.make("githubCopilot"),
++  label: "GitHub Copilot",
++  settingsSchema: CopilotSettings,
++  icon: {
++    viewBox: "0 0 24 24",
++    fill: { light: "#24292f", dark: "#f0f6fc" },
++    paths: [
++      {
++        d: "M8 3a5 5 0 0 0-5 5v2H2v7h2v2c4 3 12 3 16 0v-2h2v-7h-1V8a5 5 0 0 0-5-5c-1.6 0-3 .6-4 1.7A5.4 5.4 0 0 0 8 3Zm0 2c2 0 3 1 3 3v2H5V8c0-2 1-3 3-3Zm8 0c2 0 3 1 3 3v2h-6V8c0-2 1-3 3-3ZM6 12h12v6c-3.5 2-8.5 2-12 0Zm2 2v3h2v-3Zm6 0v3h2v-3Z",
++      },
++    ],
++  },
++});
+diff --git a/packages/provider-copilot/src/server.ts b/packages/provider-copilot/src/server.ts
+new file mode 100644
+index 000000000..5dea54a3c
+--- /dev/null
++++ b/packages/provider-copilot/src/server.ts
+@@ -0,0 +1 @@
++export { CopilotDriver, type CopilotDriverEnv } from "./server/driver.ts";
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+new file mode 100644
+index 000000000..0a2d3b059
+--- /dev/null
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -0,0 +1,918 @@
++import { assert, describe, it } from "@effect/vitest";
++import type {
++  CopilotSession,
++  MessageOptions,
++  SessionConfig,
++  SessionEvent,
++} from "@github/copilot-sdk";
++import {
++  DEFAULT_SERVER_SETTINGS,
++  MessageId,
++  NodeId,
++  ProjectId,
++  ProviderInstanceId,
++  ProviderSessionId,
++  RunAttemptId,
++  RunId,
++  ThreadId,
++  type OrchestrationV2AppThread,
++} from "@t3tools/contracts";
++import * as DateTime from "effect/DateTime";
++import * as Effect from "effect/Effect";
++import * as Exit from "effect/Exit";
++import * as Fiber from "effect/Fiber";
++import * as Queue from "effect/Queue";
++import * as Schema from "effect/Schema";
++import * as Stream from "effect/Stream";
++import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
++import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
++import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
++import { CopilotSettings } from "../settings.ts";
++import { makeAdapter, type ClientHandle, type SessionHandle } from "./adapter.ts";
++
++const threadId = ThreadId.make("copilot-test");
++const instanceId = ProviderInstanceId.make("githubCopilot");
++const sessionId = ProviderSessionId.make("copilot-runtime");
++const selection = { instanceId, model: "gpt-4.1", options: [] };
++const policy: ProviderAdapter.ProviderAdapterV2RuntimePolicy = {
++  cwd: "/workspace",
++  runtimeMode: "approval-required",
++  interactionMode: "default",
++};
++const settings = Schema.decodeSync(CopilotSettings)({});
++const host = ProviderHost.ProviderHost.of({
++  paths: {
++    cwd: "/workspace",
++    baseDir: "/test",
++    stateDir: "/test/state",
++    providerStatusCacheDir: "/test/cache",
++    attachmentsDir: "/test/attachments",
++  },
++  settings: {
++    get: Effect.succeed(DEFAULT_SERVER_SETTINGS),
++    withSnapshot: (use) => use(DEFAULT_SERVER_SETTINGS),
++    changes: Stream.empty,
++    subscribe: Effect.succeed(Stream.empty),
++  },
++  shouldRunBackgroundWork: () => Effect.succeed(false),
++  resolveAttachmentPath: (attachment) => `/test/attachments/${attachment.id}`,
++  credentials: () =>
++    Effect.succeed({
++      binding: { owner: "t3", key: "test" },
++      get: Effect.succeedNone,
++      set: () => Effect.void,
++      remove: Effect.void,
++    }),
++});
++
++function fakeSdk() {
++  let config: SessionConfig | undefined;
++  let serial = 0;
++  let disconnected = 0;
++  let stopped = 0;
++  let resumed: string | undefined;
++  let conflict = false;
++  let continuePendingWork: boolean | undefined;
++  const permissionReplies: Array<
++    Parameters<CopilotSession["rpc"]["permissions"]["handlePendingPermissionRequest"]>[0]
++  > = [];
++  let permissionResponse = async (): Promise<{ success: boolean }> => ({ success: true });
++  let background: Awaited<ReturnType<SessionHandle["rpc"]["tasks"]["list"]>> = { tasks: [] };
++  const sent: MessageOptions[] = [];
++  const emit = (type: SessionEvent["type"], data: unknown = {}, agentId?: string) => {
++    config?.onEvent?.({
++      type,
++      data,
++      id: `native-event-${++serial}`,
++      timestamp: "2026-10-29T00:00:00Z",
++      parentId: null,
++      ...(agentId ? { agentId } : {}),
++    } as SessionEvent);
++  };
++  const session: SessionHandle = {
++    sessionId: "native-copilot",
++    send: async (message) => {
++      sent.push(typeof message === "string" ? { prompt: message } : message);
++      return "native-user-message";
++    },
++    abort: async () => {
++      emit("session.idle");
++    },
++    disconnect: async () => {
++      disconnected++;
++    },
++    getEvents: async () => [],
++    setModel: async () => {},
++    rpc: {
++      mode: { set: async () => {} },
++      plan: {
++        read: async () => ({
++          exists: true,
++          content: "# Plan\n\nImplement safely",
++          path: "/copilot/plan.md",
++        }),
++      },
++      skills: { list: async () => ({ skills: [] }) },
++      tasks: { list: async () => background, cancel: async () => ({ cancelled: true }) },
++      permissions: {
++        handlePendingPermissionRequest: async (
++          response: Parameters<
++            CopilotSession["rpc"]["permissions"]["handlePendingPermissionRequest"]
++          >[0],
++        ) => {
++          permissionReplies.push(response);
++          return permissionResponse();
++        },
++      },
++    },
++  };
++  const client: ClientHandle = {
++    start: async () => {},
++    stop: async () => {
++      stopped++;
++      return [];
++    },
++    forceStop: async () => {},
++    createSession: async (created) => {
++      config = created;
++      emit("session.idle");
++      return session;
++    },
++    resumeSession: async (id, created) => {
++      resumed = id;
++      continuePendingWork = created.continuePendingWork;
++      config = created;
++      emit("session.resume", { alreadyInUse: conflict });
++      return session;
++    },
++  };
++  return {
++    client,
++    session,
++    sent,
++    emit,
++    get config() {
++      return config!;
++    },
++    get resumed() {
++      return resumed;
++    },
++    get continuePendingWork() {
++      return continuePendingWork;
++    },
++    get disconnected() {
++      return disconnected;
++    },
++    get stopped() {
++      return stopped;
++    },
++    conflict: () => {
++      conflict = true;
++    },
++    setTasks: (tasks: typeof background) => {
++      background = tasks;
++    },
++    permissionReplies,
++    setPermissionResponse: (response: () => Promise<{ success: boolean }>) => {
++      permissionResponse = response;
++    },
++  };
++}
++type Fake = ReturnType<typeof fakeSdk>;
++
++function promiseGate() {
++  let resolve!: () => void;
++  const promise = new Promise<void>((done) => {
++    resolve = done;
++  });
++  return { promise, resolve };
++}
++
++const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: string) {
++  const adapter = yield* makeAdapter(
++    { instanceId, settings, environment: { HOME: "/test-account" } },
++    { clientFactory: () => fake.client },
++  );
++  const runtime = yield* adapter.openSession({
++    threadId,
++    providerSessionId: sessionId,
++    modelSelection: selection,
++    runtimePolicy: policy,
++    ...(initialNativeThreadId ? { initialNativeThreadId } : {}),
++  });
++  const emitted: ProviderAdapter.ProviderAdapterV2Event[] = [];
++  const eventQueue = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
++  yield* runtime.events.pipe(
++    Stream.runForEach((event) =>
++      Effect.sync(() => {
++        emitted.push(event);
++      }).pipe(Effect.andThen(Queue.offer(eventQueue, event))),
++    ),
++    Effect.forkScoped,
++  );
++  const takeEvent = Effect.fnUntraced(function* (
++    predicate: (event: ProviderAdapter.ProviderAdapterV2Event) => boolean,
++  ) {
++    while (true) {
++      const event = yield* Queue.take(eventQueue);
++      if (predicate(event)) return event;
++    }
++  });
++  const thread = yield* runtime.ensureThread({
++    threadId,
++    modelSelection: selection,
++    runtimePolicy: policy,
++  });
++  const start = Effect.fnUntraced(function* (ordinal = 1) {
++    const now = yield* DateTime.now;
++    const appThread: OrchestrationV2AppThread = {
++      id: threadId,
++      projectId: ProjectId.make("project"),
++      title: "Test",
++      providerInstanceId: instanceId,
++      modelSelection: selection,
++      runtimeMode: policy.runtimeMode,
++      interactionMode: "default",
++      branch: null,
++      worktreePath: null,
++      activeProviderThreadId: thread.id,
++      lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
++      forkedFrom: null,
++      createdBy: "user",
++      creationSource: "web",
++      createdAt: now,
++      updatedAt: now,
++      archivedAt: null,
++      settledOverride: null,
++      settledAt: null,
++      lastVisitedAt: null,
++      deletedAt: null,
++    };
++    yield* runtime.startTurn({
++      appThread,
++      threadId,
++      runId: RunId.make(`run-${ordinal}`),
++      runOrdinal: ordinal,
++      providerTurnOrdinal: ordinal,
++      attemptId: RunAttemptId.make(`attempt-${ordinal}`),
++      rootNodeId: NodeId.make(`root-${ordinal}`),
++      providerThread: thread,
++      message: {
++        messageId: MessageId.make(`user-${ordinal}`),
++        text: "Hello",
++        attachments: [],
++        createdBy: "user",
++        creationSource: "web",
++      },
++      modelSelection: selection,
++      runtimePolicy: policy,
++    });
++  });
++  const drain = () => runtime.readThreadSnapshot({ providerThread: thread });
++  return { runtime, thread, emitted, start, drain, takeEvent };
++});
++
++const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
++  effect.pipe(
++    Effect.provideService(ProviderHost.ProviderHost, host),
++    Effect.provide(McpProviderSessions.layer),
++    Effect.scoped,
++  );
++
++describe("native Copilot V2", () => {
++  it.effect(
++    "waits for the native permission receipt and never replaces V2-owned response delivery",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { runtime, start, drain, emitted, takeEvent } = yield* setup(fake);
++          yield* start();
++          const permission = {
++            kind: "read" as const,
++            path: "/workspace/data",
++            intention: "Read input",
++          };
++          fake.emit("permission.requested", {
++            requestId: "native-permission",
++            permissionRequest: permission,
++          });
++          const snapshot = yield* drain();
++          assert.equal(snapshot.runtimeRequests.length, 1);
++          const request = snapshot.runtimeRequests[0]!;
++          assert.equal(request.nativeRequestRef?.nativeId, "native-permission");
++          yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "approval_request" &&
++              event.turnItem.requestId === request.id,
++          );
++          const called = promiseGate();
++          const receipt = promiseGate();
++          fake.setPermissionResponse(async () => {
++            called.resolve();
++            await receipt.promise;
++            return { success: true };
++          });
++          const observedBeforeReply = emitted.length;
++          const replying = yield* Effect.forkChild(
++            runtime.respondToRuntimeRequest({ requestId: request.id, decision: "accept" }),
++          );
++          yield* Effect.promise(() => called.promise);
++          assert.isUndefined(replying.pollUnsafe());
++          receipt.resolve();
++          yield* Fiber.join(replying);
++          fake.emit("assistant.message", {
++            messageId: "reply-boundary",
++            content: "Receipt delivered",
++          });
++          yield* takeEvent((event) => event.type === "message.updated");
++          assert.equal(
++            emitted
++              .slice(observedBeforeReply)
++              .filter(
++                (event) =>
++                  event.type === "runtime_request.updated" ||
++                  event.type === "node.updated" ||
++                  (event.type === "turn_item.updated" &&
++                    event.turnItem.type === "approval_request"),
++              ).length,
++            0,
++          );
++          assert.deepEqual(fake.permissionReplies, [
++            { requestId: "native-permission", result: { kind: "approve-once" } },
++          ]);
++          assert.equal((yield* drain()).runtimeRequests.length, 0);
++          yield* runtime.respondToRuntimeRequest({ requestId: request.id, decision: "accept" });
++          assert.equal(fake.permissionReplies.length, 1);
++          assert.isTrue(
++            Exit.isFailure(
++              yield* runtime
++                .respondToRuntimeRequest({ requestId: request.id, decision: "decline" })
++                .pipe(Effect.exit),
++            ),
++          );
++        }),
++      ),
++  );
++
++  it.effect.each(["applied", "already-resolved", "transport-error"] as const)(
++    "keeps V2-owned answers intact when idle precedes a %s permission receipt",
++    (outcome) =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { runtime, start, drain, emitted, takeEvent } = yield* setup(fake);
++          yield* start();
++          fake.emit("permission.requested", {
++            requestId: "native-idle-race",
++            permissionRequest: { kind: "read", path: "/workspace/data", intention: "Read input" },
++          });
++          const request = (yield* drain()).runtimeRequests[0]!;
++          yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "approval_request" &&
++              event.turnItem.requestId === request.id,
++          );
++          const called = promiseGate();
++          const receipt = promiseGate();
++          fake.setPermissionResponse(async () => {
++            called.resolve();
++            await receipt.promise;
++            if (outcome === "transport-error") throw new Error("Permission transport failed.");
++            return { success: outcome === "applied" };
++          });
++          const observedBeforeReply = emitted.length;
++          const replying = yield* Effect.forkChild(
++            runtime
++              .respondToRuntimeRequest({
++                requestId: request.id,
++                decision: "accept",
++              })
++              .pipe(Effect.exit),
++          );
++          yield* Effect.promise(() => called.promise);
++          const duplicate = yield* Effect.forkChild(
++            runtime
++              .respondToRuntimeRequest({
++                requestId: request.id,
++                decision: "accept",
++              })
++              .pipe(Effect.exit),
++          );
++          const conflicting = yield* Effect.forkChild(
++            runtime
++              .respondToRuntimeRequest({
++                requestId: request.id,
++                decision: "decline",
++              })
++              .pipe(Effect.exit),
++          );
++          fake.emit("permission.requested", {
++            requestId: "native-unanswered",
++            permissionRequest: { kind: "read", path: "/workspace/other", intention: "Read later" },
++          });
++          const duringDelivery = yield* drain();
++          fake.emit("session.idle");
++          yield* takeEvent((event) => event.type === "turn.terminal");
++          assert.equal(
++            emitted
++              .slice(observedBeforeReply)
++              .filter(
++                (event) =>
++                  (event.type === "runtime_request.updated" &&
++                    event.runtimeRequest.id === request.id) ||
++                  (event.type === "node.updated" && event.node.runtimeRequestId === request.id) ||
++                  (event.type === "turn_item.updated" &&
++                    (event.turnItem.type === "approval_request" ||
++                      event.turnItem.type === "user_input_request") &&
++                    event.turnItem.requestId === request.id),
++              ).length,
++            0,
++          );
++          assert.deepEqual(
++            duringDelivery.runtimeRequests.map((entry) => entry.nativeRequestRef?.nativeId),
++            ["native-unanswered"],
++          );
++          assert.isTrue(
++            emitted
++              .slice(observedBeforeReply)
++              .some(
++                (event) =>
++                  event.type === "runtime_request.updated" &&
++                  event.runtimeRequest.nativeRequestRef?.nativeId === "native-unanswered" &&
++                  event.runtimeRequest.status === "cancelled",
++              ),
++          );
++          assert.equal((yield* drain()).runtimeRequests.length, 0);
++          assert.isUndefined(replying.pollUnsafe());
++          receipt.resolve();
++          const firstResult = yield* Fiber.join(replying);
++          const duplicateResult = yield* Fiber.join(duplicate);
++          assert.equal(Exit.isSuccess(firstResult), outcome === "applied");
++          assert.equal(Exit.isSuccess(duplicateResult), outcome === "applied");
++          assert.isTrue(Exit.isFailure(yield* Fiber.join(conflicting)));
++          assert.equal(fake.permissionReplies.length, 1);
++          assert.equal((yield* drain()).runtimeRequests.length, 0);
++          if (outcome !== "applied") {
++            assert.isTrue(
++              Exit.isFailure(
++                yield* runtime
++                  .respondToRuntimeRequest({
++                    requestId: request.id,
++                    decision: "accept",
++                  })
++                  .pipe(Effect.exit),
++              ),
++            );
++            assert.equal(fake.permissionReplies.length, 2);
++          }
++        }),
++      ),
++  );
++
++  it.effect(
++    "does not publish empty tool-only assistant rows and preserves streamed whitespace",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { start, drain, emitted } = yield* setup(fake);
++          yield* start();
++          fake.emit("assistant.message", {
++            messageId: "tool-only",
++            content: "",
++            toolRequests: [
++              { toolCallId: "shell", name: "bash", arguments: { command: "printf done" } },
++            ],
++          });
++          assert.equal((yield* drain()).messages.length, 0);
++          fake.emit("assistant.message_delta", {
++            messageId: "real-text",
++            deltaContent: "  ready\n",
++          });
++          fake.emit("assistant.message", { messageId: "real-text", content: "" });
++          const snapshot = yield* drain();
++          assert.equal(snapshot.messages.length, 1);
++          assert.equal(snapshot.messages[0]?.text, "  ready\n");
++          assert.isFalse(snapshot.messages[0]!.streaming);
++          assert.isFalse(
++            emitted.some(
++              (event) =>
++                event.type === "turn_item.updated" &&
++                event.turnItem.type === "assistant_message" &&
++                event.turnItem.text.length === 0,
++            ),
++          );
++        }),
++      ),
++  );
++
++  it.effect(
++    "completes exactly once on root session.idle, never assistant or child boundaries",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { runtime, start, drain } = yield* setup(fake);
++          yield* start();
++          fake.emit("assistant.message_delta", { messageId: "reply", deltaContent: "Hello" });
++          fake.emit("assistant.turn_end", { turnId: "model-step" });
++          fake.emit("assistant.idle");
++          fake.emit("session.idle", {}, "child");
++          fake.emit("assistant.message", { messageId: "child", content: "Child only" }, "child");
++          let snapshot = yield* drain();
++          assert.equal(snapshot.providerTurns[0]?.status, "running");
++          assert.equal(snapshot.messages[0]?.text, "Hello");
++          assert.equal(snapshot.messages.length, 1);
++          const overlap = yield* start(2).pipe(Effect.exit);
++          assert.isTrue(Exit.isFailure(overlap));
++          fake.emit("assistant.message", { messageId: "reply", content: "Hello world" });
++          fake.emit("session.idle");
++          fake.emit("session.idle");
++          snapshot = yield* drain();
++          assert.equal(snapshot.providerTurns[0]?.status, "completed");
++          assert.equal(snapshot.messages[0]?.text, "Hello world");
++          assert.isFalse(snapshot.messages[0]!.streaming);
++          yield* start(2);
++          fake.emit("session.idle");
++          snapshot = yield* runtime.readThreadSnapshot({ providerThread: snapshot.providerThread });
++          assert.deepEqual(
++            snapshot.providerTurns.map((turn) => turn.status),
++            ["completed", "completed"],
++          );
++        }),
++      ),
++  );
++
++  it.effect("refuses an already-owned native resume without aborting or sending", () =>
++    provide(
++      Effect.gen(function* () {
++        const fake = fakeSdk();
++        fake.conflict();
++        const opened = yield* setup(fake, "durable-session").pipe(Effect.exit);
++        assert.isTrue(Exit.isFailure(opened));
++        assert.equal(fake.resumed, "durable-session");
++        assert.equal(fake.disconnected, 1);
++        assert.equal(fake.sent.length, 0);
++        assert.isFalse(fake.continuePendingWork ?? true);
++      }),
++    ),
++  );
++
++  it.effect(
++    "waits for native send admission even when the root becomes idle before send resolves",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const started = promiseGate();
++          const admitted = promiseGate();
++          fake.session.send = async () => {
++            started.resolve();
++            await admitted.promise;
++            return "message";
++          };
++          const { start, drain } = yield* setup(fake);
++          const sending = yield* Effect.forkChild(start());
++          yield* Effect.promise(() => started.promise);
++          fake.emit("session.idle");
++          assert.equal((yield* drain()).providerTurns[0]?.status, "running");
++          admitted.resolve();
++          yield* Fiber.join(sending);
++          assert.equal((yield* drain()).providerTurns[0]?.status, "completed");
++        }),
++      ),
++  );
++
++  it.effect(
++    "resumes the same native identity after restart and emits an interrupted rather than successful turn",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          fake.session.getEvents = async () => [
++            {
++              type: "assistant.message",
++              id: "history-tool-only",
++              timestamp: "2026-10-29T00:00:00Z",
++              parentId: null,
++              data: { messageId: "history-tool-only", content: "", toolRequests: [] },
++            },
++            {
++              type: "assistant.message",
++              id: "history-text",
++              timestamp: "2026-10-29T00:00:00Z",
++              parentId: null,
++              data: { messageId: "history-text", content: "Previous response" },
++            },
++          ];
++          const { runtime, start, drain, thread } = yield* setup(fake, "native-copilot");
++          assert.equal(thread.nativeThreadRef?.nativeId, "native-copilot");
++          assert.equal(fake.resumed, "native-copilot");
++          assert.deepEqual(
++            (yield* drain()).messages.map((message) => message.text),
++            ["Previous response"],
++          );
++          yield* start();
++          const snapshot = yield* drain();
++          yield* runtime.interruptTurn({
++            providerThread: thread,
++            providerTurnId: snapshot.providerTurns[0]!.id,
++          });
++          assert.equal((yield* drain()).providerTurns[0]?.status, "interrupted");
++        }),
++      ),
++  );
++
++  it.effect("bridges permission and user-input callbacks as live V2 requests", () =>
++    provide(
++      Effect.gen(function* () {
++        const fake = fakeSdk();
++        const { runtime, start, drain } = yield* setup(fake);
++        yield* start();
++        const permission = {
++          kind: "read" as const,
++          path: "/workspace/data",
++          intention: "Read input",
++        };
++        assert.deepEqual(
++          fake.config.onPermissionRequest!(permission, { sessionId: "native-copilot" }),
++          { kind: "no-result" },
++        );
++        fake.emit("permission.requested", {
++          requestId: "native-read",
++          permissionRequest: permission,
++        });
++        const pendingPermission = (yield* drain()).runtimeRequests[0]!;
++        assert.equal(pendingPermission.kind, "file-read");
++        const unsupported = yield* runtime
++          .respondToRuntimeRequest({
++            requestId: pendingPermission.id,
++            decision: "acceptForSession",
++          })
++          .pipe(Effect.exit);
++        assert.isTrue(Exit.isFailure(unsupported));
++        yield* runtime.respondToRuntimeRequest({
++          requestId: pendingPermission.id,
++          decision: "accept",
++        });
++        assert.deepEqual(fake.permissionReplies, [
++          { requestId: "native-read", result: { kind: "approve-once" } },
++        ]);
++        const question = fake.config.onUserInputRequest!(
++          { question: "Which?", choices: ["A", "B"] },
++          { sessionId: "native-copilot" },
++        );
++
++        const pendingQuestion = (yield* drain()).runtimeRequests.find(
++          (request) => request.status === "pending",
++        )!;
++        yield* runtime.respondToRuntimeRequest({
++          requestId: pendingQuestion.id,
++          answers: { answer: "B" },
++        });
++        assert.deepEqual(yield* Effect.promise(() => Promise.resolve(question)), {
++          answer: "B",
++          wasFreeform: false,
++        });
++        fake.emit("session.idle");
++        yield* drain();
++      }),
++    ),
++  );
++
++  it.effect(
++    "rejects unsuccessful or failed native permission receipts and never takes hook-resolved ownership",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          for (const fail of ["already-resolved", "transport"] as const) {
++            const fake = fakeSdk();
++            const { runtime, start, drain } = yield* setup(fake);
++            yield* start();
++            fake.setPermissionResponse(async () => {
++              if (fail === "transport") throw new Error("Permission transport failed.");
++              return { success: false };
++            });
++            fake.emit("permission.requested", {
++              requestId: "already-owned",
++              permissionRequest: { kind: "read", path: "/workspace/data", intention: "Read" },
++              resolvedByHook: true,
++            });
++            assert.equal((yield* drain()).runtimeRequests.length, 0);
++            fake.emit("permission.requested", {
++              requestId: "native-read",
++              permissionRequest: { kind: "read", path: "/workspace/data", intention: "Read" },
++            });
++            const request = (yield* drain()).runtimeRequests[0]!;
++            assert.isTrue(
++              Exit.isFailure(
++                yield* runtime
++                  .respondToRuntimeRequest({ requestId: request.id, decision: "accept" })
++                  .pipe(Effect.exit),
++              ),
++            );
++            assert.isTrue(
++              Exit.isFailure(
++                yield* runtime
++                  .respondToRuntimeRequest({ requestId: request.id, decision: "accept" })
++                  .pipe(Effect.exit),
++              ),
++            );
++            assert.equal(fake.permissionReplies.length, 2);
++          }
++        }),
++      ),
++  );
++
++  it.effect(
++    "publishes native plans and automatic compaction without treating either as user-turn completion",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { runtime, start, drain, takeEvent } = yield* setup(fake);
++          yield* start();
++          const approval = fake.config.onExitPlanModeRequest!(
++            {
++              summary: "Implement safely",
++              planContent: "# Plan",
++              actions: ["continue"],
++              recommendedAction: "continue",
++            },
++            { sessionId: "native-copilot" },
++          );
++          const request = (yield* drain()).runtimeRequests.find(
++            (entry) => entry.status === "pending",
++          )!;
++          const plan = yield* takeEvent((event) => event.type === "plan.updated");
++          assert.equal(plan.type === "plan.updated" ? plan.plan.kind : null, "proposed_plan");
++          yield* runtime.respondToRuntimeRequest({
++            requestId: request.id,
++            answers: { answer: "Approve" },
++          });
++          assert.deepEqual(yield* Effect.promise(() => Promise.resolve(approval)), {
++            approved: true,
++            selectedAction: "continue",
++          });
++          fake.emit("session.compaction_start", {});
++          fake.emit("session.compaction_complete", {
++            success: true,
++            summaryContent: "Compacted context",
++          });
++          const compacted = yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "compaction" &&
++              event.turnItem.status === "completed",
++          );
++          assert.equal(
++            compacted.type === "turn_item.updated" && compacted.turnItem.type === "compaction"
++              ? compacted.turnItem.summary
++              : null,
++            "Compacted context",
++          );
++          assert.equal((yield* drain()).providerTurns[0]?.status, "running");
++          fake.emit("session.idle");
++          assert.equal((yield* drain()).providerTurns[0]?.status, "completed");
++        }),
++      ),
++  );
++
++  it.effect(
++    "retains background task state after root idle without letting child idle finish the root",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { runtime, start, drain, takeEvent } = yield* setup(fake);
++          yield* start();
++          const task = {
++            id: "bg-task",
++            type: "agent" as const,
++            status: "running" as const,
++            agentType: "explore",
++            description: "Inspect code",
++            prompt: "Inspect",
++            startedAt: "2026-10-29T00:00:00Z",
++            toolCallId: "task-tool",
++          };
++          fake.setTasks({ tasks: [task] });
++          fake.emit("session.background_tasks_changed");
++          fake.emit("session.idle");
++          const snapshot = yield* drain();
++          assert.equal(snapshot.providerTurns[0]?.status, "completed");
++          assert.equal(snapshot.providerThread.pendingBackgroundTasks?.[0]?.taskId, "bg-task");
++          assert.isTrue(yield* runtime.hasPendingBackgroundWork!);
++          const running = yield* takeEvent(
++            (event) => event.type === "subagent.updated" && event.subagent.status === "running",
++          );
++          assert.equal(
++            running.type === "subagent.updated" ? running.subagent.runId : null,
++            "run-1",
++          );
++          yield* start(2);
++          fake.setTasks({ tasks: [{ ...task, status: "completed", result: "Finished" }] });
++          fake.emit("assistant.idle", {}, "bg-task");
++          const completed = yield* takeEvent(
++            (event) => event.type === "subagent.updated" && event.subagent.status === "completed",
++          );
++          assert.equal(
++            completed.type === "subagent.updated" ? completed.subagent.runId : null,
++            "run-1",
++          );
++          assert.equal((yield* drain()).providerTurns[1]?.status, "running");
++          fake.setTasks({ tasks: [] });
++          fake.emit("session.background_tasks_changed");
++          yield* drain();
++          assert.isFalse(yield* runtime.hasPendingBackgroundWork!);
++          fake.emit("session.idle");
++          yield* drain();
++        }),
++      ),
++  );
++
++  it.effect("projects native commands, file edits and redacted MCP arguments into V2 tools", () =>
++    provide(
++      Effect.gen(function* () {
++        const fake = fakeSdk();
++        const { start, drain, takeEvent } = yield* setup(fake);
++        yield* start();
++        fake.emit("tool.execution_start", {
++          toolCallId: "shell",
++          toolName: "bash",
++          arguments: { command: "git status" },
++        });
++        fake.emit("tool.execution_partial_result", {
++          toolCallId: "shell",
++          partialOutput: "clean\n",
++        });
++        const delta = yield* takeEvent((event) => event.type === "command_output.delta");
++        assert.equal(delta.type === "command_output.delta" ? delta.chunk : null, "clean\n");
++        fake.emit("tool.execution_complete", {
++          toolCallId: "shell",
++          success: true,
++          result: { content: "clean\n" },
++        });
++        const shell = yield* takeEvent(
++          (event) =>
++            event.type === "turn_item.updated" &&
++            event.turnItem.type === "command_execution" &&
++            event.turnItem.status === "completed",
++        );
++        assert.equal(
++          shell.type === "turn_item.updated" && shell.turnItem.type === "command_execution"
++            ? shell.turnItem.output
++            : null,
++          "clean\n",
++        );
++        fake.emit("tool.execution_start", {
++          toolCallId: "edit",
++          toolName: "edit",
++          arguments: { path: "src/app.ts", old_str: "old", new_str: "new" },
++        });
++        const edit = yield* takeEvent(
++          (event) => event.type === "turn_item.updated" && event.turnItem.type === "file_change",
++        );
++        assert.equal(
++          edit.type === "turn_item.updated" && edit.turnItem.type === "file_change"
++            ? edit.turnItem.fileName
++            : null,
++          "src/app.ts",
++        );
++        fake.emit("tool.execution_start", {
++          toolCallId: "mcp",
++          toolName: "lookup",
++          mcpServerName: "docs",
++          arguments: { token: "do-not-persist", query: "safe" },
++        });
++        const mcp = yield* takeEvent(
++          (event) => event.type === "turn_item.updated" && event.turnItem.type === "dynamic_tool",
++        );
++        const input =
++          mcp.type === "turn_item.updated" && mcp.turnItem.type === "dynamic_tool"
++            ? String(mcp.turnItem.input)
++            : "";
++        assert.include(input, "[redacted]");
++        assert.notInclude(input, "do-not-persist");
++        fake.emit("session.idle");
++        yield* drain();
++      }),
++    ),
++  );
++
++  it.effect("treats native shutdown as interruption and refuses subsequent sends", () =>
++    provide(
++      Effect.gen(function* () {
++        const fake = fakeSdk();
++        const { start, drain } = yield* setup(fake);
++        yield* start();
++        fake.emit("session.shutdown", { shutdownType: "routine" });
++        assert.equal((yield* drain()).providerTurns[0]?.status, "interrupted");
++        assert.isTrue(Exit.isFailure(yield* start(2).pipe(Effect.exit)));
++      }),
++    ),
++  );
++});
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+new file mode 100644
+index 000000000..87517fe9a
+--- /dev/null
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -0,0 +1,1575 @@
++import type {
++  CopilotClient,
++  CopilotClientOptions,
++  CopilotSession,
++  SessionConfig,
++  SessionEvent,
++  MessageOptions,
++  PermissionRequest,
++  ResumeSessionConfig,
++  SkillsLoadedSkill,
++} from "@github/copilot-sdk";
++import {
++  MessageId,
++  NodeId,
++  PlanId,
++  ProviderDriverKind,
++  ProviderTurnId,
++  RuntimeRequestId,
++  TurnItemId,
++  type ModelSelection,
++  type OrchestrationV2ConversationMessage,
++  type OrchestrationV2ExecutionNode,
++  type OrchestrationV2ProviderThread,
++  type OrchestrationV2ProviderTurn,
++  type OrchestrationV2RuntimeRequest,
++  type OrchestrationV2TurnItem,
++  type ProviderInstanceId,
++  type OrchestrationV2Subagent,
++  type ServerProviderSkill,
++} from "@t3tools/contracts";
++import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
++import * as DateTime from "effect/DateTime";
++import * as Deferred from "effect/Deferred";
++import * as Effect from "effect/Effect";
++import * as Queue from "effect/Queue";
++import * as Option from "effect/Option";
++import * as Stream from "effect/Stream";
++import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
++import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
++import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
++import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
++import { summarizeNativeProtocolPayload } from "@t3tools/provider-core/server/nativeProtocolLogging";
++import { derive } from "@t3tools/provider-core/server/IdAllocator";
++import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
++import { turnScopedSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
++import { providerMessageTextWithAttachmentPaths } from "@t3tools/provider-core/server/attachmentPrompt";
++import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
++import { t3OrchestrationSystemPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
++import type { CopilotSettings } from "../settings.ts";
++import { capabilities } from "./capabilities.ts";
++import { createClient, resolveClientConfiguration } from "./client.ts";
++import { skillsFromSdk } from "./status.ts";
++import { nativeToolItem } from "./tools.ts";
++
++export const COPILOT_DRIVER = ProviderDriverKind.make("githubCopilot");
++const ref = (nativeId: string) => ({
++  driver: COPILOT_DRIVER,
++  nativeId,
++  strength: "strong" as const,
++});
++type UserInput = Parameters<NonNullable<SessionConfig["onUserInputRequest"]>>[0];
++type UserAnswer = Awaited<ReturnType<NonNullable<SessionConfig["onUserInputRequest"]>>>;
++type ExitPlan = Parameters<NonNullable<SessionConfig["onExitPlanModeRequest"]>>[0];
++type ExitPlanAnswer = Awaited<ReturnType<NonNullable<SessionConfig["onExitPlanModeRequest"]>>>;
++type Rpc = CopilotSession["rpc"];
++type Task = Awaited<ReturnType<Rpc["tasks"]["list"]>>["tasks"][number];
++export type SessionHandle = Pick<
++  CopilotSession,
++  "sessionId" | "send" | "abort" | "disconnect" | "getEvents" | "setModel"
++> & {
++  readonly rpc: {
++    readonly mode: Pick<Rpc["mode"], "set">;
++    readonly plan: Pick<Rpc["plan"], "read">;
++    readonly skills: Pick<Rpc["skills"], "list">;
++    readonly tasks: Pick<Rpc["tasks"], "list" | "cancel">;
++    readonly permissions: Pick<Rpc["permissions"], "handlePendingPermissionRequest">;
++  };
++};
++export type ClientHandle = Pick<CopilotClient, "start" | "stop" | "forceStop"> & {
++  readonly createSession: (config: SessionConfig) => Promise<SessionHandle>;
++  readonly resumeSession: (id: string, config: ResumeSessionConfig) => Promise<SessionHandle>;
++};
++export interface AdapterOptions {
++  readonly clientFactory?: (options: CopilotClientOptions) => ClientHandle;
++  readonly onSkills?: (cwd: string, skills: ReadonlyArray<ServerProviderSkill> | null) => void;
++}
++
++function permissionPrompt(request: PermissionRequest): string {
++  switch (request.kind) {
++    case "shell":
++      return request.fullCommandText.slice(0, 2_000);
++    case "read":
++      return `Read ${request.path}`.slice(0, 2_000);
++    case "write":
++      return `Write ${request.fileName}`.slice(0, 2_000);
++    case "mcp":
++      return `${request.serverName}: ${request.toolTitle}`.slice(0, 2_000);
++    case "custom-tool":
++      return (request.toolDescription || request.toolName).slice(0, 2_000);
++    default:
++      return `Allow Copilot ${request.kind}?`;
++  }
++}
++
++interface ActiveTurn {
++  readonly input: ProviderAdapter.ProviderAdapterV2TurnInput;
++  providerTurn: OrchestrationV2ProviderTurn;
++  nextOrdinal: number;
++  readonly items: Map<string, OrchestrationV2TurnItem>;
++  accepted: boolean;
++  idle: boolean;
++  interrupted: boolean;
++  finished: boolean;
++}
++type PendingResponse = {
++  readonly owner: ActiveTurn;
++  readonly nativePermissionId?: string;
++  responseOwnedByV2?: true;
++  permissionReplyKey?: string;
++  permissionReplyReceipt?: Deferred.Deferred<void, ProviderAdapter.ProviderAdapterV2Error>;
++  readonly request: OrchestrationV2RuntimeRequest;
++  readonly item: OrchestrationV2TurnItem;
++  readonly node: OrchestrationV2ExecutionNode;
++  readonly resolve: (input: ProviderAdapter.ProviderAdapterV2RuntimeRequestResponseInput) => void;
++  readonly cancel: () => void;
++};
++type Ingress =
++  | { readonly type: "event"; readonly event: SessionEvent }
++  | {
++      readonly type: "request";
++      readonly kind: "permission";
++      readonly request: PermissionRequest;
++      readonly nativeRequestId: string;
++    }
++  | {
++      readonly type: "request";
++      readonly kind: "input";
++      readonly request: UserInput;
++      readonly resolve: (result: UserAnswer) => void;
++    }
++  | {
++      readonly type: "request";
++      readonly kind: "plan";
++      readonly request: ExitPlan;
++      readonly resolve: (result: ExitPlanAnswer) => void;
++    }
++  | { readonly type: "accepted" }
++  | { readonly type: "drain"; readonly receipt: Deferred.Deferred<void> };
++
++export function reasoningEffort(selection: ModelSelection): SessionConfig["reasoningEffort"] {
++  const effort = getModelSelectionStringOptionValue(selection, "reasoningEffort");
++  switch (effort) {
++    case "low":
++    case "medium":
++    case "high":
++    case "xhigh":
++      return effort;
++    default:
++      return undefined;
++  }
++}
++
++export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
++  input: {
++    readonly instanceId: ProviderInstanceId;
++    readonly settings: CopilotSettings;
++    readonly environment: NodeJS.ProcessEnv;
++  },
++  options: AdapterOptions = {},
++) {
++  const host = yield* ProviderHost.ProviderHost;
++  const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
++  const loggers = yield* Effect.serviceOption(ProviderEventLoggers.ProviderEventLoggers);
++  const nativeLogger = Option.getOrUndefined(loggers)?.native;
++  return ProviderAdapter.ProviderAdapterV2.of({
++    instanceId: input.instanceId,
++    driver: COPILOT_DRIVER,
++    getCapabilities: Effect.fn("CopilotAdapter.getCapabilities")(() =>
++      Effect.succeed(capabilities),
++    ),
++    planSelectionTransition: Effect.fn("CopilotAdapter.planSelectionTransition")(() =>
++      Effect.succeed(turnScopedSelectionTransition()),
++    ),
++    openSession: Effect.fn("CopilotAdapter.openSession")(function* (open) {
++      const cwd = open.runtimePolicy.cwd ?? host.paths.cwd;
++      const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
++      const inbox = yield* Queue.unbounded<Ingress>();
++      const now = yield* DateTime.now;
++      const providerSession = {
++        id: open.providerSessionId,
++        driver: COPILOT_DRIVER,
++        providerInstanceId: input.instanceId,
++        status: "ready" as const,
++        cwd,
++        model: open.modelSelection.model,
++        capabilities,
++        createdAt: now,
++        updatedAt: now,
++        lastError: null,
++      };
++      let native: SessionHandle | undefined;
++      let providerThread: OrchestrationV2ProviderThread | undefined;
++      let active: ActiveTurn | undefined;
++      let lastTurn: ActiveTurn | undefined;
++      let stopped = false;
++      let alreadyInUse = false;
++      let history = "";
++      const seen = new Set<string>();
++      const turns = new Map<string, OrchestrationV2ProviderTurn>();
++      const messages = new Map<string, OrchestrationV2ConversationMessage>();
++      const pending = new Map<RuntimeRequestId, PendingResponse>();
++      const confirmedPermissionReplies = new Map<RuntimeRequestId, string>();
++      const sdkOwnedPermissionRequests = new WeakSet<PermissionRequest>();
++      const tasks = new Map<string, Task>();
++      const subagents = new Map<string, OrchestrationV2Subagent>();
++      const taskOwners = new Map<string, ActiveTurn>();
++      const emit = (event: ProviderAdapter.ProviderAdapterV2Event) =>
++        Queue.offer(events, event).pipe(Effect.asVoid);
++      const sdk = <A>(operation: string, request: () => Promise<A>, timeoutMs = 10_000) =>
++        Effect.tryPromise({
++          try: request,
++          catch: (cause) =>
++            new ProviderAdapter.ProviderAdapterProtocolError({
++              driver: COPILOT_DRIVER,
++              detail: `Copilot ${operation} failed`,
++              cause,
++            }),
++        }).pipe(
++          Effect.timeoutOption(timeoutMs),
++          Effect.flatMap((result) =>
++            Effect.fromOption(result).pipe(
++              Effect.mapError(
++                () =>
++                  new ProviderAdapter.ProviderAdapterProtocolError({
++                    driver: COPILOT_DRIVER,
++                    detail: `Copilot ${operation} timed out`,
++                  }),
++              ),
++            ),
++          ),
++        );
++      const decidePermission = (
++        requestId: string,
++        result: Parameters<Rpc["permissions"]["handlePendingPermissionRequest"]>[0]["result"],
++      ) =>
++        sdk("permission response", () =>
++          native!.rpc.permissions.handlePendingPermissionRequest({
++            requestId,
++            result,
++          }),
++        ).pipe(
++          Effect.flatMap((receipt) =>
++            receipt.success
++              ? Effect.void
++              : Effect.fail(
++                  new ProviderAdapter.ProviderAdapterProtocolError({
++                    driver: COPILOT_DRIVER,
++                    detail: "Copilot permission request was already resolved",
++                  }),
++                ),
++          ),
++        );
++      const config = yield* Effect.try({
++        try: () =>
++          resolveClientConfiguration({
++            settings: input.settings,
++            cwd,
++            environment: input.environment,
++          }),
++        catch: (cause) =>
++          new ProviderAdapter.ProviderAdapterOpenSessionError({
++            driver: COPILOT_DRIVER,
++            providerSessionId: open.providerSessionId,
++            cause,
++          }),
++      });
++      const client = yield* Effect.try({
++        try: () => (options.clientFactory ?? createClient)(config.options),
++        catch: (cause) =>
++          new ProviderAdapter.ProviderAdapterOpenSessionError({
++            driver: COPILOT_DRIVER,
++            providerSessionId: open.providerSessionId,
++            cause,
++          }),
++      });
++      const settlePending = Effect.fnUntraced(function* () {
++        const now = yield* DateTime.now;
++        for (const [requestId, entry] of pending) {
++          if (entry.responseOwnedByV2) continue;
++          pending.delete(requestId);
++          entry.cancel();
++          entry.owner.items.set(entry.request.id, {
++            ...entry.item,
++            status: "cancelled",
++            completedAt: now,
++            updatedAt: now,
++          });
++          yield* emit({
++            type: "runtime_request.updated",
++            driver: COPILOT_DRIVER,
++            threadId: open.threadId,
++            runtimeRequest: { ...entry.request, status: "cancelled", resolvedAt: now },
++          });
++          yield* emit({
++            type: "turn_item.updated",
++            driver: COPILOT_DRIVER,
++            turnItem: { ...entry.item, status: "cancelled", completedAt: now, updatedAt: now },
++          });
++          yield* emit({
++            type: "node.updated",
++            driver: COPILOT_DRIVER,
++            node: { ...entry.node, status: "cancelled", completedAt: now },
++          });
++        }
++      });
++      yield* Effect.addFinalizer(() =>
++        Effect.gen(function* () {
++          stopped = true;
++          options.onSkills?.(cwd, null);
++          yield* settlePending();
++          const disconnected = native
++            ? yield* sdk("disconnect", () => native!.disconnect(), 5_000).pipe(Effect.result)
++            : undefined;
++          const stoppedClient = yield* sdk("stop", () => client.stop()).pipe(Effect.result);
++          if (
++            disconnected?._tag === "Failure" ||
++            stoppedClient._tag === "Failure" ||
++            stoppedClient.success.length
++          ) {
++            yield* sdk("force stop", () => client.forceStop(), 5_000).pipe(Effect.ignore);
++          }
++          yield* Queue.shutdown(inbox);
++          yield* Queue.shutdown(events);
++        }),
++      );
++      yield* sdk("start", () => client.start(), 30_000);
++
++      const updateThread = Effect.fnUntraced(function* (
++        patch: Partial<OrchestrationV2ProviderThread>,
++      ) {
++        if (!providerThread) return;
++        providerThread = { ...providerThread, ...patch, updatedAt: yield* DateTime.now };
++        yield* emit({ type: "provider_thread.updated", driver: COPILOT_DRIVER, providerThread });
++      });
++      const baseItem = (turn: ActiveTurn, id: string, nativeId?: string) => {
++        const existing = turn.items.get(id);
++        return {
++          id: TurnItemId.make(`${turn.providerTurn.id}:${id}`),
++          threadId: turn.input.threadId,
++          runId: turn.input.runId,
++          nodeId: turn.input.rootNodeId,
++          providerThreadId: turn.input.providerThread.id,
++          providerTurnId: turn.providerTurn.id,
++          nativeItemRef: nativeId ? ref(nativeId) : null,
++          parentItemId: null,
++          ordinal: existing?.ordinal ?? turn.nextOrdinal++,
++          status: "running" as const,
++          title: null,
++          startedAt: turn.providerTurn.startedAt,
++          completedAt: null,
++          updatedAt: turn.providerTurn.startedAt!,
++        };
++      };
++      const putItem = (turn: ActiveTurn, key: string, item: OrchestrationV2TurnItem) =>
++        Effect.sync(() => {
++          turn.items.set(key, item);
++        }).pipe(
++          Effect.andThen(
++            emit({ type: "turn_item.updated", driver: COPILOT_DRIVER, turnItem: item }),
++          ),
++        );
++      const terminal = Effect.fnUntraced(function* (turn: ActiveTurn, failure?: unknown) {
++        if (turn.finished || (!failure && !turn.accepted)) return;
++        turn.finished = true;
++        const now = yield* DateTime.now;
++        const status = failure
++          ? ("failed" as const)
++          : turn.interrupted
++            ? ("interrupted" as const)
++            : ("completed" as const);
++        yield* settlePending();
++        for (const [key, item] of turn.items) {
++          if (item.type === "subagent") continue;
++          if (
++            (item.type === "approval_request" || item.type === "user_input_request") &&
++            pending.get(item.requestId)?.responseOwnedByV2
++          )
++            continue;
++          if (item.status !== "running" && item.status !== "pending") continue;
++          yield* putItem(turn, key, {
++            ...item,
++            status,
++            completedAt: now,
++            updatedAt: now,
++            ...("streaming" in item ? { streaming: false } : {}),
++          });
++        }
++        for (const [id, message] of messages) {
++          if (message.runId !== turn.input.runId || !message.streaming) continue;
++          const completed = { ...message, streaming: false, updatedAt: now };
++          messages.set(id, completed);
++          yield* emit({ type: "message.updated", driver: COPILOT_DRIVER, message: completed });
++        }
++        turn.providerTurn = { ...turn.providerTurn, status, completedAt: now };
++        turns.set(turn.providerTurn.id, turn.providerTurn);
++        yield* emit({
++          type: "provider_turn.updated",
++          driver: COPILOT_DRIVER,
++          threadId: open.threadId,
++          providerTurn: turn.providerTurn,
++        });
++        yield* updateThread({ status: failure ? "error" : "idle" });
++        const common = {
++          type: "turn.terminal" as const,
++          driver: COPILOT_DRIVER,
++          providerThreadId: turn.providerTurn.providerThreadId,
++          providerTurnId: turn.providerTurn.id,
++          runOrdinal: turn.input.runOrdinal,
++        };
++        yield* emit(
++          failure
++            ? {
++                ...common,
++                status: "failed",
++                failure: makeProviderFailure({ cause: failure }),
++                failureItemOrdinal: turn.nextOrdinal++,
++                threadDisposition: "broken",
++              }
++            : {
++                ...common,
++                status: turn.interrupted ? "interrupted" : "completed",
++                failure: null,
++                threadDisposition: "reusable",
++              },
++        );
++        active = undefined;
++      });
++
++      const refreshTasks = Effect.fnUntraced(function* () {
++        if (!native || !providerThread) return;
++        const listed = yield* sdk("list tasks", () => native!.rpc.tasks.list());
++        tasks.clear();
++        const now = yield* DateTime.now;
++        for (const task of listed.tasks) {
++          tasks.set(task.id, task);
++          const turn = taskOwners.get(task.id) ?? active ?? lastTurn;
++          if (task.type !== "agent" || !turn) continue;
++          taskOwners.set(task.id, turn);
++          const status =
++            task.status === "running"
++              ? "running"
++              : task.status === "idle"
++                ? "idle"
++                : task.status === "completed"
++                  ? "completed"
++                  : task.status === "cancelled"
++                    ? "cancelled"
++                    : "failed";
++          const previous = subagents.get(task.id);
++          const subagent: OrchestrationV2Subagent = {
++            id: NodeId.make(`${open.providerSessionId}:task:${task.id}`),
++            threadId: turn.input.threadId,
++            runId: turn.input.runId,
++            parentNodeId: turn.input.rootNodeId,
++            origin: "provider_native",
++            createdBy: "agent",
++            driver: COPILOT_DRIVER,
++            providerInstanceId: input.instanceId,
++            providerThreadId: providerThread.id,
++            childThreadId: null,
++            nativeTaskRef: ref(task.id),
++            prompt: task.description ?? "",
++            title: task.description ?? task.agentType,
++            model: task.resolvedModel ?? task.model ?? null,
++            status,
++            result: task.result ?? task.latestResponse ?? task.error ?? null,
++            startedAt: previous?.startedAt ?? now,
++            completedAt: ["running", "idle"].includes(status) ? null : now,
++            updatedAt: now,
++          };
++          subagents.set(task.id, subagent);
++          yield* emit({ type: "subagent.updated", driver: COPILOT_DRIVER, subagent });
++          yield* emit({
++            type: "node.updated",
++            driver: COPILOT_DRIVER,
++            node: {
++              id: subagent.id,
++              threadId: turn.input.threadId,
++              runId: turn.input.runId,
++              parentNodeId: turn.input.rootNodeId,
++              rootNodeId: turn.input.rootNodeId,
++              kind: "subagent",
++              status,
++              countsForRun: false,
++              providerThreadId: providerThread.id,
++              providerTurnId: turn.providerTurn.id,
++              nativeItemRef: ref(task.id),
++              runtimeRequestId: null,
++              checkpointScopeId: null,
++              startedAt: subagent.startedAt,
++              completedAt: subagent.completedAt,
++            },
++          });
++          yield* putItem(turn, `task:${task.id}`, {
++            ...baseItem(turn, `task:${task.id}`, task.id),
++            type: "subagent",
++            subagentId: subagent.id,
++            origin: "provider_native",
++            driver: COPILOT_DRIVER,
++            providerInstanceId: input.instanceId,
++            childThreadId: null,
++            prompt: subagent.prompt,
++            result: subagent.result,
++            status,
++            title: subagent.title,
++            updatedAt: now,
++            completedAt: subagent.completedAt,
++          });
++        }
++        for (const [id, previous] of subagents) {
++          if (tasks.has(id) || !["running", "idle", "waiting", "pending"].includes(previous.status))
++            continue;
++          const subagent = {
++            ...previous,
++            status: "interrupted" as const,
++            completedAt: now,
++            updatedAt: now,
++          };
++          subagents.set(id, subagent);
++          yield* emit({ type: "subagent.updated", driver: COPILOT_DRIVER, subagent });
++          const owner = taskOwners.get(id);
++          const item = owner?.items.get(`task:${id}`);
++          if (owner && item)
++            yield* putItem(owner, `task:${id}`, {
++              ...item,
++              status: "interrupted",
++              completedAt: now,
++              updatedAt: now,
++            });
++          if (owner)
++            yield* emit({
++              type: "node.updated",
++              driver: COPILOT_DRIVER,
++              node: {
++                id: subagent.id,
++                threadId: owner.input.threadId,
++                runId: owner.input.runId,
++                parentNodeId: owner.input.rootNodeId,
++                rootNodeId: owner.input.rootNodeId,
++                kind: "subagent",
++                status: "interrupted",
++                countsForRun: false,
++                providerThreadId: providerThread.id,
++                providerTurnId: owner.providerTurn.id,
++                nativeItemRef: ref(id),
++                runtimeRequestId: null,
++                checkpointScopeId: null,
++                startedAt: subagent.startedAt,
++                completedAt: now,
++              },
++            });
++        }
++        yield* updateThread({
++          pendingBackgroundTasks: listed.tasks
++            .filter((task) => task.status === "running" || task.status === "idle")
++            .map((task) => ({
++              taskId: task.id,
++              kind: task.type === "agent" ? ("subagent" as const) : ("command" as const),
++              ...(task.description ? { description: task.description } : {}),
++            })),
++        });
++      });
++      const refreshPlan = Effect.fnUntraced(function* () {
++        const turn = active ?? lastTurn;
++        if (!native || !turn) return;
++        const plan = yield* sdk("read plan", () => native!.rpc.plan.read());
++        if (!plan.exists || !plan.content) return;
++        const planId = PlanId.make(`${turn.providerTurn.id}:plan`);
++        yield* emit({
++          type: "plan.updated",
++          driver: COPILOT_DRIVER,
++          plan: {
++            id: planId,
++            threadId: turn.input.threadId,
++            runId: turn.input.runId,
++            nodeId: turn.input.rootNodeId,
++            status: "draft",
++            kind: "proposed_plan",
++            markdown: plan.content,
++          },
++        });
++        yield* putItem(turn, "plan", {
++          ...baseItem(turn, "plan"),
++          type: "proposed_plan",
++          planId,
++          markdown: plan.content,
++          streaming: false,
++          status: "completed",
++          completedAt: yield* DateTime.now,
++        });
++      });
++      const textEvent = Effect.fnUntraced(function* (
++        turn: ActiveTurn,
++        key: string,
++        text: string,
++        final: boolean,
++        reasoning: boolean,
++      ) {
++        const previous = turn.items.get(key);
++        if (text.length === 0 && (!final || previous === undefined)) return;
++        const content =
++          final && text.length > 0
++            ? text
++            : (previous && "text" in previous ? previous.text : "") + text;
++        const now = yield* DateTime.now;
++        const base = {
++          ...baseItem(turn, key, key),
++          updatedAt: now,
++          status: final ? ("completed" as const) : ("running" as const),
++          completedAt: final ? now : null,
++        };
++        if (reasoning) {
++          yield* putItem(turn, key, {
++            ...base,
++            type: "reasoning",
++            text: content,
++            streaming: !final,
++          });
++        } else {
++          const messageId = MessageId.make(`${turn.providerTurn.id}:${key}`);
++          const message: OrchestrationV2ConversationMessage = {
++            createdBy: "agent",
++            creationSource: "provider",
++            id: messageId,
++            threadId: turn.input.threadId,
++            runId: turn.input.runId,
++            nodeId: turn.input.rootNodeId,
++            role: "assistant",
++            text: content,
++            attachments: [],
++            streaming: !final,
++            createdAt: messages.get(messageId)?.createdAt ?? now,
++            updatedAt: now,
++          };
++          messages.set(messageId, message);
++          yield* emit({ type: "message.updated", driver: COPILOT_DRIVER, message });
++          yield* putItem(turn, key, {
++            ...base,
++            type: "assistant_message",
++            messageId,
++            text: content,
++            streaming: !final,
++          });
++        }
++      });
++      const onEvent = Effect.fnUntraced(function* (event: SessionEvent) {
++        if (stopped || seen.has(event.id)) return;
++        seen.add(event.id);
++        if (nativeLogger)
++          yield* nativeLogger.write(
++            {
++              source: "copilot.sdk",
++              providerInstanceId: input.instanceId,
++              type: event.type,
++              eventId: event.id,
++              child: event.agentId !== undefined,
++              payload: summarizeNativeProtocolPayload(event.data),
++            },
++            open.threadId,
++          );
++        if (event.type === "permission.requested") {
++          if (
++            !event.data.resolvedByHook &&
++            !sdkOwnedPermissionRequests.has(event.data.permissionRequest) &&
++            ![...pending.values()].some(
++              (entry) => entry.nativePermissionId === event.data.requestId,
++            )
++          )
++            yield* onRequest({
++              type: "request",
++              kind: "permission",
++              request: event.data.permissionRequest,
++              nativeRequestId: event.data.requestId,
++            }).pipe(Effect.catch((cause) => (active ? terminal(active, cause) : Effect.void)));
++          return;
++        }
++        // Child events never advance or complete the root's user-turn lifecycle.
++        if (event.agentId) {
++          if (
++            event.type === "assistant.message" ||
++            event.type === "assistant.idle" ||
++            event.type === "session.idle" ||
++            event.type === "assistant.turn_end" ||
++            event.type.startsWith("subagent.") ||
++            event.type === "session.background_tasks_changed" ||
++            event.type === "session.error"
++          ) {
++            yield* refreshTasks().pipe(Effect.ignore);
++          }
++          return;
++        }
++        const turn = active;
++        switch (event.type) {
++          case "session.skills_loaded":
++            options.onSkills?.(cwd, skillsFromSdk(event.data.skills));
++            return;
++          case "session.background_tasks_changed":
++          case "subagent.started":
++          case "subagent.completed":
++          case "subagent.failed":
++          case "session.task_complete":
++            yield* refreshTasks().pipe(Effect.ignore);
++            return;
++          case "session.plan_changed":
++            yield* refreshPlan().pipe(Effect.ignore);
++            return;
++          case "session.idle":
++            if (!turn) return;
++            turn.idle = true;
++            yield* refreshTasks().pipe(Effect.ignore);
++            yield* terminal(turn);
++            return;
++          case "session.error":
++            if (turn) yield* terminal(turn, new Error(event.data.message));
++            return;
++          case "session.shutdown": {
++            const failed = event.data.shutdownType === "error";
++            if (turn) {
++              turn.accepted = true;
++              turn.interrupted = true;
++              yield* terminal(
++                turn,
++                failed
++                  ? new Error(event.data.errorReason ?? "Copilot runtime shut down.")
++                  : undefined,
++              );
++            }
++            stopped = true;
++            options.onSkills?.(cwd, null);
++            yield* updateThread({ status: failed ? "error" : "closed" });
++            yield* emit({
++              type: "provider_session.updated",
++              driver: COPILOT_DRIVER,
++              providerSession: {
++                ...providerSession,
++                status: failed ? "error" : "stopped",
++                updatedAt: yield* DateTime.now,
++                lastError: failed ? "Copilot runtime shut down." : null,
++              },
++            });
++            return;
++          }
++          case "assistant.message_delta":
++            if (turn)
++              yield* textEvent(turn, event.data.messageId, event.data.deltaContent, false, false);
++            return;
++          case "assistant.message":
++            if (turn) yield* textEvent(turn, event.data.messageId, event.data.content, true, false);
++            return;
++          case "assistant.reasoning_delta":
++            if (turn)
++              yield* textEvent(
++                turn,
++                `reasoning:${event.data.reasoningId}`,
++                event.data.deltaContent,
++                false,
++                true,
++              );
++            return;
++          case "assistant.reasoning":
++            if (turn)
++              yield* textEvent(
++                turn,
++                `reasoning:${event.data.reasoningId}`,
++                event.data.content,
++                true,
++                true,
++              );
++            return;
++          case "tool.execution_start":
++            if (turn)
++              yield* putItem(
++                turn,
++                event.data.toolCallId,
++                nativeToolItem(
++                  {
++                    ...baseItem(turn, event.data.toolCallId, event.data.toolCallId),
++                    title: event.data.toolName,
++                  },
++                  event.data,
++                ),
++              );
++            return;
++          case "tool.execution_partial_result": {
++            if (!turn) return;
++            const previous = turn.items.get(event.data.toolCallId);
++            if (previous?.type !== "dynamic_tool" && previous?.type !== "command_execution") return;
++            const output =
++              `${typeof previous.output === "string" ? previous.output : ""}${event.data.partialOutput}`.slice(
++                -20_000,
++              );
++            if (previous.type === "command_execution") {
++              turn.items.set(event.data.toolCallId, {
++                ...previous,
++                output,
++                updatedAt: yield* DateTime.now,
++              });
++              yield* emit({
++                type: "command_output.delta",
++                driver: COPILOT_DRIVER,
++                threadId: turn.input.threadId,
++                itemId: previous.id,
++                chunk: event.data.partialOutput.slice(0, 8_000),
++              });
++              return;
++            }
++            yield* putItem(turn, event.data.toolCallId, {
++              ...previous,
++              output,
++              updatedAt: yield* DateTime.now,
++            });
++            return;
++          }
++          case "tool.execution_complete": {
++            if (!turn) return;
++            const previous = turn.items.get(event.data.toolCallId);
++            if (!previous) return;
++            const now = yield* DateTime.now;
++            const output = (
++              event.data.result?.detailedContent ??
++              event.data.result?.content ??
++              event.data.error?.message ??
++              ""
++            ).slice(0, 20_000);
++            if (previous.type === "web_search") {
++              yield* putItem(turn, event.data.toolCallId, {
++                ...previous,
++                status: event.data.success ? "completed" : "failed",
++                ...(output ? { results: [{ snippet: output }] } : {}),
++                completedAt: now,
++                updatedAt: now,
++              });
++              return;
++            }
++            yield* putItem(turn, event.data.toolCallId, {
++              ...previous,
++              status: event.data.success ? "completed" : "failed",
++              ...(previous.type === "dynamic_tool" || previous.type === "command_execution"
++                ? { output }
++                : {}),
++              completedAt: now,
++              updatedAt: now,
++            });
++            return;
++          }
++          case "hook.start":
++          case "hook.end":
++            if (turn) {
++              const ended = event.type === "hook.end";
++              yield* putItem(turn, `hook:${event.data.hookInvocationId}`, {
++                ...baseItem(
++                  turn,
++                  `hook:${event.data.hookInvocationId}`,
++                  event.data.hookInvocationId,
++                ),
++                type: "system_notice",
++                title: `Hook: ${event.data.hookType}`,
++                message:
++                  ended && event.data.error
++                    ? event.data.error.message.slice(0, 2_000)
++                    : event.data.hookType,
++                status: ended ? (event.data.success ? "completed" : "failed") : "running",
++                completedAt: ended ? yield* DateTime.now : null,
++              });
++            }
++            return;
++          case "session.truncation":
++            yield* updateThread({
++              contextUsage: {
++                usedTokens: Math.max(0, Math.trunc(event.data.postTruncationTokensInMessages)),
++                maxTokens: Math.max(1, Math.trunc(event.data.tokenLimit)),
++                compactsAutomatically: true,
++              },
++            });
++            if (turn)
++              yield* putItem(turn, `truncation:${event.id}`, {
++                ...baseItem(turn, `truncation:${event.id}`),
++                type: "compaction",
++                driver: COPILOT_DRIVER,
++                summary: "Native context truncation",
++                beforeTokenCount: event.data.preTruncationTokensInMessages,
++                afterTokenCount: event.data.postTruncationTokensInMessages,
++                status: "completed",
++                completedAt: yield* DateTime.now,
++              });
++            return;
++          case "session.compaction_start":
++          case "session.compaction_complete":
++            if (turn) {
++              const complete = event.type === "session.compaction_complete";
++              yield* putItem(turn, "compaction", {
++                ...baseItem(turn, "compaction"),
++                type: "compaction",
++                driver: COPILOT_DRIVER,
++                status: complete ? (event.data.success ? "completed" : "failed") : "running",
++                completedAt: complete ? yield* DateTime.now : null,
++                ...(complete && event.data.summaryContent
++                  ? { summary: event.data.summaryContent }
++                  : {}),
++                ...(complete && event.data.preCompactionTokens !== undefined
++                  ? { beforeTokenCount: event.data.preCompactionTokens }
++                  : {}),
++                ...(complete && event.data.postCompactionTokens !== undefined
++                  ? { afterTokenCount: event.data.postCompactionTokens }
++                  : {}),
++              });
++            }
++            return;
++          case "session.usage_info":
++            yield* updateThread({
++              contextUsage: {
++                usedTokens: Math.max(0, Math.trunc(event.data.currentTokens)),
++                maxTokens: Math.max(1, Math.trunc(event.data.tokenLimit)),
++                compactsAutomatically: true,
++              },
++            });
++            return;
++          case "assistant.usage":
++            if (turn) {
++              const previous = turn.providerTurn.tokenUsage;
++              const inputTokens =
++                (previous?.inputTokens ?? 0) + Math.max(0, Math.trunc(event.data.inputTokens ?? 0));
++              const outputTokens =
++                (previous?.outputTokens ?? 0) +
++                Math.max(0, Math.trunc(event.data.outputTokens ?? 0));
++              turn.providerTurn = {
++                ...turn.providerTurn,
++                tokenUsage: {
++                  usedTokens: inputTokens + outputTokens,
++                  inputTokens,
++                  outputTokens,
++                  cachedInputTokens:
++                    (previous?.cachedInputTokens ?? 0) +
++                    Math.max(0, Math.trunc(event.data.cacheReadTokens ?? 0)),
++                  updatedAt: event.timestamp,
++                },
++              };
++              turns.set(turn.providerTurn.id, turn.providerTurn);
++              yield* emit({
++                type: "provider_turn.updated",
++                driver: COPILOT_DRIVER,
++                threadId: open.threadId,
++                providerTurn: turn.providerTurn,
++              });
++            }
++            return;
++          default:
++            return;
++        }
++      });
++      const onRequest = Effect.fnUntraced(function* (entry: Extract<Ingress, { type: "request" }>) {
++        const turn = active;
++        if (!turn || turn.finished || stopped) {
++          if (entry.kind === "permission") {
++            if (native && !stopped)
++              yield* decidePermission(entry.nativeRequestId, { kind: "user-not-available" });
++          } else if (entry.kind === "input") entry.resolve({ answer: "", wasFreeform: true });
++          else entry.resolve({ approved: false });
++          return;
++        }
++        if (
++          entry.kind === "permission" &&
++          (turn.input.runtimePolicy.runtimeMode === "full-access" ||
++            (turn.input.runtimePolicy.runtimeMode === "auto-accept-edits" &&
++              entry.request.kind === "write"))
++        ) {
++          yield* decidePermission(entry.nativeRequestId, { kind: "approve-once" });
++          return;
++        }
++        const now = yield* DateTime.now;
++        const id = RuntimeRequestId.make(`${turn.providerTurn.id}:request:${turn.nextOrdinal++}`);
++        const nodeId = derive.approvalNode({ requestId: id });
++        const requestKind =
++          entry.kind === "permission"
++            ? entry.request.kind === "read"
++              ? ("file-read" as const)
++              : entry.request.kind === "write"
++                ? ("file-change" as const)
++                : ("command" as const)
++            : ("user_input" as const);
++        const request: OrchestrationV2RuntimeRequest = {
++          id,
++          nodeId,
++          providerTurnId: turn.providerTurn.id,
++          nativeRequestRef: entry.kind === "permission" ? ref(entry.nativeRequestId) : null,
++          kind: requestKind,
++          status: "pending",
++          responseCapability: { type: "live", providerSessionId: open.providerSessionId },
++          createdAt: now,
++          resolvedAt: null,
++        };
++        const node: OrchestrationV2ExecutionNode = {
++          id: nodeId,
++          threadId: turn.input.threadId,
++          runId: turn.input.runId,
++          parentNodeId: turn.input.rootNodeId,
++          rootNodeId: turn.input.rootNodeId,
++          kind: entry.kind === "permission" ? "approval_request" : "user_input_request",
++          status: "waiting",
++          countsForRun: false,
++          providerThreadId: turn.input.providerThread.id,
++          providerTurnId: turn.providerTurn.id,
++          nativeItemRef: null,
++          runtimeRequestId: id,
++          checkpointScopeId: null,
++          startedAt: now,
++          completedAt: null,
++        };
++        const item: OrchestrationV2TurnItem =
++          entry.kind === "permission"
++            ? {
++                ...baseItem(turn, id),
++                type: "approval_request",
++                nodeId,
++                requestId: id,
++                requestKind:
++                  entry.request.kind === "read"
++                    ? "file-read"
++                    : entry.request.kind === "write"
++                      ? "file-change"
++                      : "command",
++                prompt: permissionPrompt(entry.request),
++                options: [
++                  { decision: "accept", label: "Allow once" },
++                  { decision: "decline", label: "Deny" },
++                ],
++              }
++            : {
++                ...baseItem(turn, id),
++                type: "user_input_request",
++                nodeId,
++                requestId: id,
++                questions: [
++                  {
++                    id: "answer",
++                    header: entry.kind === "plan" ? "Plan" : "Question",
++                    question:
++                      entry.kind === "plan"
++                        ? "Approve this plan and continue?"
++                        : entry.request.question,
++                    options:
++                      entry.kind === "plan"
++                        ? [
++                            { label: "Approve", description: "Start implementation" },
++                            { label: "Revise", description: "Stay in plan mode" },
++                          ]
++                        : (entry.request.choices ?? []).map((choice) => ({
++                            label: choice,
++                            description: choice,
++                          })),
++                    allowCustomAnswer:
++                      entry.kind === "plan" || entry.request.allowFreeform !== false,
++                  },
++                ],
++              };
++        if (entry.kind === "plan") yield* refreshPlan().pipe(Effect.ignore);
++        pending.set(id, {
++          owner: turn,
++          ...(entry.kind === "permission" ? { nativePermissionId: entry.nativeRequestId } : {}),
++          request,
++          item,
++          node,
++          resolve: (response) => {
++            if (entry.kind !== "permission") {
++              const answer = response.answers?.answer;
++              const text =
++                typeof answer === "string"
++                  ? answer
++                  : Array.isArray(answer)
++                    ? answer.join(", ")
++                    : "";
++              if (entry.kind === "input")
++                entry.resolve({
++                  answer: text,
++                  wasFreeform: !(entry.request.choices ?? []).includes(text),
++                });
++              else
++                entry.resolve({
++                  approved: text === "Approve",
++                  ...(text === "Approve"
++                    ? { selectedAction: entry.request.recommendedAction }
++                    : {}),
++                  ...(text && text !== "Approve" ? { feedback: text } : {}),
++                });
++            }
++          },
++          cancel: () => {
++            if (entry.kind === "input") entry.resolve({ answer: "", wasFreeform: true });
++            else if (entry.kind === "plan") entry.resolve({ approved: false });
++          },
++        });
++        yield* emit({ type: "node.updated", driver: COPILOT_DRIVER, node });
++        yield* emit({
++          type: "runtime_request.updated",
++          driver: COPILOT_DRIVER,
++          threadId: open.threadId,
++          runtimeRequest: request,
++        });
++        yield* putItem(turn, id, item);
++      });
++      yield* Stream.fromQueue(inbox).pipe(
++        Stream.runForEach((entry) => {
++          if (entry.type === "drain") return Deferred.succeed(entry.receipt, undefined);
++          if (entry.type === "accepted") return active?.idle ? terminal(active) : Effect.void;
++          return entry.type === "event" ? onEvent(entry.event) : onRequest(entry);
++        }),
++        Effect.forkScoped,
++      );
++
++      const drain = Effect.fnUntraced(function* () {
++        const receipt = yield* Deferred.make<void>();
++        yield* Queue.offer(inbox, { type: "drain", receipt });
++        yield* Deferred.await(receipt).pipe(
++          Effect.timeoutOption(15_000),
++          Effect.flatMap((result) =>
++            Effect.fromOption(result).pipe(
++              Effect.mapError(
++                () =>
++                  new ProviderAdapter.ProviderAdapterProtocolError({
++                    driver: COPILOT_DRIVER,
++                    detail: "Copilot event drain timed out",
++                  }),
++              ),
++            ),
++          ),
++        );
++      });
++      const ensureThread: ProviderAdapter.ProviderAdapterV2SessionRuntime["ensureThread"] =
++        Effect.fn("CopilotAdapter.ensureThread")(function* (ensure) {
++          if (ensure.modelSelection.instanceId !== input.instanceId)
++            return yield* new ProviderAdapter.ProviderAdapterEnsureThreadError({
++              driver: COPILOT_DRIVER,
++              threadId: ensure.threadId,
++              cause: new Error("Copilot model selection targets another account instance."),
++            });
++          if (providerThread) {
++            if (
++              ensure.existingProviderThread &&
++              ensure.existingProviderThread.id !== providerThread.id
++            ) {
++              return yield* new ProviderAdapter.ProviderAdapterEnsureThreadError({
++                driver: COPILOT_DRIVER,
++                threadId: ensure.threadId,
++                cause: new Error("Copilot runtime already owns another native thread."),
++              });
++            }
++            return providerThread;
++          }
++          const previous = ensure.existingProviderThread;
++          const nativeId = previous?.nativeThreadRef?.nativeId ?? open.initialNativeThreadId;
++          const mcp = yield* mcpSessions.read(open.threadId);
++          const sessionConfig: SessionConfig = {
++            clientName: "t3-code",
++            workingDirectory: cwd,
++            configDirectory: config.effectiveHome,
++            model: ensure.modelSelection.model,
++            ...(reasoningEffort(ensure.modelSelection)
++              ? { reasoningEffort: reasoningEffort(ensure.modelSelection)! }
++              : {}),
++            streaming: true,
++            enableSkills: true,
++            enableConfigDiscovery: input.settings.enableConfigDiscovery,
++            skipCustomInstructions: !input.settings.enableConfigDiscovery,
++            ...(mcp
++              ? { systemMessage: { mode: "append", content: t3OrchestrationSystemPrompt(true)! } }
++              : {}),
++            includeSubAgentStreamingEvents: false,
++            ...(mcp
++              ? {
++                  mcpServers: {
++                    "t3-code": {
++                      type: "http",
++                      url: mcp.endpoint,
++                      headers: { Authorization: mcp.authorizationHeader },
++                    },
++                  },
++                }
++              : {}),
++            // Handle native IDs and applied-decision receipts through the permission RPC.
++            onPermissionRequest: (request) => {
++              if (!active || active.finished || stopped) {
++                sdkOwnedPermissionRequests.add(request);
++                return { kind: "user-not-available" };
++              }
++              return { kind: "no-result" };
++            },
++            onUserInputRequest: (request) =>
++              new Promise((resolve) => {
++                if (stopped) resolve({ answer: "", wasFreeform: true });
++                else Queue.offerUnsafe(inbox, { type: "request", kind: "input", request, resolve });
++              }),
++            onExitPlanModeRequest: (request) =>
++              new Promise((resolve) => {
++                if (stopped) resolve({ approved: false });
++                else Queue.offerUnsafe(inbox, { type: "request", kind: "plan", request, resolve });
++              }),
++            onEvent: (event) => {
++              if (event.type === "session.resume" && event.data.alreadyInUse) alreadyInUse = true;
++              if (!stopped) Queue.offerUnsafe(inbox, { type: "event", event });
++            },
++          };
++          native = yield* sdk(
++            nativeId ? "resume session" : "create session",
++            () =>
++              nativeId
++                ? client.resumeSession(nativeId, { ...sessionConfig, continuePendingWork: false })
++                : client.createSession(sessionConfig),
++            30_000,
++          );
++          if (alreadyInUse) {
++            yield* sdk("disconnect conflicting session", () => native!.disconnect()).pipe(
++              Effect.ignore,
++            );
++            native = undefined;
++            return yield* new ProviderAdapter.ProviderAdapterEnsureThreadError({
++              driver: COPILOT_DRIVER,
++              threadId: ensure.threadId,
++              cause: new Error("Copilot session is already in use by another client."),
++            });
++          }
++          const now = yield* DateTime.now;
++          if (nativeId) {
++            const transcript = yield* sdk("read native transcript", () => native!.getEvents()).pipe(
++              Effect.result,
++            );
++            if (transcript._tag === "Success") {
++              for (const event of transcript.success) {
++                if (
++                  event.agentId ||
++                  (event.type !== "assistant.message" && event.type !== "user.message")
++                )
++                  continue;
++                if (event.type === "assistant.message" && event.data.content.length === 0) continue;
++                const messageId = MessageId.make(`${open.providerSessionId}:history:${event.id}`);
++                messages.set(messageId, {
++                  id: messageId,
++                  createdBy: event.type === "user.message" ? "user" : "agent",
++                  creationSource: "provider",
++                  threadId: ensure.threadId,
++                  runId: null,
++                  nodeId: null,
++                  role: event.type === "user.message" ? "user" : "assistant",
++                  text: event.data.content,
++                  attachments: [],
++                  streaming: false,
++                  createdAt: DateTime.makeUnsafe(event.timestamp),
++                  updatedAt: DateTime.makeUnsafe(event.timestamp),
++                });
++              }
++            }
++          }
++          const createdThread: OrchestrationV2ProviderThread = {
++            id:
++              previous?.id ??
++              derive.providerThread({
++                driver: COPILOT_DRIVER,
++                nativeThreadId: native.sessionId,
++                providerInstanceId: input.instanceId,
++              }),
++            driver: COPILOT_DRIVER,
++            providerInstanceId: input.instanceId,
++            providerSessionId: open.providerSessionId,
++            appThreadId: ensure.threadId,
++            ownerNodeId: null,
++            nativeThreadRef: ref(native.sessionId),
++            nativeConversationHeadRef: null,
++            status: "idle",
++            firstRunOrdinal: previous?.firstRunOrdinal ?? null,
++            lastRunOrdinal: previous?.lastRunOrdinal ?? null,
++            handoffIds: previous?.handoffIds ?? [],
++            forkedFrom: previous?.forkedFrom ?? null,
++            pendingBackgroundTasks: [],
++            contextUsage: null,
++            nativeMetadata: { modelSelection: ensure.modelSelection },
++            goal: null,
++            createdAt: previous?.createdAt ?? now,
++            updatedAt: now,
++          };
++          providerThread = createdThread;
++          yield* emit({
++            type: "provider_thread.updated",
++            driver: COPILOT_DRIVER,
++            providerThread: createdThread,
++          });
++          const skills = yield* sdk("list skills", () => native!.rpc.skills.list()).pipe(
++            Effect.result,
++          );
++          if (skills._tag === "Success")
++            options.onSkills?.(cwd, skillsFromSdk(skills.success.skills as SkillsLoadedSkill[]));
++          yield* drain();
++          return createdThread;
++        });
++      const startTurn: ProviderAdapter.ProviderAdapterV2SessionRuntime["startTurn"] = Effect.fn(
++        "CopilotAdapter.startTurn",
++      )(function* (turnInput) {
++        if (
++          !native ||
++          !providerThread ||
++          stopped ||
++          alreadyInUse ||
++          turnInput.modelSelection.instanceId !== input.instanceId
++        )
++          return yield* new ProviderAdapter.ProviderAdapterTurnStartError({
++            driver: COPILOT_DRIVER,
++            providerThreadId: turnInput.providerThread.id,
++            threadId: turnInput.threadId,
++            runId: turnInput.runId,
++          });
++        if (active && !active.finished)
++          return yield* new ProviderAdapter.ProviderAdapterProtocolError({
++            driver: COPILOT_DRIVER,
++            detail: "Previous Copilot turn is still active",
++            reason: "previous_turn_active",
++          });
++        const effort = reasoningEffort(turnInput.modelSelection);
++        yield* sdk("set model", () =>
++          native!.setModel(
++            turnInput.modelSelection.model,
++            effort ? { reasoningEffort: effort } : {},
++          ),
++        );
++        yield* sdk("set mode", () =>
++          native!.rpc.mode.set({
++            mode: turnInput.runtimePolicy.interactionMode === "plan" ? "plan" : "interactive",
++          }),
++        );
++        yield* drain();
++        const now = yield* DateTime.now;
++        const providerTurn: OrchestrationV2ProviderTurn = {
++          id: ProviderTurnId.make(
++            `${providerThread.id}:${turnInput.attemptId}:${turnInput.providerTurnOrdinal}`,
++          ),
++          providerThreadId: providerThread.id,
++          nodeId: turnInput.rootNodeId,
++          runAttemptId: turnInput.attemptId,
++          nativeTurnRef: null,
++          ordinal: turnInput.providerTurnOrdinal,
++          status: "running",
++          startedAt: now,
++          completedAt: null,
++        };
++        const turn: ActiveTurn = {
++          input: turnInput,
++          providerTurn,
++          nextOrdinal: 1,
++          items: new Map(),
++          accepted: false,
++          idle: false,
++          interrupted: false,
++          finished: false,
++        };
++        active = turn;
++        lastTurn = turn;
++        turns.set(providerTurn.id, providerTurn);
++        yield* emit({
++          type: "provider_turn.updated",
++          driver: COPILOT_DRIVER,
++          threadId: open.threadId,
++          providerTurn,
++        });
++        yield* updateThread({
++          status: "active",
++          firstRunOrdinal: providerThread.firstRunOrdinal ?? turnInput.runOrdinal,
++          lastRunOrdinal: turnInput.runOrdinal,
++          nativeMetadata: { modelSelection: turnInput.modelSelection },
++        });
++        const userText = yield* providerMessageTextWithAttachmentPaths({
++          text: turnInput.message.text,
++          attachments: turnInput.message.attachments,
++          resolveAttachmentPath: host.resolveAttachmentPath,
++        });
++        const instructions = buildRuntimeInstructions({
++          harness: "GitHub Copilot",
++          model: turnInput.modelSelection.model,
++          reasoningEffort: effort,
++        });
++        const context = turnInput.appContext?.map((entry) => entry.text).join("\n\n") ?? "";
++        const prompt = [instructions, history, context, userText].filter(Boolean).join("\n\n");
++        const attachments: NonNullable<MessageOptions["attachments"]> = [];
++        for (const attachment of turnInput.message.attachments) {
++          const path = host.resolveAttachmentPath(attachment);
++          if (!path)
++            return yield* new ProviderAdapter.ProviderAdapterProtocolError({
++              driver: COPILOT_DRIVER,
++              detail: "Copilot attachment is unavailable",
++              reason: "attachment_unreadable",
++            });
++          attachments.push({ type: "file" as const, path, displayName: attachment.name });
++        }
++        history = "";
++        yield* sdk(
++          "send",
++          () =>
++            native!.send({
++              prompt,
++              mode: "immediate",
++              agentMode:
++                turnInput.runtimePolicy.interactionMode === "plan" ? "plan" : "interactive",
++              ...(attachments.length ? { attachments } : {}),
++            }),
++          30_000,
++        ).pipe(
++          Effect.tapError(() =>
++            Effect.sync(() => {
++              active = undefined;
++            }),
++          ),
++        );
++        turn.accepted = true;
++        yield* Queue.offer(inbox, { type: "accepted" });
++      });
++      return {
++        instanceId: input.instanceId,
++        driver: COPILOT_DRIVER,
++        providerSessionId: open.providerSessionId,
++        providerSession,
++        events: Stream.fromQueue(events),
++        hasPendingBackgroundWork: Effect.sync(() =>
++          [...tasks.values()].some((task) => task.status === "running" || task.status === "idle"),
++        ),
++        ensureThread,
++        resumeThread: (resume) =>
++          ensureThread({
++            threadId: resume.threadId ?? open.threadId,
++            existingProviderThread: resume.providerThread,
++            modelSelection: resume.modelSelection ?? open.modelSelection,
++            runtimePolicy: resume.runtimePolicy ?? open.runtimePolicy,
++          }),
++        injectHistory: (context) =>
++          Effect.sync(() => {
++            history = context.context;
++            return true;
++          }),
++        startTurn,
++        steerTurn: (steer) =>
++          Effect.fail(
++            new ProviderAdapter.ProviderAdapterSteerRunUnsupportedError({
++              driver: COPILOT_DRIVER,
++              providerThreadId: steer.providerThread.id,
++            }),
++          ),
++        interruptTurn: Effect.fn("CopilotAdapter.interruptTurn")(function* () {
++          if (!native || !active) return;
++          active.interrupted = true;
++          yield* sdk("abort", () => native!.abort());
++        }),
++        stopTask: ({ taskId }) =>
++          sdk("cancel task", () => native!.rpc.tasks.cancel({ id: taskId })).pipe(Effect.asVoid),
++        respondToRuntimeRequest: Effect.fn("CopilotAdapter.respondToRuntimeRequest")(
++          function* (response) {
++            const entry = pending.get(response.requestId);
++            const permissionReplyKey = `${response.decision ?? ""}\n${response.feedback ?? ""}`;
++            if (
++              !entry &&
++              confirmedPermissionReplies.get(response.requestId) === permissionReplyKey &&
++              response.answers === undefined
++            )
++              return;
++            if (!entry)
++              return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({
++                driver: COPILOT_DRIVER,
++                requestId: response.requestId,
++              });
++            const answer = response.answers?.answer;
++            const validAnswer =
++              typeof answer === "string" ||
++              (Array.isArray(answer) && answer.every((part) => typeof part === "string"));
++            if (
++              entry.request.kind === "user_input"
++                ? !validAnswer
++                : !["accept", "decline", "cancel"].includes(response.decision ?? "") ||
++                  response.answers !== undefined
++            ) {
++              return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({
++                driver: COPILOT_DRIVER,
++                requestId: response.requestId,
++                cause: new Error(
++                  "Copilot requires a supported one-time decision or a text answer.",
++                ),
++              });
++            }
++            if (entry.responseOwnedByV2) {
++              if (!entry.nativePermissionId || entry.permissionReplyKey !== permissionReplyKey) {
++                return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({
++                  driver: COPILOT_DRIVER,
++                  requestId: response.requestId,
++                });
++              }
++              if (entry.permissionReplyReceipt)
++                return yield* Deferred.await(entry.permissionReplyReceipt);
++            }
++            // V2 already recorded the answer. Ownership must survive even a failed native receipt.
++            entry.responseOwnedByV2 = true;
++            const receipt = Deferred.makeUnsafe<void, ProviderAdapter.ProviderAdapterV2Error>();
++            if (entry.nativePermissionId) {
++              entry.permissionReplyKey = permissionReplyKey;
++              entry.permissionReplyReceipt = receipt;
++            }
++            return yield* Effect.gen(function* () {
++              const now = yield* DateTime.now;
++              if (entry.nativePermissionId) {
++                yield* decidePermission(
++                  entry.nativePermissionId,
++                  response.decision === "accept"
++                    ? { kind: "approve-once" }
++                    : {
++                        kind: "reject",
++                        ...(response.feedback ? { feedback: response.feedback } : {}),
++                      },
++                );
++                confirmedPermissionReplies.set(response.requestId, permissionReplyKey);
++              }
++              pending.delete(response.requestId);
++              entry.owner.items.set(response.requestId, {
++                ...entry.item,
++                status: "completed",
++                completedAt: now,
++                updatedAt: now,
++              });
++              // The decider owns resolution and delivery state; callback handoff is the last operation.
++              if (!entry.nativePermissionId) entry.resolve(response);
++            }).pipe(
++              Effect.onExit((exit) => {
++                delete entry.permissionReplyReceipt;
++                return Deferred.done(receipt, exit);
++              }),
++            );
++          },
++        ),
++        readThreadSnapshot: Effect.fn("CopilotAdapter.readThreadSnapshot")(function* () {
++          yield* drain();
++          if (!providerThread)
++            return yield* new ProviderAdapter.ProviderAdapterProtocolError({
++              driver: COPILOT_DRIVER,
++              detail: "Copilot thread is not loaded",
++            });
++          return {
++            providerThread,
++            providerTurns: [...turns.values()],
++            messages: [...messages.values()],
++            runtimeRequests: [...pending.values()]
++              .filter((entry) => !entry.responseOwnedByV2)
++              .map((entry) => entry.request),
++          };
++        }),
++        rollbackThread: (rollback) =>
++          Effect.fail(
++            new ProviderAdapter.ProviderAdapterRollbackThreadError({
++              driver: COPILOT_DRIVER,
++              providerThreadId: rollback.providerThread.id,
++              cause: new Error("Native Copilot rollback is unsupported."),
++            }),
++          ),
++        forkThread: (fork) =>
++          Effect.fail(
++            new ProviderAdapter.ProviderAdapterForkThreadError({
++              driver: COPILOT_DRIVER,
++              providerThreadId: fork.sourceProviderThread.id,
++              cause: new Error("Native Copilot fork is unsupported."),
++            }),
++          ),
++      } satisfies ProviderAdapter.ProviderAdapterV2SessionRuntime;
++    }),
++  });
++});
+diff --git a/packages/provider-copilot/src/server/capabilities.ts b/packages/provider-copilot/src/server/capabilities.ts
+new file mode 100644
+index 000000000..aa24de211
+--- /dev/null
++++ b/packages/provider-copilot/src/server/capabilities.ts
+@@ -0,0 +1,93 @@
++import type { OrchestrationV2ProviderCapabilities } from "@t3tools/contracts";
++
++export const capabilities = {
++  sessions: {
++    supportsMultipleProviderThreadsPerSession: false,
++    supportsModelSwitchInSession: true,
++    supportsProviderSwitchingViaHandoff: true,
++    supportsRuntimeModeSwitchInSession: true,
++    pendingRequestsSurviveRestart: false,
++  },
++  threads: {
++    canCreateEmptyThread: true,
++    canReadThreadSnapshot: true,
++    canRollbackThread: false,
++    canForkThread: false,
++    canForkFromTurn: false,
++    canForkFromSubagentThread: false,
++    exposesNativeThreadId: true,
++  },
++  turns: {
++    exposesNativeTurnId: false,
++    emitsTurnStarted: true,
++    emitsTurnCompleted: true,
++    supportsInterrupt: true,
++    supportsActiveSteering: false,
++    supportsSteeringByInterruptRestart: true,
++    supportsQueuedMessages: true,
++    terminalStatusQuality: "strong",
++  },
++  streaming: {
++    streamsAssistantText: true,
++    streamsReasoning: true,
++    streamsToolOutput: true,
++    streamsPlanText: false,
++    emitsMessageCompleted: true,
++  },
++  tools: {
++    exposesToolItemIds: true,
++    emitsToolStarted: true,
++    emitsToolCompleted: true,
++    emitsToolOutput: true,
++    supportsMcpTools: true,
++    supportsDynamicToolCallbacks: false,
++  },
++  approvals: {
++    supportsCommandApproval: true,
++    supportsFileReadApproval: true,
++    supportsFileChangeApproval: true,
++    supportsApplyPatchApproval: true,
++    approvalsHaveNativeRequestIds: true,
++    approvalCallbacksAreLiveOnly: true,
++    approvalsCanOriginateFromSubagents: true,
++  },
++  planning: {
++    emitsPlanUpdated: true,
++    emitsTodoList: false,
++    emitsProposedPlan: true,
++    supportsStructuredQuestions: true,
++    planDeltasHaveItemIds: false,
++  },
++  subagents: {
++    supportsSubagents: true,
++    exposesSubagentThreadIds: false,
++    emitsSubagentLifecycle: true,
++    canWaitForSubagents: false,
++    canCloseSubagents: false,
++    canForkSubagentThread: false,
++  },
++  context: {
++    acceptsSystemContext: true,
++    acceptsDeveloperContext: false,
++    acceptsSyntheticUserContext: true,
++    canGenerateSummaries: true,
++    canConsumeHandoffSummaries: true,
++    supportsDeltaHandoff: true,
++    supportsFullThreadHandoff: true,
++    maxRecommendedHandoffChars: 100_000,
++  },
++  checkpointing: {
++    appCanCheckpointFilesystem: true,
++    supportsNestedCheckpointScopes: false,
++    providerCanRollbackConversation: false,
++    providerRollbackReturnsSnapshot: false,
++    providerCanReadConversationSnapshot: true,
++  },
++  identity: {
++    nativeThreadIds: "strong",
++    nativeTurnIds: "none",
++    nativeItemIds: "strong",
++    nativeRequestIds: "weak",
++  },
++  runtimePolicy: { enforcement: "client-boundary" },
++} as const satisfies OrchestrationV2ProviderCapabilities;
+diff --git a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts
+new file mode 100644
+index 000000000..88326753d
+--- /dev/null
++++ b/packages/provider-copilot/src/server/client.ts
+@@ -0,0 +1,111 @@
++// @effect-diagnostics nodeBuiltinImport:off
++import * as NodeModule from "node:module";
++import * as NodeOS from "node:os";
++import * as NodePath from "node:path";
++import * as NodeFS from "node:fs";
++import * as NodeSea from "node:sea";
++import type { CopilotClient, CopilotClientOptions } from "@github/copilot-sdk";
++import type { CopilotSettings } from "../settings.ts";
++
++const require = NodeModule.createRequire(import.meta.url);
++
++export const createClient = (options: CopilotClientOptions): CopilotClient =>
++  new (require("@github/copilot-sdk") as typeof import("@github/copilot-sdk")).CopilotClient(
++    options,
++  );
++
++export interface HostRuntime {
++  readonly packaged: boolean;
++  readonly electron: boolean;
++  readonly platform: string;
++  readonly architecture: string;
++  readonly resolve: (name: string) => string;
++  readonly exists: (path: string) => boolean;
++}
++
++function hostRuntime(): HostRuntime {
++  return {
++    packaged: typeof process.versions.electron === "string" || NodeSea.isSea(),
++    electron: typeof process.versions.electron === "string",
++    // oxlint-disable-next-line t3code/no-global-process-runtime -- SDK options are synchronous; tests inject the host descriptor.
++    platform: NodeOS.platform(),
++    // oxlint-disable-next-line t3code/no-global-process-runtime -- SDK options are synchronous; tests inject the host descriptor.
++    architecture: NodeOS.arch(),
++    resolve: (name) =>
++      NodeModule.createRequire(require.resolve("@github/copilot-sdk")).resolve(name),
++    exists: NodeFS.existsSync,
++  };
++}
++
++export function bundledCliPath(runtime: HostRuntime): string | undefined {
++  if (!runtime.packaged) return undefined;
++  if (
++    !["darwin", "linux", "win32"].includes(runtime.platform) ||
++    !["arm64", "x64"].includes(runtime.architecture)
++  ) {
++    throw new Error("Unsupported GitHub Copilot runtime platform.");
++  }
++  for (const platform of runtime.platform === "linux"
++    ? ["linux", "linuxmusl"]
++    : [runtime.platform]) {
++    try {
++      const path = runtime.resolve(`@github/copilot-${platform}-${runtime.architecture}`);
++      const executable = runtime.electron
++        ? path.replace(/([\\/][^\\/]+\.asar)(?=[\\/])/u, "$1.unpacked")
++        : path;
++      if (runtime.exists(executable)) return executable;
++    } catch {
++      /* The Linux libc variant may not be installed. */
++    }
++  }
++  throw new Error("The bundled GitHub Copilot executable is unavailable.");
++}
++
++export function resolveClientConfiguration(
++  input: {
++    readonly settings: CopilotSettings;
++    readonly cwd: string;
++    readonly environment: NodeJS.ProcessEnv;
++  },
++  runtime: HostRuntime = hostRuntime(),
++): { readonly options: CopilotClientOptions; readonly effectiveHome: string } {
++  const { settings, environment } = input;
++  const hostHome = environment.HOME || environment.USERPROFILE || NodeOS.homedir();
++  const configuredHome =
++    settings.homePath.trim() ||
++    environment.COPILOT_HOME?.trim() ||
++    NodePath.join(hostHome, ".copilot");
++  const expandedHome =
++    configuredHome === "~"
++      ? hostHome
++      : /^~[/\\]/u.test(configuredHome)
++        ? NodePath.join(hostHome, configuredHome.slice(2))
++        : configuredHome;
++  const effectiveHome = NodePath.resolve(expandedHome);
++  const binaryPath = settings.binaryPath?.trim();
++  const configured =
++    binaryPath && !/^copilot(?:\.(?:exe|cmd|bat))?$/iu.test(binaryPath) ? binaryPath : undefined;
++  const connection = environment.COPILOT_SDK_DEFAULT_CONNECTION?.trim().toLowerCase();
++  const bundled =
++    !configured && !environment.COPILOT_CLI_PATH?.trim() && (!connection || connection === "stdio")
++      ? bundledCliPath(runtime)
++      : undefined;
++  const override = configured ?? bundled;
++  return {
++    effectiveHome,
++    options: {
++      mode: "copilot-cli",
++      workingDirectory: input.cwd,
++      baseDirectory: effectiveHome,
++      env: { ...environment, COPILOT_HOME: effectiveHome },
++      logLevel: "error",
++      ...(override
++        ? {
++            connection: (
++              require("@github/copilot-sdk") as typeof import("@github/copilot-sdk")
++            ).RuntimeConnection.forStdio({ path: override }),
++          }
++        : {}),
++    },
++  };
++}
+diff --git a/packages/provider-copilot/src/server/driver.test.ts b/packages/provider-copilot/src/server/driver.test.ts
+new file mode 100644
+index 000000000..87faf2e55
+--- /dev/null
++++ b/packages/provider-copilot/src/server/driver.test.ts
+@@ -0,0 +1,106 @@
++import { assert, describe, it } from "@effect/vitest";
++import type { CopilotClient } from "@github/copilot-sdk";
++import { DEFAULT_SERVER_SETTINGS, ProviderInstanceId } from "@t3tools/contracts";
++import * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
++import * as Stream from "effect/Stream";
++import { vi } from "vite-plus/test";
++import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
++import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
++import { CopilotSettings } from "../settings.ts";
++import * as NativeClient from "./client.ts";
++import { CopilotDriver } from "./driver.ts";
++
++const settings = Schema.decodeSync(CopilotSettings)({});
++const host = ProviderHost.ProviderHost.of({
++  paths: {
++    cwd: "/workspace",
++    baseDir: "/test",
++    stateDir: "/test/state",
++    providerStatusCacheDir: "/test/cache",
++    attachmentsDir: "/test/attachments",
++  },
++  settings: {
++    get: Effect.succeed(DEFAULT_SERVER_SETTINGS),
++    withSnapshot: (use) => use(DEFAULT_SERVER_SETTINGS),
++    changes: Stream.empty,
++    subscribe: Effect.succeed(Stream.empty),
++  },
++  shouldRunBackgroundWork: () => Effect.succeed(false),
++  resolveAttachmentPath: () => null,
++  credentials: () =>
++    Effect.succeed({
++      binding: { owner: "t3", key: "test" },
++      get: Effect.succeedNone,
++      set: () => Effect.void,
++      remove: Effect.void,
++    }),
++});
++
++describe("Copilot workspace snapshots", () => {
++  it.effect(
++    "exposes project skills only for their requested cwd, never in the instance-wide snapshot",
++    () =>
++      Effect.gen(function* () {
++        const requested: string[] = [];
++        const fake = {
++          start: async () => {},
++          stop: async () => [],
++          forceStop: async () => {},
++          getStatus: async () => ({ version: "1.0.75", protocolVersion: 1 }),
++          getAuthStatus: async () => ({ isAuthenticated: true }),
++          listModels: async () => [],
++          createSession: async () => {
++            throw new Error("Discovery must not create native sessions.");
++          },
++          rpc: {
++            skills: {
++              discover: async ({ projectPaths }: { projectPaths: string[] }) => {
++                const cwd = projectPaths[0]!;
++                requested.push(cwd);
++                return {
++                  skills: [
++                    {
++                      name: cwd === "/project-a" ? "skill-a" : "skill-b",
++                      description: "Project skill",
++                      source: "project",
++                      enabled: true,
++                      userInvocable: true,
++                      path: `${cwd}/.github/skills/SKILL.md`,
++                    },
++                  ],
++                };
++              },
++            },
++          },
++        };
++        const mock = vi
++          .spyOn(NativeClient, "createClient")
++          .mockReturnValue(fake as unknown as CopilotClient);
++        yield* Effect.addFinalizer(() => Effect.sync(() => mock.mockRestore()));
++        const instance = yield* CopilotDriver.create({
++          instanceId: ProviderInstanceId.make("githubCopilot"),
++          displayName: undefined,
++          environment: [],
++          enabled: true,
++          config: settings,
++        });
++        const first = yield* instance.snapshotForCwd!("/project-a");
++        const second = yield* instance.snapshotForCwd!("/project-b");
++        assert.deepEqual(
++          first.skills.map((skill) => skill.name),
++          ["skill-a"],
++        );
++        assert.deepEqual(
++          second.skills.map((skill) => skill.name),
++          ["skill-b"],
++        );
++        assert.deepEqual((yield* instance.snapshot.getSnapshot).skills, []);
++        assert.deepEqual(requested, ["/project-a", "/project-b"]);
++      }).pipe(
++        Effect.provideService(ProviderHost.ProviderHost, host),
++        Effect.provide(McpProviderSessions.layer),
++        Effect.scoped,
++      ),
++  );
++});
+diff --git a/packages/provider-copilot/src/server/driver.ts b/packages/provider-copilot/src/server/driver.ts
+new file mode 100644
+index 000000000..ad29ed011
+--- /dev/null
++++ b/packages/provider-copilot/src/server/driver.ts
+@@ -0,0 +1,189 @@
++import { ProviderDriverKind, type ServerProviderSkill } from "@t3tools/contracts";
++import * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
++import * as Option from "effect/Option";
++import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
++import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
++import type { ProviderDriver, ProviderInstance } from "@t3tools/provider-core/server/driver";
++import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
++import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
++import { withInstanceIdentity } from "@t3tools/provider-core/server/instanceIdentity";
++import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
++import { makeManualOnlyProviderMaintenanceCapabilities } from "@t3tools/provider-core/server/maintenanceResolver";
++import {
++  haveProviderSnapshotSettingsChanged,
++  makeProviderSnapshotSettingsSource,
++} from "@t3tools/provider-core/server/snapshotSettings";
++import { CopilotSettings } from "../settings.ts";
++import { makeAdapter } from "./adapter.ts";
++import { createClient, resolveClientConfiguration } from "./client.ts";
++import { checkStatus, pendingSnapshot, skillsFromSdk } from "./status.ts";
++import { makeTextGeneration } from "./textGeneration.ts";
++
++const driverKind = ProviderDriverKind.make("githubCopilot");
++const decodeSettings = Schema.decodeSync(CopilotSettings);
++export type CopilotDriverEnv = ProviderHost.ProviderHost | McpProviderSessions.McpProviderSessions;
++
++export const CopilotDriver: ProviderDriver<CopilotSettings, CopilotDriverEnv> = {
++  driverKind,
++  metadata: { displayName: "GitHub Copilot", supportsMultipleInstances: true },
++  configSchema: CopilotSettings,
++  defaultConfig: () => decodeSettings({}),
++  create: Effect.fn("CopilotDriver.create")(function* ({
++    instanceId,
++    displayName,
++    accentColor,
++    environment,
++    enabled,
++    config,
++  }) {
++    const host = yield* ProviderHost.ProviderHost;
++    const processEnv = yield* mergeProviderInstanceEnvironment(environment);
++    const settings = { ...config, enabled };
++    const configuration = yield* Effect.try({
++      try: () =>
++        resolveClientConfiguration({ settings, cwd: host.paths.cwd, environment: processEnv }),
++      catch: (cause) =>
++        new ProviderDriverError({
++          driver: driverKind,
++          instanceId,
++          detail: "Could not configure Copilot.",
++          cause,
++        }),
++    });
++    const continuationIdentity = {
++      driverKind,
++      continuationKey: `githubCopilot:home:${configuration.effectiveHome}`,
++    };
++    const stamp = withInstanceIdentity({
++      instanceId,
++      driverKind,
++      displayName,
++      accentColor,
++      continuationGroupKey: continuationIdentity.continuationKey,
++    });
++    const workspaceSkills = new Map<string, ReadonlyArray<ServerProviderSkill>>();
++    const orchestrationAdapter = yield* makeAdapter(
++      { instanceId, settings, environment: processEnv },
++      {
++        onSkills: (cwd, skills) => {
++          if (skills) workspaceSkills.set(cwd, skills);
++          else workspaceSkills.delete(cwd);
++        },
++      },
++    );
++    const snapshotSettings = yield* makeProviderSnapshotSettingsSource(settings);
++    const snapshot = yield* makeManagedServerProvider({
++      resolveMaintenance: () =>
++        Effect.succeed(
++          makeManualOnlyProviderMaintenanceCapabilities({
++            provider: driverKind,
++            packageName: "@github/copilot-sdk",
++          }),
++        ),
++      getSettings: snapshotSettings.getSettings,
++      streamSettings: snapshotSettings.streamSettings,
++      haveSettingsChanged: haveProviderSnapshotSettingsChanged,
++      initialSnapshot: () => pendingSnapshot(settings).pipe(Effect.map(stamp)),
++      checkProvider: checkStatus(settings, host.paths.cwd, processEnv).pipe(Effect.map(stamp)),
++    }).pipe(
++      Effect.mapError(
++        (cause) =>
++          new ProviderDriverError({
++            driver: driverKind,
++            instanceId,
++            detail: "Could not build Copilot provider snapshot.",
++            cause,
++          }),
++      ),
++    );
++    const snapshotForCwd: NonNullable<ProviderInstance["snapshotForCwd"]> = Effect.fn(
++      "CopilotDriver.snapshotForCwd",
++    )(function* (cwd) {
++      const current = yield* snapshot.getSnapshot;
++      if (!enabled) return current;
++      const cached = workspaceSkills.get(cwd);
++      if (cached) return { ...current, skills: cached };
++      const skills = yield* Effect.scoped(
++        Effect.gen(function* () {
++          const client = yield* Effect.acquireRelease(
++            Effect.try({
++              try: () =>
++                createClient(
++                  resolveClientConfiguration({ settings, cwd, environment: processEnv }).options,
++                ),
++              catch: (cause) =>
++                new ProviderDriverError({
++                  driver: driverKind,
++                  instanceId,
++                  detail: "Copilot discovery failed.",
++                  cause,
++                }),
++            }),
++            (client) =>
++              Effect.gen(function* () {
++                const stopped = yield* Effect.tryPromise(() => client.stop()).pipe(
++                  Effect.timeoutOption(10_000),
++                  Effect.result,
++                );
++                if (
++                  stopped._tag === "Failure" ||
++                  Option.isNone(stopped.success) ||
++                  stopped.success.value.length
++                ) {
++                  yield* Effect.tryPromise(() => client.forceStop()).pipe(
++                    Effect.timeoutOption(5_000),
++                    Effect.ignore,
++                  );
++                }
++              }),
++          );
++          return yield* Effect.tryPromise({
++            try: async () => {
++              await client.start();
++              const discovered = await client.rpc.skills.discover({
++                projectPaths: settings.enableConfigDiscovery ? [cwd] : [],
++              });
++              return skillsFromSdk(discovered.skills);
++            },
++            catch: (cause) =>
++              new ProviderDriverError({
++                driver: driverKind,
++                instanceId,
++                detail: "Copilot workspace skill discovery failed.",
++                cause,
++              }),
++          });
++        }),
++      ).pipe(
++        Effect.timeoutOption(30_000),
++        Effect.flatMap((result) =>
++          Effect.fromOption(result).pipe(
++            Effect.mapError(
++              (cause) =>
++                new ProviderDriverError({
++                  driver: driverKind,
++                  instanceId,
++                  detail: "Copilot discovery timed out.",
++                  cause,
++                }),
++            ),
++          ),
++        ),
++      );
++      return { ...current, skills };
++    });
++    return {
++      instanceId,
++      driverKind,
++      displayName,
++      accentColor,
++      enabled,
++      continuationIdentity,
++      snapshot,
++      snapshotForCwd,
++      orchestrationAdapter,
++      textGeneration: makeTextGeneration(settings, processEnv),
++    } satisfies ProviderInstance;
++  }),
++};
+diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
+new file mode 100644
+index 000000000..2f9b7e99d
+--- /dev/null
++++ b/packages/provider-copilot/src/server/status.test.ts
+@@ -0,0 +1,183 @@
++import { assert, describe, it } from "@effect/vitest";
++import type { ModelInfo, SkillsLoadedSkill } from "@github/copilot-sdk";
++import * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
++import { CopilotSettings } from "../settings.ts";
++import { checkStatus, modelsFromSdk, skillsFromSdk } from "./status.ts";
++import { bundledCliPath, resolveClientConfiguration } from "./client.ts";
++
++const decode = Schema.decodeSync(CopilotSettings);
++const model = (id: string, extra: Partial<ModelInfo> = {}): ModelInfo => ({
++  id,
++  name: id,
++  capabilities: {
++    supports: { vision: true, reasoningEffort: true },
++    limits: { max_context_window_tokens: 128_000 },
++  },
++  ...extra,
++});
++const skill = (
++  name: string,
++  source: SkillsLoadedSkill["source"],
++  extra: Partial<SkillsLoadedSkill> = {},
++): SkillsLoadedSkill => ({
++  name,
++  source,
++  description: `${name} skill`,
++  enabled: true,
++  userInvocable: true,
++  path: `/workspace/${name}/SKILL.md`,
++  ...extra,
++});
++
++describe("Copilot discovery and account isolation", () => {
++  it("keeps project/native skills in workspace results, including pathless built-ins", () => {
++    const skills = skillsFromSdk([
++      skill("project-skill", "project"),
++      skill("personal-skill", "personal-copilot"),
++      skill("builtin", "builtin", { path: "" }),
++      skill("disabled", "project", { enabled: false }),
++      skill("agent-only", "project", { userInvocable: false }),
++      skill("project-skill", "personal-agents"),
++    ]);
++    assert.deepEqual(
++      skills.map((entry) => entry.name),
++      ["project-skill", "personal-skill", "builtin"],
++    );
++    assert.equal(skills[0]?.scope, "project");
++    assert.equal(skills[2]?.path, "copilot://skills/builtin");
++  });
++
++  it("discovers allowed models and reasoning options without duplicates or policy-disabled models", () => {
++    const result = modelsFromSdk(
++      [
++        model("gpt", {
++          supportedReasoningEfforts: ["low", "high"],
++          defaultReasoningEffort: "high",
++        }),
++        model("gpt"),
++        model("blocked", { policy: { state: "disabled", terms: "" } }),
++      ],
++      decode({ customModels: ["custom"] }),
++    );
++    assert.deepEqual(
++      result.map((entry) => entry.slug),
++      ["gpt", "custom"],
++    );
++    assert.deepEqual(result[0]?.capabilities?.optionDescriptors?.[0], {
++      id: "reasoningEffort",
++      label: "Reasoning",
++      type: "select",
++      currentValue: "high",
++      options: [
++        { id: "low", label: "Low" },
++        { id: "high", label: "High", isDefault: true },
++      ],
++    });
++  });
++
++  it("uses only the selected account's home and preserves SDK-owned native paths", () => {
++    const first = resolveClientConfiguration({
++      settings: decode({ homePath: "~/.copilot-work" }),
++      cwd: "/workspace",
++      environment: { HOME: "/accounts/first", COPILOT_HOME: "/ignored", GITHUB_TOKEN: "first" },
++    });
++    const second = resolveClientConfiguration({
++      settings: decode({}),
++      cwd: "/workspace",
++      environment: { HOME: "/accounts/second", COPILOT_HOME: "/native/second" },
++    });
++    assert.equal(first.effectiveHome, "/accounts/first/.copilot-work");
++    assert.equal(first.options.mode, "copilot-cli");
++    assert.equal(first.options.baseDirectory, first.effectiveHome);
++    assert.equal(first.options.env?.COPILOT_HOME, first.effectiveHome);
++    assert.equal(second.effectiveHome, "/native/second");
++    assert.isUndefined(second.options.env?.GITHUB_TOKEN);
++  });
++
++  it("resolves packaged Windows executables outside asar and Linux libc alternatives", () => {
++    assert.equal(
++      bundledCliPath({
++        packaged: true,
++        electron: true,
++        platform: "win32",
++        architecture: "x64",
++        resolve: () => "C:\\T3\\app.asar\\node_modules\\@github\\copilot-win32-x64\\copilot.exe",
++        exists: (path) => path.includes("app.asar.unpacked"),
++      }),
++      "C:\\T3\\app.asar.unpacked\\node_modules\\@github\\copilot-win32-x64\\copilot.exe",
++    );
++    assert.equal(
++      bundledCliPath({
++        packaged: true,
++        electron: false,
++        platform: "linux",
++        architecture: "arm64",
++        resolve: (name) => {
++          if (!name.includes("linuxmusl")) throw new Error("not installed");
++          return "/native/copilot";
++        },
++        exists: () => true,
++      }),
++      "/native/copilot",
++    );
++  });
++
++  it.effect("returns authenticated SDK models without exposing any workspace skills globally", () =>
++    Effect.gen(function* () {
++      let stops = 0;
++      const result = yield* checkStatus(
++        decode({ enabled: true }),
++        "/workspace",
++        { HOME: "/account" },
++        () => ({
++          start: async () => {},
++          stop: async () => {
++            stops++;
++            return [];
++          },
++          forceStop: async () => {},
++          getStatus: async () => ({ version: "1.0.75", protocolVersion: 1 }),
++          getAuthStatus: async () => ({ isAuthenticated: true, login: "octocat" }),
++          listModels: async () => [model("gpt")],
++        }),
++      );
++      assert.equal(result.status, "ready");
++      assert.equal(result.auth.label, "octocat");
++      assert.equal(result.models[0]?.slug, "gpt");
++      assert.deepEqual(result.skills, []);
++      assert.equal(stops, 1);
++    }),
++  );
++
++  it.effect(
++    "reports cleanup-only failures and preserves a primary probe failure when cleanup also fails",
++    () =>
++      Effect.gen(function* () {
++        for (const failProbe of [false, true]) {
++          let forced = 0;
++          const snapshot = yield* checkStatus(decode({ enabled: true }), "/workspace", {}, () => ({
++            start: async () => {},
++            stop: async () => {
++              throw new Error("stop failed");
++            },
++            forceStop: async () => {
++              forced++;
++            },
++            getStatus: async () => {
++              if (failProbe) throw new Error("probe failed");
++              return { version: "1.0.75", protocolVersion: 1 };
++            },
++            getAuthStatus: async () => ({ isAuthenticated: true }),
++            listModels: async () => [],
++          }));
++          assert.equal(snapshot.status, "error");
++          assert.equal(forced, 1);
++          assert.equal(
++            snapshot.message,
++            failProbe ? "GitHub Copilot status check failed." : "GitHub Copilot cleanup failed.",
++          );
++        }
++      }),
++  );
++});
+diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts
+new file mode 100644
+index 000000000..8e895fc04
+--- /dev/null
++++ b/packages/provider-copilot/src/server/status.ts
+@@ -0,0 +1,196 @@
++import type { CopilotClient, ModelInfo, SkillsLoadedSkill } from "@github/copilot-sdk";
++import type { ServerProviderSkill } from "@t3tools/contracts";
++import { createModelCapabilities } from "@t3tools/shared/model";
++import * as DateTime from "effect/DateTime";
++import * as Effect from "effect/Effect";
++import * as Option from "effect/Option";
++import {
++  buildSelectOptionDescriptor,
++  buildServerProvider,
++  providerModelsFromSettings,
++} from "@t3tools/provider-core/server/snapshotProbe";
++import type { CopilotSettings } from "../settings.ts";
++import { createClient, resolveClientConfiguration } from "./client.ts";
++
++const presentation = {
++  displayName: "GitHub Copilot",
++  badgeLabel: "Preview",
++  showInteractionModeToggle: true,
++  supportsConversationRollback: false,
++};
++const emptyCapabilities = createModelCapabilities({ optionDescriptors: [] });
++
++export function modelsFromSdk(models: ReadonlyArray<ModelInfo>, settings: CopilotSettings) {
++  const seen = new Set<string>();
++  return providerModelsFromSettings(
++    models.flatMap((model) => {
++      const slug = model.id.trim();
++      if (!slug || !model.name.trim() || seen.has(slug) || model.policy?.state === "disabled")
++        return [];
++      seen.add(slug);
++      const efforts = model.supportedReasoningEfforts ?? [];
++      return [
++        {
++          slug,
++          name: model.name,
++          isCustom: false,
++          ...(seen.size === 1 ? { isDefault: true } : {}),
++          capabilities: createModelCapabilities({
++            optionDescriptors: efforts.length
++              ? [
++                  buildSelectOptionDescriptor({
++                    id: "reasoningEffort",
++                    label: "Reasoning",
++                    options: efforts.map((effort) => ({
++                      value: effort,
++                      label:
++                        effort === "xhigh"
++                          ? "Extra High"
++                          : effort[0]!.toUpperCase() + effort.slice(1),
++                      isDefault: effort === model.defaultReasoningEffort,
++                    })),
++                  }),
++                ]
++              : [],
++          }),
++        },
++      ];
++    }),
++    settings.customModels,
++    emptyCapabilities,
++  );
++}
++
++// Workspace snapshots are requested with a cwd; no project skills enter the instance snapshot.
++export function skillsFromSdk(
++  skills: ReadonlyArray<SkillsLoadedSkill>,
++): ReadonlyArray<ServerProviderSkill> {
++  const seen = new Set<string>();
++  return skills.flatMap((skill) => {
++    const name = skill.name.trim();
++    if (!name || !skill.enabled || !skill.userInvocable || seen.has(name)) return [];
++    seen.add(name);
++    return [
++      {
++        name,
++        ...(skill.description.trim() ? { description: skill.description } : {}),
++        path: skill.path?.trim() || `copilot://skills/${encodeURIComponent(name)}`,
++        enabled: true,
++        scope: skill.source,
++        userInvocable: true,
++      },
++    ];
++  });
++}
++
++export const pendingSnapshot = (settings: CopilotSettings) =>
++  DateTime.now.pipe(
++    Effect.map((now) =>
++      buildServerProvider({
++        presentation,
++        enabled: settings.enabled,
++        checkedAt: DateTime.formatIso(now),
++        models: modelsFromSdk([], settings),
++        probe: {
++          installed: false,
++          version: null,
++          status: "warning",
++          auth: { status: "unknown" },
++          message: settings.enabled
++            ? "Checking GitHub Copilot availability..."
++            : "GitHub Copilot is disabled.",
++        },
++      }),
++    ),
++  );
++
++export type StatusClient = Pick<
++  CopilotClient,
++  "start" | "stop" | "forceStop" | "getStatus" | "getAuthStatus" | "listModels"
++>;
++
++export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
++  settings: CopilotSettings,
++  cwd: string,
++  environment: NodeJS.ProcessEnv,
++  factory: (
++    options: ReturnType<typeof resolveClientConfiguration>["options"],
++  ) => StatusClient = createClient,
++) {
++  if (!settings.enabled) return yield* pendingSnapshot(settings);
++  let started = false;
++  let cleanupFailed = false;
++  const checkedAt = DateTime.formatIso(yield* DateTime.now);
++  const result = yield* Effect.scoped(
++    Effect.gen(function* () {
++      const client = yield* Effect.acquireRelease(
++        Effect.try(() =>
++          factory(resolveClientConfiguration({ settings, cwd, environment }).options),
++        ),
++        (client) =>
++          Effect.gen(function* () {
++            const stopped = yield* Effect.tryPromise(() => client.stop()).pipe(
++              Effect.timeoutOption(10_000),
++              Effect.result,
++            );
++            if (
++              stopped._tag === "Failure" ||
++              Option.isNone(stopped.success) ||
++              stopped.success.value.length
++            ) {
++              cleanupFailed = true;
++              yield* Effect.tryPromise(() => client.forceStop()).pipe(
++                Effect.timeoutOption(5_000),
++                Effect.ignore,
++              );
++            }
++          }),
++      );
++      return yield* Effect.tryPromise(async () => {
++        await client.start();
++        started = true;
++        const [status, auth] = await Promise.all([client.getStatus(), client.getAuthStatus()]);
++        const models = auth.isAuthenticated ? await client.listModels() : [];
++        return { status, auth, models };
++      });
++    }),
++  ).pipe(Effect.timeoutOption(30_000), Effect.result);
++  if (result._tag === "Failure" || Option.isNone(result.success) || cleanupFailed) {
++    return buildServerProvider({
++      presentation,
++      enabled: true,
++      checkedAt,
++      models: modelsFromSdk([], settings),
++      probe: {
++        installed: started,
++        version: null,
++        status: "error",
++        auth: { status: "unknown" },
++        message:
++          cleanupFailed && result._tag === "Success" && Option.isSome(result.success)
++            ? "GitHub Copilot cleanup failed."
++            : started
++              ? "GitHub Copilot status check failed."
++              : "Unable to start the Copilot CLI.",
++      },
++    });
++  }
++  const { status, auth, models } = result.success.value;
++  return buildServerProvider({
++    presentation,
++    enabled: true,
++    checkedAt,
++    models: modelsFromSdk(models, settings),
++    probe: {
++      installed: true,
++      version: status.version,
++      status: auth.isAuthenticated ? "ready" : "error",
++      auth: auth.isAuthenticated
++        ? { status: "authenticated", ...(auth.login ? { label: auth.login } : {}) }
++        : { status: "unauthenticated" },
++      ...(!auth.isAuthenticated
++        ? { message: "Sign in with `copilot login` in this provider's account environment." }
++        : {}),
++    },
++  });
++});
+diff --git a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts
+new file mode 100644
+index 000000000..129d9378f
+--- /dev/null
++++ b/packages/provider-copilot/src/server/textGeneration.test.ts
+@@ -0,0 +1,186 @@
++import { assert, describe, it } from "@effect/vitest";
++import type { SessionConfig } from "@github/copilot-sdk";
++import { ProviderInstanceId } from "@t3tools/contracts";
++import * as Effect from "effect/Effect";
++import * as Exit from "effect/Exit";
++import * as Fiber from "effect/Fiber";
++import * as Schema from "effect/Schema";
++import { CopilotSettings } from "../settings.ts";
++import { makeTextGeneration } from "./textGeneration.ts";
++
++const settings = Schema.decodeSync(CopilotSettings)({});
++
++function gate() {
++  let resolve!: () => void;
++  const promise = new Promise<void>((done) => {
++    resolve = done;
++  });
++  return { promise, resolve };
++}
++
++describe("Copilot background text generation", () => {
++  it.effect(
++    "uses a tool-free native session, validates JSON and deletes only its owned ephemeral session",
++    () =>
++      Effect.gen(function* () {
++        let config: SessionConfig | undefined;
++        const cleanup: string[] = [];
++        const generation = makeTextGeneration(
++          settings,
++          { HOME: "/account" },
++          {
++            clientFactory: (options) => {
++              assert.equal(options.mode, "copilot-cli");
++              return {
++                start: async () => {},
++                stop: async () => {
++                  cleanup.push("stop");
++                  return [];
++                },
++                forceStop: async () => {},
++                deleteSession: async (id) => {
++                  cleanup.push(`delete:${id}`);
++                },
++                createSession: async (created) => {
++                  config = created;
++                  return {
++                    sessionId: "ephemeral",
++                    disconnect: async () => {
++                      cleanup.push("disconnect");
++                    },
++                    sendAndWait: async () =>
++                      ({
++                        type: "assistant.message",
++                        data: { content: '{"title":"Native title"}' },
++                      }) as Awaited<
++                        ReturnType<import("@github/copilot-sdk").CopilotSession["sendAndWait"]>
++                      >,
++                  };
++                },
++              };
++            },
++          },
++        );
++        const result = yield* generation.generateThreadTitle({
++          cwd: "/workspace",
++          message: "Title this work",
++          modelSelection: {
++            instanceId: ProviderInstanceId.make("githubCopilot"),
++            model: "gpt-4.1",
++            options: [],
++          },
++        });
++        assert.equal(result.title, "Native title");
++        assert.deepEqual(config?.availableTools, []);
++        assert.deepEqual(config?.mcpServers, {});
++        assert.isFalse(config!.enableConfigDiscovery);
++        assert.isFalse(config!.enableSkills);
++        assert.deepEqual(cleanup, ["disconnect", "delete:ephemeral", "stop"]);
++      }),
++  );
++
++  it.effect("rejects malformed generation output while still cleaning up native resources", () =>
++    Effect.gen(function* () {
++      let deleted = 0;
++      let stopped = 0;
++      const generation = makeTextGeneration(
++        settings,
++        {},
++        {
++          clientFactory: () => ({
++            start: async () => {},
++            stop: async () => {
++              stopped++;
++              return [];
++            },
++            forceStop: async () => {},
++            deleteSession: async () => {
++              deleted++;
++            },
++            createSession: async () => ({
++              sessionId: "ephemeral",
++              disconnect: async () => {},
++              sendAndWait: async () =>
++                ({ type: "assistant.message", data: { content: "not JSON" } }) as Awaited<
++                  ReturnType<import("@github/copilot-sdk").CopilotSession["sendAndWait"]>
++                >,
++            }),
++          }),
++        },
++      );
++      const result = yield* generation
++        .generateBranchName({
++          cwd: "/workspace",
++          message: "Fix native session lifecycle",
++          modelSelection: {
++            instanceId: ProviderInstanceId.make("githubCopilot"),
++            model: "gpt-4.1",
++            options: [],
++          },
++        })
++        .pipe(Effect.exit);
++      assert.isTrue(Exit.isFailure(result));
++      assert.equal(deleted, 1);
++      assert.equal(stopped, 1);
++    }),
++  );
++
++  it.effect("never sends after cancellation while a native session is being created", () =>
++    Effect.gen(function* () {
++      const creating = gate();
++      const release = gate();
++      const cleaned = gate();
++      let sent = 0;
++      let deleted = 0;
++      let stopped = 0;
++      const generation = makeTextGeneration(
++        settings,
++        {},
++        {
++          clientFactory: () => ({
++            start: async () => {},
++            stop: async () => {
++              stopped++;
++              return [];
++            },
++            forceStop: async () => {},
++            deleteSession: async () => {
++              deleted++;
++              cleaned.resolve();
++            },
++            createSession: async () => {
++              creating.resolve();
++              await release.promise;
++              return {
++                sessionId: "late-session",
++                disconnect: async () => {},
++                sendAndWait: async () => {
++                  sent++;
++                  return undefined;
++                },
++              };
++            },
++          }),
++        },
++      );
++      const pending = yield* Effect.forkChild(
++        generation.generateThreadTitle({
++          cwd: "/workspace",
++          message: "Title",
++          modelSelection: {
++            instanceId: ProviderInstanceId.make("githubCopilot"),
++            model: "gpt-4.1",
++            options: [],
++          },
++        }),
++      );
++      yield* Effect.promise(() => creating.promise);
++      yield* Fiber.interrupt(pending);
++      assert.equal(stopped, 1);
++      release.resolve();
++      yield* Effect.promise(() => cleaned.promise);
++      assert.equal(deleted, 1);
++      assert.equal(sent, 0);
++    }),
++  );
++});
+diff --git a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts
+new file mode 100644
+index 000000000..0eee026ea
+--- /dev/null
++++ b/packages/provider-copilot/src/server/textGeneration.ts
+@@ -0,0 +1,159 @@
++import type {
++  CopilotClient,
++  CopilotClientOptions,
++  CopilotSession,
++  SessionConfig,
++} from "@github/copilot-sdk";
++import { TextGenerationError } from "@t3tools/contracts";
++import * as Effect from "effect/Effect";
++import * as Option from "effect/Option";
++import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
++import type { CopilotSettings } from "../settings.ts";
++import { createClient, resolveClientConfiguration } from "./client.ts";
++import { reasoningEffort } from "./adapter.ts";
++
++type GenerationSession = Pick<CopilotSession, "sessionId" | "sendAndWait" | "disconnect">;
++type GenerationClient = Pick<CopilotClient, "start" | "stop" | "forceStop" | "deleteSession"> & {
++  readonly createSession: (config: SessionConfig) => Promise<GenerationSession>;
++};
++export interface GenerationOptions {
++  readonly clientFactory?: (options: CopilotClientOptions) => GenerationClient;
++}
++
++export function makeTextGeneration(
++  settings: CopilotSettings,
++  environment: NodeJS.ProcessEnv,
++  options: GenerationOptions = {},
++) {
++  const run: TextGenerationOperations.Runner = Effect.fn("CopilotTextGeneration.run")(
++    function* (request) {
++      const error = (cause?: unknown) =>
++        new TextGenerationError({
++          operation: request.operation,
++          detail: "GitHub Copilot text generation failed.",
++          cause,
++        });
++      let cleanupFailed = false;
++      let forceRequired = false;
++      const generated = yield* Effect.scoped(
++        Effect.gen(function* () {
++          const client = yield* Effect.try({
++            try: () =>
++              (options.clientFactory ?? createClient)(
++                resolveClientConfiguration({ settings, cwd: request.cwd, environment }).options,
++              ),
++            catch: error,
++          });
++          let session: GenerationSession | undefined;
++          let finalized = false;
++          const call = <A>(stage: string, operation: () => Promise<A>, timeoutMs: number) =>
++            Effect.tryPromise({ try: operation, catch: error }).pipe(
++              Effect.timeoutOption(timeoutMs),
++              Effect.flatMap((result) =>
++                Effect.fromOption(result).pipe(
++                  Effect.mapError(() => {
++                    forceRequired = true;
++                    return new TextGenerationError({
++                      operation: request.operation,
++                      detail: `GitHub Copilot text generation ${stage} timed out.`,
++                    });
++                  }),
++                ),
++              ),
++            );
++          const cleanup = <A>(operation: () => Promise<A>, timeoutMs = 5_000) =>
++            Effect.tryPromise(operation).pipe(Effect.timeoutOption(timeoutMs), Effect.result);
++          yield* Effect.addFinalizer(() =>
++            Effect.gen(function* () {
++              if (finalized) return;
++              finalized = true;
++              const owned = session;
++              session = undefined;
++              if (owned) {
++                const disconnected = yield* cleanup(() => owned.disconnect());
++                const deleted = yield* cleanup(() => client.deleteSession(owned.sessionId));
++                if (
++                  disconnected._tag === "Failure" ||
++                  Option.isNone(disconnected.success) ||
++                  deleted._tag === "Failure" ||
++                  Option.isNone(deleted.success)
++                )
++                  cleanupFailed = true;
++              }
++              const stopped = yield* cleanup(() => client.stop(), 10_000);
++              if (
++                stopped._tag === "Failure" ||
++                Option.isNone(stopped.success) ||
++                stopped.success.value.length
++              ) {
++                cleanupFailed = true;
++              }
++              if (cleanupFailed || forceRequired) yield* cleanup(() => client.forceStop());
++            }),
++          );
++          yield* call("startup", () => client.start(), 30_000);
++          const effort = reasoningEffort(request.modelSelection);
++          const owned = yield* call(
++            "session creation",
++            () =>
++              client
++                .createSession({
++                  clientName: "t3-code-text-generation",
++                  workingDirectory: request.cwd,
++                  model: request.modelSelection.model,
++                  ...(effort ? { reasoningEffort: effort } : {}),
++                  streaming: false,
++                  enableConfigDiscovery: false,
++                  enableSkills: false,
++                  availableTools: [],
++                  mcpServers: {},
++                  customAgents: [],
++                  skipCustomInstructions: true,
++                  requestExtensions: false,
++                  requestCanvasRenderer: false,
++                  enableMcpApps: false,
++                  manageScheduleEnabled: false,
++                  infiniteSessions: { enabled: false },
++                  onPermissionRequest: () => ({ kind: "reject" }),
++                })
++                .then(async (created) => {
++                  if (finalized) {
++                    try {
++                      await created.disconnect();
++                    } finally {
++                      await client.deleteSession(created.sessionId);
++                    }
++                    throw new Error("Copilot session creation completed after cancellation.");
++                  }
++                  session = created;
++                  return created;
++                }),
++            30_000,
++          );
++          const reply = yield* call(
++            "response",
++            () => owned.sendAndWait({ prompt: request.prompt }, 180_000),
++            180_000,
++          );
++          const output = reply?.data.content ?? "";
++          if (output.length > 20_000)
++            return yield* new TextGenerationError({
++              operation: request.operation,
++              detail: "GitHub Copilot returned oversized structured output.",
++            });
++          return yield* TextGenerationOperations.decodeJsonReply(request, "GitHub Copilot", output);
++        }),
++      );
++      if (cleanupFailed)
++        return yield* new TextGenerationError({
++          operation: request.operation,
++          detail: "GitHub Copilot text generation cleanup failed.",
++        });
++      return generated;
++    },
++  );
++  return TextGenerationOperations.fromRunner(
++    "CopilotTextGeneration",
++    TextGenerationOperations.withoutInvestigation("GitHub Copilot", run),
++  );
++}
+diff --git a/packages/provider-copilot/src/server/tools.ts b/packages/provider-copilot/src/server/tools.ts
+new file mode 100644
+index 000000000..de6f9c681
+--- /dev/null
++++ b/packages/provider-copilot/src/server/tools.ts
+@@ -0,0 +1,70 @@
++import type { SessionEvent } from "@github/copilot-sdk";
++import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
++
++type ToolStart = Extract<SessionEvent, { type: "tool.execution_start" }>["data"];
++type Base = Omit<
++  Extract<OrchestrationV2TurnItem, { type: "dynamic_tool" }>,
++  "type" | "toolName" | "input" | "output"
++>;
++const sensitive = /authorization|cookie|credential|password|secret|token/iu;
++const binary = /^(?:base64|bytes|binaryResultsForLlm|contents)$/u;
++
++export function boundedToolJson(value: unknown): string {
++  try {
++    return (
++      JSON.stringify(value, (key, entry: unknown) => {
++        if (sensitive.test(key)) return "[redacted]";
++        if (binary.test(key)) return "[omitted]";
++        if (typeof entry === "string") return entry.slice(0, 4_000);
++        if (Array.isArray(entry)) return entry.slice(0, 64);
++        return entry;
++      }) ?? ""
++    ).slice(0, 8_000);
++  } catch {
++    return "[unavailable]";
++  }
++}
++
++function argument(data: ToolStart, keys: ReadonlyArray<string>): string | undefined {
++  for (const key of keys) {
++    const value = data.arguments?.[key];
++    if (typeof value === "string" && value.trim()) return value.slice(0, 8_000);
++  }
++  return undefined;
++}
++
++export function nativeToolItem(base: Base, data: ToolStart): OrchestrationV2TurnItem {
++  const toolName = data.toolName.toLowerCase();
++  if (!data.mcpServerName && /shell|bash|powershell|command/u.test(toolName)) {
++    return {
++      ...base,
++      type: "command_execution",
++      input: argument(data, ["command", "cmd", "script"]) ?? data.toolName,
++    };
++  }
++  const path = argument(data, ["path", "filePath", "filename", "fileName", "file_name"]);
++  if (!data.mcpServerName && /write|edit|patch|create/u.test(toolName) && path) {
++    const before = argument(data, ["old_str", "oldString"]);
++    const after = argument(data, ["new_str", "newString", "file_text", "content"]);
++    return {
++      ...base,
++      type: "file_change",
++      fileName: path,
++      ...(before ? { oldStr: before } : {}),
++      ...(after ? { newStr: after } : {}),
++    };
++  }
++  if (!data.mcpServerName && /web|search/u.test(toolName)) {
++    const query = argument(data, ["query", "search_query", "pattern"]);
++    return { ...base, type: "web_search", ...(query ? { patterns: [query] } : {}) };
++  }
++  return {
++    ...base,
++    type: "dynamic_tool",
++    toolName: data.toolName,
++    title: data.mcpServerName
++      ? `${data.mcpServerName}: ${data.mcpToolName ?? data.toolName}`
++      : base.title,
++    input: boundedToolJson(data.arguments ?? {}),
++  };
++}
+diff --git a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts
+new file mode 100644
+index 000000000..5e8196963
+--- /dev/null
++++ b/packages/provider-copilot/src/settings.ts
+@@ -0,0 +1,46 @@
++import {
++  CustomModelSetting,
++  TrimmedString,
++  makeBinaryPathSetting,
++  makeProviderSettingsSchema,
++} from "@t3tools/contracts";
++import * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
++
++export const CopilotSettings = makeProviderSettingsSchema(
++  {
++    enabled: Schema.Boolean.pipe(
++      Schema.withDecodingDefault(Effect.succeed(false)),
++      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
++    ),
++    binaryPath: makeBinaryPathSetting("copilot").pipe(
++      Schema.annotateKey({
++        title: "Binary path",
++        description: "Optional CLI override. Leave as copilot to use the SDK's bundled executable.",
++        providerSettingsForm: { placeholder: "copilot", clearWhenEmpty: "omit" },
++      }),
++    ),
++    homePath: TrimmedString.pipe(
++      Schema.withDecodingDefault(Effect.succeed("")),
++      Schema.annotateKey({
++        title: "COPILOT_HOME path",
++        description: "Copilot account, session and configuration directory.",
++        providerSettingsForm: { placeholder: "~/.copilot", clearWhenEmpty: "omit" },
++      }),
++    ),
++    enableConfigDiscovery: Schema.Boolean.pipe(
++      Schema.withDecodingDefault(Effect.succeed(true)),
++      Schema.annotateKey({
++        title: "Discover project configuration",
++        description: "Load project MCP servers, skills and instructions.",
++        providerSettingsForm: { control: "switch" },
++      }),
++    ),
++    customModels: Schema.Array(CustomModelSetting).pipe(
++      Schema.withDecodingDefault(Effect.succeed([])),
++      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
++    ),
++  },
++  { order: ["binaryPath", "homePath", "enableConfigDiscovery"] },
++);
++export type CopilotSettings = typeof CopilotSettings.Type;
+diff --git a/packages/provider-copilot/src/testing.ts b/packages/provider-copilot/src/testing.ts
+new file mode 100644
+index 000000000..649177e9d
+--- /dev/null
++++ b/packages/provider-copilot/src/testing.ts
+@@ -0,0 +1,4 @@
++export { makeAdapter, type ClientHandle, type SessionHandle } from "./server/adapter.ts";
++export { makeTextGeneration } from "./server/textGeneration.ts";
++export { checkStatus, modelsFromSdk, skillsFromSdk } from "./server/status.ts";
++export { resolveClientConfiguration } from "./server/client.ts";
+diff --git a/packages/provider-copilot/tsconfig.json b/packages/provider-copilot/tsconfig.json
+new file mode 100644
+index 000000000..f9d61df25
+--- /dev/null
++++ b/packages/provider-copilot/tsconfig.json
+@@ -0,0 +1,5 @@
++{
++  "extends": "../../tsconfig.base.json",
++  "compilerOptions": { "types": ["node"] },
++  "include": ["src"]
++}
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 96751b010..1eb4bdff1 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -253,6 +253,11 @@ catalogs:
+       version: 11.0.5
+ 
+ overrides:
++  '@github/copilot-sdk@1.0.8>@github/copilot': 1.0.75
++  '@github/copilot-sdk@1.0.8>koffi': 3.3.1
++  '@github/copilot-sdk@1.0.8>vscode-jsonrpc': 8.2.1
++  '@github/copilot-sdk@1.0.8>zod': 4.4.3
++  '@github/copilot@1.0.75>detect-libc': 2.1.2
+   react-native-image-viewing: 0.2.2
+   mdast-util-math: 3.0.0
+   micromark-extension-llm-math: 3.1.0
+@@ -582,6 +587,9 @@ importers:
+       '@t3tools/provider-acp-registry':
+         specifier: workspace:*
+         version: link:../../packages/provider-acp-registry
++      '@t3tools/provider-copilot':
++        specifier: workspace:*
++        version: link:../../packages/provider-copilot
+       '@t3tools/provider-core':
+         specifier: workspace:*
+         version: link:../../packages/provider-core
+@@ -859,6 +867,9 @@ importers:
+       '@t3tools/provider-acp-registry':
+         specifier: workspace:*
+         version: link:../../packages/provider-acp-registry
++      '@t3tools/provider-copilot':
++        specifier: workspace:*
++        version: link:../../packages/provider-copilot
+       '@t3tools/provider-core':
+         specifier: workspace:*
+         version: link:../../packages/provider-core
+@@ -1064,6 +1075,9 @@ importers:
+       '@t3tools/provider-acp-registry':
+         specifier: workspace:*
+         version: link:../../packages/provider-acp-registry
++      '@t3tools/provider-copilot':
++        specifier: workspace:*
++        version: link:../../packages/provider-copilot
+       '@t3tools/provider-core':
+         specifier: workspace:*
+         version: link:../../packages/provider-core
+@@ -1601,6 +1615,34 @@ importers:
+         specifier: 1.4.0
+         version: 1.4.0(@astrojs/compiler-rs@0.5.1)(@tsc-rs/typescript@0.8.0)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(@tsc-rs/typescript@0.8.0))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.60.0)(terser@5.48.0)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
+ 
++  packages/provider-copilot:
++    dependencies:
++      '@github/copilot-sdk':
++        specifier: 1.0.8
++        version: 1.0.8
++      '@t3tools/contracts':
++        specifier: workspace:*
++        version: link:../contracts
++      '@t3tools/provider-core':
++        specifier: workspace:*
++        version: link:../provider-core
++      '@t3tools/shared':
++        specifier: workspace:*
++        version: link:../shared
++      effect:
++        specifier: 4.0.5
++        version: 4.0.5
++    devDependencies:
++      '@effect/vitest':
++        specifier: 4.0.5
++        version: 4.0.5(patch_hash=2731c9c3761c595f25ddc625a7d61ca376b389d5b3049ecb837c8940f21cfa02)(@astrojs/compiler-rs@0.5.1)(@tsc-rs/typescript@0.8.0)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(@tsc-rs/typescript@0.8.0))(bufferutil@4.1.0)(effect@4.0.5)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.60.0)(terser@5.48.0)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
++      '@types/node':
++        specifier: 24.12.4
++        version: 24.12.4
++      vite-plus:
++        specifier: 1.4.0
++        version: 1.4.0(@astrojs/compiler-rs@0.5.1)(@tsc-rs/typescript@0.8.0)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(@tsc-rs/typescript@0.8.0))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.60.0)(terser@5.48.0)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
++
+   packages/provider-core:
+     dependencies:
+       '@t3tools/contracts':
+@@ -4323,6 +4365,66 @@ packages:
+   '@formkit/auto-animate@0.9.0':
+     resolution: {integrity: sha512-VhP4zEAacXS3dfTpJpJ88QdLqMTcabMg0jwpOSxZ/VzfQVfl3GkZSCZThhGC5uhq/TxPHPzW0dzr4H9Bb1OgKA==}
+ 
++  '@github/copilot-darwin-arm64@1.0.75':
++    resolution: {integrity: sha512-avt2ganQwtycGkqz9z8JpARoEz2Fzi02O+WitbB8I8iF3jfvEGpQ8k3z9oSCPAAO0rIMBeSl05xEUUV5RJwfRA==}
++    cpu: [arm64]
++    os: [darwin]
++    hasBin: true
++
++  '@github/copilot-darwin-x64@1.0.75':
++    resolution: {integrity: sha512-eyM5cz83d9h05m6cnnG7tIHR4lSHHXUnxXeQm4rU3nGB1uwHWOa1TH9B4uAaW3zKQgkCkNgm+IlcPJ7geM0KBg==}
++    cpu: [x64]
++    os: [darwin]
++    hasBin: true
++
++  '@github/copilot-linux-arm64@1.0.75':
++    resolution: {integrity: sha512-PuGjPCy+z7DrD0rkcXQRBzoA8lVxD1WC6UeZxkZaIb9asueE798eqHHMV169zYiA3gsiSegIKu5J/aUeWwhpuQ==}
++    cpu: [arm64]
++    os: [linux]
++    libc: [glibc]
++    hasBin: true
++
++  '@github/copilot-linux-x64@1.0.75':
++    resolution: {integrity: sha512-aGDtUrNyj/ubqLfXOomL4XYZR//1Cs4tDGe7r/464e3Nw4WlNxWPjBbNyOCcUPUMbPHXck6TyxjEvBwwlKCK5w==}
++    cpu: [x64]
++    os: [linux]
++    libc: [glibc]
++    hasBin: true
++
++  '@github/copilot-linuxmusl-arm64@1.0.75':
++    resolution: {integrity: sha512-4cbjjR/laL+4a0VjMkzjIsprRUxiAHAefWVTppFitKiqNxfgyRuOhfSUPUA5TVxPwfyYXknsxeYSNRL8zu9YDA==}
++    cpu: [arm64]
++    os: [linux]
++    libc: [musl]
++    hasBin: true
++
++  '@github/copilot-linuxmusl-x64@1.0.75':
++    resolution: {integrity: sha512-I4oFPNOULMGxWghGCG/VkiT0a62UiL4XGKSlp6X0rVD9xyoYyiLGlsBmTumrooPbzEvgKICYWIz8PCZjrZTyhA==}
++    cpu: [x64]
++    os: [linux]
++    libc: [musl]
++    hasBin: true
++
++  '@github/copilot-sdk@1.0.8':
++    resolution: {integrity: sha512-dbahVsyt2aX8qqtOOtmYNe40MnvzSvOSHYFFgoFK7gHZSTNz9QgOht8b1sCCJlcXaFAn/w+5qNc7CwWoCjpQ0g==}
++    engines: {node: ^20.19.0 || >=22.12.0}
++
++  '@github/copilot-win32-arm64@1.0.75':
++    resolution: {integrity: sha512-wlLDuor+Qm1H43VwZNi03QI4H9FSyZoQzE/YHpGhUay7sKA+4cDJF8ZZNGrtYkyPskfH5HCdNygUn7EEt6lRyQ==}
++    cpu: [arm64]
++    os: [win32]
++    hasBin: true
++
++  '@github/copilot-win32-x64@1.0.75':
++    resolution: {integrity: sha512-TKISaaILkgcOi7ThaTnln1XoasbUIx+HKSb+pf678RvGucIfLohQyLceuq+rTykoynX54KQ0pf9TEUbMVkUNAA==}
++    cpu: [x64]
++    os: [win32]
++    hasBin: true
++
++  '@github/copilot@1.0.75':
++    resolution: {integrity: sha512-rn7ZQmhydCZ9XRdG6V78QEhXIdYlChlUvOVAtyJ6KHJGt2O9/71si7PCt84amfmg0N7IXBT2UGRYF4GQDQBt+g==}
++    hasBin: true
++
+   '@hono/node-server@1.19.17':
+     resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
+     engines: {node: '>=18.14.1'}
+@@ -4536,6 +4638,106 @@ packages:
+     resolution: {integrity: sha512-hloP58zRVCRSpgDxmqCWJNlizAlUgJFqG2ypq79DCvyv9tHjRYMDOcPFjzfl/A1/YxDvRCZz8wvZvmapQnKwFQ==}
+     engines: {node: '>=12'}
+ 
++  '@koromix/koffi-android-arm64@3.3.1':
++    resolution: {integrity: sha512-S3yMzUGca5UJRioY7wdBjeO+LuW9mQhrksL+Wd5ri1X7kWMB2IGLzrT1mn1xqx02Vicgvuy5GtkhHuxG5mkzYw==}
++    cpu: [arm64]
++    os: [android]
++
++  '@koromix/koffi-android-x64@3.3.1':
++    resolution: {integrity: sha512-QaKSyVi37j19CfN2tR3q8lQMosZ+mQIOQXcNQmWXfYDUs9x2CSCxzvMTeQyFyGdAqB58dBluEiy8V5ZMvARSHg==}
++    cpu: [x64]
++    os: [android]
++
++  '@koromix/koffi-darwin-arm64@3.3.1':
++    resolution: {integrity: sha512-xVLQMZzACn6TQJsGp/mBF71mfRyuhmxTBGcQLfJM59YArNN/9+1JV8FFCElmgspffijASZsLwbSEdPwZMNeDhQ==}
++    cpu: [arm64]
++    os: [darwin]
++
++  '@koromix/koffi-darwin-x64@3.3.1':
++    resolution: {integrity: sha512-+VGqqnBQvR+AbAbRyRDsxK0D6wwAivUURWsyVX8NhR5agf+0+sSAdNMsSy+9DyO7CmioTUVwV+Do+12uWnFrmA==}
++    cpu: [x64]
++    os: [darwin]
++
++  '@koromix/koffi-freebsd-arm64@3.3.1':
++    resolution: {integrity: sha512-oPkfxEiLiZs1jV6qqw3DzZy3aigzOb9mGbRtK6ENNgoiZ2QdAw55cXUTOMNiAwgbkBwt7SsorFdUnYUuP5b0Gg==}
++    cpu: [arm64]
++    os: [freebsd]
++
++  '@koromix/koffi-freebsd-ia32@3.3.1':
++    resolution: {integrity: sha512-uLb93keIlk6TkECtb17z2d5nehEIJ2labIXF0ava3s+9w7VE7QZUw3O2IQVq4t95sIm5rMoE1Y+cFa0aN6444w==}
++    cpu: [ia32]
++    os: [freebsd]
++
++  '@koromix/koffi-freebsd-x64@3.3.1':
++    resolution: {integrity: sha512-+Iuh+m5Ln0fjubgw/6bzEkliBcFBIFWWL7IqzmktPy0Q0Bq+XCGtUf+5/KTlodYlTOLv/SE/YTbVkk3c02+E6w==}
++    cpu: [x64]
++    os: [freebsd]
++
++  '@koromix/koffi-linux-arm64@3.3.1':
++    resolution: {integrity: sha512-Itv2N+TvBFTSdEZdokM4ydjbBwr6GNKd51+UXoh/5HVXALBRnMQek2QhBnG7z6H9+/p2SB4rqBnvhuLQpv4B7g==}
++    cpu: [arm64]
++    os: [linux]
++
++  '@koromix/koffi-linux-arm@3.3.1':
++    resolution: {integrity: sha512-rE6QypE/h4nDHPlzzVPok5W2gL5CopvBYI44lJXO2SauxVAeV86bbf+ucmF/toYENdjF0DBdY7GbloyixwQpPQ==}
++    cpu: [arm]
++    os: [linux]
++
++  '@koromix/koffi-linux-ia32@3.3.1':
++    resolution: {integrity: sha512-pb1NJ/Ih4MAPB1e2koQOKxGtLuPWKMT3QXxBrPptkkkDz/XpV6+bAA4ys7amXxpA0ybM2u/+VM0gGzdJRThkRg==}
++    cpu: [ia32]
++    os: [linux]
++
++  '@koromix/koffi-linux-loong64@3.3.1':
++    resolution: {integrity: sha512-RdS57JuF39tLXS/yYq4KlFnU7CMrn1+x/4v171bji+1aPYOXPxzYDAJVjapv/6tnrESrMTnfWIja3jfzieFmpQ==}
++    cpu: [loong64]
++    os: [linux]
++
++  '@koromix/koffi-linux-ppc64@3.3.1':
++    resolution: {integrity: sha512-nmOTpQQS5pWG73X01y7K70JQaL+5T/v04i0G4BtXDAxQq3WHmyeJCgmdHhz5W0JVtjHicitSZoothTspAopF9A==}
++    cpu: [ppc64]
++    os: [linux]
++
++  '@koromix/koffi-linux-riscv64@3.3.1':
++    resolution: {integrity: sha512-mk0Av5QmK0BPD3OHytOThVhEe4VCTrYv3+em6h75E1rNYiCfixzeh3d5+s5x2vCaby8zzxvNd39sO89Bp1juwg==}
++    cpu: [riscv64]
++    os: [linux]
++
++  '@koromix/koffi-linux-x64@3.3.1':
++    resolution: {integrity: sha512-uU5cJNe145TvITqrUWvBmZO4WLNObdZ2Gnm8eNk/OdrhRFG9LB44RUv07aQwPbdo1438j+Cr+tFNnpjTBadZFQ==}
++    cpu: [x64]
++    os: [linux]
++
++  '@koromix/koffi-openbsd-arm64@3.3.1':
++    resolution: {integrity: sha512-owXmXHI+5kkDyVjqGPfPgIHIzH1swsGY+YNbQ4ozkO23UKzJElAtmQPcmA1pQwiDCeyojHEelgd9+BV58uOIkA==}
++    cpu: [arm64]
++    os: [openbsd]
++
++  '@koromix/koffi-openbsd-ia32@3.3.1':
++    resolution: {integrity: sha512-fvIKWycDdc9XL3ATQT0uvt/j82EB3/JWzJU4yqUCJbMotTP8mvo/c1D1Jus4mO+fNGEYM33YuFDkJcQkHJd9Dg==}
++    cpu: [ia32]
++    os: [openbsd]
++
++  '@koromix/koffi-openbsd-x64@3.3.1':
++    resolution: {integrity: sha512-UYk2xNAK5wEyskLtrgTRt+2lwfBOvgaK8UJDz4B2qm57VvRrqb7ye1hzKFZrRVa8NWRPUk6W/zsqZyFHu4BoLA==}
++    cpu: [x64]
++    os: [openbsd]
++
++  '@koromix/koffi-win32-arm64@3.3.1':
++    resolution: {integrity: sha512-SZsmAWUKxBHdUR6Z5IJTslOOy0VEFHxoDHMZkn3k0P5TuP/aOZfQYoEa34UwnLI8t2Fmgyhmympth+39tR/XUw==}
++    cpu: [arm64]
++    os: [win32]
++
++  '@koromix/koffi-win32-ia32@3.3.1':
++    resolution: {integrity: sha512-pARisOvxCPkk6Wg1HkwRCnrkJIVS31kDweWLo+bQay/Dr1915s7skVydWpTKS30EcfOh4Jay7B4c0dgamTLBHg==}
++    cpu: [ia32]
++    os: [win32]
++
++  '@koromix/koffi-win32-x64@3.3.1':
++    resolution: {integrity: sha512-LYoO19cTIA7xjl+3s4VeGagCAO38VNXZ969DNszb1wTwJUjrHLrAbHFkk8fYkXineM3HJkFwElW0VLmZqXcfRg==}
++    cpu: [x64]
++    os: [win32]
++
+   '@legendapp/list@3.3.5':
+     resolution: {integrity: sha512-XTsLYtpg41SVb5uLBYA+YcDSA3w0tgoPq/W8ZggQ2tx+3lrC/rf+ehTP9KYHea9oFaZIuePAgzACs5/auVMJlQ==}
+     peerDependencies:
+@@ -9593,6 +9795,9 @@ packages:
+     engines: {node: ^20.19.0 || >=22.12.0}
+     hasBin: true
+ 
++  koffi@3.3.1:
++    resolution: {integrity: sha512-FZYfhBfYQr/cmHhZpaQ9rhbKpkjHhxaytn2A0mbPhiD5yV8QzF3SiQwR1w/34rCJ1fw+6qBQSj/ZoXRdC+Xc2Q==}
++
+   lan-network@0.2.1:
+     resolution: {integrity: sha512-ONPnazC96VKDntab9j9JKwIWhZ4ZUceB4A9Epu4Ssg0hYFmtHZSeQ+n15nIwTFmcBUKtExOer8WTJ4GF9MO64A==}
+     hasBin: true
+@@ -12076,6 +12281,10 @@ packages:
+     resolution: {integrity: sha512-C+r0eKJUIfiDIfwJhria30+TYWPtuHJXHtI7J0YlOmKAo7ogxP20T0zxB7HZQIFhIyvoBPwWskjxrvAtfjyZfA==}
+     engines: {node: '>=14.0.0'}
+ 
++  vscode-jsonrpc@8.2.1:
++    resolution: {integrity: sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ==}
++    engines: {node: '>=14.0.0'}
++
+   vscode-languageserver-protocol@3.17.5:
+     resolution: {integrity: sha512-mb1bvRJN8SVznADSGWM9u/b07H7Ecg0I3OgXDuLdn307rl/J3A9YD6/eYOssqhecL27hK1IPZAsaqh00i/Jljg==}
+ 
+@@ -12329,6 +12538,9 @@ packages:
+   zod@3.25.76:
+     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+ 
++  zod@4.4.3:
++    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
++
+   zod@4.5.4:
+     resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
+ 
+@@ -14678,6 +14890,50 @@ snapshots:
+ 
+   '@formkit/auto-animate@0.9.0': {}
+ 
++  '@github/copilot-darwin-arm64@1.0.75':
++    optional: true
++
++  '@github/copilot-darwin-x64@1.0.75':
++    optional: true
++
++  '@github/copilot-linux-arm64@1.0.75':
++    optional: true
++
++  '@github/copilot-linux-x64@1.0.75':
++    optional: true
++
++  '@github/copilot-linuxmusl-arm64@1.0.75':
++    optional: true
++
++  '@github/copilot-linuxmusl-x64@1.0.75':
++    optional: true
++
++  '@github/copilot-sdk@1.0.8':
++    dependencies:
++      '@github/copilot': 1.0.75
++      koffi: 3.3.1
++      vscode-jsonrpc: 8.2.1
++      zod: 4.4.3
++
++  '@github/copilot-win32-arm64@1.0.75':
++    optional: true
++
++  '@github/copilot-win32-x64@1.0.75':
++    optional: true
++
++  '@github/copilot@1.0.75':
++    dependencies:
++      detect-libc: 2.1.2
++    optionalDependencies:
++      '@github/copilot-darwin-arm64': 1.0.75
++      '@github/copilot-darwin-x64': 1.0.75
++      '@github/copilot-linux-arm64': 1.0.75
++      '@github/copilot-linux-x64': 1.0.75
++      '@github/copilot-linuxmusl-arm64': 1.0.75
++      '@github/copilot-linuxmusl-x64': 1.0.75
++      '@github/copilot-win32-arm64': 1.0.75
++      '@github/copilot-win32-x64': 1.0.75
++
+   '@hono/node-server@1.19.17(hono@4.13.7)':
+     dependencies:
+       hono: 4.13.7
+@@ -14840,6 +15096,66 @@ snapshots:
+     dependencies:
+       jsbi: 4.3.2
+ 
++  '@koromix/koffi-android-arm64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-android-x64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-darwin-arm64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-darwin-x64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-freebsd-arm64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-freebsd-ia32@3.3.1':
++    optional: true
++
++  '@koromix/koffi-freebsd-x64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-linux-arm64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-linux-arm@3.3.1':
++    optional: true
++
++  '@koromix/koffi-linux-ia32@3.3.1':
++    optional: true
++
++  '@koromix/koffi-linux-loong64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-linux-ppc64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-linux-riscv64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-linux-x64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-openbsd-arm64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-openbsd-ia32@3.3.1':
++    optional: true
++
++  '@koromix/koffi-openbsd-x64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-win32-arm64@3.3.1':
++    optional: true
++
++  '@koromix/koffi-win32-ia32@3.3.1':
++    optional: true
++
++  '@koromix/koffi-win32-x64@3.3.1':
++    optional: true
++
+   '@legendapp/list@3.3.5(patch_hash=6cbdacd8c380d9a5afb9f73d4198dc2cc44be6ef28a955b1183c781469307896)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)':
+     dependencies:
+       react: 19.3.0
+@@ -19757,6 +20073,29 @@ snapshots:
+       yaml: 2.9.0
+       zod: 4.6.5
+ 
++  koffi@3.3.1:
++    optionalDependencies:
++      '@koromix/koffi-android-arm64': 3.3.1
++      '@koromix/koffi-android-x64': 3.3.1
++      '@koromix/koffi-darwin-arm64': 3.3.1
++      '@koromix/koffi-darwin-x64': 3.3.1
++      '@koromix/koffi-freebsd-arm64': 3.3.1
++      '@koromix/koffi-freebsd-ia32': 3.3.1
++      '@koromix/koffi-freebsd-x64': 3.3.1
++      '@koromix/koffi-linux-arm': 3.3.1
++      '@koromix/koffi-linux-arm64': 3.3.1
++      '@koromix/koffi-linux-ia32': 3.3.1
++      '@koromix/koffi-linux-loong64': 3.3.1
++      '@koromix/koffi-linux-ppc64': 3.3.1
++      '@koromix/koffi-linux-riscv64': 3.3.1
++      '@koromix/koffi-linux-x64': 3.3.1
++      '@koromix/koffi-openbsd-arm64': 3.3.1
++      '@koromix/koffi-openbsd-ia32': 3.3.1
++      '@koromix/koffi-openbsd-x64': 3.3.1
++      '@koromix/koffi-win32-arm64': 3.3.1
++      '@koromix/koffi-win32-ia32': 3.3.1
++      '@koromix/koffi-win32-x64': 3.3.1
++
+   lan-network@0.2.1: {}
+ 
+   lazy-val@1.0.5: {}
+@@ -22844,6 +23183,8 @@ snapshots:
+ 
+   vscode-jsonrpc@8.2.0: {}
+ 
++  vscode-jsonrpc@8.2.1: {}
++
+   vscode-languageserver-protocol@3.17.5:
+     dependencies:
+       vscode-jsonrpc: 8.2.0
+@@ -23092,6 +23433,8 @@ snapshots:
+ 
+   zod@3.25.76: {}
+ 
++  zod@4.4.3: {}
++
+   zod@4.5.4: {}
+ 
+   zod@4.6.5: {}
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index f953a77de..dee9cf728 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -18,6 +18,7 @@ allowBuilds:
+   electron: false
+   electron-winstaller: false
+   esbuild: true
++  koffi: true
+   msgpackr-extract: true
+   msw: false
+   node-pty: true
+@@ -226,6 +227,11 @@ minimumReleaseAgeExclude:
+   - "@pierre/theming@1.0.2"
+ 
+ overrides:
++  "@github/copilot-sdk@1.0.8>@github/copilot": 1.0.75
++  "@github/copilot-sdk@1.0.8>koffi": 3.3.1
++  "@github/copilot-sdk@1.0.8>vscode-jsonrpc": 8.2.1
++  "@github/copilot-sdk@1.0.8>zod": 4.4.3
++  "@github/copilot@1.0.75>detect-libc": 2.1.2
+   # Pin every patched package, including transitive dependencies, so lockfile-free
+   # release installs cannot drift past the patch. Update these with patchedDependencies.
+   react-native-image-viewing: 0.2.2

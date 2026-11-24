@@ -1,0 +1,1673 @@
+{
+  "base": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "target": "edee604cdf3ef0fbc6ef96708e0c73022a7162cb",
+  "orderedRoots": [
+    "copilot-cli-provider",
+    "session-search",
+    "copilot-sdk-license-notice",
+    "copilot-runtime-packaging-replay",
+    "phase1-foundation",
+    "attention-notifications",
+    "tpatch-local-capture-ignore",
+    "fork-maintenance-policy",
+    "fork-maintenance-check-scope",
+    "foundation-v014-client-compat",
+    "attention-policy-completion-watermarks",
+    "copilot-sdk-runtime-upgrade",
+    "copilot-sdk-v1-license-notices",
+    "copilot-fusion-model-selection",
+    "copilot-auto-default-routing",
+    "copilot-routing-late-telemetry",
+    "copilot-fusion-client-presentation",
+    "windows-preview-zip-artifact",
+    "linux-runtime-libatomic-prerequisite",
+    "copilot-fusion-runtime-transition",
+    "copilot-idle-agent-completion",
+    "copilot-background-routing",
+    "copilot-context-occupancy",
+    "copilot-extension-opt-out",
+    "provider-direct-dispatch-selection-restart",
+    "composer-shortcut-keyboard-guidance",
+    "copilot-runtime-knip-declaration",
+    "turn-fold-bottom-affordance",
+    "fork-patch-flow-convention",
+    "stable-main-preservation-v014"
+  ],
+  "roots": [
+    {
+      "slug": "copilot-cli-provider",
+      "patchSha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+      "recordedApplicationBase": "2a79a1b73b15bdd0aa093967855a8a92fd5799d9",
+      "files": [
+        {
+          "path": "apps/server/package.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/provider/builtInDrivers.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/serverSettings.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/serverSettings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/internals/providers.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/providers-copilot.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/package.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/providerClients.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/settings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/package.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/client.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/capabilities.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/client.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/driver.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/driver.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/textGeneration.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/textGeneration.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/tools.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/settings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/testing.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/tsconfig.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "result": "forward-applied"
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "session-search",
+      "patchSha256": "e98b6ddf7a85432e3adb7ce5bb29ffc4cfae0a2d196c6239bd7d893955f20019",
+      "recordedApplicationBase": "fed030d5cfba9b76789105d7f40933957d7b37cf",
+      "files": [
+        {
+          "path": "apps/server/src/orchestration-v2/ThreadFind.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/ThreadFind.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/MessagesTimeline.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/ThreadFindBar.browser.test.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/ThreadFindBar.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/TimelinePendingApprovalRow.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/TimelineWorkGroupRows.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/threadFindHighlights.browser.test.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/threadFindHighlights.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/threadFindPosition.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/timelineRowContext.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/useThreadFind.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/useThreadFindNavigation.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/useThreadFindPositionReader.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/internals/thread-find.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/keybindings.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/orchestrationV2.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/threadFindText.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/threadSearch.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/threadSearch.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-sdk-license-notice",
+      "patchSha256": "d6be21044ffda12ef416021400bfc83a1c1dc6aa0f2f832c772e8e21e56d9a56",
+      "recordedApplicationBase": "8605454d5cba4ab065f43fa694e62868fe093e31",
+      "files": [
+        {
+          "path": "third-party-licenses.config.json",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-runtime-packaging-replay",
+      "patchSha256": "097951c0d3a4fc2cb3948e24ea0f4b9d6890d665866f83f6b5317ac030e0d7ce",
+      "recordedApplicationBase": "ba951f958e8cd3cb6582f7902171f573621407a7",
+      "files": [
+        {
+          "path": ".github/workflows/fork-native-preview.yml",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/app/DesktopClerk.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/app/DesktopClerk.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/app/DesktopConfig.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/app/DesktopEnvironment.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/app/DesktopLegacyLocalStorage.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/app/DesktopUserData.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/app/DesktopUserData.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/operations/fork-native-preview.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/operations/release.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/package.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/copilotRuntime.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/copilotRuntime.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/build-cli-archive.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/build-desktop-artifact.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/build-desktop-artifact.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/fork-preview-bootstrap.cjs",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/fork-preview-manifest.mjs",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/cli-external-packages.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/cli-external-packages.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/copilot-payload.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/copilot-payload.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/fork-preview.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/fork-preview.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/runtime-external-dependencies.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/runtime-external-dependencies.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "phase1-foundation",
+      "patchSha256": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+      "recordedApplicationBase": "8605454d5cba4ab065f43fa694e62868fe093e31",
+      "files": [
+        {
+          "path": "apps/mobile/src/state/attention.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/mobile/src/state/tws.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/auth/RpcAuthorization.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/environment/ServerEnvironment.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/observability/RpcInstrumentation.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/AttentionEvidence.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/AttentionSync.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/EffectWorker.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/EffectWorker.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/EventSink.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/FoundationProjection.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/FoundationProjection.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/Orchestrator.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/ProjectionMaintenance.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/045_TwsBindings.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/045_TwsBindings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/049_TwsContext.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/ForkMigrations/050_FoundationV2.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Layers/TwsBindings.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Layers/TwsBindings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Migrations.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Migrations.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/OrchestrationEventStore.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Services/ProjectionThreadAttentionAudit.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/persistence/Services/TwsBindings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/server.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/serverRuntimeStartup.autoPull.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/serverRuntimeStartup.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/serverRuntimeStartup.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsBindingMatch.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsBindingMatch.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsCliAdapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsCliAdapter.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsCliDecoder.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsCliDecoder.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsContextInference.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsContextModel.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsContextService.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsContextService.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsContextStore.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsExecutionResolver.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsTopology.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsTopology.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsTopologyRefresh.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/runtimeLayer.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/ws.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/ws.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/settings/TwsIntegrationSettings.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/settings/WorktreesSettings.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/settings/settingsSearch.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/state/attention.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/state/tws.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/internals/foundation.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/internals/tws-context.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/tws.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/package.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/attentionSync.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/attentionSync.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/rpc/client.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/attention.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/attention.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/attentionNotifications.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/attentionNotifications.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/attentionProjection.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/commandPermissions.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/tws.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/attention.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/attention.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/attentionSync.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/attentionSync.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/clientRpcPermissions.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/environment.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/index.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/orchestrationV2.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/rpc.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/settings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/twsBindings.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/twsBindings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/twsContext.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/twsContext.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/workItem.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/workItem.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "attention-notifications",
+      "patchSha256": "6feb99da51a9427557a215cfcfcde7a8b8f7de07489c01d724556f2876e860d1",
+      "recordedApplicationBase": "4de99f4a515055662ccd5d59f6f705b2ff973bd4",
+      "files": [
+        {
+          "path": "apps/web/src/attentionNotificationPolicy.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/attentionNotificationPolicy.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/AppSidebarLayout.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/CommandPalette.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/ThreadNotificationCoordinator.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/attention/AttentionInbox.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/attention/AttentionSidebarItem.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/attention/attentionInbox.logic.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/attention/attentionInbox.logic.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/attention/useOpenAttentionInbox.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/settings/NotificationSettings.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/settings/SettingsPanels.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/settings/settingsSearch.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/sidebar/SidebarChrome.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/routeTree.gen.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/routes/_chat.attention.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/threadNotifications.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/threadNotifications.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/internals/attention-notifications.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/internals/overview.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/attention.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/keybindings.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/notifications.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/thread-sidebar.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/keybindings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/settings.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/settings.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "tpatch-local-capture-ignore",
+      "patchSha256": "2534669ad7e0a2e7fe801555eab601a73bba3a5a6a4a52ff109b13e03f65e729",
+      "recordedApplicationBase": "fed030d5cfba9b76789105d7f40933957d7b37cf",
+      "files": [
+        {
+          "path": ".gitignore",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "fork-maintenance-policy",
+      "patchSha256": "fba7028e530ab08be19b311c57a0d89f8ef1aefc4a1c7cbe7bec5ba5e4c12368",
+      "recordedApplicationBase": "16a55122c16fdd957ac7bba8e00aed970584d0f2",
+      "files": [
+        {
+          "path": "docs/internals/fork-maintenance.md",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "fork-maintenance-check-scope",
+      "patchSha256": "dc0acca276a3999c02e1da071d3b01fad31b1c931bb02f5b2407cde5386011a4",
+      "recordedApplicationBase": "3f9e8448cfb55f09c0025837031bb02d63c9d59d",
+      "files": [
+        {
+          "path": ".github/scripts/ci-changes.cjs",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/ci-changes.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "vite.config.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "foundation-v014-client-compat",
+      "patchSha256": "9ac66594f926d0d35387331473d86d5e8059f00edbef5b773b46daf5084609a4",
+      "recordedApplicationBase": "6c925ff7c8ad226f5535ba3464636377a292437e",
+      "files": [
+        {
+          "path": "apps/mobile/src/state/attention.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/mobile/src/state/tws.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/tws/TwsCliDecoder.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/internals/tws-context.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/attention.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/attention.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/commandPermissions.test.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "attention-policy-completion-watermarks",
+      "patchSha256": "c93803f59c055124c2c58954dea3b2a92891d891a7e12e65c5c235cdf40b1369",
+      "recordedApplicationBase": "ee5c462a9d408f38ac2c7495ec91dfcc617b1ac1",
+      "files": [
+        {
+          "path": "apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/ThreadNotificationCoordinator.logic.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/ThreadNotificationCoordinator.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/internals/attention-notifications.md",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-sdk-runtime-upgrade",
+      "patchSha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+      "recordedApplicationBase": "c88f207e5e9dc0789612e66c911492a1491bcc21",
+      "files": [
+        {
+          "path": "apps/server/package.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/package.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/client.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/tools.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/copilotRuntime.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/copilotRuntime.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "result": "forward-applied"
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/build-desktop-artifact.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/build-desktop-artifact.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/cli-external-packages.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/copilot-payload.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "scripts/lib/copilot-payload.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-sdk-v1-license-notices",
+      "patchSha256": "65933499a1fe2a21bed526161e9333733a571ef59a61db46490c51a1212a9cb2",
+      "recordedApplicationBase": "8a3e34631cca72fcf79327c5c625077ba71800ae",
+      "files": [
+        {
+          "path": "scripts/lib/third-party-licenses.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "third-party-licenses.config.json",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-fusion-model-selection",
+      "patchSha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
+      "recordedApplicationBase": "d82592306068663ae4665d4500894030fe647dae",
+      "files": [
+        {
+          "path": "apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/mobile/src/features/threads/ThreadSettingsSheet.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/mobile/src/features/threads/thread-settings-options.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/mobile/src/lib/providerOptions.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/mobile/src/lib/threadActivity.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/ProviderEventIngestor.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/RunExecutionService.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/TraitsPicker.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/session-logic.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/activity-log.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/providers-copilot.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/package.json",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/modelTraits.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/work-log/itemDetail.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/work-log/itemDetail.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/work-log/modelExecution.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/work-log/modelExecution.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/model.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/orchestrationV2.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/orchestrationV2.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/fusion.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/fusion.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/routing.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/routing.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/model.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/model.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-auto-default-routing",
+      "patchSha256": "08fb073397bbcf694f48141c4345d6376caff996ab489ae88b58483f711c8e2a",
+      "recordedApplicationBase": "2b383e8463042f4f2332707568dbeab9a39bfe38",
+      "files": [
+        {
+          "path": "docs/user/providers-copilot.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/routing.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/routing.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-routing-late-telemetry",
+      "patchSha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+      "recordedApplicationBase": "07508376dc320bdbcddd98b5ff33d72d3b142469",
+      "files": [
+        {
+          "path": "docs/user/activity-log.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/work-log/modelExecution.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/work-log/modelExecution.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/fusion.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/fusion.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-fusion-client-presentation",
+      "patchSha256": "1200ced90fd0e8fedeb4b3c8a5dd94de8b47e2e9d48170e2687c3bece46b4b8f",
+      "recordedApplicationBase": "c715f234138b5f7af0e825cd67f2f0deb7a790b0",
+      "files": [
+        {
+          "path": "apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/TurnItemPositionStore.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/activity-log.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/providers-copilot.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/modelTraits.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/work-log/modelExecution.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/work-log/modelExecution.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/model.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/orchestrationV2.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/client.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/routing.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/routing.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/settings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/model.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/shared/src/model.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "windows-preview-zip-artifact",
+      "patchSha256": "3935397e093aa88b0361399991329857942a3bad8aa9e52d3ed33c62bde061a1",
+      "recordedApplicationBase": "63b22001d98b2a77c222f962a409975f4504768e",
+      "files": [
+        {
+          "path": ".github/workflows/fork-native-preview.yml",
+          "result": "exact-postimage-already-materialized"
+        }
+      ]
+    },
+    {
+      "slug": "linux-runtime-libatomic-prerequisite",
+      "patchSha256": "23a17244dee8af51e9eb9f6a5704688c08352fa83b70a8704deb486fe22b30a6",
+      "recordedApplicationBase": "4a5ad9255cefc6cecee050f576e584e618aed71e",
+      "files": [
+        {
+          "path": "docs/operations/fork-native-preview.md",
+          "result": "exact-postimage-already-materialized"
+        },
+        {
+          "path": "docs/user/install.md",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-fusion-runtime-transition",
+      "patchSha256": "faa9f5dc40c9044ce53aff0f03303d24d1bbec95b51b591405ad8bb35ff532d8",
+      "recordedApplicationBase": "c69222b5429a77fb92e985d37710bff6df9c593b",
+      "files": [
+        {
+          "path": "docs/user/providers-copilot.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-idle-agent-completion",
+      "patchSha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+      "recordedApplicationBase": "0947fd992e5e8ddab8d0c28f008b4ad72ec7f912",
+      "files": [
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-background-routing",
+      "patchSha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+      "recordedApplicationBase": "0c0303b8f468934d08ebf6f45f72b19da29a23ce",
+      "files": [
+        {
+          "path": "docs/user/providers-copilot.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/textGeneration.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/textGeneration.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-context-occupancy",
+      "patchSha256": "7fe62a01cbd83a1ec1f97964d78e917664e728ab97e410cd54e12dd17a4b82aa",
+      "recordedApplicationBase": "f03693d6a4b53e4fc16278203a247ccf946b6bef",
+      "files": [
+        {
+          "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-core/src/server/ProviderAdapter.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-extension-opt-out",
+      "patchSha256": "cee87244cb829ee3a7cfd9704dc979616f68d29bce090490191ea5d53a03ffac",
+      "recordedApplicationBase": "6b43f8280c25fa4734ac823c2fc97cdfb614f390",
+      "files": [
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "provider-direct-dispatch-selection-restart",
+      "patchSha256": "a31c6244ea7b13ce27cbb685cb67834306bb7ccd76e37e0a8a15c5ba66b55664",
+      "recordedApplicationBase": "30fad02f12291b5383ae1403a19e1c7adb881b5f",
+      "files": [
+        {
+          "path": "apps/server/src/orchestration-v2/Orchestrator.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "composer-shortcut-keyboard-guidance",
+      "patchSha256": "8d7c2a6b3db67c74319da7a51c3685d6b72db3d6b14ff9737b7f9cc6e6d8bee6",
+      "recordedApplicationBase": "021e6349cef1761698549ab3bd07f68a393dac5e",
+      "files": [
+        {
+          "path": "docs/user/keybindings.md",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "copilot-runtime-knip-declaration",
+      "patchSha256": "626513e72e70b3d6b0c938e1489c648a6f5a87acd4772dc9404ea4891a3c0a7c",
+      "recordedApplicationBase": "b93b5b0e3b619c60cf75f86f8b66b0287707035f",
+      "files": [
+        {
+          "path": "knip.jsonc",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "turn-fold-bottom-affordance",
+      "patchSha256": "34f0e6dfa0c5bfa44a7a9057953051d604acd22c96ac7d9ccda619dc45c6afaf",
+      "recordedApplicationBase": "3725b908ec40bed05a98d0feb86d24193706c880",
+      "files": [
+        {
+          "path": "apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/MessagesTimeline.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/timelineRowContext.ts",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "fork-patch-flow-convention",
+      "patchSha256": "3f0b49bc0d03de3d9779dba837a6daf6d01a687eefdf041e768b6068ee3f928f",
+      "recordedApplicationBase": "b898dfc62539010245036d8ed4b5675f77136deb",
+      "files": [
+        {
+          "path": "docs/internals/fork-maintenance.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/operations/patch-flow.md",
+          "result": "forward-applied"
+        }
+      ]
+    },
+    {
+      "slug": "stable-main-preservation-v014",
+      "patchSha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+      "recordedApplicationBase": "5751f36722f20c9e974433092d55dfe85e017ed5",
+      "files": [
+        {
+          "path": "README.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/auth/RpcAuthorization.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/auth/RpcAuthorization.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/observability/RpcInstrumentation.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/provider/ProviderRegistry.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/provider/ProviderRegistry.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/provider/testUtils/providerRegistryMock.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/serverSettings.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/server/src/ws.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/components/chat/composerProviderState.tsx",
+          "result": "forward-applied"
+        },
+        {
+          "path": "apps/web/src/index.css",
+          "result": "forward-applied"
+        },
+        {
+          "path": "docs/user/providers-copilot.md",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/client-runtime/src/state/commandPermissions.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/clientRpcPermissions.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/rpc.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/contracts/src/server.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/adapter.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/driver.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.test.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/server/status.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-copilot/src/settings.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-core/src/server/ProviderAdapter.ts",
+          "result": "forward-applied"
+        },
+        {
+          "path": "packages/provider-core/src/server/driver.ts",
+          "result": "forward-applied"
+        }
+      ]
+    }
+  ],
+  "replayedTree": "f5321db0de3695c9910f5c398a98cfa85cdf4a43",
+  "method": "Unmodified canonical file sections: strict forward application or strict reverse-check of an already materialized postimage; no fuzz, three-way fallback, discarded context or unexplained exclusions.",
+  "excluded": [
+    ".tpatch administrative metadata only"
+  ],
+  "includesFileModes": true,
+  "residual": [],
+  "exact": true,
+  "scope": "Independent source coverage probe; not a native tpatch pass or behavioral qualification."
+}

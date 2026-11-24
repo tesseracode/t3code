@@ -1,0 +1,8 @@
+{
+  "slug": "provider-direct-dispatch-selection-restart",
+  "completed_at": "2026-11-05T08:19:22Z",
+  "base_commit": "30fad02f12291b5383ae1403a19e1c7adb881b5f",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "tpatch test — command: vp test run apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts apps/server/src/orchestration-v2/ProviderSwitchService.test.ts packages/provider-copilot/src/server/adapter.test.ts"
+}

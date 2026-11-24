@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "feature": "foundation-v014-client-compat",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_5544e15b2736",
+      "kind": "record",
+      "patch_sha256": "9ac66594f926d0d35387331473d86d5e8059f00edbef5b773b46daf5084609a4",
+      "git_patch_id": "6654a09161a32d690594a364666f23b5ec0558cd",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "5524869561befb4e5016d2ff64e2b979cebc6c6a310b124fcfcf41beffc0499d",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "6c925ff7c8ad226f5535ba3464636377a292437e",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/mobile/src/state/attention.ts",
+        "apps/mobile/src/state/tws.ts",
+        "apps/server/src/tws/TwsCliDecoder.ts",
+        "docs/internals/tws-context.md",
+        "packages/client-runtime/src/state/attention.test.ts",
+        "packages/client-runtime/src/state/attention.ts",
+        "packages/client-runtime/src/state/commandPermissions.test.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "phase1-foundation",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 26,
+          "parent_patch_sha256": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+          "parent_recipe_sha256": "4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "copilot-session-import",
+  "slug": "copilot-session-import",
+  "title": "Issue #33: safely import existing Copilot CLI history snapshots and continue confirmed-stopped native sessions, preserving provider-instance identity and refusing active or uncertain owners. No live-owner handoff or silent new-session fallback.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-11T06:21:55Z",
+  "updated_at": "2026-11-13T05:47:11Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-12T20:56:29Z",
+    "base_commit": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "verify": {
+    "verified_at": "2026-11-13T05:47:05Z",
+    "passed": true,
+    "recipe_hash_at_verify": "3b1595c718dc1d6a436e01270fb01cf2b2f4ff59ca224682e24725a08d105ec4",
+    "patch_hash_at_verify": "09cb61d94051e31518518bbd7b76b2bd7501b6daadab32044b20c15c7ca7ac7b"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "copilot-sdk-runtime-upgrade",
+  "slug": "copilot-sdk-runtime-upgrade",
+  "title": "Analyze and qualify a controlled upgrade from @github/copilot-sdk 1.0.8 and the fork bundled CLI 1.0.75 to a compatible SDK/runtime pair. Assess SDK 1.0.28 as a candidate, not an approved minimum. Preserve native CLI session continuity, provider-instance account/home isolation, permission and input receipts, cancellation, completion and existing model selection. Analyze dynamic routing discovery needed by copilot-fusion-model-selection, native runtime packaging and platform staging, source-server resolution defect #34, and focused regression gates for macOS, Windows and WSL/Linux. Compare priority and sequencing with Fusion integration. Analysis only: no dependency installation, runtime changes, paid turns, experimental flags, deployment, or implementation.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-01T04:21:02Z",
+  "updated_at": "2026-11-02T08:14:39Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-11-02T08:14:58Z",
+  "apply": {
+    "completed_at": "2026-11-01T04:39:12Z",
+    "base_commit": "c88f207e5e9dc0789612e66c911492a1491bcc21",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-cli-provider",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-runtime-packaging-replay",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-02T08:14:34Z",
+    "passed": true,
+    "recipe_hash_at_verify": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad",
+    "patch_hash_at_verify": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+    "parent_snapshot": {
+      "copilot-cli-provider": "applied",
+      "copilot-runtime-packaging-replay": "applied"
+    }
+  }
+}

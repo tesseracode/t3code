@@ -1,0 +1,8 @@
+{
+  "slug": "fork-maintenance-check-scope",
+  "completed_at": "2026-10-29T17:45:44Z",
+  "base_commit": "3f9e8448cfb55f09c0025837031bb02d63c9d59d",
+  "has_patch": true,
+  "validation_status": "needs_review",
+  "validation_notes": "Original canonical rematerialized exactly; known test-import correction still pending before recording."
+}

@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "scope": "Source acceptance only; not a packaged release or receiving-host qualification.",
+  "upstream_baseline": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "upstream_version": "v0.1.4",
+  "previous_main": "870f7a1975f429f5465730bf73c8169d81faf347",
+  "reviewed_candidate": "210a3d6ff2b7eee3f25382637c12bb0dbda38d1c",
+  "reviewed_merge_proposal": "9f7532ea262528a9b6976dd298abda22129a0914",
+  "accepted_merge": "edee604cdf3ef0fbc6ef96708e0c73022a7162cb",
+  "accepted_merge_tree": "7eb43b58a97f993d7dbf7eb6824c2deeeb32f6c4",
+  "history": {
+    "previous_main_is_merge_parent": true,
+    "original_reconciliation_history_preserved": true,
+    "old_main_product_paths_reviewed": 35,
+    "unexplained_product_differences_from_reviewed_candidate": 0,
+    "file_modes_included": true,
+    "historical_only_artifacts": "Seven original old-main blobs and modes are retained under .tpatch/history/main-v0.0.23-870f7a197/ instead of reactivating obsolete incremental recipes and stale markers in current features."
+  },
+  "source_proofs": {
+    "canonical_coverage": "canonical-source-coverage.json",
+    "maintained_roots": 30,
+    "method": "Strict complete canonical-file-section application, or complete reverse-check proving an already materialized section, in dependency order from the pinned upstream commit. Exact final product tree and file modes; only .tpatch excluded. No fuzz, three-way fallback or discarded context.",
+    "unexplained_final_differences": 0,
+    "current_root_recipe_proof": "current-root-recipe-proof.json",
+    "current_roots": [
+      "fork-patch-flow-convention",
+      "stable-main-preservation-v014"
+    ],
+    "recipe_method": "Each current root has an exact current four-trailer attestation. Its complete canonical patch and committed write-file recipe independently reproduce its actual landing product tree and modes from the recorded actual single parent.",
+    "historical_recipe_scope": "The 30-root canonical source proof does not claim that every historical recipe has been independently executed or that every overlapping ancestor patch remains independently materialized at HEAD."
+  },
+  "native_verification": {
+    "version": "0.16.0",
+    "result": "failed",
+    "accepted_exception": "Explicitly authorized historical and overlapping-ancestor verifier exception, supported by exact independent source/recipe proofs, focused behavior checks and independent review. This is not a native verification pass.",
+    "reports": [
+      {
+        "slug": "fork-patch-flow-convention",
+        "file": "native-policy.json",
+        "exit_code": 2,
+        "reason": "Historical-anchor ambiguity across four legitimate different generations; exact current attestation and current materialization remain present."
+      },
+      {
+        "slug": "stable-main-preservation-v014",
+        "file": "native-preservation.json",
+        "exit_code": 2,
+        "reason": "Historical Copilot parent-landing drift aborts native parent replay; exact current attestation and current materialization remain present."
+      },
+      {
+        "slug": "copilot-cli-provider",
+        "file": "native-provider.json",
+        "exit_code": 2,
+        "reason": "Historical replay passes; the overlapping ancestor postimage is not independently materialized at the final HEAD after maintained later roots."
+      },
+      {
+        "slug": "copilot-sdk-runtime-upgrade",
+        "file": "native-sdk.json",
+        "exit_code": 2,
+        "reason": "Historical replay passes; later maintained adapter-test changes invalidate the old ancestor postimage context. Native verification correctly refuses a discarded-context match; the independent source proof does not use it."
+      }
+    ],
+    "no_waiver": [
+      "Malformed current landing attestations",
+      "Unexplained product differences",
+      "Actual failure of the accepted current canonical or recipe replay"
+    ]
+  },
+  "checks": [
+    {
+      "command": "vp run check:changed 98213a256b",
+      "result": "passed",
+      "details": "Formatting, lint, both Knip passes, server GraphQL, 33 affected package typechecks and 225 tests across 12 files."
+    },
+    {
+      "scope": "Preserved search, keybinding, Windows/WSL, native payload and fork-maintenance entrypoints",
+      "result": "passed",
+      "details": "107 tests passed; 13 platform-conditional cases skipped."
+    },
+    {
+      "scope": "Independent read-only review of the exact frozen actual merge",
+      "result": "passed",
+      "details": "No significant findings. The normal merge commit has exactly the reviewed proposal tree and both intended parents."
+    },
+    {
+      "scope": "Isolated SDK and client behavior",
+      "result": "passed",
+      "details": "Two native no-send sessions exercised selected-owner skill controls and cleanup. An isolated real client exercised default-off model filtering, persisted opt-in and static xhigh framing with its reverse state. Both fixture threads had zero runs."
+    }
+  ],
+  "not_qualified": [
+    "Windows or Linux receiving-host package continuity",
+    "New installer or packaged-release artifacts",
+    "Deployment or installed-application restart",
+    "Repository-wide local checks"
+  ]
+}

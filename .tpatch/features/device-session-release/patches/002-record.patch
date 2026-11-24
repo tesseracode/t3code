@@ -1,0 +1,181 @@
+diff --git a/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx b/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx
+index 99aed81cf2..bb39f2cc76 100644
+--- a/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx
++++ b/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx
+@@ -96,10 +96,12 @@ export function DevicePreviewScreen({
+   const [selectedKey, setSelectedKey] = useState<string | null>(initialDeviceKey ?? null);
+   const [inputConnected, setInputConnected] = useState(false);
+   const [streamAttempt, setStreamAttempt] = useState(0);
+-  const [shuttingDown, setShuttingDown] = useState(false);
++  const [closingOperation, setClosingOperation] = useState<"shutdown" | "disconnect" | null>(null);
++  const deviceBusy = closingOperation !== null;
+   const [controlsVisible, setControlsVisible] = useState(true);
+   const retryHost = useAtomCommand(deviceEnvironment.list);
+   const shutdown = useAtomCommand(deviceEnvironment.shutdown, { reportFailure: false });
++  const disconnect = useAtomCommand(deviceEnvironment.close, { reportFailure: false });
+   const streamRef = useRef<DeviceStreamRef>(null);
+   const state = useEnvironmentQuery(deviceEnvironment.state({ environmentId, input: {} }));
+   const previews = threadDevicePreviews(state.data, threadId);
+@@ -130,8 +132,8 @@ export function DevicePreviewScreen({
+   });
+ 
+   const shutDownDevice = async () => {
+-    if (!preview || shuttingDown) return;
+-    setShuttingDown(true);
++    if (!preview || deviceBusy) return;
++    setClosingOperation("shutdown");
+     const result = await shutdown({
+       environmentId,
+       input: {
+@@ -139,13 +141,37 @@ export function DevicePreviewScreen({
+         deviceId: preview.session.deviceId,
+         platform: preview.session.platform,
+       },
+-    }).finally(() => setShuttingDown(false));
++    }).finally(() => setClosingOperation(null));
+     if (result._tag === "Failure") {
+       Dialog.alert("Could not shut down device", String(Cause.squash(result.cause)));
+     }
+   };
+ 
++  const disconnectDevice = async () => {
++    if (!preview || deviceBusy) return;
++    setClosingOperation("disconnect");
++    const result = await disconnect({
++      environmentId,
++      input: {
++        threadId,
++        hostId: preview.session.hostId,
++        deviceId: preview.session.deviceId,
++        shutdown: false,
++      },
++    }).finally(() => setClosingOperation(null));
++    if (result._tag === "Failure") {
++      Dialog.alert("Could not disconnect device", String(Cause.squash(result.cause)));
++    }
++  };
++
+   const controls: AppBarMenuItem[] = [
++    {
++      id: "disconnect",
++      title: closingOperation === "disconnect" ? "Disconnecting…" : "Disconnect device",
++      icon: "link",
++      disabled: !preview || deviceBusy,
++      onPress: () => void disconnectDevice(),
++    },
+     ...(state.data?.hosts
+       .filter(
+         (host) =>
+@@ -198,7 +224,7 @@ export function DevicePreviewScreen({
+       id: "reload",
+       title: "Reload stream",
+       icon: "arrow.clockwise" as const,
+-      disabled: !preview || shuttingDown,
++      disabled: !preview || deviceBusy,
+       onPress: () => {
+         setInputConnected(false);
+         setStreamAttempt((attempt) => attempt + 1);
+@@ -235,9 +261,9 @@ export function DevicePreviewScreen({
+       : []),
+     {
+       id: "shutdown",
+-      title: shuttingDown ? "Shutting down…" : "Shut down device",
++      title: closingOperation === "shutdown" ? "Shutting down…" : "Shut down device",
+       icon: "power",
+-      disabled: !preview || shuttingDown,
++      disabled: !preview || deviceBusy,
+       onPress: () => void shutDownDevice(),
+     },
+   ];
+diff --git a/apps/web/src/components/device/DeviceControlsRail.tsx b/apps/web/src/components/device/DeviceControlsRail.tsx
+index 3ed2b3a4fa..8de3019e66 100644
+--- a/apps/web/src/components/device/DeviceControlsRail.tsx
++++ b/apps/web/src/components/device/DeviceControlsRail.tsx
+@@ -14,6 +14,7 @@ import {
+   Smartphone,
+   Square,
+   Type,
++  Unplug,
+   X,
+ } from "lucide-react";
+ import { Moon, Sun } from "lucide";
+@@ -45,6 +46,7 @@ export function DeviceControlsRail(props: {
+   onTools: () => void;
+   onFloat: () => void;
+   onClose: () => void;
++  onDisconnect: () => void;
+   onPowerOff: () => void;
+   /** The host takes input but runs no device commands (Simlock): no rotation, settings, tools, or screenshots. */
+   inputOnly?: boolean;
+@@ -226,6 +228,10 @@ export function DeviceControlsRail(props: {
+               <X />
+               Close device panel
+             </MenuItem>
++            <MenuItem onClick={props.onDisconnect}>
++              <Unplug />
++              Disconnect device
++            </MenuItem>
+             <MenuSeparator />
+             <MenuItem variant="destructive" onClick={props.onPowerOff}>
+               <Power />
+diff --git a/apps/web/src/components/device/DevicePanel.tsx b/apps/web/src/components/device/DevicePanel.tsx
+index c8f5566511..17f02b5932 100644
+--- a/apps/web/src/components/device/DevicePanel.tsx
++++ b/apps/web/src/components/device/DevicePanel.tsx
+@@ -148,10 +148,6 @@ export function DevicePanel(props: {
+   };
+ 
+   const closeActive = (powerOff: boolean) => {
+-    if (!powerOff) {
+-      closeSurface();
+-      return;
+-    }
+     if (!activeSession) return;
+     const settleOperation = startOperation(null);
+     void close({
+@@ -244,7 +240,8 @@ export function DevicePanel(props: {
+               }
+               visible={props.visible}
+               onFloat={floatActive}
+-              onClose={() => closeActive(false)}
++              onClose={closeSurface}
++              onDisconnect={() => closeActive(false)}
+               onPowerOff={() => closeActive(true)}
+             />
+           ) : loading ? (
+diff --git a/apps/web/src/components/device/DeviceWorkspace.tsx b/apps/web/src/components/device/DeviceWorkspace.tsx
+index b57adae023..f2d6b540f2 100644
+--- a/apps/web/src/components/device/DeviceWorkspace.tsx
++++ b/apps/web/src/components/device/DeviceWorkspace.tsx
+@@ -22,6 +22,7 @@ export function DeviceWorkspace(props: {
+   visible: boolean;
+   onFloat: () => void;
+   onClose: () => void;
++  onDisconnect: () => void;
+   onPowerOff: () => void;
+ }) {
+   const [toolsOpen, setToolsOpen] = useState(false);
+@@ -97,6 +98,7 @@ export function DeviceWorkspace(props: {
+                 onTools={() => setToolsOpen(!toolsOpen)}
+                 onFloat={props.onFloat}
+                 onClose={props.onClose}
++                onDisconnect={props.onDisconnect}
+                 onPowerOff={props.onPowerOff}
+                 inputOnly={props.simlock === true}
+               />
+diff --git a/docs/user/devices.md b/docs/user/devices.md
+index ce5a7d8d06..f47d76aee7 100644
+--- a/docs/user/devices.md
++++ b/docs/user/devices.md
+@@ -47,6 +47,11 @@ iOS, and power off. Close the tab to stop watching; the device keeps running
+ unless you power it off. Closed tabs stay closed after a reload. To watch the
+ device again, choose it from **+ → Device**.
+ 
++To release this thread's device automation without powering off the simulator
++or emulator, choose **Disconnect device** in the device actions menu. Closing
++or hiding the panel only stops watching; it does not release automation
++ownership. Disconnect before moving verification to another thread.
++
+ Choose **3D view** to inspect supported devices while the live screen stays
+ interactive. On iPhone Duo, use the fold and stance controls to change its
+ physical pose, or pinch over the device to adjust the hinge. Turning the model

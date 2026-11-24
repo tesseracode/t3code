@@ -1,0 +1,9 @@
+{
+  "slug": "attention-policy-completion-watermarks",
+  "completed_at": "2026-10-29T17:35:38Z",
+  "base_commit": "ee5c462a9d408f38ac2c7495ec91dfcc617b1ac1",
+  "has_patch": false,
+  "operator_notes": "Consume pending policy completions without clearing handled/skipped watermarks; keep full clear for snapshot/session teardown. Complete four-path cohesive fix, full existing parent canonical roots unchanged.",
+  "validation_status": "passed",
+  "validation_notes": "Actual coordinator regression: 4 failed before production fix, same 4 pass after. Full focused coordinator/gate/policy selection 39 passed; owning web typecheck and scoped format/lint pass. Headless unit runner only, no app/dev servers or full helper."
+}

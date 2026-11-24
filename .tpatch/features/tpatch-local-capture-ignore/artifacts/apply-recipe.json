@@ -1,0 +1,11 @@
+{
+  "feature": "tpatch-local-capture-ignore",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": ".gitignore",
+      "search": ".t3\n.idea/",
+      "replace": ".t3\n.tpatch/local/\n.idea/"
+    }
+  ]
+}

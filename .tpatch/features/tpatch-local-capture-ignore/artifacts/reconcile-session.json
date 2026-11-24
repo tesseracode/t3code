@@ -1,0 +1,53 @@
+{
+  "slug": "tpatch-local-capture-ignore",
+  "title": "Record the already-shipped .tpatch/local/ ignore rule so a clean same-base replay includes the local-only private capture exclusion. This is historical intent adoption, not a new product behavior.",
+  "outcome": "reapplied",
+  "phase": "phase-4-forward-apply-strict",
+  "upstream_ref": "v0.1.4",
+  "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "notes": [
+    "Patch applies cleanly (strict) — safe to auto-apply"
+  ],
+  "evidence": [
+    {
+      "schema_version": 1,
+      "feature_slug": "tpatch-local-capture-ignore",
+      "attempt_id": "re_01a42d716ea2",
+      "upstream_ref": "v0.1.4",
+      "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+      "base_commit": "2cad5d72dc615996325bc1204d3e034e094795b7",
+      "raw_reconcile_verdict": "reapplied",
+      "phase": "phase-4",
+      "evidence_kind": "forward-apply",
+      "confidence": "medium",
+      "matched_paths": [],
+      "matched_operations": [],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "not-checked",
+      "requires_confirmation": true,
+      "reason_code": "phase-4-forward-apply-strict"
+    },
+    {
+      "schema_version": 1,
+      "feature_slug": "tpatch-local-capture-ignore",
+      "attempt_id": "re_6059a8511b53",
+      "upstream_ref": "v0.1.4",
+      "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+      "base_commit": "2cad5d72dc615996325bc1204d3e034e094795b7",
+      "raw_reconcile_verdict": "reapplied",
+      "phase": "phase-3.5",
+      "evidence_kind": "file-novelty",
+      "confidence": "medium",
+      "matched_paths": [
+        ".gitignore"
+      ],
+      "matched_operations": [],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "present",
+      "requires_confirmation": true,
+      "reason_code": "modifies-existing-files"
+    }
+  ]
+}

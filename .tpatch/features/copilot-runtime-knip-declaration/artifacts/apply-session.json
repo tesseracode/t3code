@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-runtime-knip-declaration",
+  "completed_at": "2026-11-05T18:35:42Z",
+  "base_commit": "60c107e3b3c888dca25f604950b0a9662b3e1d29",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "tpatch test — command: vp test run scripts/lib/cli-external-packages.test.ts scripts/lib/runtime-external-dependencies.test.ts scripts/lib/copilot-payload.test.ts"
+}

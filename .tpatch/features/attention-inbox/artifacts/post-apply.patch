@@ -1,0 +1,1204 @@
+diff --git a/apps/web/src/components/AppSidebarLayout.tsx b/apps/web/src/components/AppSidebarLayout.tsx
+index c00565f45..b3a27a1b0 100644
+--- a/apps/web/src/components/AppSidebarLayout.tsx
++++ b/apps/web/src/components/AppSidebarLayout.tsx
+@@ -45,6 +45,7 @@ import {
+   useSidebarVisibility,
+ } from "./ui/sidebar";
+ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
++import { AttentionWorkspaceRetention } from "./attention/AttentionWorkspaceRetention";
+ 
+ const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
+ 
+@@ -227,6 +228,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
+         style={sidebarProviderStyle}
+       >
+         <ProjectProjectionRetention />
++        <AttentionWorkspaceRetention />
+         <Sidebar
+           side="left"
+           collapsible="offcanvas"
+diff --git a/apps/web/src/components/CommandPalette.tsx b/apps/web/src/components/CommandPalette.tsx
+index acb1bbf4e..1ab1a2744 100644
+--- a/apps/web/src/components/CommandPalette.tsx
++++ b/apps/web/src/components/CommandPalette.tsx
+@@ -57,6 +57,7 @@ import {
+   SettingsIcon,
+   SquarePenIcon,
+   TextSearchIcon,
++  InboxIcon,
+ } from "lucide-react";
+ import {
+   useCallback,
+@@ -187,6 +188,8 @@ import {
+   buildSidebarProjectSnapshots,
+ } from "../sidebarProjectGrouping";
+ import type { Project } from "../types";
++import { useOpenAttentionInbox } from "./attention/useOpenAttentionInbox";
++import { ATTENTION_INBOX_COMMAND } from "./attention/attentionInbox.logic";
+ 
+ const EMPTY_BROWSE_ENTRIES: FilesystemBrowseResult["entries"] = [];
+ 
+@@ -1679,7 +1682,18 @@ function OpenCommandPaletteDialog(props: {
+     pushPaletteView,
+   ]);
+ 
+-  const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
++  const openAttentionInbox = useOpenAttentionInbox();
++  const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [
++    {
++      kind: "action",
++      value: "action:attention-inbox",
++      searchTerms: ["attention", "inbox", "approvals", "input", "failures"],
++      title: "Open attention inbox",
++      icon: <InboxIcon className={ITEM_ICON_CLASS} />,
++      shortcutCommand: ATTENTION_INBOX_COMMAND,
++      run: openAttentionInbox,
++    },
++  ];
+ 
+   if (projects.length > 0) {
+     const activeProjectTitle =
+diff --git a/apps/web/src/components/attention/AttentionInbox.tsx b/apps/web/src/components/attention/AttentionInbox.tsx
+new file mode 100644
+index 000000000..afcdbc5cd
+--- /dev/null
++++ b/apps/web/src/components/attention/AttentionInbox.tsx
+@@ -0,0 +1,394 @@
++import { useAtomValue } from "@effect/atom-react";
++import { LegendList, type LegendListRef } from "@legendapp/list/react";
++import { useNavigate } from "@tanstack/react-router";
++import type { ScopedAttentionItem } from "@t3tools/client-runtime/state/attention";
++import type { EnvironmentId } from "@t3tools/contracts";
++import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
++import { InboxIcon } from "lucide-react";
++import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
++import { environmentCatalog } from "../../connection/catalog";
++import { isElectron } from "../../env";
++import { cn } from "../../lib/utils";
++import { attentionWorkspace } from "../../state/attention";
++import { useProjects, useThreadShell } from "../../state/entities";
++import { Button } from "../ui/button";
++import { SidebarInset } from "../ui/sidebar";
++import { toastManager } from "../ui/toast";
++import { WorkspacePageHeader } from "../WorkspacePageHeader";
++import { useAttentionSeen } from "./AttentionWorkspaceRetention";
++import {
++  ATTENTION_KINDS,
++  ATTENTION_PRIORITIES,
++  ATTENTION_STATUSES,
++  EMPTY_ATTENTION_FILTERS,
++  attentionKeyboardIndex,
++  attentionThreadTarget,
++  filterAttentionInbox,
++  markAttentionSeen,
++} from "./attentionInbox.logic";
++
++function AttentionRowTitle({ row }: { row: ScopedAttentionItem }) {
++  const shell = useThreadShell(row.ref);
++  return <>{shell?.title ?? `Thread ${row.ref.threadId}`}</>;
++}
++
++export function AttentionInbox() {
++  const workspace = useAtomValue(attentionWorkspace.valueAtom);
++  const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
++  const projects = useProjects();
++  const [filters, setFilters] = useState(EMPTY_ATTENTION_FILTERS);
++  const [seen, setSeen] = useAttentionSeen();
++  const [activeKey, setActiveKey] = useState<string | null>(null);
++  const [mountedActiveId, setMountedActiveId] = useState<string | undefined>();
++  const listRef = useRef<LegendListRef | null>(null);
++  const listboxRef = useRef<HTMLDivElement | null>(null);
++  const id = useId();
++  const navigate = useNavigate();
++  const all = useAtomValue(attentionWorkspace.aggregateAtom);
++  const filtered = useMemo(() => filterAttentionInbox(all, filters), [all, filters]);
++  const seenByKey = useMemo(
++    () => new Map(seen.map((entry) => [entry.key, entry.revision])),
++    [seen],
++  );
++  const activeIndex = Math.max(
++    0,
++    filtered.items.findIndex((row) => row.key === activeKey),
++  );
++  const active = filtered.items[activeIndex];
++  const activeId = active ? `${id}-${active.key}` : undefined;
++  const labels = useMemo(
++    () =>
++      new Map(
++        projects.map((project) => [
++          scopedProjectKey(scopeProjectRef(project.environmentId, project.id)),
++          project.title,
++        ]),
++      ),
++    [projects],
++  );
++  const environmentLabel = (environmentId: EnvironmentId) =>
++    catalog.entries.get(environmentId)?.target.label ?? environmentId;
++  const projectOptions = useMemo(
++    () => [
++      ...new Map(
++        all.items
++          .filter((row) => !filters.environment || row.ref.environmentId === filters.environment)
++          .map((row) => {
++            const key = scopedProjectKey(
++              scopeProjectRef(row.ref.environmentId, row.item.projectId),
++            );
++            return [
++              key,
++              { key, projectId: row.item.projectId, environmentId: row.ref.environmentId },
++            ];
++          }),
++      ).values(),
++    ],
++    [all.items, filters.environment],
++  );
++  const scrollTo = useCallback((index: number) => {
++    void listRef.current
++      ?.scrollIndexIntoView({ index, animated: false })
++      .catch((error: unknown) => {
++        console.error("Could not navigate attention list.", error);
++        toastManager.add({ type: "error", title: "Could not navigate attention list" });
++      });
++  }, []);
++  useEffect(() => {
++    if (activeId) scrollTo(activeIndex);
++  }, [activeId, activeIndex, scrollTo]);
++  useEffect(() => {
++    const listbox = listboxRef.current;
++    if (!listbox) return;
++    const update = () =>
++      setMountedActiveId(activeId && document.getElementById(activeId) ? activeId : undefined);
++    update();
++    const observer = new MutationObserver(update);
++    observer.observe(listbox, { childList: true, subtree: true });
++    return () => observer.disconnect();
++  }, [activeId]);
++
++  const openRow = useCallback(
++    async (row: ScopedAttentionItem) => {
++      setSeen((current) => markAttentionSeen(current, row, true));
++      try {
++        await navigate(attentionThreadTarget(row));
++      } catch (error) {
++        console.error("Could not open attention thread.", error);
++        toastManager.add({ type: "error", title: "Could not open thread" });
++      }
++    },
++    [navigate, setSeen],
++  );
++  const selectClass =
++    "h-8 max-w-64 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring";
++  return (
++    <SidebarInset className="h-svh min-h-0 overflow-hidden bg-background text-foreground md:h-dvh">
++      <WorkspacePageHeader electron={isElectron}>
++        <InboxIcon className="size-4" aria-hidden="true" />
++        <h1 className="text-sm font-medium">Attention inbox</h1>
++      </WorkspacePageHeader>
++      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-4 px-5 py-5 sm:px-6">
++        <div>
++          <h2 className="text-lg font-semibold">Needs your attention</h2>
++          <p className="text-sm text-muted-foreground" role="status">
++            {all.threadCount} actionable threads · {all.itemCount} items
++            {!all.complete ? " · Total incomplete" : ""}
++            {` · ${all.liveThreadCount} live / ${all.staleThreadCount} stale threads`}
++          </p>
++          <p className="mt-1 text-xs text-muted-foreground">
++            Open a thread to respond with its existing controls. Seen only changes emphasis on this
++            device, not the actionable count.
++          </p>
++        </div>
++        {(!all.complete || workspace.environments.size === 0) && (
++          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
++            <p>
++              {workspace.environments.size === 0
++                ? workspace.isReady
++                  ? "No enabled environments. Add or enable one in Settings → Connections."
++                  : "Loading environments…"
++                : "Some attention may be missing or stale. A frontend disconnection is not an agent failure."}
++            </p>
++            <ul className="mt-1 text-xs text-muted-foreground">
++              {[...workspace.environments]
++                .filter(([, state]) => state.status !== "live")
++                .map(([environmentId, state]) => (
++                  <li key={environmentId}>
++                    {environmentLabel(environmentId)}: {ATTENTION_STATUSES[state.status]}
++                    {state.reason ? ` (${state.reason})` : ""}
++                  </li>
++                ))}
++            </ul>
++          </div>
++        )}
++        <div className="flex flex-wrap gap-3" aria-label="Attention filters">
++          <label className="flex flex-col gap-1 text-xs">
++            Environment
++            <select
++              aria-label="Environment"
++              className={selectClass}
++              value={filters.environment}
++              onChange={(event) => {
++                setFilters((current) => ({
++                  ...current,
++                  environment: event.target.value,
++                  project: "",
++                }));
++                setActiveKey(null);
++              }}
++            >
++              <option value="">All environments</option>
++              {[...workspace.environments.keys()].map((environmentId) => (
++                <option key={environmentId} value={environmentId}>
++                  {environmentLabel(environmentId)}
++                </option>
++              ))}
++            </select>
++          </label>
++          <label className="flex flex-col gap-1 text-xs">
++            Project
++            <select
++              aria-label="Project"
++              className={selectClass}
++              value={filters.project}
++              onChange={(event) => {
++                setFilters((current) => ({ ...current, project: event.target.value }));
++                setActiveKey(null);
++              }}
++            >
++              <option value="">All projects</option>
++              {projectOptions.map((project) => (
++                <option key={project.key} value={project.key}>
++                  {labels.get(project.key) ?? project.projectId} ·{" "}
++                  {environmentLabel(project.environmentId)}
++                </option>
++              ))}
++            </select>
++          </label>
++          <label className="flex flex-col gap-1 text-xs">
++            Kind
++            <select
++              aria-label="Kind"
++              className={selectClass}
++              value={filters.kind}
++              onChange={(event) => {
++                setFilters((current) => ({ ...current, kind: event.target.value }));
++                setActiveKey(null);
++              }}
++            >
++              <option value="">All kinds</option>
++              {Object.entries(ATTENTION_KINDS).map(([key, label]) => (
++                <option key={key} value={key}>
++                  {label}
++                </option>
++              ))}
++            </select>
++          </label>
++          <label className="flex flex-col gap-1 text-xs">
++            Severity
++            <select
++              aria-label="Severity"
++              className={selectClass}
++              value={filters.priority}
++              onChange={(event) => {
++                setFilters((current) => ({ ...current, priority: event.target.value }));
++                setActiveKey(null);
++              }}
++            >
++              <option value="">All severities</option>
++              {Object.entries(ATTENTION_PRIORITIES).map(([key, label]) => (
++                <option key={key} value={key}>
++                  {label}
++                </option>
++              ))}
++            </select>
++          </label>
++          <Button
++            className="self-end"
++            variant="outline"
++            size="sm"
++            onClick={() => {
++              setFilters(EMPTY_ATTENTION_FILTERS);
++              setActiveKey(null);
++            }}
++          >
++            Clear filters
++          </Button>
++        </div>
++        <div className="flex flex-wrap items-center justify-between gap-2">
++          <p className="text-xs text-muted-foreground">
++            {filtered.items.length} items in {filtered.threadCount} threads shown
++          </p>
++          <div className="flex gap-2">
++            <Button
++              size="sm"
++              variant="outline"
++              disabled={!active}
++              onClick={() => {
++                if (active)
++                  setSeen((current) =>
++                    markAttentionSeen(
++                      current,
++                      active,
++                      seenByKey.get(active.key) !== active.item.revision,
++                    ),
++                  );
++              }}
++            >
++              {active && seenByKey.get(active.key) === active.item.revision
++                ? "Mark unseen"
++                : "Mark seen"}
++            </Button>
++            <Button
++              size="sm"
++              disabled={!active}
++              onClick={() => {
++                if (active) void openRow(active);
++              }}
++            >
++              Open thread
++            </Button>
++          </div>
++        </div>
++        <p id={`${id}-help`} className="text-xs text-muted-foreground">
++          Use Up/Down or Home/End to select; Enter opens the thread. Stale items may already be
++          resolved; reconnect before responding.
++        </p>
++        {filtered.items.length === 0 ? (
++          <div className="flex flex-1 items-center justify-center rounded-md border border-border p-6 text-center text-sm text-muted-foreground">
++            {all.itemCount > 0
++              ? "No items match these filters."
++              : workspace.environments.size === 0
++                ? "No enabled environments."
++                : all.complete
++                  ? "No open attention items."
++                  : "No attention available yet. The total is incomplete."}
++          </div>
++        ) : (
++          <div
++            ref={listboxRef}
++            role="listbox"
++            aria-label="Attention items"
++            aria-describedby={`${id}-help`}
++            aria-activedescendant={mountedActiveId}
++            tabIndex={0}
++            className="min-h-0 flex-1 overflow-hidden rounded-md border border-border focus-visible:outline-2 focus-visible:outline-ring"
++            onKeyDown={(event) => {
++              const next = attentionKeyboardIndex(event.key, activeIndex, filtered.items.length);
++              if (next !== null) {
++                event.preventDefault();
++                setActiveKey(filtered.items[next]?.key ?? null);
++                scrollTo(next);
++              } else if (event.key === "Enter" && active) {
++                event.preventDefault();
++                void openRow(active);
++              }
++            }}
++          >
++            <LegendList
++              ref={listRef}
++              data={filtered.items}
++              keyExtractor={(row) => row.key}
++              estimatedItemSize={100}
++              drawDistance={300}
++              style={{ height: "100%" }}
++              extraData={{ activeKey: active?.key, seenByKey, labels, catalog }}
++              renderItem={({ item: row, index }) => {
++                const isSeen = seenByKey.get(row.key) === row.item.revision;
++                return (
++                  <div
++                    id={`${id}-${row.key}`}
++                    role="option"
++                    aria-selected={row.key === active?.key}
++                    aria-posinset={index + 1}
++                    aria-setsize={filtered.items.length}
++                    onMouseDown={(event) => {
++                      event.preventDefault();
++                      listboxRef.current?.focus();
++                    }}
++                    onClick={() => {
++                      setActiveKey(row.key);
++                      void openRow(row);
++                    }}
++                    className={cn(
++                      "cursor-pointer border-b border-border px-4 py-3 text-sm",
++                      row.key === active?.key ? "bg-accent" : "hover:bg-muted/50",
++                    )}
++                  >
++                    <div className="flex items-center justify-between gap-3">
++                      <span className={cn("truncate", !isSeen && "font-semibold")}>
++                        {ATTENTION_KINDS[row.item.kind]} · <AttentionRowTitle row={row} />
++                      </span>
++                      <span className="shrink-0 text-xs text-muted-foreground">
++                        {isSeen ? "Seen" : "Unseen"}
++                        {row.stale ? " · Stale" : ""}
++                      </span>
++                    </div>
++                    <div className="mt-1 truncate text-xs text-muted-foreground">
++                      {environmentLabel(row.ref.environmentId)} ·{" "}
++                      {labels.get(
++                        scopedProjectKey(
++                          scopeProjectRef(row.ref.environmentId, row.item.projectId),
++                        ),
++                      ) ?? row.item.projectId}
++                    </div>
++                    <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
++                      <span>{ATTENTION_PRIORITIES[row.priority]}</span>
++                      <time dateTime={row.item.openedAt}>
++                        {new Date(row.item.openedAt).toLocaleString()}
++                      </time>
++                      {row.item.reasonCode === "response_failed" && (
++                        <span>Response failed; still open</span>
++                      )}
++                    </div>
++                  </div>
++                );
++              }}
++            />
++          </div>
++        )}
++      </div>
++    </SidebarInset>
++  );
++}
+diff --git a/apps/web/src/components/attention/AttentionSidebarItem.tsx b/apps/web/src/components/attention/AttentionSidebarItem.tsx
+new file mode 100644
+index 000000000..f18b0b74a
+--- /dev/null
++++ b/apps/web/src/components/attention/AttentionSidebarItem.tsx
+@@ -0,0 +1,39 @@
++import { useAtomValue } from "@effect/atom-react";
++import { useLocation } from "@tanstack/react-router";
++import { InboxIcon } from "lucide-react";
++import { attentionWorkspace } from "../../state/attention";
++import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "../ui/sidebar";
++import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
++import { attentionBadge } from "./attentionInbox.logic";
++import { useOpenAttentionInbox } from "./useOpenAttentionInbox";
++
++export function AttentionSidebarItem() {
++  const aggregate = useAtomValue(attentionWorkspace.aggregateAtom);
++  const badge = attentionBadge(aggregate);
++  const active = useLocation({ select: (location) => location.pathname === "/attention" });
++  const open = useOpenAttentionInbox();
++  const { isMobile, setOpenMobile } = useSidebar();
++  return (
++    <SidebarMenuItem className="shrink-0">
++      <Tooltip>
++        <TooltipTrigger
++          render={
++            <SidebarMenuButton
++              aria-label={`Attention inbox. ${badge.label}`}
++              isActive={active}
++              className="w-auto gap-1.5"
++              onClick={() => {
++                if (isMobile) setOpenMobile(false);
++                void open();
++              }}
++            >
++              <InboxIcon />
++              <span className="tabular-nums text-xs">{badge.text}</span>
++            </SidebarMenuButton>
++          }
++        />
++        <TooltipPopup side="top">Attention inbox: {badge.label}</TooltipPopup>
++      </Tooltip>
++    </SidebarMenuItem>
++  );
++}
+diff --git a/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx b/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx
+new file mode 100644
+index 000000000..1669a79b7
+--- /dev/null
++++ b/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx
+@@ -0,0 +1,47 @@
++import { useAtomValue } from "@effect/atom-react";
++import { useEffect, useRef } from "react";
++import type { EnvironmentId } from "@t3tools/contracts";
++import { isCommandPaletteOpen } from "../../commandPaletteBus";
++import { useLocalStorage } from "../../hooks/useLocalStorage";
++import { resolveShortcutCommand } from "../../keybindings";
++import { attentionWorkspace } from "../../state/attention";
++import { primaryServerKeybindingsAtom } from "../../state/server";
++import {
++  ATTENTION_INBOX_COMMAND,
++  AttentionSeen,
++  EMPTY_ATTENTION_SEEN,
++  pruneAttentionSeen,
++} from "./attentionInbox.logic";
++import { useOpenAttentionInbox } from "./useOpenAttentionInbox";
++
++export function useAttentionSeen() {
++  return useLocalStorage("t3code:attention-seen:v1", EMPTY_ATTENTION_SEEN, AttentionSeen);
++}
++
++export function AttentionWorkspaceRetention() {
++  const workspace = useAtomValue(attentionWorkspace.valueAtom);
++  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
++  const [seen, setSeen] = useAttentionSeen();
++  const observedEnvironments = useRef(new Set<EnvironmentId>());
++  const open = useOpenAttentionInbox();
++  useEffect(() => {
++    for (const id of workspace.environments.keys()) observedEnvironments.current.add(id);
++    if (pruneAttentionSeen(seen, workspace, observedEnvironments.current) !== seen) {
++      setSeen((current) => pruneAttentionSeen(current, workspace, observedEnvironments.current));
++    }
++  }, [seen, setSeen, workspace]);
++  useEffect(() => {
++    const onKeyDown = (event: KeyboardEvent) => {
++      if (event.defaultPrevented || isCommandPaletteOpen()) return;
++      if (event.target instanceof HTMLElement && event.target.closest("[data-keybinding-capture]"))
++        return;
++      if (resolveShortcutCommand(event, keybindings) !== ATTENTION_INBOX_COMMAND) return;
++      event.preventDefault();
++      event.stopPropagation();
++      void open();
++    };
++    window.addEventListener("keydown", onKeyDown);
++    return () => window.removeEventListener("keydown", onKeyDown);
++  }, [keybindings, open]);
++  return null;
++}
+diff --git a/apps/web/src/components/attention/attentionInbox.logic.test.ts b/apps/web/src/components/attention/attentionInbox.logic.test.ts
+new file mode 100644
+index 000000000..90a303717
+--- /dev/null
++++ b/apps/web/src/components/attention/attentionInbox.logic.test.ts
+@@ -0,0 +1,219 @@
++import { describe, expect, it } from "vite-plus/test";
++import {
++  ApprovalRequestId,
++  AttentionId,
++  EnvironmentId,
++  EventId,
++  ProjectId,
++  ThreadId,
++  type AttentionChange,
++} from "@t3tools/contracts";
++import * as HashMap from "effect/HashMap";
++import * as Schema from "effect/Schema";
++import {
++  aggregateAttention,
++  type AttentionWorkspaceState,
++  type ScopedAttentionItem,
++} from "@t3tools/client-runtime/state/attention";
++import { KeybindingRule } from "@t3tools/contracts";
++import {
++  DEFAULT_RESOLVED_KEYBINDINGS,
++  compileResolvedKeybindingsConfig,
++} from "@t3tools/shared/keybindings";
++import { resolveShortcutCommand } from "../../keybindings";
++import {
++  ATTENTION_INBOX_COMMAND,
++  ATTENTION_SEEN_LIMIT,
++  AttentionSeen,
++  EMPTY_ATTENTION_FILTERS,
++  attentionBadge,
++  attentionKeyboardIndex,
++  attentionThreadTarget,
++  filterAttentionInbox,
++  markAttentionSeen,
++  pruneAttentionSeen,
++} from "./attentionInbox.logic";
++
++const A = EnvironmentId.make("machine-a");
++const B = EnvironmentId.make("machine-b");
++const isAttentionSeen = Schema.is(AttentionSeen);
++const decodeKeybindingRule = Schema.decodeUnknownSync(KeybindingRule);
++function row(index: number, environmentId = A): ScopedAttentionItem {
++  const threadId = ThreadId.make(`thread-${Math.floor(index / 2)}`);
++  const item = {
++    attentionId: AttentionId.make(index.toString(16).padStart(64, "0")),
++    projectId: ProjectId.make(index % 2 === 0 ? "repo-one" : "repo-two"),
++    threadId,
++    turnId: null,
++    requestId: ApprovalRequestId.make(`request-${index}`),
++    kind: index % 2 === 0 ? ("approval" as const) : ("user_input" as const),
++    status: "open" as const,
++    reasonCode: "approval_requested" as const,
++    revision: 1,
++    sourceEventId: EventId.make(`event-${index}`),
++    sourceSequence: index,
++    openedAt: "2026-09-28T00:00:00Z",
++    updatedAt: "2026-09-28T00:00:00Z",
++    resolvedAt: null,
++  };
++  return {
++    key: `${environmentId}:${item.attentionId}`,
++    ref: { environmentId, threadId },
++    item,
++    stale: false,
++    priority: "blocking-error",
++  };
++}
++function workspace(count: number, stale = false): AttentionWorkspaceState {
++  return {
++    isReady: true,
++    environments: new Map(
++      [A, B].map((environmentId) => {
++        const entries = Array.from({ length: count }, (_, index) => {
++          const { item } = row(index, environmentId);
++          const key = `item:${item.attentionId}`;
++          const change: AttentionChange = {
++            key,
++            version: index,
++            entity: { type: "item", value: item },
++          };
++          return [key, change] as const;
++        });
++        return [
++          environmentId,
++          {
++            status: stale && environmentId === B ? "stale" : "live",
++            hasSnapshot: true,
++            entries: HashMap.fromIterable(entries),
++            reason: null,
++          },
++        ];
++      }),
++    ),
++  };
++}
++
++describe("attention inbox semantics", () => {
++  it("keeps colliding IDs, routing and filtered counts scoped across a realistic large list", () => {
++    const state = workspace(2_500);
++    const all = aggregateAttention(state);
++    expect(all.itemCount).toBe(5_000);
++    expect(all.threadCount).toBe(2_500);
++    const selected = filterAttentionInbox(all, {
++      ...EMPTY_ATTENTION_FILTERS,
++      project: `${B}:repo-one`,
++      kind: "approval",
++      priority: "blocking-error",
++    });
++    expect(selected.items).toHaveLength(1_250);
++    expect(selected.threadCount).toBe(1_250);
++    expect(new Set(selected.items.map((item) => item.ref.environmentId))).toEqual(new Set([B]));
++    expect(attentionThreadTarget(row(0, A))).toEqual({
++      to: "/$environmentId/$threadId",
++      params: { environmentId: A, threadId: "thread-0" },
++    });
++    expect(attentionThreadTarget({ ...row(0, B), stale: true }).params.environmentId).toBe(B);
++    expect(
++      filterAttentionInbox(all, { ...EMPTY_ATTENTION_FILTERS, environment: "missing" }).items,
++    ).toEqual([]);
++    expect(
++      filterAttentionInbox(all, { ...EMPTY_ATTENTION_FILTERS, priority: "warning" }).items,
++    ).toEqual([]);
++  });
++  it("distinguishes partial/stale badge totals from a complete zero", () => {
++    expect(attentionBadge(aggregateAttention(workspace(2, true)))).toEqual({
++      text: "2?",
++      label: "2 actionable threads known; total incomplete. 1 stale.",
++    });
++    expect(attentionBadge(aggregateAttention(workspace(0))).text).toBe("0");
++    expect(
++      attentionBadge(aggregateAttention({ isReady: false, environments: new Map() })).text,
++    ).toBe("0?");
++  });
++  it("marks revisions seen and unseen without changing canonical items or counts", () => {
++    const state = workspace(2);
++    const before = aggregateAttention(state);
++    const target = row(0);
++    let seen = markAttentionSeen([], target, true);
++    expect(seen).toEqual([{ key: target.key, environmentId: A, revision: 1 }]);
++    seen = markAttentionSeen(seen, target, true);
++    expect(seen).toHaveLength(1);
++    const revised = { ...target, item: { ...target.item, revision: 2 } };
++    expect(seen[0]?.revision).not.toBe(revised.item.revision);
++    seen = markAttentionSeen(seen, revised, true);
++    expect(seen[0]?.revision).toBe(2);
++    expect(markAttentionSeen(seen, revised, false)).toEqual([]);
++    expect(aggregateAttention(state)).toEqual(before);
++  });
++  it("retains at most 2000 most recently marked scoped revisions", () => {
++    let seen = Array.from({ length: ATTENTION_SEEN_LIMIT }, (_, index) => ({
++      key: row(index).key,
++      environmentId: A,
++      revision: 1,
++    }));
++    seen = [...markAttentionSeen(seen, row(0), true)];
++    seen = [...markAttentionSeen(seen, row(ATTENTION_SEEN_LIMIT), true)];
++    expect(seen).toHaveLength(ATTENTION_SEEN_LIMIT);
++    expect(seen[0]?.key).toBe(row(2).key);
++    expect(seen.at(-2)?.key).toBe(row(0).key);
++    expect(isAttentionSeen(seen)).toBe(true);
++    expect(isAttentionSeen([...seen, seen[0]])).toBe(false);
++  });
++  it("prunes only complete authoritative absence, removal or revocation, never partial/stale caches", () => {
++    const state = workspace(2);
++    const a = row(5);
++    const b = row(5, B);
++    const seen = markAttentionSeen(markAttentionSeen([], a, true), b, true);
++    const observed = new Set([A, B]);
++    expect(pruneAttentionSeen(seen, { ...state, isReady: false }, observed)).toBe(seen);
++    expect(pruneAttentionSeen(seen, { isReady: true, environments: new Map() }, new Set())).toBe(
++      seen,
++    );
++    const disconnected = new Map(state.environments);
++    for (const [id, value] of disconnected)
++      disconnected.set(id, { ...value, status: id === A ? "syncing" : "stale" });
++    expect(pruneAttentionSeen(seen, { ...state, environments: disconnected }, observed)).toBe(seen);
++    expect(pruneAttentionSeen(seen, state, observed)).toEqual([]);
++    disconnected.delete(A);
++    expect(pruneAttentionSeen(seen, { ...state, environments: disconnected }, observed)).toEqual([
++      seen[1],
++    ]);
++    const current = disconnected.get(B)!;
++    disconnected.set(B, { ...current, status: "unauthorized" });
++    expect(pruneAttentionSeen(seen, { ...state, environments: disconnected }, observed)).toEqual(
++      [],
++    );
++  });
++  it("bounds keyboard selection and supports Home/End without truncating large lists", () => {
++    expect(attentionKeyboardIndex("End", 0, 5_000)).toBe(4_999);
++    expect(attentionKeyboardIndex("ArrowDown", 4_999, 5_000)).toBe(4_999);
++    expect(attentionKeyboardIndex("Home", 4_999, 5_000)).toBe(0);
++    expect(attentionKeyboardIndex("ArrowUp", 0, 5_000)).toBe(0);
++    expect(attentionKeyboardIndex("ArrowDown", 0, 0)).toBeNull();
++    expect(attentionKeyboardIndex("Enter", 2, 5_000)).toBeNull();
++  });
++  it("accepts the configurable inbox command without assigning a default shortcut", () => {
++    const rule = decodeKeybindingRule({
++      command: ATTENTION_INBOX_COMMAND,
++      key: "mod+shift+i",
++    });
++    expect(rule.command).toBe(ATTENTION_INBOX_COMMAND);
++    expect(
++      DEFAULT_RESOLVED_KEYBINDINGS.some((entry) => entry.command === ATTENTION_INBOX_COMMAND),
++    ).toBe(false);
++    const bindings = compileResolvedKeybindingsConfig([rule]);
++    expect(
++      resolveShortcutCommand(
++        {
++          key: "i",
++          metaKey: true,
++          ctrlKey: false,
++          shiftKey: true,
++          altKey: false,
++        },
++        bindings,
++        { platform: "MacIntel" },
++      ),
++    ).toBe(ATTENTION_INBOX_COMMAND);
++  });
++});
+diff --git a/apps/web/src/components/attention/attentionInbox.logic.ts b/apps/web/src/components/attention/attentionInbox.logic.ts
+new file mode 100644
+index 000000000..a58c3f2af
+--- /dev/null
++++ b/apps/web/src/components/attention/attentionInbox.logic.ts
+@@ -0,0 +1,141 @@
++import {
++  type AttentionWorkspaceState,
++  type EnvironmentAttentionState,
++  type ScopedAttentionItem,
++  aggregateAttention,
++} from "@t3tools/client-runtime/state/attention";
++import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
++import { EnvironmentId, PositiveInt } from "@t3tools/contracts";
++import * as Schema from "effect/Schema";
++import * as HashMap from "effect/HashMap";
++import * as Option from "effect/Option";
++import { scopedThreadKey } from "@t3tools/client-runtime/environment";
++import { buildThreadRouteParams } from "../../threadRoutes";
++
++export const ATTENTION_INBOX_COMMAND = "attention.open" as const;
++export const ATTENTION_INBOX_ROUTE = { to: "/attention" } as const;
++export const ATTENTION_SEEN_LIMIT = 2_000;
++export const AttentionSeen = Schema.Array(
++  Schema.Struct({
++    key: Schema.String,
++    environmentId: EnvironmentId,
++    revision: PositiveInt,
++  }),
++).check(Schema.isMaxLength(ATTENTION_SEEN_LIMIT));
++export type AttentionSeen = typeof AttentionSeen.Type;
++export const EMPTY_ATTENTION_SEEN: AttentionSeen = [];
++
++export const ATTENTION_KINDS = {
++  approval: "Approval requested",
++  user_input: "Input requested",
++  failure: "Agent failed",
++  disconnect: "Provider disconnected",
++} as const;
++export const ATTENTION_PRIORITIES = {
++  "blocking-error": "Blocking / error",
++  warning: "Warning",
++} as const;
++export const ATTENTION_STATUSES: Record<EnvironmentAttentionState["status"], string> = {
++  loading: "Waiting for attention",
++  syncing: "Synchronizing; previous snapshot is stale",
++  live: "Up to date",
++  stale: "Disconnected or retrying; retained snapshot is stale",
++  unauthorized: "Access denied; cached attention removed",
++  unsupported: "Attention is not supported by this server",
++  error: "Attention sync stopped; reconnect to retry",
++};
++export interface AttentionInboxFilters {
++  environment: string;
++  project: string;
++  kind: string;
++  priority: string;
++}
++export const EMPTY_ATTENTION_FILTERS: AttentionInboxFilters = {
++  environment: "",
++  project: "",
++  kind: "",
++  priority: "",
++};
++
++export function filterAttentionInbox(
++  aggregate: ReturnType<typeof aggregateAttention>,
++  filters: AttentionInboxFilters,
++) {
++  const items = aggregate.items.filter(
++    (row) =>
++      (filters.environment === "" || row.ref.environmentId === filters.environment) &&
++      (filters.project === "" ||
++        scopedProjectKey(scopeProjectRef(row.ref.environmentId, row.item.projectId)) ===
++          filters.project) &&
++      (filters.kind === "" || row.item.kind === filters.kind) &&
++      (filters.priority === "" || row.priority === filters.priority),
++  );
++  return { items, threadCount: new Set(items.map((row) => scopedThreadKey(row.ref))).size };
++}
++
++export function attentionBadge(aggregate: ReturnType<typeof aggregateAttention>) {
++  return {
++    text: aggregate.complete ? String(aggregate.threadCount) : `${aggregate.threadCount}?`,
++    label: `${aggregate.threadCount} actionable ${aggregate.threadCount === 1 ? "thread" : "threads"}${aggregate.complete ? "" : " known; total incomplete"}. ${aggregate.staleThreadCount} stale.`,
++  };
++}
++
++export function attentionThreadTarget(row: ScopedAttentionItem) {
++  return { to: "/$environmentId/$threadId" as const, params: buildThreadRouteParams(row.ref) };
++}
++
++export function markAttentionSeen(
++  current: AttentionSeen,
++  row: ScopedAttentionItem,
++  seen: boolean,
++): AttentionSeen {
++  const rest = current.filter((entry) => entry.key !== row.key);
++  return seen
++    ? [
++        ...rest,
++        { key: row.key, environmentId: row.ref.environmentId, revision: row.item.revision },
++      ].slice(-ATTENTION_SEEN_LIMIT)
++    : rest;
++}
++
++/** Only a complete live snapshot proves that a previously seen item is gone. */
++export function pruneAttentionSeen(
++  current: AttentionSeen,
++  state: AttentionWorkspaceState,
++  observedEnvironments: ReadonlySet<EnvironmentId>,
++): AttentionSeen {
++  if (!state.isReady) return current;
++  const next = current.filter((entry) => {
++    const environment = state.environments.get(entry.environmentId);
++    if (!environment) return !observedEnvironments.has(entry.environmentId);
++    if (environment.status === "unauthorized") return false;
++    if (environment.status !== "live") return true;
++    const change = HashMap.get(
++      environment.entries,
++      `item:${entry.key.slice(entry.environmentId.length + 1)}`,
++    );
++    return (
++      Option.isSome(change) &&
++      change.value.entity?.type === "item" &&
++      change.value.entity.value.status === "open" &&
++      change.value.entity.value.revision === entry.revision
++    );
++  });
++  return next.length === current.length ? current : next;
++}
++
++export function attentionKeyboardIndex(key: string, index: number, count: number): number | null {
++  if (count === 0) return null;
++  switch (key) {
++    case "ArrowDown":
++      return Math.min(count - 1, index + 1);
++    case "ArrowUp":
++      return Math.max(0, index - 1);
++    case "Home":
++      return 0;
++    case "End":
++      return count - 1;
++    default:
++      return null;
++  }
++}
+diff --git a/apps/web/src/components/attention/useOpenAttentionInbox.ts b/apps/web/src/components/attention/useOpenAttentionInbox.ts
+new file mode 100644
+index 000000000..03ab7760e
+--- /dev/null
++++ b/apps/web/src/components/attention/useOpenAttentionInbox.ts
+@@ -0,0 +1,16 @@
++import { useNavigate } from "@tanstack/react-router";
++import { useCallback } from "react";
++import { toastManager } from "../ui/toast";
++import { ATTENTION_INBOX_ROUTE } from "./attentionInbox.logic";
++
++export function useOpenAttentionInbox() {
++  const navigate = useNavigate();
++  return useCallback(async () => {
++    try {
++      await navigate(ATTENTION_INBOX_ROUTE);
++    } catch (error) {
++      console.error("Could not open attention inbox.", error);
++      toastManager.add({ type: "error", title: "Could not open attention inbox" });
++    }
++  }, [navigate]);
++}
+diff --git a/apps/web/src/components/sidebar/SidebarChrome.tsx b/apps/web/src/components/sidebar/SidebarChrome.tsx
+index 5a332b860..1c406648e 100644
+--- a/apps/web/src/components/sidebar/SidebarChrome.tsx
++++ b/apps/web/src/components/sidebar/SidebarChrome.tsx
+@@ -33,6 +33,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+ import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+ import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
+ import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
++import { AttentionSidebarItem } from "../attention/AttentionSidebarItem";
+ 
+ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
+   isElectron,
+@@ -146,7 +147,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
+             ? "usage"
+             : location.pathname === "/pull-requests"
+               ? "pull-requests"
+-              : null,
++              : location.pathname === "/attention"
++                ? "attention"
++                : null,
+   });
+   const { environments } = useEnvironments();
+   // The page reads every connected server, so one of them offering pull requests is enough for
+@@ -189,6 +192,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
+ 
+   return (
+     <SidebarMenu className="flex-row items-center">
++      <AttentionSidebarItem />
+       {currentFooterPage ? (
+         <SidebarMenuItem className="min-w-0 flex-1">
+           <SidebarMenuButton onClick={handleBackClick}>
+diff --git a/apps/web/src/routeTree.gen.ts b/apps/web/src/routeTree.gen.ts
+index f6ba4dece..d2c3dc1aa 100644
+--- a/apps/web/src/routeTree.gen.ts
++++ b/apps/web/src/routeTree.gen.ts
+@@ -30,6 +30,7 @@ import { Route as SettingsArchivedRouteImport } from './routes/settings.archived
+ import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
+ import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
+ import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
++import { Route as ChatAttentionRouteImport } from './routes/_chat.attention'
+ import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
+ import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
+ 
+@@ -138,6 +139,11 @@ const ChatPullRequestsRoute = ChatPullRequestsRouteImport.update({
+   path: '/pull-requests',
+   getParentRoute: () => ChatRoute,
+ } as any)
++const ChatAttentionRoute = ChatAttentionRouteImport.update({
++  id: '/attention',
++  path: '/attention',
++  getParentRoute: () => ChatRoute,
++} as any)
+ const ChatDraftDraftIdRoute = ChatDraftDraftIdRouteImport.update({
+   id: '/draft/$draftId',
+   path: '/draft/$draftId',
+@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
+   '/settings': typeof SettingsRouteWithChildren
+   '/usage': typeof UsageRoute
+   '/welcome': typeof WelcomeRoute
++  '/attention': typeof ChatAttentionRoute
+   '/pull-requests': typeof ChatPullRequestsRoute
+   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+   '/settings/appearance': typeof SettingsAppearanceRoute
+@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
+   '/settings': typeof SettingsRouteWithChildren
+   '/usage': typeof UsageRoute
+   '/welcome': typeof WelcomeRoute
++  '/attention': typeof ChatAttentionRoute
+   '/pull-requests': typeof ChatPullRequestsRoute
+   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+   '/settings/appearance': typeof SettingsAppearanceRoute
+@@ -206,6 +214,7 @@ export interface FileRoutesById {
+   '/settings': typeof SettingsRouteWithChildren
+   '/usage': typeof UsageRoute
+   '/welcome': typeof WelcomeRoute
++  '/_chat/attention': typeof ChatAttentionRoute
+   '/_chat/pull-requests': typeof ChatPullRequestsRoute
+   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+   '/settings/appearance': typeof SettingsAppearanceRoute
+@@ -233,6 +242,7 @@ export interface FileRouteTypes {
+     | '/settings'
+     | '/usage'
+     | '/welcome'
++    | '/attention'
+     | '/pull-requests'
+     | '/projects/$projectKey'
+     | '/settings/appearance'
+@@ -256,6 +266,7 @@ export interface FileRouteTypes {
+     | '/settings'
+     | '/usage'
+     | '/welcome'
++    | '/attention'
+     | '/pull-requests'
+     | '/projects/$projectKey'
+     | '/settings/appearance'
+@@ -281,6 +292,7 @@ export interface FileRouteTypes {
+     | '/settings'
+     | '/usage'
+     | '/welcome'
++    | '/_chat/attention'
+     | '/_chat/pull-requests'
+     | '/projects/$projectKey'
+     | '/settings/appearance'
+@@ -459,6 +471,13 @@ declare module '@tanstack/react-router' {
+       preLoaderRoute: typeof ChatPullRequestsRouteImport
+       parentRoute: typeof ChatRoute
+     }
++    '/_chat/attention': {
++      id: '/_chat/attention'
++      path: '/attention'
++      fullPath: '/attention'
++      preLoaderRoute: typeof ChatAttentionRouteImport
++      parentRoute: typeof ChatRoute
++    }
+     '/_chat/draft/$draftId': {
+       id: '/_chat/draft/$draftId'
+       path: '/draft/$draftId'
+@@ -477,6 +496,7 @@ declare module '@tanstack/react-router' {
+ }
+ 
+ interface ChatRouteChildren {
++  ChatAttentionRoute: typeof ChatAttentionRoute
+   ChatPullRequestsRoute: typeof ChatPullRequestsRoute
+   ChatIndexRoute: typeof ChatIndexRoute
+   ChatEnvironmentIdThreadIdRoute: typeof ChatEnvironmentIdThreadIdRoute
+@@ -484,6 +504,7 @@ interface ChatRouteChildren {
+ }
+ 
+ const ChatRouteChildren: ChatRouteChildren = {
++  ChatAttentionRoute: ChatAttentionRoute,
+   ChatPullRequestsRoute: ChatPullRequestsRoute,
+   ChatIndexRoute: ChatIndexRoute,
+   ChatEnvironmentIdThreadIdRoute: ChatEnvironmentIdThreadIdRoute,
+diff --git a/apps/web/src/routes/_chat.attention.tsx b/apps/web/src/routes/_chat.attention.tsx
+new file mode 100644
+index 000000000..01bc9873e
+--- /dev/null
++++ b/apps/web/src/routes/_chat.attention.tsx
+@@ -0,0 +1,6 @@
++import { createFileRoute } from "@tanstack/react-router";
++import { AttentionInbox } from "../components/attention/AttentionInbox";
++
++export const Route = createFileRoute("/_chat/attention")({
++  component: AttentionInbox,
++});
+diff --git a/docs/internals/overview.md b/docs/internals/overview.md
+index a7fbfd315..bc1627338 100644
+--- a/docs/internals/overview.md
++++ b/docs/internals/overview.md
+@@ -287,3 +287,26 @@ down, so new native capability goes in a child with a deadline, not an `import`
+ 
+ See the [glossary](./glossary.md) for shared terms and the
+ [development runbook](../operations/development.md) for setup and checks.
++
++## Web and desktop attention inbox
++
++The `/attention` route consumes the single web `attentionWorkspace`; the
++authenticated app sidebar layout retains it across route/sidebar changes.
++Both sidebar variants and Settings use one attention entry. Command-palette
++selection and the configurable `attention.open` shortcut share the same route
++action. No shortcut is assigned by default, and the existing OS notification
++coordinator/badge is unchanged.
++
++The page filters the already-sorted aggregate, rather than re-sorting for each
++consumer. LegendList bounds rendered rows; only visible rows read thread shell
++titles, and thread detail is loaded only after scoped navigation. The listbox
++retains selection by scoped item identity, scrolls keyboard selection into view
++and exposes an active descendant only while its row is mounted.
++
++Seen state is a schema-checked, device-local list of at most 2000 recent scoped
++item revisions. Marking seen/unseen never changes canonical counts. Cleanup
++uses direct item lookups and only trusts absence in a live complete snapshot.
++Environment removal is recognized only after that environment was observed in
++the current mount: the initially empty catalog during discovery is not evidence
++that persisted seen marks should be erased. Unknown leftover IDs remain bounded
++by the retention cap, without persisting titles, prompts or provider output.
+diff --git a/docs/user/attention.md b/docs/user/attention.md
+new file mode 100644
+index 000000000..ee6e476d6
+--- /dev/null
++++ b/docs/user/attention.md
+@@ -0,0 +1,26 @@
++# Attention inbox
++
++Open **Attention inbox** from the sidebar or command palette to see open approvals,
++input requests, agent failures and provider disconnections across enabled
++environments. The sidebar badge counts threads, while the inbox lists individual
++items: two approvals in one thread count as one thread and two items.
++
++Use Environment, Project, Kind and Severity to narrow the list. Blocking requests
++and errors appear before warnings, oldest first within each group. In the list,
++Up/Down and Home/End select an item; Enter opens its owning thread. Respond using
++the thread's normal approval or input controls.
++
++A `?` after the badge count means the total is incomplete. Disconnected
++environments retain a visibly stale snapshot; their items might already be
++resolved elsewhere. Reconnect before responding. Disabling or removing an
++environment removes its cached attention from this client.
++
++Opening an item marks that revision **Seen** on this device. **Mark unseen**
++reverses the emphasis. A changed revision becomes unseen again. Seen items
++remain in the inbox and actionable count until the environment resolves them;
++seen history keeps up to 2,000 recent marks.
++
++You can assign **Attention: Open** in Settings → Keybindings. No shortcut is
++assigned by default. The inbox and its badge are separate from background
++notification badges; opening the app or marking items seen does not resolve
++attention or change notification preferences.
+diff --git a/docs/user/keybindings.md b/docs/user/keybindings.md
+index 5c62b3d85..1910fd895 100644
+--- a/docs/user/keybindings.md
++++ b/docs/user/keybindings.md
+@@ -130,3 +130,10 @@ keyboard repeat; if repeat is disabled, use two presses or the application menu.
+ Change **Settings → General → Confirmations → Quit shortcut** to **Direct** for a
+ single press or **Double press** for two presses only. Choosing **Quit** from the
+ application menu always quits immediately.
++
++## Open the attention inbox
++
++Choose **Open attention inbox** in the command palette, or assign
++`attention.open` in Settings → Keybindings. No shortcut is assigned by default.
++Inside the [attention inbox](./attention.md), Up/Down and Home/End select an
++item; Enter opens its owning thread.
+diff --git a/docs/user/thread-sidebar.md b/docs/user/thread-sidebar.md
+index dfd2eb865..6b487b52f 100644
+--- a/docs/user/thread-sidebar.md
++++ b/docs/user/thread-sidebar.md
+@@ -109,6 +109,11 @@ The linked pull request participates in automatic settlement.
+ 
+ ## Find and reference work
+ 
++The sidebar's [attention inbox](./attention.md) badge counts threads with open
++approvals, input requests, failures or provider disconnections across enabled
++environments. A `?` marks an incomplete total; opening or marking an item seen
++does not resolve it.
++
+ On web and desktop, open the command palette with `Cmd/Ctrl+K` to search threads
+ across connected environments. Message search starts after two characters and
+ includes your messages and final agent responses.
+diff --git a/packages/contracts/src/keybindings.ts b/packages/contracts/src/keybindings.ts
+index 634bd611a..d447e74a3 100644
+--- a/packages/contracts/src/keybindings.ts
++++ b/packages/contracts/src/keybindings.ts
+@@ -55,6 +55,7 @@ const MODEL_PICKER_KEYBINDING_COMMANDS = [
+ export type ModelPickerKeybindingCommand = (typeof MODEL_PICKER_KEYBINDING_COMMANDS)[number];
+ 
+ export const STATIC_KEYBINDING_COMMANDS = [
++  "attention.open",
+   "sidebar.toggle",
+   "terminal.toggle",
+   "terminal.split",

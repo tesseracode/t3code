@@ -1,0 +1,188 @@
+diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
+index a110d2019..7d8c907a8 100644
+--- a/docs/user/providers-copilot.md
++++ b/docs/user/providers-copilot.md
+@@ -7,8 +7,12 @@ not the ACP registry or a separately billed hosted model service.
+ Sign in on that environment with `copilot login`, then refresh provider status.
+ Models and reasoning options come from your account's available catalog.
+ 
+-When your account advertises **Auto routing**, its **Routing** option includes the eligible
+-preferences, including Fusion. Disabled preferences show their account-specific reason.
++When **Auto** is available in your model catalog, you can select it to let Copilot
++choose the model using its current routing preferences. Auto remains available
++even when the account does not supply routing-preference details.
++
++When your account advertises routing preferences, Auto's **Routing** option includes the
++eligible preferences, including Fusion. Disabled preferences show their account-specific reason.
+ Requests can remain pending before they take effect; the activity log distinguishes requested,
+ effective, and activating routing and shows reported model phases and timing. See
+ [Activity log](activity-log.md). Explicit-model selection and defaults are unchanged.
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index 06b3d0907..230bee4b0 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -416,6 +416,41 @@ describe("native Copilot V2", () => {
+         }),
+       ),
+   );
++  it.effect(
++    "creates, resumes and switches plain Auto turns without optional routing-tier metadata",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const autoSelection: ModelSelection = { instanceId, model: "auto" };
++          for (const resumed of [undefined, "native-copilot"]) {
++            const fake = fakeSdk();
++            fake.setCurrent({ modelId: "auto" });
++            const { start, drain } = yield* setup(fake, resumed, autoSelection);
++            assert.equal(fake.config.model, "auto");
++            assert.isUndefined(fake.config.capi);
++            yield* start();
++            assert.equal(fake.sent.length, 1);
++            fake.emit("session.idle");
++            yield* drain();
++            yield* start(2, selection);
++            fake.emit("session.idle");
++            yield* drain();
++            yield* start(3, autoSelection);
++            assert.equal(fake.sent.length, 3);
++            assert.deepEqual(
++              fake.modelChanges.map((change) => change.model),
++              ["auto", "gpt-4.1", "auto"],
++            );
++            assert.isTrue(
++              fake.modelChanges.every((change) => change.options?.autoTier === undefined),
++            );
++            fake.emit("session.idle");
++            yield* drain();
++          }
++        }),
++      ),
++  );
++
+   it.effect(
+     "preserves opaque create/resume routing and distinguishes pending, applied and failed activation",
+     () =>
+diff --git a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts
+index 43247659d..b507bbfd8 100644
+--- a/packages/provider-copilot/src/server/routing.test.ts
++++ b/packages/provider-copilot/src/server/routing.test.ts
+@@ -69,7 +69,15 @@ describe("account-advertised routing", () => {
+           autoCatalog,
+         ),
+       );
+-    assert.throws(() => autoTierForSelection({ instanceId, model: "auto" }), /does not advertise/);
++    assert.throws(
++      () =>
++        autoTierForSelection({
++          instanceId,
++          model: "auto",
++          options: [{ id: "autoTier", value: "fuse@2026:opaque" }],
++        }),
++      /does not advertise/,
++    );
+     assert.throws(
+       () =>
+         autoTierForSelection(
+@@ -83,4 +91,10 @@ describe("account-advertised routing", () => {
+       /requires/,
+     );
+   });
++  it("leaves plain Auto routing to the runtime without requiring an advertised default tier", () => {
++    const selection = { instanceId, model: "auto" };
++    assert.isUndefined(autoTierForSelection(selection));
++    assert.isUndefined(autoTierForSelection(selection, { defaultTier: "unknown", tiers: [] }));
++    assert.isUndefined(autoTierForSelection(selection, { ...autoCatalog, defaultTier: "blocked" }));
++  });
+ });
+diff --git a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts
+index 390a40760..9bbac0183 100644
+--- a/packages/provider-copilot/src/server/routing.ts
++++ b/packages/provider-copilot/src/server/routing.ts
+@@ -52,9 +52,10 @@ export function autoTierForSelection(selection: ModelSelection, auto?: AutoCatal
+       throw new Error("A Copilot routing preference requires the account-advertised auto model.");
+     return undefined;
+   }
++  if (requested === undefined) return undefined;
+   if (!auto)
+-    throw new Error("This Copilot runtime/account does not advertise Auto or Fusion routing.");
+-  const id = requested ?? auto.defaultTier;
++    throw new Error("This Copilot runtime/account does not advertise routing preferences.");
++  const id = requested;
+   const tier = auto.tiers.find((entry) => entry.id === id);
+   if (!tier || tier.id.length > 512 || !tier.status.enabled || tier.status.pickerVisible === false)
+     throw new Error(
+diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
+index 8ca6de9ca..0b076b80f 100644
+--- a/packages/provider-copilot/src/server/status.test.ts
++++ b/packages/provider-copilot/src/server/status.test.ts
+@@ -58,6 +58,22 @@ describe("Copilot discovery and account isolation", () => {
+       ["explicit"],
+     );
+   });
++  it("keeps advertised plain Auto without tier metadata or invented routing choices", () => {
++    const result = modelsFromSdk([model("explicit"), model("auto")], decode({}));
++    assert.deepEqual(
++      result.map((entry) => entry.slug),
++      ["explicit", "auto"],
++    );
++    assert.isTrue(result[0]?.isDefault);
++    assert.isUndefined(result[1]?.isDefault);
++    assert.deepEqual(result[1]?.capabilities?.optionDescriptors, []);
++    assert.deepEqual(
++      modelsFromSdk([model("auto", { policy: { state: "disabled", terms: "" } })], decode({})),
++      [],
++    );
++    assert.deepEqual(modelsFromSdk([], decode({})), []);
++  });
++
+   it("keeps project/native skills in workspace results, including pathless built-ins", () => {
+     const skills = skillsFromSdk([
+       skill("project-skill", "project"),
+@@ -177,12 +193,17 @@ describe("Copilot discovery and account isolation", () => {
+           forceStop: async () => {},
+           getStatus: async () => ({ version: "1.0.75", protocolVersion: 1 }),
+           getAuthStatus: async () => ({ isAuthenticated: true, login: "octocat" }),
+-          rpc: { models: { list: async () => ({ models: [model("gpt")] }) } },
++          rpc: { models: { list: async () => ({ models: [model("gpt"), model("auto")] }) } },
+         }),
+       );
+       assert.equal(result.status, "ready");
+       assert.equal(result.auth.label, "octocat");
+       assert.equal(result.models[0]?.slug, "gpt");
++      assert.equal(result.models[1]?.slug, "auto");
++      assert.equal(
++        result.message,
++        "This account/runtime does not advertise routing preferences. Available models can still use their default routing.",
++      );
+       assert.deepEqual(result.skills, []);
+       assert.equal(stops, 1);
+     }),
+diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts
+index 5c863ab42..019d99146 100644
+--- a/packages/provider-copilot/src/server/status.ts
++++ b/packages/provider-copilot/src/server/status.ts
+@@ -31,13 +31,7 @@ export function modelsFromSdk(
+     models
+       .flatMap((model) => {
+         const slug = model.id.trim();
+-        if (
+-          !slug ||
+-          !model.name.trim() ||
+-          seen.has(slug) ||
+-          model.policy?.state === "disabled" ||
+-          (slug === "auto" && !auto)
+-        )
++        if (!slug || !model.name.trim() || seen.has(slug) || model.policy?.state === "disabled")
+           return [];
+         seen.add(slug);
+         const efforts = model.supportedReasoningEfforts ?? [];
+@@ -223,7 +217,7 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
+         : !catalog.auto
+           ? {
+               message:
+-                "This account/runtime does not advertise Auto or Fusion routing. Explicit models remain available.",
++                "This account/runtime does not advertise routing preferences. Available models can still use their default routing.",
+             }
+           : {}),
+     },

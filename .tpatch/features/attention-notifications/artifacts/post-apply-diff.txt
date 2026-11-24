@@ -1,0 +1,6 @@
+ .../artifacts/apply-recipe.json                    | 174 ++++++++-------------
+ .../artifacts/apply-session.json                   |   7 +-
+ .../artifacts/manual-validation.md                 |   4 +-
+ .../artifacts/post-apply-diff.txt                  |  21 +--
+ .../features/attention-notifications/status.json   |  10 +-
+ 5 files changed, 76 insertions(+), 140 deletions(-)

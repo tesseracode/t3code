@@ -1,0 +1,35 @@
+{
+  "kind": "manual-compatibility-recipe-and-removal-attestation",
+  "generated_at": "2026-10-29T17:25:53.425287+00:00",
+  "base_commit": "6c925ff7c8ad226f5535ba3464636377a292437e",
+  "write_paths": [
+    "packages/client-runtime/src/state/attention.test.ts",
+    "packages/client-runtime/src/state/commandPermissions.test.ts",
+    "packages/client-runtime/src/state/attention.ts",
+    "apps/server/src/tws/TwsCliDecoder.ts",
+    "docs/internals/tws-context.md"
+  ],
+  "manual_removals": [
+    {
+      "path": "apps/mobile/src/state/attention.ts",
+      "preimage_sha256": "9eeed4917c626acc293212efa6d3e6788593a3f19ecd9beba4a4eac517b72c3d",
+      "mode": "supported manual apply session with git rm; no delete-file recipe operation exists"
+    },
+    {
+      "path": "apps/mobile/src/state/tws.ts",
+      "preimage_sha256": "3b6e4d6670ebd44ea1899b3fbd3224803c3c853d22157b02881516690de89d4b",
+      "mode": "supported manual apply session with git rm; no delete-file recipe operation exists"
+    }
+  ],
+  "preserved_canonical_roots": {
+    "phase1-foundation": {
+      "post-apply.patch": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+      "apply-recipe.json": "4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e"
+    },
+    "attention-notifications": {
+      "post-apply.patch": "6feb99da51a9427557a215cfcfcde7a8b8f7de07489c01d724556f2876e860d1",
+      "apply-recipe.json": "8d9797d8e72e39081b7a66612c42f8813f13cd09f93a72317349ec2678153c52"
+    }
+  },
+  "formatted_content_refreshed_at": "2026-10-29T17:28:01.972778+00:00"
+}

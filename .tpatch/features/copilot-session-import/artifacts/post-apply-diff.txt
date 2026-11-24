@@ -1,0 +1,21 @@
+ .../src/features/threads/ThreadDetailScreen.tsx    | 153 ++++-----
+ .../state/threadOutboxDelivery.permissions.test.ts |  36 +++
+ apps/mobile/src/state/threadOutboxDelivery.ts      |   4 +
+ apps/mobile/src/state/use-thread-composer-state.ts |   9 +-
+ .../Orchestrator.control-reads.test.ts             | 145 +++++++++
+ apps/server/src/orchestration-v2/Orchestrator.ts   |  53 ++++
+ .../server/src/orchestration-v2/ProjectionStore.ts |   6 +
+ .../src/orchestration-v2/ThreadMessageIntake.ts    |   1 +
+ .../src/project/AgentSessionImporter.test.ts       |  81 ++++-
+ apps/server/src/project/AgentSessionImporter.ts    | 103 +++++--
+ .../server/src/project/AgentSessionScanner.test.ts | 343 +++++++++++++++++++++
+ apps/server/src/project/AgentSessionScanner.ts     | 330 +++++++++++++++++++-
+ apps/web/src/components/ChatView.tsx               |  10 +-
+ .../src/components/onboarding/WelcomeWizard.tsx    |  22 +-
+ docs/user/providers-copilot.md                     |  23 +-
+ docs/user/welcome-wizard.md                        |   7 +-
+ packages/client-runtime/src/state/models.ts        |   2 +
+ .../client-runtime/src/state/threadWorkflows.ts    |   1 +
+ packages/contracts/src/agentSessions.ts            |  14 +-
+ packages/contracts/src/orchestrationV2.ts          |   3 +
+ 20 files changed, 1222 insertions(+), 124 deletions(-)

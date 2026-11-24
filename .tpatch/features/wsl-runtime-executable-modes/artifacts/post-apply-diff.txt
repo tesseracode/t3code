@@ -1,0 +1,9 @@
+ .../wsl-runtime-executable-modes/analysis.md       |   7 +-
+ .../artifacts/apply-session.json                   |   9 +-
+ .../artifacts/manual-validation.md                 |   6 +-
+ .../artifacts/post-apply-diff.txt                  |  16 +-
+ .../artifacts/post-apply.patch                     | 995 +++++++++++----------
+ .../wsl-runtime-executable-modes/exploration.md    |  14 +-
+ .../features/wsl-runtime-executable-modes/spec.md  |  24 +-
+ .../wsl-runtime-executable-modes/status.json       |  10 +-
+ 8 files changed, 598 insertions(+), 483 deletions(-)

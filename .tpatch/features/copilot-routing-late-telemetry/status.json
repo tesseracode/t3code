@@ -1,0 +1,32 @@
+{
+  "id": "copilot-routing-late-telemetry",
+  "slug": "copilot-routing-late-telemetry",
+  "title": "Persist Auto routing resolutions and preserve late Fusion route/phase facts without inventing execution or completing a root turn; show resolved virtual model, actual final model and execution pattern in shared chat activity.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-03T09:21:02Z",
+  "updated_at": "2026-11-03T09:33:47Z",
+  "last_command": "verify",
+  "notes": "Patch recorded",
+  "apply": {
+    "completed_at": "2026-11-03T09:32:40Z",
+    "base_commit": "07508376dc320bdbcddd98b5ff33d72d3b142469",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-auto-default-routing",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-03T09:33:43Z",
+    "passed": false,
+    "recipe_hash_at_verify": "d2ea728ea2927fa958e78ffff9414a9183a27d5cf44f879525c89a0995c4b4d5",
+    "patch_hash_at_verify": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+    "parent_snapshot": {
+      "copilot-auto-default-routing": "applied"
+    }
+  }
+}

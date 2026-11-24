@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "feature": "copilot-sdk-runtime-upgrade",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_915cae4e0cf6",
+      "kind": "record",
+      "patch_sha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+      "git_patch_id": "0ba52b93300e3e4d11e7b6bace4307476ece4ee4",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "a043de31d500054e1be2d1907c09e088ad0b74de",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/package.json",
+          "packages/provider-copilot/package.json",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts",
+          "packages/provider-copilot/src/server/client.ts",
+          "packages/provider-copilot/src/server/status.test.ts",
+          "packages/provider-copilot/src/server/tools.ts",
+          "packages/shared/src/copilotRuntime.test.ts",
+          "packages/shared/src/copilotRuntime.ts",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "scripts/build-desktop-artifact.test.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/lib/cli-external-packages.test.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/package.json",
+        "packages/provider-copilot/package.json",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-copilot/src/server/client.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/tools.ts",
+        "packages/shared/src/copilotRuntime.test.ts",
+        "packages/shared/src/copilotRuntime.ts",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/cli-external-packages.test.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 24,
+          "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

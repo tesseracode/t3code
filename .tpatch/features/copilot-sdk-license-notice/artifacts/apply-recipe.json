@@ -1,0 +1,11 @@
+{
+  "feature": "copilot-sdk-license-notice",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "third-party-licenses.config.json",
+      "search": "  \"packageOverrides\": [\n",
+      "replace": "  \"packageOverrides\": [\n    {\n      \"name\": \"@github/copilot-sdk\",\n      \"version\": \"1.0.8\",\n      \"license\": \"MIT\",\n      \"sourceUrl\": \"https://github.com/github/copilot-sdk/blob/a54b0b5885534ba5ad073cfe99c7f0085b1be11c/LICENSE\",\n      \"generatedNotice\": {\n        \"licenseId\": \"MIT\",\n        \"copyrights\": [\"Copyright GitHub, Inc.\"]\n      }\n    },\n"
+    }
+  ]
+}

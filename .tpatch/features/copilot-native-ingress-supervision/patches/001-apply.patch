@@ -1,0 +1,157 @@
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index cb025ce52c..e2428debe3 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -19,6 +19,7 @@ import {
+   type ModelSelection,
+   type ServerProviderSkill,
+ } from "@t3tools/contracts";
++import * as Cause from "effect/Cause";
+ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+ import * as Exit from "effect/Exit";
+@@ -44,6 +45,8 @@ const policy: ProviderAdapter.ProviderAdapterV2RuntimePolicy = {
+   interactionMode: "default",
+ };
+ const settings = Schema.decodeSync(CopilotSettings)({});
++const isEventStreamError = Schema.is(ProviderAdapter.ProviderAdapterEventStreamError);
++const isProtocolError = Schema.is(ProviderAdapter.ProviderAdapterProtocolError);
+ const host = ProviderHost.ProviderHost.of({
+   paths: {
+     cwd: "/workspace",
+@@ -305,7 +308,7 @@ const setup = Effect.fnUntraced(function* (
+   });
+   const emitted: ProviderAdapter.ProviderAdapterV2Event[] = [];
+   const eventQueue = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
+-  yield* runtime.events.pipe(
++  const eventFiber = yield* runtime.events.pipe(
+     Stream.runForEach((event) =>
+       Effect.sync(() => {
+         emitted.push(event);
+@@ -372,7 +375,7 @@ const setup = Effect.fnUntraced(function* (
+     });
+   });
+   const drain = () => runtime.readThreadSnapshot({ providerThread: thread });
+-  return { runtime, thread, emitted, start, drain, takeEvent };
++  return { runtime, thread, emitted, start, drain, takeEvent, eventFiber };
+ });
+ 
+ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+@@ -1747,6 +1750,55 @@ describe("native Copilot V2", () => {
+       ),
+   );
+ 
++  it.effect("fails its stream and drains when a native handler fails during interruption", () =>
++    provide(
++      Effect.gen(function* () {
++        const fake = fakeSdk();
++        const { runtime, start, drain, thread, eventFiber } = yield* setup(fake, "native-copilot");
++        yield* start();
++        const turn = (yield* drain()).providerTurns[0]!;
++        const failure = new Error("Routing read failed during interruption.");
++        const reading = promiseGate();
++        const rejectRead = promiseGate();
++        fake.session.rpc.model.getCurrent = async () => {
++          reading.resolve();
++          await rejectRead.promise;
++          throw failure;
++        };
++        fake.session.abort = async () => {
++          fake.emit("session.model_change", { newModel: "gpt-4.1" });
++          fake.emit("session.idle");
++        };
++        yield* runtime.interruptTurn({ providerThread: thread, providerTurnId: turn.id });
++        yield* Effect.promise(() => reading.promise);
++        const pendingDrain = yield* drain().pipe(Effect.exit, Effect.forkChild);
++        rejectRead.resolve();
++        const stream = yield* Fiber.await(eventFiber);
++        assert.isTrue(Exit.isFailure(stream));
++        if (Exit.isFailure(stream)) {
++          const error = Cause.squash(stream.cause);
++          assert.instanceOf(error, ProviderAdapter.ProviderAdapterEventStreamError);
++          if (isEventStreamError(error)) {
++            assert.equal(error.driver, runtime.driver);
++            assert.equal(error.providerSessionId, sessionId);
++            assert.instanceOf(error.cause, ProviderAdapter.ProviderAdapterProtocolError);
++            if (isProtocolError(error.cause)) {
++              assert.equal(error.cause.cause, failure);
++            }
++            for (const draining of [yield* Fiber.join(pendingDrain), yield* Effect.exit(drain())]) {
++              assert.isTrue(Exit.isFailure(draining));
++              if (Exit.isFailure(draining)) {
++                assert.equal(Cause.squash(draining.cause), error);
++              }
++            }
++          }
++        }
++        assert.equal(fake.resumed, "native-copilot");
++        assert.lengthOf(fake.sent, 1);
++      }),
++    ),
++  );
++
+   it.effect("bridges permission and user-input callbacks as live V2 requests", () =>
+     provide(
+       Effect.gen(function* () {
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+index 30f91876dd..0c9d933acd 100644
+--- a/packages/provider-copilot/src/server/adapter.ts
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -34,9 +34,11 @@ import {
+   getModelSelectionStringOptionValue,
+   getProviderOptionStatedValue,
+ } from "@t3tools/shared/model";
++import * as Cause from "effect/Cause";
+ import * as DateTime from "effect/DateTime";
+ import * as Deferred from "effect/Deferred";
+ import * as Effect from "effect/Effect";
++import * as Fiber from "effect/Fiber";
+ import * as Schema from "effect/Schema";
+ import * as Queue from "effect/Queue";
+ import * as Option from "effect/Option";
+@@ -264,7 +266,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+       const cwd = open.runtimePolicy.cwd ?? host.paths.cwd;
+       const skillOwner = Symbol();
+       const skillMutationSemaphore = yield* Semaphore.make(1);
+-      const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
++      const events = yield* Queue.unbounded<
++        ProviderAdapter.ProviderAdapterV2Event,
++        ProviderAdapter.ProviderAdapterEventStreamError
++      >();
+       const inbox = yield* Queue.unbounded<Ingress>();
+       const now = yield* DateTime.now;
+       const providerSession = {
+@@ -1648,12 +1653,24 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+         });
+         yield* putItem(turn, id, item);
+       });
+-      yield* Stream.fromQueue(inbox).pipe(
++      const ingress = yield* Stream.fromQueue(inbox).pipe(
+         Stream.runForEach((entry) => {
+           if (entry.type === "drain") return Deferred.succeed(entry.receipt, undefined);
+           if (entry.type === "accepted") return active?.idle ? terminal(active) : Effect.void;
+           return entry.type === "event" ? onEvent(entry.event) : onRequest(entry);
+         }),
++        Effect.catchCause((cause) =>
++          Cause.hasInterruptsOnly(cause)
++            ? Effect.interrupt
++            : new ProviderAdapter.ProviderAdapterEventStreamError({
++                driver: COPILOT_DRIVER,
++                providerSessionId: open.providerSessionId,
++                cause: Cause.squash(cause),
++              }),
++        ),
++        Effect.tapError((error) =>
++          Queue.fail(events, error).pipe(Effect.andThen(Queue.shutdown(inbox))),
++        ),
+         Effect.forkScoped,
+       );
+ 
+@@ -1661,6 +1678,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+         const receipt = yield* Deferred.make<void>();
+         yield* Queue.offer(inbox, { type: "drain", receipt });
+         yield* Deferred.await(receipt).pipe(
++          Effect.raceFirst(Fiber.join(ingress)),
+           Effect.timeoutOption(15_000),
+           Effect.flatMap((result) =>
+             Effect.fromOption(result).pipe(

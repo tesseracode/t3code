@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.1",
+  "slug": "session-search",
+  "verified_at": "2026-10-29T21:36:22Z",
+  "verdict": "failed",
+  "exit_code": 2,
+  "repository": {
+    "object_format": "sha1",
+    "commit_id_hex_len": 40,
+    "shallow": false,
+    "partial_clone": false,
+    "git_version": "git version 2.55.0",
+    "git_floor_satisfied": true
+  },
+  "baseline": {
+    "mode": "dual-anchor",
+    "current_commit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+    "current_probe": "isolated-index",
+    "historical_anchor": {
+      "state": "unavailable",
+      "candidates_collected": 0,
+      "candidates_qualified": 0,
+      "reason": "landing evidence is malformed"
+    }
+  },
+  "landing_evidence": {
+    "state": "malformed",
+    "attestation_commit": "8605454d5cba4ab065f43fa694e62868fe093e31",
+    "candidates": 2,
+    "parent_count": 1,
+    "patch_presence": "present-nonempty",
+    "recipe_presence": "present-nonempty-with-ops",
+    "reason": "commit 8605454d5cba4ab065f43fa694e62868fe093e31 carries a Tpatch-Feature line that git does not parse as a terminal trailer, or a duplicated/ill-formed Tpatch-* value"
+  },
+  "target_mode": "landed",
+  "checks": [
+    {
+      "id": "status_loaded",
+      "severity": "block-abort",
+      "passed": true
+    },
+    {
+      "id": "intent_files_present",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_parses",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_op_targets_resolve",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "dep_metadata_valid",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "satisfied_by_reachable",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "no satisfied_by deps to check"
+    },
+    {
+      "id": "dependency_gate_satisfied",
+      "severity": "warn",
+      "passed": true
+    },
+    {
+      "id": "recipe_replay_clean",
+      "severity": "block",
+      "passed": false,
+      "remediation": "landing evidence for session-search is malformed: commit 8605454d5cba4ab065f43fa694e62868fe093e31 carries a Tpatch-Feature line that Git does not parse as a trailer, or a duplicated/ill-formed Tpatch-* value; restore the four-trailer block with git commit --amend, or re-land",
+      "mode": "historical-anchor"
+    },
+    {
+      "id": "post_apply_patch_replay_clean",
+      "severity": "block",
+      "passed": false,
+      "remediation": "landing evidence for session-search is malformed: the historical half of this check could not run; see recipe_replay_clean",
+      "mode": "dual-anchor",
+      "anchor_results": {
+        "current": "skipped",
+        "historical": "skipped"
+      }
+    },
+    {
+      "id": "reconcile_outcome_consistent",
+      "severity": "warn",
+      "passed": false,
+      "remediation": "reconcile outcome is blocked; verify cannot vouch for reconcile health (warn-only)"
+    },
+    {
+      "id": "write_file_preimage_fresh",
+      "severity": "block",
+      "passed": false,
+      "remediation": "landing evidence for session-search is malformed: preimage freshness cannot be evaluated without a landing baseline; see recipe_replay_clean",
+      "mode": "historical-anchor"
+    }
+  ],
+  "lifecycle_state": "applied",
+  "recipe_hash_at_verify": "317f5c18c9ea5ddbeaabb3a9813cbba243a365de8703c81d78fea341779f9c3f",
+  "patch_hash_at_verify": "e98b6ddf7a85432e3adb7ce5bb29ffc4cfae0a2d196c6239bd7d893955f20019",
+  "failed_at": "landing-evidence"
+}

@@ -1,0 +1,12 @@
+diff --git a/.gitignore b/.gitignore
+index 81568b229..8482c5a29 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -27,7 +27,6 @@ squashfs-root/
+ .vercel
+ .gstack/
+ .plans/
+-.tpatch/local/
+ dist-electron/
+ .electron-runtime/
+ .showcase/

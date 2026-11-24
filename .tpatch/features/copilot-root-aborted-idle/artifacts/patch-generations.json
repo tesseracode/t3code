@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "feature": "copilot-root-aborted-idle",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_b501d1166c77",
+      "kind": "record",
+      "patch_sha256": "2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963",
+      "git_patch_id": "7b389f9cd64e76d330ef5d83333c2a8ef69c6992",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "1397679380a80b9b583a88cd9437b2d017aa48a939be64ba06478aeccf0f7eb3",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "3e6a6d4ee53d7f6c02109d5731df745cf997fd7c",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "docs/user/providers-copilot.md",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/user/providers-copilot.md",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-idle-agent-completion",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+          "parent_recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3"
+        },
+        {
+          "slug": "copilot-native-ingress-supervision",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+          "parent_recipe_sha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

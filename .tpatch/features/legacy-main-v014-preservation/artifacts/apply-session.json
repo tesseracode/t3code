@@ -1,0 +1,8 @@
+{
+  "slug": "legacy-main-v014-preservation",
+  "completed_at": "2026-11-06T06:34:16Z",
+  "base_commit": "4a34c4941f17ae85cb68f55f89da80dc9b54abc8",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "Focused failing-first behavior cases, independent review corrections, 33 affected typechecks, 225 tests and isolated no-inference client qualification passed."
+}

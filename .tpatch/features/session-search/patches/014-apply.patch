@@ -1,0 +1,182 @@
+diff --git a/apps/server/src/orchestration-v2/ThreadFind.test.ts b/apps/server/src/orchestration-v2/ThreadFind.test.ts
+index 0a1b2a3c6..ce09e5788 100644
+--- a/apps/server/src/orchestration-v2/ThreadFind.test.ts
++++ b/apps/server/src/orchestration-v2/ThreadFind.test.ts
+@@ -30,7 +30,6 @@ import {
+   THREAD_HISTORY_PAGE_POLICY,
+ } from "./threadHistoryPaging.ts";
+ import { projectTurnItemForWire } from "./WireProjection.ts";
+-import { findProjectedThreadItems } from "./ThreadFind.ts";
+ 
+ const layerTest = Layer.mergeAll(EventStore.layer, ProjectionStore.layer, ProjectStore.layer).pipe(
+   Layer.provideMerge(SqlitePersistence.layerMemory),
+@@ -201,7 +200,7 @@ const setup = Effect.gen(function* () {
+ });
+ 
+ describe("V2 thread find", () => {
+-  it.effect("navigates activity summaries and messages identically in SQLite and memory", () =>
++  it.effect("navigates activity summaries and messages in occurrence order", () =>
+     Effect.gen(function* () {
+       const projection = yield* setup;
+       const items: OrchestrationV2TurnItem[] = [
+@@ -238,13 +237,6 @@ describe("V2 thread find", () => {
+         item("async-answer:answered", 9, "needle", "user_message"),
+       ];
+       yield* putItems(items);
+-      const projected = items.map((item, position) => ({
+-        item,
+-        position,
+-        visibility: "local" as const,
+-        sourceThreadId: threadId,
+-        sourceItemId: item.id,
+-      }));
+       const expected = [
+         "prompt",
+         "command",
+@@ -260,7 +252,8 @@ describe("V2 thread find", () => {
+         const result = yield* projection.searchThread(input);
+         assert.equal(result.totalMatches, expected.length);
+         assert.equal(result.match?.entryId, entryId);
+-        assert.deepEqual(result.match, findProjectedThreadItems(projected, input, 0).match);
++        assert.equal(result.match?.occurrence, index === 2 ? 1 : 0);
++        assert.equal(result.activeIndex, index);
+       }
+       const wrapped = yield* projection.searchThread({
+         threadId,
+diff --git a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
+index 99c406b99..5b4d8627d 100644
+--- a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
++++ b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx
+@@ -11,7 +11,6 @@ import {
+   TurnItemId,
+   ScheduledTaskId,
+   ThreadId,
+-  TurnItemId,
+ } from "@t3tools/contracts";
+ import type { LegendListRef } from "@legendapp/list/react";
+ import { createRef, Profiler, StrictMode, type ComponentProps, type ReactElement } from "react";
+@@ -1195,6 +1194,29 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
+   await click(screen.button("Why am I being asked this?"));
+   await expect.element(page.getByText(/an ask rule in the agent's own settings/)).toBeVisible();
+   await click(screen.button("Why am I being asked this?"));
++  await screen.rerender(
++    ui({
++      findOpen: true,
++      findExpanded: true,
++      findActivity: true,
++      findQuery: "long-command",
++      activeFindMatch: { entryId: "approval-0", runId: fixture.runId, occurrence: 79 },
++    }),
++  );
++  await vi.waitFor(() => {
++    const active = CSS.highlights.get("t3-thread-find-active");
++    expect(active?.size).toBe(1);
++    const range = [...active!][0]!;
++    if (!(range instanceof Range)) throw new Error("Expected a text range");
++    expect(range.toString()).toBe("long-command");
++    expect(
++      range.startContainer.parentElement
++        ?.closest("[data-thread-find-entry-id]")
++        ?.getAttribute("data-thread-find-entry-id"),
++    ).toBe("approval-0");
++  });
++  await expect.element(screen.getByRole("button", { name: "Decline", exact: true })).toBeVisible();
++  await screen.rerender(ui());
+   await click(screen.buttons("More approval options")[1]!);
+   await expect.element(page.getByRole("menuitem", { name: "Always allow Safari" })).toBeVisible();
+   await page.getByRole("menuitem", { name: "Always allow Safari" }).click();
+diff --git a/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx b/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx
+index 377b2a9b3..0c0343f0b 100644
+--- a/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx
++++ b/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx
+@@ -34,6 +34,7 @@ function Find() {
+ }
+ 
+ it("navigates from the input, preserves native button Enter, and closes from a focused find control", async () => {
++  // The keyboard-only find bar does not use navigation.
+   await using screen = await render(<Find />, { router: false });
+   const input = screen.getByRole("searchbox", { name: "Find in thread" });
+   await expect.element(input).toHaveFocus();
+diff --git a/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx b/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
+index c425d560b..5c3e3d332 100644
+--- a/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
++++ b/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx
+@@ -3,7 +3,7 @@ import {
+   fullAccessOverrideExplanation,
+ } from "@t3tools/client-runtime/state/thread-requests";
+ import { ShieldIcon } from "lucide-react";
+-import { memo, use } from "react";
++import { memo, use, type ReactNode } from "react";
+ import { type PendingApproval } from "../../session-logic";
+ import { InlineButton } from "../ui/button";
+ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+@@ -33,16 +33,23 @@ const APPROVAL_PRESENTATION = {
+ 
+ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalRow({
+   approval,
++  findEntryId,
++  findLabel,
+ }: {
+   approval: PendingApproval;
++  findEntryId?: string;
++  findLabel?: ReactNode;
+ }) {
+-  const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
++  const { respondingRequestIds, canOperateThread, onRespondToApproval, activeFindEntryId } =
++    use(TimelineRowCtx);
+   const presentation = APPROVAL_PRESENTATION[approval.requestKind];
+   const canRespond = approval.responseCapability === "live";
+   return (
+     <WorkLogRow
+       role="group"
+       aria-label={presentation.label}
++      data-thread-find-entry-id={findEntryId}
++      aria-current={findEntryId === activeFindEntryId ? true : undefined}
+       data-v2-item-type="approval_request"
+       wrapLabel
+       icon={
+@@ -54,14 +61,16 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
+         />
+       }
+       label={
+-        <code
+-          aria-label={presentation.detailLabel}
+-          className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+-          data-approval-detail="complete"
+-          tabIndex={0}
+-        >
+-          {approval.detail || presentation.label}
+-        </code>
++        findLabel ?? (
++          <code
++            aria-label={presentation.detailLabel}
++            className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
++            data-approval-detail="complete"
++            tabIndex={0}
++          >
++            {approval.detail || presentation.label}
++          </code>
++        )
+       }
+     >
+       <div className="ms-7.5 flex min-w-0 flex-col gap-1 pb-1 text-xs">
+diff --git a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
+index 43c7cc423..6192cc99b 100644
+--- a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
++++ b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
+@@ -221,7 +221,14 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+     failureItem?.type === "approval_request"
+       ? ctx.pendingApprovals.get(failureItem.requestId)
+       : undefined;
+-  if (pendingApproval) return <TimelinePendingApprovalRow approval={pendingApproval} />;
++  if (pendingApproval)
++    return (
++      <TimelinePendingApprovalRow
++        approval={pendingApproval}
++        findEntryId={workEntry.id}
++        findLabel={findLabel}
++      />
++    );
+   if (failureItem?.type === "error" && failureItem.status === "failed") {
+     const warning = failureItem.failure.class === "usage_limit";
+     const resetAt = failureItem.failure.resetAt;

@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.1",
+  "slug": "copilot-sdk-runtime-upgrade",
+  "verified_at": "2026-11-06T07:06:54Z",
+  "verdict": "failed",
+  "exit_code": 2,
+  "repository": {
+    "object_format": "sha1",
+    "commit_id_hex_len": 40,
+    "shallow": false,
+    "partial_clone": false,
+    "git_version": "git version 2.55.0",
+    "git_floor_satisfied": true
+  },
+  "baseline": {
+    "mode": "dual-anchor",
+    "current_commit": "edee604cdf3ef0fbc6ef96708e0c73022a7162cb",
+    "current_probe": "isolated-index",
+    "historical_anchor": {
+      "state": "available",
+      "commit": "c88f207e5e9dc0789612e66c911492a1491bcc21",
+      "replay_anchor_commit": "aa0cd4238d5c596a2e687e8a8d34ec6a5468be52",
+      "candidates_collected": 1,
+      "candidates_qualified": 1
+    }
+  },
+  "landing_evidence": {
+    "state": "exact",
+    "attestation_commit": "aa0cd4238d5c596a2e687e8a8d34ec6a5468be52",
+    "candidates": 1,
+    "parent_count": 1,
+    "patch_presence": "present-nonempty",
+    "recipe_presence": "present-nonempty-with-ops",
+    "patch_sha_match": true,
+    "recipe_sha_match": true,
+    "base_commit_match": true,
+    "base_commit_reachable": true
+  },
+  "target_mode": "landed",
+  "checks": [
+    {
+      "id": "status_loaded",
+      "severity": "block-abort",
+      "passed": true
+    },
+    {
+      "id": "intent_files_present",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_parses",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_op_targets_resolve",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "dep_metadata_valid",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "satisfied_by_reachable",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "no satisfied_by deps to check"
+    },
+    {
+      "id": "dependency_gate_satisfied",
+      "severity": "warn",
+      "passed": true
+    },
+    {
+      "id": "recipe_replay_clean",
+      "severity": "block",
+      "passed": true,
+      "mode": "historical-anchor"
+    },
+    {
+      "id": "post_apply_patch_replay_clean",
+      "severity": "block",
+      "passed": false,
+      "remediation": "landed feature: post-apply.patch matched at HEAD only with all context discarded at packages/provider-copilot/src/server/adapter.test.ts; verify refuses to certify an unanchored match — inspect with git diff aa0cd4238d5c596a2e687e8a8d34ec6a5468be52 HEAD -- packages/provider-copilot/src/server/adapter.test.ts, then re-record so the captured context matches HEAD and re-land",
+      "mode": "dual-anchor",
+      "anchor_results": {
+        "current": "absent",
+        "historical": "passed"
+      }
+    },
+    {
+      "id": "reconcile_outcome_consistent",
+      "severity": "warn",
+      "passed": true,
+      "skipped": true,
+      "reason": "no Reconcile.Outcome set"
+    },
+    {
+      "id": "write_file_preimage_fresh",
+      "severity": "block",
+      "passed": true,
+      "mode": "historical-anchor",
+      "member_baselines": {
+        "copilot-cli-provider": "114f257eecd04ad283cd4016573eb51347c0e757",
+        "copilot-runtime-packaging-replay": "ba951f958e8cd3cb6582f7902171f573621407a7",
+        "copilot-sdk-runtime-upgrade": "c88f207e5e9dc0789612e66c911492a1491bcc21"
+      }
+    }
+  ],
+  "lifecycle_state": "applied",
+  "recipe_hash_at_verify": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad",
+  "patch_hash_at_verify": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+  "parent_snapshot": {
+    "copilot-cli-provider": "applied",
+    "copilot-runtime-packaging-replay": "applied"
+  },
+  "failed_at": "landed-content-absent"
+}

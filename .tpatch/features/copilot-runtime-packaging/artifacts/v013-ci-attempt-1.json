@@ -1,0 +1,12 @@
+{
+  "run": "https://github.com/tesseracode/t3code/actions/runs/40856532713",
+  "source": "21fbfac08eb93e0b04811da6967a5c99175e1b3c",
+  "linuxX64": "build, archive smoke and artifact upload passed",
+  "windowsX64": "installer built; final self-containment gate correctly refused",
+  "failure": "C:\\t3\\s\\node_modules was visible from the probe because TEMP/TMP were inside the checkout.",
+  "correction": "Move TEMP, TMP and TMPDIR to the explicitly created C:\\t3\\tmp, outside C:\\t3\\s. Do not change the self-containment check.",
+  "scope": "The complete 29-file packaging root is retained; this is not a replacement with a one-file delta.",
+  "nextGate": "A new build-only CI attempt must prove the correction.",
+  "budgetUsedPerTarget": 1,
+  "budgetLimitPerTarget": 4
+}

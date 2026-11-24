@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "feature": "fork-patch-flow-convention",
+  "attempt_id": "ua_8f1ce4b4ff19",
+  "attempted_at": "2026-11-06T06:44:44Z",
+  "mode": "patch",
+  "actor": "Copilot",
+  "previous_state": "applied",
+  "result": "unapplied",
+  "canonical_patch_sha256": "7baaa3f0917cd749fde51e6113fbc485bb92d2a11da8eae02acaf23b5c9a6ad9",
+  "reverse_patch": "artifacts/unapply/ua_8f1ce4b4ff19/reverse.patch",
+  "touched_paths": [
+    "docs/internals/fork-maintenance.md",
+    "docs/operations/patch-flow.md"
+  ],
+  "dependency_blockers": [],
+  "preflight": {
+    "clean_tree": true,
+    "conflict_markers": [],
+    "leftovers": []
+  }
+}

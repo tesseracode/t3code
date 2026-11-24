@@ -1,0 +1,2975 @@
+diff --git a/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx b/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx
+index 384195ec5..5879307b3 100644
+--- a/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx
++++ b/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx
+@@ -21,6 +21,7 @@ export type ModelRowProps = {
+ export type ChoiceRowProps = {
+   readonly label: string;
+   readonly description?: string;
++  readonly disabled?: boolean;
+   readonly selected: boolean;
+   readonly onPress: () => void;
+   readonly isLast: boolean;
+@@ -140,12 +141,14 @@ export function ChoiceRowContent(props: ChoiceRowProps & RowSelectionProps) {
+     <Pressable
+       accessibilityLabel={props.description ? `${props.label}. ${props.description}` : props.label}
+       accessibilityRole="radio"
+-      accessibilityState={{ checked: props.selected }}
++      accessibilityState={{ checked: props.selected, disabled: props.disabled === true }}
++      disabled={props.disabled}
+       onPress={props.onPress}
+       style={props.minimumHeight === undefined ? undefined : { minHeight: props.minimumHeight }}
+       className={cn(
+         "min-h-14 flex-row items-center gap-3 bg-grouped-card px-4 py-3 active:bg-subtle",
+         !props.isLast && "border-b border-border-subtle",
++        props.disabled && "opacity-50",
+       )}
+     >
+       {props.leadingSelection}
+diff --git a/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx b/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx
+index 11d871047..a494933ff 100644
+--- a/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx
++++ b/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx
+@@ -1093,6 +1093,7 @@ function ThreadSettingsChoiceContent(props: {
+             id: choice.mode,
+             label: choice.label,
+             description: choice.description,
++            disabled: false,
+             selected: choice.mode === session.runtimeMode,
+             onPress: () => {
+               void Haptics.selectionAsync();
+@@ -1106,7 +1107,14 @@ function ThreadSettingsChoiceContent(props: {
+             rows: selectableChoices(activeDescriptor).map((choice) => ({
+               id: choice.id,
+               label: choice.label,
+-              description: choice.description,
++              description:
++                [
++                  choice.description,
++                  choice.disabledReason ? `Unavailable: ${choice.disabledReason}` : undefined,
++                ]
++                  .filter(Boolean)
++                  .join("\n") || undefined,
++              disabled: choice.disabledReason !== undefined,
+               selected:
+                 choice.id ===
+                 (session.promptTraits.ultrathinkPromptControlled &&
+@@ -1118,6 +1126,7 @@ function ThreadSettingsChoiceContent(props: {
+                       session.reportedModelSelection,
+                     )),
+               onPress: () => {
++                if (choice.disabledReason !== undefined) return;
+                 void Haptics.selectionAsync();
+                 if (
+                   session.promptTraits.ultrathinkInBodyText &&
+@@ -1161,6 +1170,7 @@ function ThreadSettingsChoiceContent(props: {
+           <ChoiceRow
+             key={row.id}
+             description={row.description}
++            disabled={row.disabled}
+             isLast={index === submenuContent.rows.length - 1}
+             label={row.label}
+             selected={row.selected}
+diff --git a/apps/mobile/src/features/threads/thread-settings-options.test.ts b/apps/mobile/src/features/threads/thread-settings-options.test.ts
+index 81baead62..208411f76 100644
+--- a/apps/mobile/src/features/threads/thread-settings-options.test.ts
++++ b/apps/mobile/src/features/threads/thread-settings-options.test.ts
+@@ -85,5 +85,25 @@ describe("prompt-controlled reasoning", () => {
+         "ultrathink",
+       ),
+     ).toEqual({ prompt: "/review" });
++    const unavailableDescriptor = {
++      ...effortDescriptor,
++      options: effortDescriptor.options.map((option) => ({
++        ...option,
++        disabledReason: "Unavailable for this session",
++      })),
++    };
++    for (const value of ["low", "ultrathink", "removed-tier"]) {
++      expect(
++        getTraitSelectChange(
++          {
++            ...getPromptControlledTraits([unavailableDescriptor], ""),
++            descriptors: [unavailableDescriptor],
++          },
++          unavailableDescriptor,
++          "",
++          value,
++        ),
++      ).toBeNull();
++    }
+   });
+ });
+diff --git a/apps/mobile/src/lib/providerOptions.ts b/apps/mobile/src/lib/providerOptions.ts
+index 0199b0fbd..20c50489b 100644
+--- a/apps/mobile/src/lib/providerOptions.ts
++++ b/apps/mobile/src/lib/providerOptions.ts
+@@ -33,7 +33,9 @@ export function applyProviderOptionSelection(
+     (descriptor.type === "boolean" && typeof change.value !== "boolean") ||
+     (descriptor.type === "select" &&
+       (typeof change.value !== "string" ||
+-        !descriptor.options.some((option) => option.id === change.value)))
++        !descriptor.options.some(
++          (option) => option.id === change.value && option.disabledReason === undefined,
++        )))
+   ) {
+     return null;
+   }
+diff --git a/apps/mobile/src/lib/threadActivity.ts b/apps/mobile/src/lib/threadActivity.ts
+index fc085a7c5..b4a2b4096 100644
+--- a/apps/mobile/src/lib/threadActivity.ts
++++ b/apps/mobile/src/lib/threadActivity.ts
+@@ -4,6 +4,10 @@ import type {
+   ThreadUserInputQuestion,
+ } from "@t3tools/client-runtime/state/thread-requests";
+ import { turnItemIsWorkspacePreparation } from "@t3tools/client-runtime/state/turn-item-presentation";
++import {
++  modelExecutionDetail,
++  modelExecutionSummary,
++} from "@t3tools/client-runtime/work-log/model-execution";
+ import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
+ import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
+ import { isLiveSubagentTurnItem } from "@t3tools/client-runtime/state/subagentRuntime";
+@@ -653,7 +657,8 @@ function itemSummary(
+   toolPresentation: T3McpToolPresentation | null = null,
+ ): string {
+   if (item.type === "notification") return item.summary;
+-  if (item.type === "system_notice") return item.message;
++  if (item.type === "system_notice")
++    return item.modelExecution ? modelExecutionSummary(item.modelExecution) : item.message;
+   if (item.type === "compaction") return contextCompactionLabel(item);
+   const title =
+     (item.type === "dynamic_tool"
+@@ -743,8 +748,9 @@ function itemPreview(item: OrchestrationV2TurnItem): string | null {
+         : `${item.files.length} changed files`;
+     case "run_interrupt_request":
+     case "run_interrupt_result":
+-    case "system_notice":
+       return item.message || null;
++    case "system_notice":
++      return item.modelExecution ? null : item.message || null;
+     case "error":
+       return item.failure.message;
+     case "compaction":
+@@ -849,6 +855,9 @@ export function formatItemFullDetail(
+   row: OrchestrationV2ProjectedTurnItem,
+   item: OrchestrationV2TurnItem,
+ ): string {
++  if (item.type === "system_notice" && item.modelExecution) {
++    return modelExecutionDetail(item.modelExecution, item.message);
++  }
+   return JSON.stringify(
+     {
+       visibility: row.visibility,
+diff --git a/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts b/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts
+index 3fecc1c7d..836b083e8 100644
+--- a/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts
++++ b/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts
+@@ -871,6 +871,134 @@ layer("ProviderEventIngestorV2", (it) => {
+     }),
+   );
+ 
++  it.effect(
++    "persists native model history without losing run ownership or observed starts on cold replay",
++    () =>
++      Effect.gen(function* () {
++        const now = yield* DateTime.now;
++        const eventSink = yield* EventSink.EventSinkV2;
++        const projections = yield* ProjectionStore.ProjectionStoreV2;
++        const ingestor = yield* ProviderEventIngestor.ProviderEventIngestorV2;
++        const ids = yield* IdAllocator.IdAllocatorV2;
++        const thread = yield* threadCreatedEvent(now);
++        yield* eventSink.write({ events: [thread] });
++        const providerSessionId = yield* ids.allocate.providerSession({
++          providerInstanceId: modelSelection.instanceId,
++          threadId: thread.threadId,
++        });
++        const providerThreadId = ids.derive.providerThread({
++          driver: CODEX_DRIVER,
++          nativeThreadId: "native-model-history",
++        });
++        const providerTurnId = ids.derive.providerTurn({
++          driver: CODEX_DRIVER,
++          nativeTurnId: "native-model-turn",
++        });
++        const runId = RunId.make("model-history-original");
++        const nodeId = NodeId.make("model-history-node");
++        const observed = DateTime.makeUnsafe("2026-10-29T00:00:00Z");
++        const item = {
++          id: TurnItemId.make("native-session:fusion:primary"),
++          threadId: thread.threadId,
++          runId,
++          nodeId,
++          providerThreadId,
++          providerTurnId,
++          nativeItemRef: null,
++          parentItemId: null,
++          ordinal: 7,
++          type: "system_notice",
++          title: "Model execution",
++          message: "Model phase succeeded",
++          status: "completed",
++          startedAt: observed,
++          completedAt: now,
++          updatedAt: now,
++          modelExecution: {
++            version: 1,
++            kind: "phase",
++            nativeSessionId: "native-session",
++            fusionId: "fusion",
++            phaseId: "primary",
++            eventId: "completed",
++            sourceTimestamp: "2026-10-29T00:00:02Z",
++            receivedAt: "2026-10-29T00:00:03Z",
++            model: "same-model",
++            role: "primary",
++            status: "succeeded",
++            startSource: "observed",
++            startedAt: "2026-10-29T00:00:00Z",
++            endedAt: "2026-10-29T00:00:02Z",
++            durationMs: 2000,
++            gaps: [],
++          },
++        } satisfies OrchestrationV2TurnItem;
++        const ingest = (turnItem: OrchestrationV2TurnItem) =>
++          ingestor.ingestNormalized({
++            providerSessionId,
++            providerInstanceId: modelSelection.instanceId,
++            threadId: thread.threadId,
++            runId: RunId.make("model-history-current"),
++            event: { type: "turn_item.updated", driver: CODEX_DRIVER, turnItem },
++          });
++        yield* ingest(item);
++        const original = yield* projections.getTurnItem({
++          threadId: thread.threadId,
++          itemId: item.id,
++        });
++        const replay = {
++          ...item,
++          runId: null,
++          nodeId: null,
++          providerTurnId: null,
++          ordinal: 99,
++          startedAt: DateTime.makeUnsafe("2026-10-29T00:00:01Z"),
++          modelExecution: {
++            ...item.modelExecution,
++            startSource: "estimated" as const,
++            startedAt: "2026-10-29T00:00:01Z",
++            gaps: [
++              "Phase start was not observed; its start time is only an estimate.",
++              "Native execution could not be associated with a T3 run.",
++            ],
++          },
++        };
++        const identity: ProviderEventRouteIdentity = {
++          threadId: thread.threadId,
++          runId: RunId.make("model-history-current"),
++          attemptId: RunAttemptId.make("model-history-attempt"),
++          providerThreadId,
++        };
++        const [accepted] = routeProviderEvent(
++          { type: "turn_item.updated", driver: CODEX_DRIVER, turnItem: replay },
++          identity,
++          makeProviderEventRoutingState({ identity, providerTurnId: null }),
++        );
++        assert.isTrue(accepted);
++        yield* ingest(replay);
++        yield* ingest(replay);
++        const stored = yield* projections.getTurnItem({
++          threadId: thread.threadId,
++          itemId: item.id,
++        });
++        assert.equal(stored?.runId, runId);
++        assert.equal(stored?.nodeId, nodeId);
++        assert.equal(stored?.providerTurnId, providerTurnId);
++        assert.equal(stored?.ordinal, original?.ordinal);
++        assert.equal(stored?.type, "system_notice");
++        if (stored?.type !== "system_notice") return assert.fail("Expected stored model history.");
++        assert.equal(stored.modelExecution?.startSource, "observed");
++        assert.deepEqual(stored.modelExecution?.gaps, []);
++        assert.equal(stored.modelExecution?.startedAt, "2026-10-29T00:00:00Z");
++        assert.equal(
++          (yield* projections.getThreadProjection(thread.threadId)).turnItems.filter(
++            (candidate) => candidate.id === item.id,
++          ).length,
++          1,
++        );
++      }),
++  );
++
+   it.effect("persists a completed run's late background terminal exactly once", () =>
+     Effect.gen(function* () {
+       const now = yield* DateTime.now;
+diff --git a/apps/server/src/orchestration-v2/ProviderEventIngestor.ts b/apps/server/src/orchestration-v2/ProviderEventIngestor.ts
+index 6beb4d0e5..dbc70cf90 100644
+--- a/apps/server/src/orchestration-v2/ProviderEventIngestor.ts
++++ b/apps/server/src/orchestration-v2/ProviderEventIngestor.ts
+@@ -649,18 +649,63 @@ export const layer: Layer.Layer<
+                   nodeId: input.event.message.nodeId,
+                 }),
+               ];
+-            case "turn_item.updated":
++            case "turn_item.updated": {
++              let item = input.event.turnItem;
++              if (item.type === "system_notice" && item.modelExecution) {
++                const previous = yield* projections.getTurnItem({
++                  threadId: item.threadId,
++                  itemId: item.id,
++                });
++                if (
++                  previous?.type === "system_notice" &&
++                  previous.modelExecution &&
++                  previous.modelExecution.nativeSessionId === item.modelExecution.nativeSessionId
++                ) {
++                  const oldExecution = previous.modelExecution;
++                  const execution = item.modelExecution;
++                  const completed = (Boolean(oldExecution.endedAt) && !execution.endedAt) ||
++                    (oldExecution.kind === "phase" && oldExecution.status === "unknown" &&
++                      previous.status !== "running" && execution.status === "running");
++                  const observed =
++                    oldExecution.startSource === "observed" && execution.startSource !== "observed";
++                  item = {
++                    ...(completed ? previous : item),
++                    runId: previous.runId ?? item.runId,
++                    nodeId: previous.nodeId ?? item.nodeId,
++                    providerTurnId: previous.providerTurnId ?? item.providerTurnId,
++                    ordinal: previous.runId ? previous.ordinal : item.ordinal,
++                    ...(observed ? { startedAt: previous.startedAt } : {}),
++                    modelExecution: {
++                      ...(completed ? oldExecution : execution),
++                      ...(observed
++                        ? { startedAt: oldExecution.startedAt, startSource: "observed" as const }
++                        : {}),
++                      gaps: (completed ? oldExecution.gaps : execution.gaps).filter(
++                        (gap) =>
++                          !(
++                            (previous.runId ?? item.runId) &&
++                            gap === "Native execution could not be associated with a T3 run."
++                          ) &&
++                          !(
++                            observed &&
++                            gap ===
++                              "Phase start was not observed; its start time is only an estimate."
++                          ),
++                      ),
++                    },
++                  };
++                }
++              }
+               return [
+                 yield* makeDomainEvent(input, {
+                   type: "turn-item.updated",
+-                  threadId: input.event.turnItem.threadId,
+-                  payload: boundFileChangeForStorage(
+-                    stripUnservedToolOutputImageBytes(input.event.turnItem),
+-                  ),
+-                  runId: input.event.turnItem.runId,
+-                  nodeId: input.event.turnItem.nodeId,
++                  threadId: item.threadId,
++                  payload: boundFileChangeForStorage(stripUnservedToolOutputImageBytes(item)),
++                  runId: item.runId,
++                  nodeId: item.nodeId,
+                 }),
+               ];
++            }
+             case "runtime_request.updated":
+               return [
+                 yield* makeDomainEvent(input, {
+diff --git a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts
+index 3e3f37a15..ceb5c9aff 100644
+--- a/apps/server/src/orchestration-v2/RunExecutionService.ts
++++ b/apps/server/src/orchestration-v2/RunExecutionService.ts
+@@ -479,6 +479,13 @@ export function routeProviderEvent(
+     case "message.updated":
+       return [ownsRun(event.message.runId) || ownsChildThread(event.message.threadId), state];
+     case "turn_item.updated": {
++      if (
++        event.turnItem.type === "system_notice" &&
++        event.turnItem.modelExecution &&
++        event.turnItem.threadId === input.threadId &&
++        event.turnItem.providerThreadId === input.providerThreadId
++      )
++        return [true, state];
+       if (ownsRun(event.turnItem.runId) || ownsChildThread(event.turnItem.threadId)) {
+         return [true, state];
+       }
+diff --git a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
+index 6192cc99b..126bb6e75 100644
+--- a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
++++ b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
+@@ -22,6 +22,7 @@ import {
+ import {
+   turnItemHasDetail,
+   turnItemNeedsDetailFetch,
++  turnItemOutputText,
+ } from "@t3tools/client-runtime/work-log/item-detail";
+ import { claudeSkillInvocation } from "@t3tools/shared/toolActivity";
+ import { threadFindActivityText } from "@t3tools/shared/threadFindText";
+@@ -325,11 +326,13 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+       ? claudeSkillInvocation(payload.toolName, payload.input)
+       : undefined;
+   const plainOutput =
+-    toolGroupAction(workEntry) === "read"
+-      ? workEntryReadOutput(workEntry, workspaceRoot)
+-      : skill
+-        ? (skill.args ?? null)
+-        : undefined;
++    payload?.type === "system_notice" && payload.modelExecution
++      ? turnItemOutputText(payload)
++      : toolGroupAction(workEntry) === "read"
++        ? workEntryReadOutput(workEntry, workspaceRoot)
++        : skill
++          ? (skill.args ?? null)
++          : undefined;
+   const viewedImage =
+     viewedImagePath && threadRef
+       ? resolveViewedImageAsset(viewedImagePath, {
+diff --git a/apps/web/src/components/chat/TraitsPicker.tsx b/apps/web/src/components/chat/TraitsPicker.tsx
+index f02780bed..394f9c703 100644
+--- a/apps/web/src/components/chat/TraitsPicker.tsx
++++ b/apps/web/src/components/chat/TraitsPicker.tsx
+@@ -23,6 +23,7 @@ import {
+   getProviderOptionDescriptors,
+   isClaudeUltrathinkPrompt,
+   normalizeModelSlug,
++  providerOptionChoicesInCycleOrder,
+ } from "@t3tools/shared/model";
+ import { memo, type ReactNode, useRef } from "react";
+ import { GaugeIcon, ZapIcon } from "lucide-react";
+@@ -271,15 +272,14 @@ export function getReasoningTraitStep(input: {
+           { instanceId: input.instanceId, model: input.model, options: input.modelOptions ?? [] },
+           input.reportedModelSelection,
+         );
+-  const ordered = input.direction > 0 ? descriptor.options : descriptor.options.toReversed();
+-  const position =
+-    [current, getDescriptorStringValue(descriptor)]
+-      .map((value) => ordered.findIndex((option) => option.id === value))
+-      .find((index) => index >= 0) ?? -1;
+-  for (const option of [
+-    ...ordered.slice(position + 1),
+-    ...ordered.slice(0, Math.max(position, 0)),
+-  ]) {
++  const cycleCurrent = descriptor.options.some((option) => option.id === current)
++    ? current
++    : getDescriptorStringValue(descriptor);
++  for (const option of providerOptionChoicesInCycleOrder(
++    descriptor,
++    cycleCurrent,
++    input.direction,
++  )) {
+     const change = getTraitSelectChange(selected, descriptor, input.prompt, option.id);
+     if (!change) return null;
+     if ("modelOptions" in change) {
+@@ -457,7 +457,10 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
+                     value={option.id}
+                     hideIndicator
+                     closeOnClick
+-                    disabled={ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id}
++                    disabled={
++                      option.disabledReason !== undefined ||
++                      (ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id)
++                    }
+                   >
+                     <span className="flex w-full min-w-0 flex-col">
+                       <span className="flex min-w-0 items-center gap-1">
+@@ -469,6 +472,11 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
+                           {option.description}
+                         </span>
+                       ) : null}
++                      {option.disabledReason ? (
++                        <span className="max-w-56 text-pretty text-muted-foreground text-xs">
++                          Unavailable: {option.disabledReason}
++                        </span>
++                      ) : null}
+                     </span>
+                   </MenuRadioItem>
+                 ))}
+diff --git a/apps/web/src/session-logic.ts b/apps/web/src/session-logic.ts
+index 7b79dea6f..5a5da959c 100644
+--- a/apps/web/src/session-logic.ts
++++ b/apps/web/src/session-logic.ts
+@@ -25,6 +25,7 @@ import {
+ } from "@t3tools/shared/toolActivity";
+ import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
+ import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
++import { modelExecutionSummary } from "@t3tools/client-runtime/work-log/model-execution";
+ import type { McpAppReference } from "@t3tools/shared/mcpApp";
+ import { htmlRenderFromToolItem, mcpAppFromToolItem } from "@t3tools/shared/toolOutput";
+ import {
+@@ -479,8 +480,8 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
+     case "system_notice":
+       return {
+         ...common,
+-        label: item.message,
+-        sourceActivityKind: "runtime.warning",
++        label: item.modelExecution ? modelExecutionSummary(item.modelExecution) : item.message,
++        ...(item.modelExecution ? {} : { sourceActivityKind: "runtime.warning" }),
+       };
+     case "error": {
+       const presentation = providerErrorPresentation(item);
+diff --git a/docs/user/activity-log.md b/docs/user/activity-log.md
+index 0aad505e0..a798213fe 100644
+--- a/docs/user/activity-log.md
++++ b/docs/user/activity-log.md
+@@ -17,3 +17,15 @@ Failed calls do not count as successful messages or creations. Waiting on a thre
+ it finished, and an interrupt or cancellation request does not mean the thread stopped. When tool
+ details are unavailable, summaries use a broader description instead of guessing how many threads
+ were affected.
++
++When Copilot reports Fusion model activity, open a model phase or routing entry to inspect its
++details on web, desktop, or mobile. Requested routing and planned work do not prove which model
++executed. Phase details distinguish observed from estimated starts, provider elapsed time from
++event and receipt timestamps, and show reported final models, fallback, failures, and telemetry
++gaps. Missing timing or model data stays unknown rather than being inferred from the request.
++
++For Copilot, select **Auto routing** and its **Routing** option when your connected account
++advertises them. Available preferences come from that account; unavailable choices show their
++reason. Explicit models and your default model are unchanged. You can switch back to an explicit
++model at any time. A requested preference may be pending or activating: the routing entry shows
++the confirmed effective preference separately, including activation failures.
+diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
+index eca524ff4..a110d2019 100644
+--- a/docs/user/providers-copilot.md
++++ b/docs/user/providers-copilot.md
+@@ -7,6 +7,12 @@ not the ACP registry or a separately billed hosted model service.
+ Sign in on that environment with `copilot login`, then refresh provider status.
+ Models and reasoning options come from your account's available catalog.
+ 
++When your account advertises **Auto routing**, its **Routing** option includes the eligible
++preferences, including Fusion. Disabled preferences show their account-specific reason.
++Requests can remain pending before they take effect; the activity log distinguishes requested,
++effective, and activating routing and shows reported model phases and timing. See
++[Activity log](activity-log.md). Explicit-model selection and defaults are unchanged.
++
+ The default runtime uses the bundled Copilot executable. **Binary path** can
+ override it. **COPILOT_HOME path** selects the account's configuration and native
+ session directory; separate provider instances can use separate directories.
+diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json
+index 0d95631cf..ce98e377d 100644
+--- a/packages/client-runtime/package.json
++++ b/packages/client-runtime/package.json
+@@ -391,6 +391,10 @@
+       "types": "./src/work-log/itemDetail.ts",
+       "default": "./src/work-log/itemDetail.ts"
+     },
++    "./work-log/model-execution": {
++      "types": "./src/work-log/modelExecution.ts",
++      "default": "./src/work-log/modelExecution.ts"
++    },
+     "./work-log/presentation": {
+       "types": "./src/work-log/presentation.ts",
+       "default": "./src/work-log/presentation.ts"
+diff --git a/packages/client-runtime/src/modelTraits.ts b/packages/client-runtime/src/modelTraits.ts
+index 734a84c46..29004784b 100644
+--- a/packages/client-runtime/src/modelTraits.ts
++++ b/packages/client-runtime/src/modelTraits.ts
+@@ -81,7 +81,11 @@ export function getTraitSelectChange(
+   prompt: string,
+   value: string,
+ ) {
+-  if (!value) return null;
++  if (
++    !value ||
++    !descriptor.options.some((option) => option.id === value && option.disabledReason === undefined)
++  )
++    return null;
+   if (descriptor.promptInjectedValues?.includes(value)) {
+     return {
+       prompt:
+diff --git a/packages/client-runtime/src/work-log/itemDetail.test.ts b/packages/client-runtime/src/work-log/itemDetail.test.ts
+index e15111708..2e256c0de 100644
+--- a/packages/client-runtime/src/work-log/itemDetail.test.ts
++++ b/packages/client-runtime/src/work-log/itemDetail.test.ts
+@@ -2,9 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
+ import { ThreadId, TurnItemId, type OrchestrationV2TurnItem } from "@t3tools/contracts";
+ import * as DateTime from "effect/DateTime";
+ 
+-import { turnItemOutputImages, turnItemOutputText } from "./itemDetail.ts";
++import { turnItemHasDetail, turnItemOutputImages, turnItemOutputText } from "./itemDetail.ts";
+ 
+-function toolItem(output: unknown): OrchestrationV2TurnItem {
++function toolItem(output: unknown): Extract<OrchestrationV2TurnItem, { type: "dynamic_tool" }> {
+   return {
+     id: TurnItemId.make("images"),
+     threadId: ThreadId.make("thread"),
+@@ -52,3 +52,29 @@ describe("tool image output parsing", () => {
+     },
+   );
+ });
++
++it("keeps typed model notices expandable without changing ordinary notice output", () => {
++  const notice = {
++    ...toolItem(null),
++    type: "system_notice" as const,
++    message: "",
++  };
++  expect(turnItemHasDetail(notice)).toBe(false);
++  expect(turnItemOutputText({ ...notice, message: "Ordinary notice" })).toBeNull();
++  const executionNotice = {
++    ...notice,
++    modelExecution: {
++      version: 1 as const,
++      kind: "gap" as const,
++      nativeSessionId: "session",
++      eventId: "gap",
++      sourceTimestamp: "2026-11-02T10:00:00Z",
++      receivedAt: "2026-11-02T10:00:01Z",
++      status: "incomplete",
++      startSource: "unknown" as const,
++      gaps: ["missing start"],
++    },
++  };
++  expect(turnItemHasDetail(executionNotice)).toBe(true);
++  expect(turnItemOutputText(executionNotice)).toContain("Incomplete model execution telemetry");
++});
+diff --git a/packages/client-runtime/src/work-log/itemDetail.ts b/packages/client-runtime/src/work-log/itemDetail.ts
+index 5e16cf538..7e8cf5eb0 100644
+--- a/packages/client-runtime/src/work-log/itemDetail.ts
++++ b/packages/client-runtime/src/work-log/itemDetail.ts
+@@ -1,6 +1,7 @@
+ import type { AssetResource, OrchestrationV2TurnItem } from "@t3tools/contracts";
+ import { toolOutputImageBlocks, toolOutputImages } from "@t3tools/shared/toolOutput";
+ import * as DateTime from "effect/DateTime";
++import { modelExecutionDetail } from "./modelExecution.ts";
+ 
+ const MAX_TEXT_BLOCK_DEPTH = 4;
+ 
+@@ -159,6 +160,8 @@ function commandOutputText(output: string): string {
+ 
+ export function turnItemOutputText(item: OrchestrationV2TurnItem): string | null {
+   switch (item.type) {
++    case "system_notice":
++      return item.modelExecution ? modelExecutionDetail(item.modelExecution, item.message) : null;
+     case "command_execution":
+       return item.output?.trim() ? commandOutputText(item.output) || null : null;
+     case "dynamic_tool":
+@@ -238,7 +241,7 @@ export function turnItemHasDetail(item: OrchestrationV2TurnItem): boolean {
+     case "notification":
+       return Boolean(item.detail?.trim());
+     case "system_notice":
+-      return item.message.trim().length > 0;
++      return item.modelExecution !== undefined || item.message.trim().length > 0;
+     case "error":
+       return item.failure.message.trim().length > 0;
+     case "proposed_plan":
+diff --git a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts
+new file mode 100644
+index 000000000..97b7f7957
+--- /dev/null
++++ b/packages/client-runtime/src/work-log/modelExecution.test.ts
+@@ -0,0 +1,85 @@
++import type { OrchestrationV2ModelExecution } from "@t3tools/contracts";
++import { describe, expect, it } from "vite-plus/test";
++import { modelExecutionDetail, modelExecutionSummary } from "./modelExecution.ts";
++
++const phase: OrchestrationV2ModelExecution = {
++  version: 1,
++  kind: "phase",
++  nativeSessionId: "session-1",
++  eventId: "event-1",
++  sourceTimestamp: "2026-11-02T10:00:05.000Z",
++  receivedAt: "2026-11-02T10:00:08.000Z",
++  status: "completed",
++  model: "actual-model",
++  startSource: "observed",
++  startedAt: "2026-11-02T10:00:00.000Z",
++  endedAt: "2026-11-02T10:00:05.000Z",
++  durationMs: 4800,
++  gaps: [],
++};
++
++describe("model execution presentation", () => {
++  it("uses provider duration rather than receipt latency and distinguishes timing evidence", () => {
++    expect(modelExecutionSummary(phase)).toContain("actual-model · completed · 4.8s");
++    const detail = modelExecutionDetail(phase);
++    expect(detail).toContain("Provider elapsed: 4.8s");
++    expect(detail).toContain(`Started (observed): ${phase.startedAt}`);
++    expect(detail).toContain(`Provider event time: ${phase.sourceTimestamp}`);
++    expect(detail).toContain(`Received: ${phase.receivedAt}`);
++    expect(modelExecutionDetail({ ...phase, startSource: "estimated" })).toContain(
++      `Started (estimated): ${phase.startedAt}`,
++    );
++    const { durationMs: _duration, ...withoutDuration } = phase;
++    expect(modelExecutionSummary(withoutDuration)).not.toContain("5.0s");
++    expect(modelExecutionDetail(withoutDuration)).toContain("Provider elapsed: not reported");
++    expect(
++      modelExecutionDetail({ ...phase, startSource: "unknown", startedAt: undefined }),
++    ).toContain("Start: unknown");
++  });
++
++  it("keeps requested routing separate from effective, pending, and actual execution", () => {
++    const route = {
++      ...phase,
++      kind: "route" as const,
++      requestedModel: "Fusion",
++      requestedPreference: "premium",
++      effectivePreference: "standard",
++      pendingPreference: "premium",
++      activatingPreference: null,
++    };
++    expect(modelExecutionSummary(route)).not.toContain("actual-model");
++    const detail = modelExecutionDetail(route);
++    expect(detail).toContain("Routing state (not proof of model execution)");
++    expect(detail).toContain("Requested model: Fusion");
++    expect(detail).toContain("Requested routing: premium");
++    expect(detail).toContain("Effective routing: standard");
++    expect(detail).toContain("Pending routing: premium");
++    expect(detail).toContain("Activating routing: none");
++    expect(modelExecutionDetail({ ...route, pendingPreference: undefined })).not.toContain(
++      "Pending routing:",
++    );
++  });
++
++  it("surfaces fallback, failure, final provenance and incomplete telemetry without inventing success", () => {
++    const failed = {
++      ...phase,
++      status: "failed",
++      fallbackModel: "fallback-model",
++      finalSourceModel: "final-model",
++      finalSourcePhaseId: "final-phase",
++      reason: "Provider unavailable",
++      awaitingBackgroundWork: true,
++      gaps: ["missing phase start", "duration incomplete"],
++    };
++    expect(modelExecutionSummary(failed)).toContain("failed");
++    expect(modelExecutionSummary(failed)).toContain("final final-model");
++    expect(modelExecutionSummary(failed)).toContain("telemetry gaps");
++    const detail = modelExecutionDetail(failed);
++    expect(detail).toContain("Fallback model: fallback-model");
++    expect(detail).toContain("Final source model: final-model");
++    expect(detail).toContain("Final source phase: final-phase");
++    expect(detail).toContain("Reason: Provider unavailable");
++    expect(detail).toContain("Background work: awaiting completion");
++    expect(detail).toContain("Telemetry gaps:\n- missing phase start\n- duration incomplete");
++  });
++});
+diff --git a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts
+new file mode 100644
+index 000000000..0d1f0e605
+--- /dev/null
++++ b/packages/client-runtime/src/work-log/modelExecution.ts
+@@ -0,0 +1,108 @@
++import type { OrchestrationV2ModelExecution } from "@t3tools/contracts";
++import { formatDuration } from "@t3tools/shared/orchestrationTiming";
++
++export function modelExecutionSummary(execution: OrchestrationV2ModelExecution): string {
++  const subject =
++    execution.kind === "phase"
++      ? ["Model phase", execution.model ?? "model unknown", execution.role]
++      : execution.kind === "gap"
++        ? ["Model telemetry gap", execution.model]
++        : [
++            execution.kind === "selection" ? "Model selection (requested)" : "Model routing",
++            execution.requestedModel,
++            execution.effectivePreference
++              ? `effective ${execution.effectivePreference}`
++              : execution.requestedPreference
++                ? `requested ${execution.requestedPreference}`
++                : undefined,
++          ];
++  return [
++    ...subject,
++    execution.status,
++    execution.kind === "phase" && execution.durationMs !== undefined
++      ? formatDuration(execution.durationMs)
++      : undefined,
++    execution.finalSourceModel ? `final ${execution.finalSourceModel}` : undefined,
++    execution.fallbackModel ? `fallback ${execution.fallbackModel}` : undefined,
++    execution.gaps.length > 0 ? "telemetry gaps" : undefined,
++  ]
++    .filter(Boolean)
++    .join(" · ");
++}
++
++export function modelExecutionDetail(
++  execution: OrchestrationV2ModelExecution,
++  message?: string,
++): string {
++  const lines: string[] = message?.trim() ? [message.trim(), ""] : [];
++  const add = (label: string, value: string | number | null | undefined) => {
++    if (value !== undefined) lines.push(`${label}: ${value === null ? "none" : value}`);
++  };
++  lines.push(
++    execution.kind === "selection" || execution.kind === "route"
++      ? "Routing state (not proof of model execution)"
++      : execution.kind === "gap"
++        ? "Incomplete model execution telemetry"
++        : "Provider-reported model phase",
++  );
++  add("Status", execution.status);
++  add("Model", execution.model);
++  add("Role", execution.role);
++  add("Phase kind", execution.phaseKind);
++  add("Conversation scope", execution.conversationScope);
++  add("Pattern", execution.pattern);
++  if (execution.plannedModels?.length)
++    lines.push(
++      `Planned models (not execution evidence):\n${execution.plannedModels
++        .map(
++          (phase) => `- ${phase.role}: ${phase.model}${phase.phaseId ? ` (${phase.phaseId})` : ""}`,
++        )
++        .join("\n")}`,
++    );
++  add("Requested model", execution.requestedModel);
++  add("Resolved virtual model", execution.syntheticModel);
++  add("Requested routing", execution.requestedPreference);
++  add("Effective routing", execution.effectivePreference);
++  add("Pending routing", execution.pendingPreference);
++  add("Activating routing", execution.activatingPreference);
++  add(
++    execution.startedAt ? `Started (${execution.startSource})` : "Start",
++    execution.startedAt ?? execution.startSource,
++  );
++  add("Ended", execution.endedAt);
++  add(
++    "Provider elapsed",
++    execution.durationMs === undefined ? "not reported" : formatDuration(execution.durationMs),
++  );
++  add(
++    execution.kind === "selection"
++      ? "Snapshot time"
++      : execution.kind === "gap"
++        ? "Gap detected"
++        : "Provider event time",
++    execution.sourceTimestamp,
++  );
++  add("Received", execution.receivedAt);
++  add("Fallback model", execution.fallbackModel);
++  add("Degraded to phase", execution.degradedToPhaseId);
++  add("Final source model", execution.finalSourceModel);
++  add("Final source phase", execution.finalSourcePhaseId);
++  add("Reason", execution.reason);
++  if (execution.awaitingBackgroundWork !== undefined) {
++    add(
++      "Background work",
++      execution.awaitingBackgroundWork ? "awaiting completion" : "not pending",
++    );
++  }
++  if (execution.endedWithBackgroundWork !== undefined)
++    add("Phase ended with background work", execution.endedWithBackgroundWork ? "yes" : "no");
++  add("Session", execution.nativeSessionId);
++  add("Turn", execution.nativeTurnId);
++  add("Fusion", execution.fusionId);
++  add("Phase", execution.phaseId);
++  add("Event", execution.eventId);
++  add("Contract version", execution.contractVersion);
++  if (execution.gaps.length > 0)
++    lines.push(`Telemetry gaps:\n${execution.gaps.map((gap) => `- ${gap}`).join("\n")}`);
++  return lines.join("\n");
++}
+diff --git a/packages/contracts/src/model.ts b/packages/contracts/src/model.ts
+index 8027c9079..c677a696e 100644
+--- a/packages/contracts/src/model.ts
++++ b/packages/contracts/src/model.ts
+@@ -11,6 +11,7 @@ export const ProviderOptionChoice = Schema.Struct({
+   id: TrimmedNonEmptyString,
+   label: TrimmedNonEmptyString,
+   description: Schema.optional(TrimmedNonEmptyString),
++  disabledReason: Schema.optional(TrimmedNonEmptyString),
+   isDefault: Schema.optional(Schema.Boolean),
+ });
+ export type ProviderOptionChoice = typeof ProviderOptionChoice.Type;
+diff --git a/packages/contracts/src/orchestrationV2.test.ts b/packages/contracts/src/orchestrationV2.test.ts
+index 378230717..06a0a76ad 100644
+--- a/packages/contracts/src/orchestrationV2.test.ts
++++ b/packages/contracts/src/orchestrationV2.test.ts
+@@ -33,8 +33,75 @@ const decodeOrchestrationV2ProviderThread = Schema.decodeUnknownSync(Orchestrati
+ const decodeOrchestrationV2ProviderCapabilities = Schema.decodeUnknownSync(
+   OrchestrationV2ProviderCapabilities,
+ );
++const decodeRuntimeTurnItem = Schema.decodeUnknownSync(OrchestrationV2TurnItem);
++const turnItemWireCodec = Schema.toCodecJson(OrchestrationV2TurnItem);
++const encodeWireTurnItem = Schema.encodeSync(turnItemWireCodec);
++const decodeWireTurnItem = Schema.decodeUnknownSync(turnItemWireCodec);
++const decodeLegacyNotice = Schema.decodeUnknownSync(
++  Schema.Struct({
++    type: Schema.Literal("system_notice"),
++    message: Schema.String,
++  }),
++);
+ 
+ describe("orchestration V2 contracts", () => {
++  it("round-trips optional model execution metadata through runtime and JSON notices without breaking old histories", () => {
++    const notice = {
++      id: "model-notice",
++      type: "system_notice",
++      threadId: "thread-1",
++      runId: null,
++      nodeId: null,
++      providerThreadId: null,
++      providerTurnId: null,
++      nativeItemRef: null,
++      parentItemId: null,
++      ordinal: 1,
++      status: "completed",
++      title: "Model execution",
++      startedAt: null,
++      completedAt: null,
++      updatedAt: now,
++      message: "Model phase succeeded",
++    };
++    const modelExecution = {
++      version: 1,
++      kind: "phase",
++      nativeSessionId: "session",
++      phaseId: "primary",
++      eventId: "event",
++      sourceTimestamp: DateTime.formatIso(now),
++      receivedAt: DateTime.formatIso(now),
++      status: "succeeded",
++      model: "model",
++      startSource: "estimated",
++      durationMs: 2000,
++      gaps: ["Transient start was not observed."],
++    };
++    const legacy = decodeRuntimeTurnItem(notice);
++    expect(legacy.type).toBe("system_notice");
++    const runtime = decodeRuntimeTurnItem({ ...notice, modelExecution });
++    const wire = encodeWireTurnItem(runtime);
++    const json = decodeOrchestrationV2TurnItemJson(wire);
++    expect(json.type).toBe("system_notice");
++    if (json.type !== "system_notice") throw new Error("Expected system notice.");
++    expect(json.modelExecution).toEqual(modelExecution);
++    const restored = decodeWireTurnItem(wire);
++    expect(restored).toEqual(runtime);
++    expect(decodeLegacyNotice(wire)).toEqual({ type: "system_notice", message: notice.message });
++    expect(() =>
++      decodeRuntimeTurnItem({
++        ...notice,
++        modelExecution: { ...modelExecution, model: "x".repeat(513) },
++      }),
++    ).toThrow();
++    expect(() =>
++      decodeRuntimeTurnItem({
++        ...notice,
++        modelExecution: { ...modelExecution, gaps: Array.from({ length: 17 }, () => "gap") },
++      }),
++    ).toThrow();
++  });
+   it("decodes thread event types from a newer server as skippable items", () => {
+     const decodeWireItems = Schema.decodeUnknownSync(
+       Schema.toCodecJson(Schema.Array(OrchestrationV2RpcSchemas.subscribeThread.output)),
+diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts
+index 09482a808..156046a77 100644
+--- a/packages/contracts/src/orchestrationV2.ts
++++ b/packages/contracts/src/orchestrationV2.ts
+@@ -1549,6 +1549,55 @@ const OrchestrationV2LinkRequestFields = {
+   failure: Schema.optional(Schema.String),
+ } as const;
+ 
++const ModelExecutionText = Schema.String.check(Schema.isMaxLength(512));
++
++export const OrchestrationV2ModelExecution = Schema.Struct({
++  version: Schema.Literal(1),
++  kind: Schema.Literals(["selection", "route", "phase", "gap"]),
++  nativeSessionId: ModelExecutionText,
++  nativeTurnId: Schema.optional(ModelExecutionText),
++  fusionId: Schema.optional(ModelExecutionText),
++  phaseId: Schema.optional(ModelExecutionText),
++  phaseKind: Schema.optional(ModelExecutionText),
++  conversationScope: Schema.optional(ModelExecutionText),
++  degradedToPhaseId: Schema.optional(ModelExecutionText),
++  eventId: ModelExecutionText,
++  sourceTimestamp: ModelExecutionText,
++  receivedAt: ModelExecutionText,
++  status: ModelExecutionText,
++  model: Schema.optional(ModelExecutionText),
++  role: Schema.optional(ModelExecutionText),
++  pattern: Schema.optional(ModelExecutionText),
++  syntheticModel: Schema.optional(ModelExecutionText),
++  requestedModel: Schema.optional(ModelExecutionText),
++  requestedPreference: Schema.optional(ModelExecutionText),
++  effectivePreference: Schema.optional(ModelExecutionText),
++  pendingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
++  activatingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
++  startSource: Schema.Literals(["observed", "estimated", "unknown"]),
++  startedAt: Schema.optional(ModelExecutionText),
++  endedAt: Schema.optional(ModelExecutionText),
++  durationMs: Schema.optional(NonNegativeInt),
++  fallbackModel: Schema.optional(ModelExecutionText),
++  finalSourceModel: Schema.optional(ModelExecutionText),
++  finalSourcePhaseId: Schema.optional(ModelExecutionText),
++  reason: Schema.optional(ModelExecutionText),
++  contractVersion: Schema.optional(NonNegativeInt),
++  awaitingBackgroundWork: Schema.optional(Schema.Boolean),
++  endedWithBackgroundWork: Schema.optional(Schema.Boolean),
++  plannedModels: Schema.optional(
++    Schema.Array(
++      Schema.Struct({
++        model: ModelExecutionText,
++        role: ModelExecutionText,
++        phaseId: Schema.optional(ModelExecutionText),
++      }),
++    ).check(Schema.isMaxLength(64)),
++  ),
++  gaps: Schema.Array(ModelExecutionText).check(Schema.isMaxLength(16)),
++});
++export type OrchestrationV2ModelExecution = typeof OrchestrationV2ModelExecution.Type;
++
+ export const OrchestrationV2TurnItem = Schema.Union([
+   Schema.Struct({
+     ...OrchestrationV2TurnItemBaseFields,
+@@ -1677,6 +1726,7 @@ export const OrchestrationV2TurnItem = Schema.Union([
+     ...OrchestrationV2TurnItemBaseFields,
+     type: Schema.Literal("system_notice"),
+     message: Schema.String,
++    modelExecution: Schema.optional(OrchestrationV2ModelExecution),
+   }),
+   Schema.Struct({
+     ...OrchestrationV2TurnItemBaseFields,
+@@ -2501,6 +2551,7 @@ export const OrchestrationV2TurnItemJson = Schema.Union([
+     ...OrchestrationV2TurnItemJsonBaseFields,
+     type: Schema.Literal("system_notice"),
+     message: Schema.String,
++    modelExecution: Schema.optional(OrchestrationV2ModelExecution),
+   }),
+   Schema.Struct({
+     ...OrchestrationV2TurnItemJsonBaseFields,
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index 43ddd0b79..06b3d0907 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -16,6 +16,7 @@ import {
+   RunId,
+   ThreadId,
+   type OrchestrationV2AppThread,
++  type ModelSelection,
+ } from "@t3tools/contracts";
+ import * as DateTime from "effect/DateTime";
+ import * as Effect from "effect/Effect";
+@@ -29,6 +30,7 @@ import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+ import { CopilotSettings } from "../settings.ts";
+ import { makeAdapter, type ClientHandle, type SessionHandle } from "./adapter.ts";
++import type { ModelCatalog } from "./routing.ts";
+ 
+ const threadId = ThreadId.make("copilot-test");
+ const instanceId = ProviderInstanceId.make("githubCopilot");
+@@ -78,13 +80,24 @@ function fakeSdk() {
+   > = [];
+   let permissionResponse = async (): Promise<{ success: boolean }> => ({ success: true });
+   let background: Awaited<ReturnType<SessionHandle["rpc"]["tasks"]["list"]>> = { tasks: [] };
++  let catalog: ModelCatalog = { models: [] };
++  let current: Awaited<ReturnType<SessionHandle["rpc"]["model"]["getCurrent"]>> = {
++    modelId: "gpt-4.1",
++  };
++  const modelChanges: Array<{ model: string; options: Parameters<SessionHandle["setModel"]>[1] }> =
++    [];
+   const sent: MessageOptions[] = [];
+-  const emit = (type: SessionEvent["type"], data: unknown = {}, agentId?: string) => {
++  const emit = (
++    type: SessionEvent["type"],
++    data: unknown = {},
++    agentId?: string,
++    timestamp = "2026-10-29T00:00:00Z",
++  ) => {
+     config?.onEvent?.({
+       type,
+       data,
+       id: `native-event-${++serial}`,
+-      timestamp: "2026-10-29T00:00:00Z",
++      timestamp,
+       parentId: null,
+       ...(agentId ? { agentId } : {}),
+     } as SessionEvent);
+@@ -102,8 +115,14 @@ function fakeSdk() {
+       disconnected++;
+     },
+     getEvents: async () => [],
+-    setModel: async () => {},
++    setModel: async (model, options) => {
++      modelChanges.push({ model, options });
++    },
+     rpc: {
++      model: {
++        list: async () => ({ list: [], ...(catalog.auto ? { auto: catalog.auto } : {}) }),
++        getCurrent: async () => current,
++      },
+       mode: { set: async () => ({ status: "success", modelChanged: false, modeApplied: true }) },
+       plan: {
+         read: async () => ({
+@@ -127,6 +146,7 @@ function fakeSdk() {
+     },
+   };
+   const client: ClientHandle = {
++    rpc: { models: { list: async () => catalog } },
+     start: async () => {},
+     stop: async () => {
+       stopped++;
+@@ -151,6 +171,13 @@ function fakeSdk() {
+     session,
+     sent,
+     emit,
++    modelChanges,
++    setCatalog: (value: ModelCatalog) => {
++      catalog = value;
++    },
++    setCurrent: (value: typeof current) => {
++      current = value;
++    },
+     get config() {
+       return config!;
+     },
+@@ -179,6 +206,25 @@ function fakeSdk() {
+   };
+ }
+ type Fake = ReturnType<typeof fakeSdk>;
++const durablePhase = (phaseId: string): SessionEvent => ({
++  type: "assistant.fusion_phase_completed",
++  id: `durable-${phaseId}`,
++  timestamp: "2026-10-29T00:00:02Z",
++  parentId: null,
++  data: {
++    fusionId: "fusion-1",
++    phaseId,
++    model: "model",
++    role: "primary",
++    phaseKind: "primary",
++    conversationScope: "root",
++    durationMs: 2000,
++    status: "succeeded",
++    content: "PRIVATE",
++    verdict: null,
++    usage: { inputTokens: 10, outputTokens: 5, cachedTokens: 0, requestCount: 1, totalNanoAiu: 0 },
++  },
++});
+ 
+ function promiseGate() {
+   let resolve!: () => void;
+@@ -188,15 +234,20 @@ function promiseGate() {
+   return { promise, resolve };
+ }
+ 
+-const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: string) {
++const setup = Effect.fnUntraced(function* (
++  fake: Fake,
++  initialNativeThreadId?: string,
++  initialSelection: ModelSelection = selection,
++  runtimeSessionId = sessionId,
++) {
+   const adapter = yield* makeAdapter(
+     { instanceId, settings, environment: { HOME: "/test-account" } },
+     { clientFactory: () => fake.client },
+   );
+   const runtime = yield* adapter.openSession({
+     threadId,
+-    providerSessionId: sessionId,
+-    modelSelection: selection,
++    providerSessionId: runtimeSessionId,
++    modelSelection: initialSelection,
+     runtimePolicy: policy,
+     ...(initialNativeThreadId ? { initialNativeThreadId } : {}),
+   });
+@@ -220,17 +271,17 @@ const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: s
+   });
+   const thread = yield* runtime.ensureThread({
+     threadId,
+-    modelSelection: selection,
++    modelSelection: initialSelection,
+     runtimePolicy: policy,
+   });
+-  const start = Effect.fnUntraced(function* (ordinal = 1) {
++  const start = Effect.fnUntraced(function* (ordinal = 1, turnSelection = initialSelection) {
+     const now = yield* DateTime.now;
+     const appThread: OrchestrationV2AppThread = {
+       id: threadId,
+       projectId: ProjectId.make("project"),
+       title: "Test",
+       providerInstanceId: instanceId,
+-      modelSelection: selection,
++      modelSelection: turnSelection,
+       runtimeMode: policy.runtimeMode,
+       interactionMode: "default",
+       branch: null,
+@@ -264,7 +315,7 @@ const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: s
+         createdBy: "user",
+         creationSource: "web",
+       },
+-      modelSelection: selection,
++      modelSelection: turnSelection,
+       runtimePolicy: policy,
+     });
+   });
+@@ -280,6 +331,325 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+   );
+ 
+ describe("native Copilot V2", () => {
++  it.effect(
++    "bounds live phase records and exposes an overflow gap instead of silently losing telemetry",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { start, emitted, takeEvent } = yield* setup(fake);
++          yield* start();
++          fake.emit("assistant.turn_start", { turnId: "0" });
++          fake.emit("session.fusion_resolved", {
++            fusionId: "fusion-1",
++            turnId: "0",
++            contractVersion: 1,
++            pattern: "single",
++            primaryModel: "model",
++            fallbackModel: "model",
++            syntheticModel: "auto",
++          });
++          for (let index = 0; index < 130; index++)
++            fake.emit("assistant.fusion_phase_started", {
++              fusionId: "fusion-1",
++              phaseId: `phase-${index}`,
++              model: "model",
++              role: "primary",
++              pattern: "single",
++            });
++          yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution?.kind === "gap" &&
++              event.turnItem.modelExecution.phaseId === "phase-129",
++          );
++          const items = new Map(
++            emitted.flatMap((event) =>
++              event.type === "turn_item.updated"
++                ? [[event.turnItem.id, event.turnItem] as const]
++                : [],
++            ),
++          );
++          assert.equal(items.size, 128);
++          assert.isTrue(
++            [...items.values()].some(
++              (item) =>
++                item.type === "system_notice" &&
++                item.modelExecution?.gaps.some((gap) => gap.includes("per-turn limit")),
++            ),
++          );
++        }),
++      ),
++  );
++
++  it.effect(
++    "bounds cold replay and exposes omitted native history without deleting persisted records",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          fake.session.getEvents = async () =>
++            Array.from({ length: 513 }, (_, index) => durablePhase(`phase-${index}`));
++          const { emitted, takeEvent } = yield* setup(fake, "native-copilot");
++          yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution?.kind === "gap",
++          );
++          const phases = emitted.filter(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution?.kind === "phase",
++          );
++          assert.equal(phases.length, 512);
++          assert.isTrue(
++            emitted.some(
++              (event) =>
++                event.type === "turn_item.updated" &&
++                event.turnItem.type === "system_notice" &&
++                event.turnItem.modelExecution?.gaps.some((gap) => gap.startsWith("1 older native")),
++            ),
++          );
++        }),
++      ),
++  );
++  it.effect(
++    "preserves opaque create/resume routing and distinguishes pending, applied and failed activation",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const auto = {
++            defaultTier: "standard",
++            tiers: ["standard", "fuse@2026:opaque"].map((id) => ({
++              id,
++              displayName: id,
++              description: "",
++              type: "auto",
++              status: { enabled: true },
++            })),
++          };
++          const autoSelection: ModelSelection = {
++            instanceId,
++            model: "auto",
++            options: [{ id: "autoTier", value: "fuse@2026:opaque" }],
++          };
++          for (const resumed of [undefined, "native-copilot"]) {
++            const fake = fakeSdk();
++            fake.setCatalog({ models: [], auto });
++            fake.setCurrent({
++              modelId: "auto",
++              autoTier: "standard",
++              pendingAutoTier: "fuse@2026:opaque",
++            });
++            const { start, drain, emitted, takeEvent } = yield* setup(fake, resumed, autoSelection);
++            assert.deepEqual(fake.config.capi, { autoTier: "fuse@2026:opaque" });
++            yield* start();
++            assert.deepEqual(fake.modelChanges[0], {
++              model: "auto",
++              options: { autoTier: "fuse@2026:opaque" },
++            });
++            const pending = yield* takeEvent(
++              (event) =>
++                event.type === "turn_item.updated" &&
++                event.turnItem.runId === RunId.make("run-1") &&
++                event.turnItem.type === "system_notice" &&
++                event.turnItem.modelExecution?.status === "pending",
++            );
++            assert.equal(pending.type, "turn_item.updated");
++            if (pending.type !== "turn_item.updated" || pending.turnItem.type !== "system_notice")
++              return assert.fail("Expected persisted routing state.");
++            assert.equal(pending.turnItem.modelExecution?.effectivePreference, "standard");
++            assert.equal(pending.turnItem.modelExecution?.requestedPreference, "fuse@2026:opaque");
++            fake.setCurrent({ modelId: "auto", autoTier: "fuse@2026:opaque" });
++            fake.emit("session.model_change", {});
++            yield* takeEvent(
++              (event) =>
++                event.type === "turn_item.updated" &&
++                event.turnItem.type === "system_notice" &&
++                event.turnItem.modelExecution?.status === "effective",
++            );
++            fake.setCurrent({ modelId: "auto", autoTier: "standard" });
++            fake.emit("session.auto_tier_switch_failed", {
++              requestedAutoTier: "fuse@2026:opaque",
++              effectiveAutoTier: "standard",
++              reason: "policy-changed",
++            });
++            yield* takeEvent(
++              (event) =>
++                event.type === "turn_item.updated" &&
++                event.turnItem.type === "system_notice" &&
++                event.turnItem.modelExecution?.status === "activation-failed",
++            );
++            const states = emitted.flatMap((event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution
++                ? [event.turnItem.modelExecution]
++                : [],
++            );
++            assert.isTrue(
++              states.some(
++                (state) =>
++                  state.status === "effective" && state.effectivePreference === "fuse@2026:opaque",
++              ),
++            );
++            assert.isTrue(
++              states.some(
++                (state) =>
++                  state.status === "activation-failed" && state.effectivePreference === "standard",
++              ),
++            );
++            fake.emit("session.idle");
++            yield* drain();
++            yield* start(2, selection);
++            assert.equal(fake.modelChanges.at(-1)?.model, "gpt-4.1");
++            assert.deepEqual(fake.modelChanges.at(-1)?.options, {});
++          }
++        }),
++      ),
++  );
++
++  it.effect(
++    "keeps phase identity and late ownership without finishing the root or counting aggregate usage",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { start, drain, emitted, takeEvent } = yield* setup(fake);
++          yield* start();
++          fake.emit("assistant.turn_start", { turnId: "0" });
++          fake.emit("session.fusion_resolved", {
++            fusionId: "fusion-1",
++            turnId: "0",
++            contractVersion: 1,
++            pattern: "critique",
++            primaryModel: "same-model",
++            secondaryModel: "same-model",
++            fallbackModel: "fallback",
++            syntheticModel: "auto",
++          });
++          for (const phaseId of ["draft", "critic"])
++            fake.emit("assistant.fusion_phase_started", {
++              fusionId: "fusion-1",
++              phaseId,
++              model: "same-model",
++              role: phaseId,
++              pattern: "critique",
++            });
++          fake.emit("assistant.fusion_phase_completed", {
++            fusionId: "fusion-1",
++            phaseId: "critic",
++            model: "same-model",
++            role: "critic",
++            durationMs: 2000,
++            status: "completed",
++            content: "PRIVATE CRITIC",
++            usage: { inputTokens: 500 },
++          });
++          fake.emit("session.fusion_completed", {
++            fusionId: "fusion-1",
++            turnId: "0",
++            pattern: "critique",
++            durationMs: 2000,
++            outcome: "completed",
++            finalSourceModel: "same-model",
++            finalSourcePhaseId: "draft",
++            awaitingBackgroundWork: true,
++            syntheticModel: "auto",
++            inputTokens: 1000,
++          });
++          assert.equal((yield* drain()).providerTurns[0]?.status, "running");
++          assert.isUndefined((yield* drain()).providerTurns[0]?.tokenUsage);
++          fake.emit("assistant.usage", { inputTokens: 10, outputTokens: 5 });
++          assert.equal((yield* drain()).providerTurns[0]?.tokenUsage?.usedTokens, 15);
++          fake.emit("session.idle");
++          assert.equal((yield* drain()).providerTurns[0]?.status, "completed");
++          yield* start(2);
++          fake.emit("assistant.fusion_phase_completed", {
++            fusionId: "fusion-1",
++            phaseId: "draft",
++            model: "same-model",
++            role: "draft",
++            durationMs: 2500,
++            status: "completed",
++            content: "PRIVATE DRAFT",
++          });
++          fake.emit("assistant.fusion_phase_failed", {
++            fusionId: "unknown-fusion",
++            phaseId: "late",
++            model: "same-model",
++            role: "critic",
++            durationMs: 100,
++            status: "failed",
++            reason: "cancelled",
++            errorMessage: "PRIVATE ERROR",
++          });
++          yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution?.fusionId === "unknown-fusion",
++          );
++          const items = new Map(
++            emitted.flatMap((event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution
++                ? [[event.turnItem.id, event.turnItem] as const]
++                : [],
++            ),
++          );
++          const phases = [...items.values()].filter(
++            (item) => item.modelExecution?.kind === "phase",
++          );
++          assert.equal(phases.length, 3);
++          assert.isTrue(
++            phases
++              .filter((item) => item.modelExecution?.fusionId === "fusion-1")
++              .every((item) => item.runId === RunId.make("run-1")),
++          );
++          assert.equal(
++            phases.find((item) => item.modelExecution?.fusionId === "unknown-fusion")?.runId,
++            null,
++          );
++          assert.notInclude(JSON.stringify([...items.values()]), "PRIVATE");
++        }),
++      ),
++  );
++
++  it.effect(
++    "imports cold native execution history with stable IDs and honest missing associations",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const ids: string[] = [];
++          for (let restart = 0; restart < 2; restart++) {
++            const fake = fakeSdk();
++            fake.session.getEvents = async () => [durablePhase("primary")];
++            const { takeEvent } = yield* setup(
++              fake,
++              "native-copilot",
++              selection,
++              ProviderSessionId.make(`restart-${restart}`),
++            );
++            const imported = yield* takeEvent((event) => event.type === "turn_item.updated");
++            if (imported.type !== "turn_item.updated" || imported.turnItem.type !== "system_notice")
++              return assert.fail("Expected imported execution history.");
++            ids.push(imported.turnItem.id);
++            assert.equal(imported.turnItem.runId, null);
++            assert.equal(imported.turnItem.modelExecution?.startSource, "estimated");
++            assert.include(
++              imported.turnItem.modelExecution?.gaps.join(" "),
++              "could not be associated",
++            );
++          }
++          assert.equal(ids[0], ids[1]);
++        }),
++      ),
++  );
+   it.effect(
+     "waits for the native permission receipt and never replaces V2-owned response delivery",
+     () =>
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+index 4db6536f4..241306b16 100644
+--- a/packages/provider-copilot/src/server/adapter.ts
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -24,6 +24,7 @@ import {
+   type OrchestrationV2ProviderTurn,
+   type OrchestrationV2RuntimeRequest,
+   type OrchestrationV2TurnItem,
++  OrchestrationV2ModelExecution,
+   type ProviderInstanceId,
+   type OrchestrationV2Subagent,
+   type ServerProviderSkill,
+@@ -32,6 +33,7 @@ import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
+ import * as DateTime from "effect/DateTime";
+ import * as Deferred from "effect/Deferred";
+ import * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
+ import * as Queue from "effect/Queue";
+ import * as Option from "effect/Option";
+ import * as Stream from "effect/Stream";
+@@ -51,8 +53,17 @@ import { capabilities } from "./capabilities.ts";
+ import { createClient, resolveClientConfiguration } from "./client.ts";
+ import { skillsFromSdk } from "./status.ts";
+ import { nativeToolItem } from "./tools.ts";
++import { autoTierForSelection } from "./routing.ts";
++import {
++  fusionExecutionKey,
++  normalizeFusionExecution,
++  MAX_EXECUTION_ITEMS,
++  MAX_REPLAY_EXECUTION_EVENTS,
++  ROOT_PHASE_GAP,
++} from "./fusion.ts";
+ 
+ export const COPILOT_DRIVER = ProviderDriverKind.make("githubCopilot");
++const decodeModelExecution = Schema.decodeEffect(OrchestrationV2ModelExecution);
+ const ref = (nativeId: string) => ({
+   driver: COPILOT_DRIVER,
+   nativeId,
+@@ -70,6 +81,7 @@ export type SessionHandle = Pick<
+ > & {
+   readonly rpc: {
+     readonly mode: Pick<Rpc["mode"], "set">;
++    readonly model: Pick<Rpc["model"], "list" | "getCurrent">;
+     readonly plan: Pick<Rpc["plan"], "read">;
+     readonly skills: Pick<Rpc["skills"], "list">;
+     readonly tasks: Pick<Rpc["tasks"], "list" | "cancel">;
+@@ -77,6 +89,7 @@ export type SessionHandle = Pick<
+   };
+ };
+ export type ClientHandle = Pick<CopilotClient, "start" | "stop" | "forceStop"> & {
++  readonly rpc: { readonly models: Pick<CopilotClient["rpc"]["models"], "list"> };
+   readonly createSession: (config: SessionConfig) => Promise<SessionHandle>;
+   readonly resumeSession: (id: string, config: ResumeSessionConfig) => Promise<SessionHandle>;
+ };
+@@ -214,6 +227,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+       const tasks = new Map<string, Task>();
+       const subagents = new Map<string, OrchestrationV2Subagent>();
+       const taskOwners = new Map<string, ActiveTurn>();
++      const executionItems = new Map<
++        string,
++        Extract<OrchestrationV2TurnItem, { type: "system_notice" }>
++      >();
++      const fusionOwners = new Map<string, ActiveTurn>();
++      const nativeTurnOwners = new Map<string, ActiveTurn>();
++      let replayExecutionEvents: ReadonlyArray<SessionEvent> = [];
++      let omittedReplayEvents = 0;
+       const emit = (event: ProviderAdapter.ProviderAdapterV2Event) =>
+         Queue.offer(events, event).pipe(Effect.asVoid);
+       const sdk = <A>(operation: string, request: () => Promise<A>, timeoutMs = 10_000) =>
+@@ -364,11 +385,219 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+       const putItem = (turn: ActiveTurn, key: string, item: OrchestrationV2TurnItem) =>
+         Effect.sync(() => {
+           turn.items.set(key, item);
++          if (item.type === "system_notice" && item.modelExecution) executionItems.set(key, item);
+         }).pipe(
+           Effect.andThen(
+             emit({ type: "turn_item.updated", driver: COPILOT_DRIVER, turnItem: item }),
+           ),
+         );
++      const putExecution = Effect.fnUntraced(function* (
++        key: string,
++        execution: OrchestrationV2ModelExecution,
++        owner?: ActiveTurn,
++      ) {
++        if (!native || !providerThread) return;
++        execution = yield* decodeModelExecution({
++          ...execution,
++          gaps: [...new Set(execution.gaps)].slice(0, 16),
++        }).pipe(
++          Effect.mapError(
++            (cause) =>
++              new ProviderAdapter.ProviderAdapterProtocolError({
++                driver: COPILOT_DRIVER,
++                detail: "Copilot execution metadata exceeded the supported contract.",
++                cause,
++              }),
++          ),
++        );
++        const previous = executionItems.get(key);
++        const now = DateTime.makeUnsafe(execution.receivedAt);
++        const source = DateTime.makeUnsafe(execution.sourceTimestamp);
++        const running = execution.kind === "phase" && execution.status === "running";
++        const item: Extract<OrchestrationV2TurnItem, { type: "system_notice" }> = {
++          ...(previous ?? {
++            id: TurnItemId.make(
++              `${input.instanceId}:${open.threadId}:copilot:${native.sessionId}:execution:${key}`,
++            ),
++            threadId: open.threadId,
++            runId: owner?.input.runId ?? null,
++            nodeId: owner?.input.rootNodeId ?? null,
++            providerThreadId: providerThread.id,
++            providerTurnId: owner?.providerTurn.id ?? null,
++            parentItemId: null,
++            ordinal: owner ? owner.nextOrdinal++ : executionItems.size + 1,
++            title: execution.kind === "selection" ? "Routing selection" : "Model execution",
++          }),
++          type: "system_notice",
++          runId: previous?.runId ?? owner?.input.runId ?? null,
++          nodeId: previous?.nodeId ?? owner?.input.rootNodeId ?? null,
++          providerTurnId: previous?.providerTurnId ?? owner?.providerTurn.id ?? null,
++          nativeItemRef: ref(key),
++          status:
++            execution.status === "unknown" && previous
++              ? previous.status
++              : running
++                ? "running"
++                : execution.status === "cancelled"
++                  ? "interrupted"
++                  : ["failed", "activation-failed", "routing-failed"].includes(execution.status)
++                    ? "failed"
++                    : "completed",
++          startedAt: execution.startedAt ? DateTime.makeUnsafe(execution.startedAt) : source,
++          completedAt:
++            execution.status === "unknown" && previous
++              ? previous.completedAt
++              : running
++                ? null
++                : source,
++          updatedAt: now,
++          message:
++            execution.kind === "phase"
++              ? `${execution.model ?? "Unknown model"} · ${execution.role ?? "phase"} · ${execution.status}`
++              : `${execution.kind === "selection" ? "Routing selection" : "Model routing"} · ${execution.status}${execution.reason ? ` · ${execution.reason}` : ""}`,
++          modelExecution: { ...execution, gaps: [...new Set(execution.gaps)].slice(0, 16) },
++        };
++        executionItems.set(key, item);
++        if (executionItems.size > MAX_REPLAY_EXECUTION_EVENTS)
++          executionItems.delete(executionItems.keys().next().value!);
++        if (owner) owner.items.set(key, item);
++        yield* emit({ type: "turn_item.updated", driver: COPILOT_DRIVER, turnItem: item });
++      });
++      const refreshSelection = Effect.fnUntraced(function* (
++        selection: ModelSelection,
++        owner?: ActiveTurn,
++        failure?: { readonly reason: string; readonly timestamp: string; readonly id: string },
++      ) {
++        if (!native) return;
++        const current = yield* sdk("read current routing state", () =>
++          native!.rpc.model.getCurrent(),
++        );
++        const now = DateTime.formatIso(yield* DateTime.now);
++        const requested = getModelSelectionStringOptionValue(selection, "autoTier");
++        const execution: OrchestrationV2ModelExecution = {
++          version: 1,
++          kind: "selection",
++          nativeSessionId: native.sessionId,
++          eventId: failure?.id ?? `${owner?.providerTurn.id ?? "current"}:selection`,
++          sourceTimestamp: failure?.timestamp ?? now,
++          receivedAt: now,
++          status: failure
++            ? "activation-failed"
++            : current.pendingAutoTier !== undefined || current.activatingAutoTier !== undefined
++              ? "pending"
++              : current.modelId !== selection.model
++                ? current.modelId
++                  ? "different-model"
++                  : "unknown"
++                : selection.model === "auto" && !current.autoTier
++                  ? "preference-unknown"
++                  : "effective",
++          requestedModel: selection.model,
++          ...(current.modelId ? { model: current.modelId } : {}),
++          ...(requested ? { requestedPreference: requested } : {}),
++          ...(current.autoTier ? { effectivePreference: current.autoTier } : {}),
++          ...(current.pendingAutoTier !== undefined
++            ? { pendingPreference: current.pendingAutoTier }
++            : {}),
++          ...(current.activatingAutoTier !== undefined
++            ? { activatingPreference: current.activatingAutoTier }
++            : {}),
++          ...(failure ? { reason: failure.reason.slice(0, 512) } : {}),
++          startSource: "unknown",
++          gaps: [],
++        };
++        yield* updateThread({
++          nativeMetadata: { ...providerThread?.nativeMetadata, modelSelection: selection },
++        });
++        if (selection.model === "auto" || failure)
++          yield* putExecution(`selection:${owner?.providerTurn.id ?? "current"}`, execution, owner);
++      });
++      const recordFusion = Effect.fnUntraced(function* (event: SessionEvent, replay = false) {
++        const key = fusionExecutionKey(event);
++        if (!key || !native) return;
++        const now = DateTime.formatIso(yield* DateTime.now);
++        const execution = normalizeFusionExecution(
++          event,
++          native.sessionId,
++          now,
++          executionItems.get(key)?.modelExecution,
++        );
++        if (!execution) return;
++        let owner = execution.fusionId ? fusionOwners.get(execution.fusionId) : undefined;
++        if (!owner && !replay && !event.agentId && execution.nativeTurnId) {
++          owner = nativeTurnOwners.get(execution.nativeTurnId);
++          if (
++            owner?.providerTurn.startedAt &&
++            Date.parse(event.timestamp) < DateTime.toEpochMillis(owner.providerTurn.startedAt)
++          )
++            owner = undefined;
++          if (owner && execution.fusionId && execution.kind === "route") {
++            fusionOwners.set(execution.fusionId, owner);
++            if (fusionOwners.size > MAX_EXECUTION_ITEMS)
++              fusionOwners.delete(fusionOwners.keys().next().value!);
++          }
++          if (owner && execution.fusionId) {
++            for (const [phaseKey, item] of executionItems) {
++              if (item.runId === null && item.modelExecution?.fusionId === execution.fusionId)
++                yield* putExecution(
++                  phaseKey,
++                  {
++                    ...item.modelExecution,
++                    gaps: item.modelExecution.gaps.filter(
++                      (gap) => gap !== "Native execution could not be associated with a T3 run.",
++                    ),
++                  },
++                  owner,
++                );
++            }
++          }
++        }
++        if (
++          owner &&
++          !owner.items.has(key) &&
++          [...owner.items.values()].filter(
++            (item) => item.type === "system_notice" && item.modelExecution,
++          ).length >=
++            MAX_EXECUTION_ITEMS - 1
++        ) {
++          yield* putExecution(
++            `execution-limit:${owner.providerTurn.id}`,
++            {
++              ...execution,
++              kind: "gap",
++              status: "incomplete",
++              gaps: [
++                "Execution history exceeded the per-turn limit; additional phase facts were omitted.",
++              ],
++            },
++            owner,
++          );
++          return;
++        }
++        yield* putExecution(
++          key,
++          {
++            ...execution,
++            ...(owner
++              ? {
++                  requestedModel: owner.input.modelSelection.model,
++                  ...(getModelSelectionStringOptionValue(owner.input.modelSelection, "autoTier")
++                    ? {
++                        requestedPreference: getModelSelectionStringOptionValue(
++                          owner.input.modelSelection,
++                          "autoTier",
++                        ),
++                      }
++                    : {}),
++                }
++              : {}),
++            gaps: owner
++              ? execution.gaps
++              : [...execution.gaps, "Native execution could not be associated with a T3 run."],
++          },
++          owner,
++        );
++      });
+       const terminal = Effect.fnUntraced(function* (turn: ActiveTurn, failure?: unknown) {
+         if (turn.finished || (!failure && !turn.accepted)) return;
+         turn.finished = true;
+@@ -393,6 +622,15 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             completedAt: now,
+             updatedAt: now,
+             ...("streaming" in item ? { streaming: false } : {}),
++            ...(item.type === "system_notice" && item.modelExecution?.kind === "phase"
++              ? {
++                  modelExecution: {
++                    ...item.modelExecution,
++                    status: "unknown",
++                    gaps: [...item.modelExecution.gaps, ROOT_PHASE_GAP],
++                  },
++                }
++              : {}),
+           });
+         }
+         for (const [id, message] of messages) {
+@@ -684,6 +922,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             }).pipe(Effect.catch((cause) => (active ? terminal(active, cause) : Effect.void)));
+           return;
+         }
++        if (fusionExecutionKey(event)) {
++          yield* recordFusion(event);
++          return;
++        }
+         // Child events never advance or complete the root's user-turn lifecycle.
+         if (event.agentId) {
+           if (
+@@ -701,6 +943,57 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+         }
+         const turn = active;
+         switch (event.type) {
++          case "assistant.turn_start":
++            if (
++              turn?.providerTurn.startedAt &&
++              Date.parse(event.timestamp) >= DateTime.toEpochMillis(turn.providerTurn.startedAt)
++            ) {
++              nativeTurnOwners.set(event.data.turnId, turn);
++              if (nativeTurnOwners.size > MAX_EXECUTION_ITEMS)
++                nativeTurnOwners.delete(nativeTurnOwners.keys().next().value!);
++              for (const item of executionItems.values()) {
++                const execution = item.modelExecution;
++                if (
++                  execution?.fusionId &&
++                  execution.nativeTurnId === event.data.turnId &&
++                  !item.runId &&
++                  Date.parse(execution.sourceTimestamp) >=
++                    DateTime.toEpochMillis(turn.providerTurn.startedAt)
++                )
++                  fusionOwners.set(execution.fusionId, turn);
++              }
++              for (const [key, item] of executionItems) {
++                if (
++                  !item.runId &&
++                  item.modelExecution?.fusionId &&
++                  fusionOwners.get(item.modelExecution.fusionId) === turn
++                )
++                  yield* putExecution(
++                    key,
++                    {
++                      ...item.modelExecution,
++                      gaps: item.modelExecution.gaps.filter(
++                        (gap) => gap !== "Native execution could not be associated with a T3 run.",
++                      ),
++                    },
++                    turn,
++                  );
++              }
++            }
++            return;
++          case "session.model_change":
++          case "session.auto_tier_switch_failed":
++            if (native && providerThread)
++              yield* refreshSelection(
++                turn?.input.modelSelection ??
++                  providerThread.nativeMetadata?.modelSelection ??
++                  open.modelSelection,
++                turn,
++                event.type === "session.auto_tier_switch_failed"
++                  ? { reason: event.data.reason, timestamp: event.timestamp, id: event.id }
++                  : undefined,
++              );
++            return;
+           case "session.skills_loaded":
+             options.onSkills?.(cwd, skillsFromSdk(event.data.skills));
+             return;
+@@ -1165,11 +1458,23 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+           const previous = ensure.existingProviderThread;
+           const nativeId = previous?.nativeThreadRef?.nativeId ?? open.initialNativeThreadId;
+           const mcp = yield* mcpSessions.read(open.threadId);
++          const autoTier =
++            ensure.modelSelection.model === "auto"
++              ? yield* sdk("validate routing selection", async () =>
++                  autoTierForSelection(
++                    ensure.modelSelection,
++                    (await client.rpc.models.list({})).auto,
++                  ),
++                )
++              : yield* sdk("validate model selection", async () =>
++                  autoTierForSelection(ensure.modelSelection),
++                );
+           const sessionConfig: SessionConfig = {
+             clientName: "t3-code",
+             workingDirectory: cwd,
+             configDirectory: config.effectiveHome,
+             model: ensure.modelSelection.model,
++            ...(autoTier ? { capi: { autoTier } } : {}),
+             ...(reasoningEffort(ensure.modelSelection)
+               ? { reasoningEffort: reasoningEffort(ensure.modelSelection)! }
+               : {}),
+@@ -1248,6 +1553,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+               Effect.result,
+             );
+             if (transcript._tag === "Success") {
++              const executionEvents = transcript.success.filter((event) =>
++                fusionExecutionKey(event),
++              );
++              omittedReplayEvents = Math.max(
++                0,
++                executionEvents.length - MAX_REPLAY_EXECUTION_EVENTS,
++              );
++              replayExecutionEvents = executionEvents.slice(-MAX_REPLAY_EXECUTION_EVENTS);
+               for (const event of transcript.success) {
+                 if (
+                   event.agentId ||
+@@ -1306,6 +1619,30 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             driver: COPILOT_DRIVER,
+             providerThread: createdThread,
+           });
++          for (const event of replayExecutionEvents) {
++            yield* recordFusion(event, true);
++            seen.add(event.id);
++          }
++          replayExecutionEvents = [];
++          if (omittedReplayEvents) {
++            const timestamp = DateTime.formatIso(yield* DateTime.now);
++            yield* putExecution("native-replay-gap", {
++              version: 1,
++              kind: "gap",
++              nativeSessionId: native.sessionId,
++              eventId: "native-replay-limit",
++              sourceTimestamp: timestamp,
++              receivedAt: timestamp,
++              status: "incomplete",
++              startSource: "unknown",
++              gaps: [
++                `${omittedReplayEvents} older native execution events were omitted from bounded replay; previously persisted T3 history is retained.`,
++              ],
++            });
++            omittedReplayEvents = 0;
++          }
++          if (ensure.modelSelection.model === "auto")
++            yield* refreshSelection(ensure.modelSelection);
+           const skills = yield* sdk("list skills", () => native!.rpc.skills.list()).pipe(
+             Effect.result,
+           );
+@@ -1337,11 +1674,22 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             reason: "previous_turn_active",
+           });
+         const effort = reasoningEffort(turnInput.modelSelection);
++        const autoTier =
++          turnInput.modelSelection.model === "auto"
++            ? yield* sdk("validate routing selection", async () =>
++                autoTierForSelection(
++                  turnInput.modelSelection,
++                  (await native!.rpc.model.list()).auto,
++                ),
++              )
++            : yield* sdk("validate model selection", async () =>
++                autoTierForSelection(turnInput.modelSelection),
++              );
+         yield* sdk("set model", () =>
+-          native!.setModel(
+-            turnInput.modelSelection.model,
+-            effort ? { reasoningEffort: effort } : {},
+-          ),
++          native!.setModel(turnInput.modelSelection.model, {
++            ...(effort ? { reasoningEffort: effort } : {}),
++            ...(autoTier ? { autoTier } : {}),
++          }),
+         );
+         const modeResult = yield* sdk("set mode", () =>
+           native!.rpc.mode.set({
+@@ -1392,8 +1740,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+           status: "active",
+           firstRunOrdinal: providerThread.firstRunOrdinal ?? turnInput.runOrdinal,
+           lastRunOrdinal: turnInput.runOrdinal,
+-          nativeMetadata: { modelSelection: turnInput.modelSelection },
++          nativeMetadata: {
++            ...providerThread.nativeMetadata,
++            modelSelection: turnInput.modelSelection,
++          },
+         });
++        if (turnInput.modelSelection.model === "auto")
++          yield* refreshSelection(turnInput.modelSelection, turn);
+         const userText = yield* providerMessageTextWithAttachmentPaths({
+           text: turnInput.message.text,
+           attachments: turnInput.message.attachments,
+diff --git a/packages/provider-copilot/src/server/fusion.test.ts b/packages/provider-copilot/src/server/fusion.test.ts
+new file mode 100644
+index 000000000..f0d7317eb
+--- /dev/null
++++ b/packages/provider-copilot/src/server/fusion.test.ts
+@@ -0,0 +1,189 @@
++import { assert, describe, it } from "@effect/vitest";
++import type { SessionEvent } from "@github/copilot-sdk";
++import { normalizeFusionExecution, fusionExecutionKey, ROOT_PHASE_GAP } from "./fusion.ts";
++
++const start = "2026-10-30T00:00:00.000Z";
++const end = "2026-10-30T00:00:02.000Z";
++const receipt = "2026-10-30T00:00:04.000Z";
++function event(type: SessionEvent["type"], data: object, timestamp = end, id = type): SessionEvent {
++  return { type, data, timestamp, id, parentId: "chronological-not-semantic" } as SessionEvent;
++}
++const phase = { fusionId: "fusion-a", phaseId: "primary-1", model: "same-model", role: "primary" };
++
++describe("bounded Copilot execution metadata", () => {
++  it("keeps overlapping repeated models separate, ignores activity, and never copies drafts or usage", () => {
++    const first = event("assistant.fusion_phase_completed", {
++      ...phase,
++      durationMs: 2000,
++      status: "completed",
++      content: "PRIVATE DRAFT",
++      usage: { inputTokens: 100 },
++      verdict: "PRIVATE CRITIC",
++    });
++    const second = event("assistant.fusion_phase_completed", {
++      ...phase,
++      phaseId: "critic-2",
++      role: "critic",
++      durationMs: 2000,
++      status: "completed",
++    });
++    assert.notEqual(fusionExecutionKey(first), fusionExecutionKey(second));
++    const metadata = normalizeFusionExecution(first, "session", receipt)!;
++    assert.equal(metadata.startedAt, start);
++    assert.equal(metadata.startSource, "estimated");
++    assert.equal(metadata.durationMs, 2000);
++    assert.equal(metadata.sourceTimestamp, end);
++    assert.equal(metadata.receivedAt, receipt);
++    assert.notInclude(JSON.stringify(metadata), "PRIVATE");
++    assert.notInclude(JSON.stringify(metadata), "inputTokens");
++    assert.isUndefined(
++      normalizeFusionExecution(event("assistant.fusion_phase_activity", phase), "session", receipt),
++    );
++  });
++
++  it("retains terminal status when a delayed start arrives and upgrades estimated timing", () => {
++    const done = normalizeFusionExecution(
++      event("assistant.fusion_phase_completed", {
++        ...phase,
++        durationMs: 2000,
++        status: "completed",
++      }),
++      "session",
++      receipt,
++    )!;
++    const delayed = normalizeFusionExecution(
++      event(
++        "assistant.fusion_phase_started",
++        {
++          ...phase,
++          pattern: "cascade",
++        },
++        start,
++      ),
++      "session",
++      receipt,
++      done,
++    )!;
++    assert.equal(delayed.status, "completed");
++    assert.equal(delayed.startSource, "observed");
++    assert.equal(delayed.endedAt, end);
++    assert.deepEqual(delayed.gaps, []);
++    const replay = normalizeFusionExecution(
++      event("assistant.fusion_phase_completed", {
++        ...phase,
++        durationMs: 2000,
++        status: "completed",
++      }),
++      "session",
++      receipt,
++      delayed,
++    )!;
++    assert.equal(replay.startSource, "observed");
++    assert.equal(replay.startedAt, start);
++  });
++
++  it("records failures without provider error text and preserves unknown durations", () => {
++    const failed = normalizeFusionExecution(
++      event("assistant.fusion_phase_failed", {
++        ...phase,
++        durationMs: Number.NaN,
++        status: "failed",
++        reason: "provider-unavailable",
++        errorMessage: "PRIVATE PROVIDER RESPONSE",
++      }),
++      "session",
++      receipt,
++    )!;
++    assert.equal(failed.reason, "provider-unavailable");
++    assert.equal(failed.startSource, "unknown");
++    assert.isUndefined(failed.durationMs);
++    assert.notInclude(JSON.stringify(failed), "PRIVATE");
++  });
++
++  it("does not resurrect a phase from a late start after the root ended without terminal telemetry", () => {
++    const execution = normalizeFusionExecution(
++      event("assistant.fusion_phase_started", phase, start),
++      "session",
++      receipt,
++    )!;
++    const missing = { ...execution, status: "unknown", gaps: [ROOT_PHASE_GAP] };
++    const late = normalizeFusionExecution(
++      event("assistant.fusion_phase_started", phase, end),
++      "session",
++      receipt,
++      missing,
++    )!;
++    assert.equal(late.status, "unknown");
++    assert.equal(late.startedAt, start);
++    assert.isUndefined(late.endedAt);
++    assert.deepEqual(late.gaps, [ROOT_PHASE_GAP]);
++  });
++
++  it("separates planned models from execution and retains aggregate final source without token duplication", () => {
++    const resolved = event("session.fusion_resolved", {
++      fusionId: "fusion-a",
++      turnId: "0",
++      pattern: "critique",
++      contractVersion: 999,
++      primaryModel: "draft",
++      secondaryModel: "review",
++      fallbackModel: "fallback",
++      syntheticModel: "auto",
++      critics: [{ model: "critic", phaseId: "c1" }],
++    });
++    const plan = normalizeFusionExecution(resolved, "session", receipt)!;
++    assert.equal(plan.status, "planned");
++    assert.isUndefined(plan.model);
++    assert.equal(plan.plannedModels?.length, 3);
++    assert.include(plan.gaps[0], "Unrecognized");
++    const done = normalizeFusionExecution(
++      event("session.fusion_completed", {
++        fusionId: "fusion-a",
++        turnId: "0",
++        pattern: "critique",
++        outcome: "completed",
++        durationMs: 2000,
++        syntheticModel: "auto",
++        finalSourceModel: "draft",
++        finalSourcePhaseId: "primary-1",
++        awaitingBackgroundWork: true,
++        inputTokens: 1000,
++        totalNanoAiu: 1000,
++      }),
++      "session",
++      receipt,
++      plan,
++    )!;
++    assert.equal(done.finalSourceModel, "draft");
++    assert.isTrue(done.awaitingBackgroundWork);
++    assert.notInclude(JSON.stringify(done), "inputTokens");
++    assert.notInclude(JSON.stringify(done), "totalNanoAiu");
++    assert.equal(normalizeFusionExecution(resolved, "session", receipt, done)?.status, "completed");
++  });
++
++  it("does not derive identity or run ownership from chronological parent links", () => {
++    const failed = event("session.fusion_route_failed", {
++      attemptId: "attempt",
++      fallbackModel: "explicit",
++      policy: "opaque",
++      reason: "route-failed",
++      syntheticModel: "auto",
++      errorMessage: "PRIVATE",
++    });
++    const metadata = normalizeFusionExecution(failed, "session", receipt)!;
++    assert.isUndefined(metadata.nativeTurnId);
++    assert.isUndefined(metadata.fusionId);
++    assert.equal(metadata.fallbackModel, "explicit");
++    assert.notInclude(JSON.stringify(metadata), "chronological");
++    assert.throws(
++      () =>
++        fusionExecutionKey(
++          event("assistant.fusion_phase_started", {
++            ...phase,
++            phaseId: "x".repeat(513),
++          }),
++        ),
++      /metadata bound/,
++    );
++  });
++});
+diff --git a/packages/provider-copilot/src/server/fusion.ts b/packages/provider-copilot/src/server/fusion.ts
+new file mode 100644
+index 000000000..da7eb6b0c
+--- /dev/null
++++ b/packages/provider-copilot/src/server/fusion.ts
+@@ -0,0 +1,215 @@
++import type { SessionEvent } from "@github/copilot-sdk";
++import type { OrchestrationV2ModelExecution } from "@t3tools/contracts";
++import * as DateTime from "effect/DateTime";
++
++export const MAX_EXECUTION_ITEMS = 128;
++export const MAX_REPLAY_EXECUTION_EVENTS = 512;
++export const ROOT_PHASE_GAP = "The root turn ended without terminal phase telemetry.";
++
++const label = (value: string) => value.slice(0, 512);
++const duration = (value: number) =>
++  Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : undefined;
++
++export function fusionExecutionKey(event: SessionEvent): string | undefined {
++  const identity = "fusionId" in event.data ? event.data.fusionId : undefined;
++  const phase = "phaseId" in event.data ? event.data.phaseId : undefined;
++  if (
++    (typeof identity === "string" && identity.length > 512) ||
++    (typeof phase === "string" && phase.length > 512)
++  )
++    throw new Error("Copilot execution identity exceeds the supported metadata bound.");
++  switch (event.type) {
++    case "session.fusion_resolved":
++    case "session.fusion_completed":
++      return `fusion:${event.data.fusionId}:route`;
++    case "session.fusion_route_failed":
++      return `fusion:${event.data.fusionId ?? event.data.attemptId}:route`;
++    case "assistant.fusion_phase_started":
++    case "assistant.fusion_phase_completed":
++    case "assistant.fusion_phase_failed":
++      return `fusion:${event.data.fusionId}:phase:${event.data.phaseId}`;
++    default:
++      return undefined;
++  }
++}
++
++export function normalizeFusionExecution(
++  event: SessionEvent,
++  nativeSessionId: string,
++  receivedAt: string,
++  previous?: OrchestrationV2ModelExecution,
++): OrchestrationV2ModelExecution | undefined {
++  if (!fusionExecutionKey(event)) return undefined;
++  const base: OrchestrationV2ModelExecution = {
++    version: 1,
++    kind: "route",
++    nativeSessionId,
++    eventId: event.id,
++    sourceTimestamp: event.timestamp,
++    receivedAt,
++    status: "planned",
++    startSource: "unknown",
++    gaps: [],
++  };
++  switch (event.type) {
++    case "session.fusion_resolved": {
++      const data = event.data;
++      const plannedModels = [
++        { model: label(data.primaryModel), role: "primary" },
++        ...(data.secondaryModel ? [{ model: label(data.secondaryModel), role: "secondary" }] : []),
++        ...(data.judgeModel ? [{ model: label(data.judgeModel), role: "judge" }] : []),
++        ...(data.repairModel ? [{ model: label(data.repairModel), role: "repair" }] : []),
++        ...(data.critics ?? []).slice(0, 60).map((critic) => ({
++          model: label(critic.model),
++          role: "critic",
++          phaseId: critic.phaseId,
++        })),
++      ];
++      // Replaying the route must not erase a later authoritative completion.
++      if (previous?.endedAt) return { ...previous, plannedModels };
++      return {
++        ...base,
++        fusionId: data.fusionId,
++        nativeTurnId: data.turnId,
++        syntheticModel: label(data.syntheticModel),
++        pattern: data.pattern,
++        fallbackModel: label(data.fallbackModel),
++        contractVersion: data.contractVersion,
++        plannedModels,
++        gaps: [
++          ...(data.contractVersion !== 1
++            ? ["Unrecognized routing contract version; execution facts may be incomplete."]
++            : []),
++          ...((data.critics?.length ?? 0) > 60
++            ? ["The routing plan was truncated to 64 models."]
++            : []),
++        ],
++      };
++    }
++    case "session.fusion_completed":
++      return {
++        ...(previous ?? base),
++        kind: "route",
++        fusionId: event.data.fusionId,
++        nativeTurnId: event.data.turnId,
++        eventId: event.id,
++        sourceTimestamp: event.timestamp,
++        receivedAt,
++        status: event.data.outcome,
++        pattern: event.data.pattern,
++        syntheticModel: label(event.data.syntheticModel),
++        endedAt: event.timestamp,
++        durationMs: duration(event.data.durationMs),
++        ...(event.data.finalSourceModel
++          ? { finalSourceModel: label(event.data.finalSourceModel) }
++          : {}),
++        ...(event.data.finalSourcePhaseId
++          ? { finalSourcePhaseId: event.data.finalSourcePhaseId }
++          : {}),
++        ...(event.data.degradedReason ? { reason: label(event.data.degradedReason) } : {}),
++        awaitingBackgroundWork: event.data.awaitingBackgroundWork ?? false,
++        gaps: previous?.gaps ?? ["The resolved routing plan was not observed."],
++      };
++    case "session.fusion_route_failed":
++      return {
++        ...(previous ?? base),
++        kind: "route",
++        ...(event.data.fusionId ? { fusionId: event.data.fusionId } : {}),
++        eventId: event.id,
++        sourceTimestamp: event.timestamp,
++        receivedAt,
++        status: "routing-failed",
++        reason: label(event.data.reason),
++        syntheticModel: label(event.data.syntheticModel),
++        fallbackModel: label(event.data.fallbackModel),
++        gaps: previous?.gaps ?? [
++          "Native turn association is unavailable for this routing failure.",
++        ],
++      };
++    case "assistant.fusion_phase_started": {
++      if (previous?.status === "unknown" && previous.gaps.includes(ROOT_PHASE_GAP))
++        return {
++          ...previous,
++          receivedAt,
++          startedAt: previous.startSource === "observed" ? previous.startedAt : event.timestamp,
++          startSource: "observed",
++        };
++      if (previous?.endedAt) {
++        if (Date.parse(event.timestamp) > Date.parse(previous.endedAt)) return previous;
++        return {
++          ...previous,
++          startedAt: event.timestamp,
++          startSource: "observed",
++          gaps: previous.gaps.filter(
++            (gap) => gap !== "Phase start was not observed; its start time is only an estimate.",
++          ),
++        };
++      }
++      return {
++        ...base,
++        kind: "phase",
++        fusionId: event.data.fusionId,
++        phaseId: event.data.phaseId,
++        phaseKind: event.data.phaseKind,
++        conversationScope: event.data.conversationScope,
++        model: label(event.data.model),
++        role: label(event.data.role),
++        pattern: event.data.pattern,
++        status: "running",
++        startedAt: event.timestamp,
++        startSource: "observed",
++      };
++    }
++    case "assistant.fusion_phase_completed":
++    case "assistant.fusion_phase_failed": {
++      const elapsed = duration(event.data.durationMs);
++      const observed = previous?.startSource === "observed";
++      const end = Date.parse(event.timestamp);
++      return {
++        ...(previous ?? base),
++        kind: "phase",
++        fusionId: event.data.fusionId,
++        phaseId: event.data.phaseId,
++        phaseKind: event.data.phaseKind,
++        conversationScope: event.data.conversationScope,
++        model: label(event.data.model),
++        role: label(event.data.role),
++        status: event.data.status,
++        eventId: event.id,
++        sourceTimestamp: event.timestamp,
++        receivedAt,
++        endedAt: event.timestamp,
++        durationMs: elapsed,
++        ...(event.type === "assistant.fusion_phase_completed" &&
++        event.data.endedWithBackgroundWork !== undefined
++          ? { endedWithBackgroundWork: event.data.endedWithBackgroundWork }
++          : {}),
++        ...(observed
++          ? { startedAt: previous.startedAt, startSource: "observed" as const }
++          : elapsed !== undefined && Number.isFinite(end) && end >= elapsed
++            ? {
++                startedAt: DateTime.formatIso(DateTime.makeUnsafe(end - elapsed)),
++                startSource: "estimated" as const,
++              }
++            : { startSource: "unknown" as const }),
++        ...(event.type === "assistant.fusion_phase_failed"
++          ? {
++              reason: label(event.data.reason),
++              ...(event.data.degradedToPhaseId
++                ? { degradedToPhaseId: event.data.degradedToPhaseId }
++                : {}),
++            }
++          : {}),
++        gaps: observed
++          ? []
++          : [
++              elapsed !== undefined
++                ? "Phase start was not observed; its start time is only an estimate."
++                : "Phase start and usable elapsed time were not observed.",
++            ],
++      };
++    }
++    default:
++      return undefined;
++  }
++}
+diff --git a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts
+new file mode 100644
+index 000000000..43247659d
+--- /dev/null
++++ b/packages/provider-copilot/src/server/routing.test.ts
+@@ -0,0 +1,86 @@
++import { assert, describe, it } from "@effect/vitest";
++import { ProviderInstanceId } from "@t3tools/contracts";
++import { autoTierForSelection, routingDescriptor, type AutoCatalog } from "./routing.ts";
++
++const instanceId = ProviderInstanceId.make("account-a");
++export const autoCatalog: AutoCatalog = {
++  defaultTier: "standard",
++  tiers: [
++    {
++      id: "standard",
++      displayName: "Standard",
++      description: "",
++      type: "auto",
++      status: { enabled: true },
++    },
++    {
++      id: "fuse@2026:opaque",
++      displayName: "Fusion",
++      description: "Account routing",
++      type: "fusion",
++      fusionTier: "do-not-translate",
++      status: { enabled: true },
++    },
++    {
++      id: "blocked",
++      displayName: "Unavailable",
++      description: "",
++      type: "fusion",
++      status: { enabled: false, message: "Your account policy disables this." },
++    },
++    {
++      id: "hidden",
++      displayName: "Hidden",
++      description: "",
++      type: "fusion",
++      status: { enabled: true, pickerVisible: false },
++    },
++  ],
++};
++
++describe("account-advertised routing", () => {
++  it("uses opaque IDs without aliases, honors visibility, and exposes disabled reasons", () => {
++    const descriptor = routingDescriptor(autoCatalog);
++    assert.deepEqual(
++      descriptor.options.map((option) => option.id),
++      ["standard", "fuse@2026:opaque", "blocked"],
++    );
++    assert.equal(descriptor.options[2]?.disabledReason, "Your account policy disables this.");
++    assert.equal(descriptor.currentValue, "standard");
++    const selection = {
++      instanceId,
++      model: "auto",
++      options: [{ id: "autoTier", value: "fuse@2026:opaque" }],
++    };
++    assert.equal(autoTierForSelection(selection, autoCatalog), "fuse@2026:opaque");
++    assert.isUndefined(autoTierForSelection({ instanceId, model: "auto" }, autoCatalog));
++    assert.isUndefined(autoTierForSelection({ instanceId, model: "explicit" }));
++  });
++
++  it("refuses unknown, hidden, policy-disabled and unsupported destination choices", () => {
++    for (const id of ["blocked", "hidden", "unknown"])
++      assert.throws(() =>
++        autoTierForSelection(
++          {
++            instanceId,
++            model: "auto",
++            options: [{ id: "autoTier", value: id }],
++          },
++          autoCatalog,
++        ),
++      );
++    assert.throws(() => autoTierForSelection({ instanceId, model: "auto" }), /does not advertise/);
++    assert.throws(
++      () =>
++        autoTierForSelection(
++          {
++            instanceId,
++            model: "explicit",
++            options: [{ id: "autoTier", value: "standard" }],
++          },
++          autoCatalog,
++        ),
++      /requires/,
++    );
++  });
++});
+diff --git a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts
+new file mode 100644
+index 000000000..390a40760
+--- /dev/null
++++ b/packages/provider-copilot/src/server/routing.ts
+@@ -0,0 +1,66 @@
++import type { CopilotClient } from "@github/copilot-sdk";
++import type { ModelSelection, SelectProviderOptionDescriptor } from "@t3tools/contracts";
++import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
++
++export type ModelCatalog = Awaited<ReturnType<CopilotClient["rpc"]["models"]["list"]>>;
++export type AutoCatalog = NonNullable<ModelCatalog["auto"]>;
++
++export function routingDescriptor(auto: AutoCatalog): SelectProviderOptionDescriptor {
++  const seen = new Set<string>();
++  const options = auto.tiers.flatMap((tier) => {
++    if (
++      !tier.id ||
++      tier.id.length > 512 ||
++      tier.id !== tier.id.trim() ||
++      seen.has(tier.id) ||
++      tier.status.pickerVisible === false
++    )
++      return [];
++    seen.add(tier.id);
++    return [
++      {
++        id: tier.id,
++        label: tier.displayName.trim() || tier.id,
++        ...(tier.description.trim() ? { description: tier.description.trim() } : {}),
++        ...(!tier.status.enabled
++          ? {
++              disabledReason:
++                tier.status.message?.trim() ||
++                tier.status.reason?.trim() ||
++                "Unavailable for this account.",
++            }
++          : {}),
++        ...(tier.id === auto.defaultTier && tier.status.enabled ? { isDefault: true } : {}),
++      },
++    ];
++  });
++  return {
++    id: "autoTier",
++    label: "Routing",
++    type: "select",
++    options,
++    ...(options.some((option) => option.id === auto.defaultTier && !option.disabledReason)
++      ? { currentValue: auto.defaultTier }
++      : {}),
++  };
++}
++
++export function autoTierForSelection(selection: ModelSelection, auto?: AutoCatalog) {
++  const requested = getModelSelectionStringOptionValue(selection, "autoTier");
++  if (selection.model !== "auto") {
++    if (requested)
++      throw new Error("A Copilot routing preference requires the account-advertised auto model.");
++    return undefined;
++  }
++  if (!auto)
++    throw new Error("This Copilot runtime/account does not advertise Auto or Fusion routing.");
++  const id = requested ?? auto.defaultTier;
++  const tier = auto.tiers.find((entry) => entry.id === id);
++  if (!tier || tier.id.length > 512 || !tier.status.enabled || tier.status.pickerVisible === false)
++    throw new Error(
++      tier?.status.message ||
++        tier?.status.reason ||
++        "The requested Copilot routing preference is unavailable for this account.",
++    );
++  return requested;
++}
+diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
+index bde8595cc..8ca6de9ca 100644
+--- a/packages/provider-copilot/src/server/status.test.ts
++++ b/packages/provider-copilot/src/server/status.test.ts
+@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
+ import { CopilotSettings } from "../settings.ts";
+ import { checkStatus, modelsFromSdk, skillsFromSdk } from "./status.ts";
+ import { bundledCliPath, resolveClientConfiguration } from "./client.ts";
++import type { AutoCatalog } from "./routing.ts";
+ 
+ const decode = Schema.decodeSync(CopilotSettings);
+ const model = (id: string, extra: Partial<ModelInfo> = {}): ModelInfo => ({
+@@ -31,6 +32,32 @@ const skill = (
+ });
+ 
+ describe("Copilot discovery and account isolation", () => {
++  it("adds advertised Auto routing without replacing explicit-model defaults", () => {
++    const auto: AutoCatalog = {
++      defaultTier: "opaque-tier",
++      tiers: [
++        {
++          id: "opaque-tier",
++          displayName: "Fusion",
++          description: "Account supplied",
++          type: "fusion",
++          status: { enabled: true },
++        },
++      ],
++    };
++    const result = modelsFromSdk([model("explicit")], decode({}), auto);
++    assert.deepEqual(
++      result.map((entry) => entry.slug),
++      ["explicit", "auto"],
++    );
++    assert.isTrue(result[0]?.isDefault);
++    assert.isUndefined(result[1]?.isDefault);
++    assert.equal(result[1]?.capabilities?.optionDescriptors?.[0]?.id, "autoTier");
++    assert.deepEqual(
++      modelsFromSdk([model("explicit")], decode({})).map((entry) => entry.slug),
++      ["explicit"],
++    );
++  });
+   it("keeps project/native skills in workspace results, including pathless built-ins", () => {
+     const skills = skillsFromSdk([
+       skill("project-skill", "project"),
+@@ -150,7 +177,7 @@ describe("Copilot discovery and account isolation", () => {
+           forceStop: async () => {},
+           getStatus: async () => ({ version: "1.0.75", protocolVersion: 1 }),
+           getAuthStatus: async () => ({ isAuthenticated: true, login: "octocat" }),
+-          listModels: async () => [model("gpt")],
++          rpc: { models: { list: async () => ({ models: [model("gpt")] }) } },
+         }),
+       );
+       assert.equal(result.status, "ready");
+@@ -180,7 +207,7 @@ describe("Copilot discovery and account isolation", () => {
+               return { version: "1.0.75", protocolVersion: 1 };
+             },
+             getAuthStatus: async () => ({ isAuthenticated: true }),
+-            listModels: async () => [],
++            rpc: { models: { list: async () => ({ models: [] }) } },
+           }));
+           assert.equal(snapshot.status, "error");
+           assert.equal(forced, 1);
+diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts
+index 8e895fc04..5c863ab42 100644
+--- a/packages/provider-copilot/src/server/status.ts
++++ b/packages/provider-copilot/src/server/status.ts
+@@ -1,4 +1,4 @@
+-import type { CopilotClient, ModelInfo, SkillsLoadedSkill } from "@github/copilot-sdk";
++import type { CopilotClient, SkillsLoadedSkill } from "@github/copilot-sdk";
+ import type { ServerProviderSkill } from "@t3tools/contracts";
+ import { createModelCapabilities } from "@t3tools/shared/model";
+ import * as DateTime from "effect/DateTime";
+@@ -11,6 +11,7 @@ import {
+ } from "@t3tools/provider-core/server/snapshotProbe";
+ import type { CopilotSettings } from "../settings.ts";
+ import { createClient, resolveClientConfiguration } from "./client.ts";
++import { routingDescriptor, type AutoCatalog, type ModelCatalog } from "./routing.ts";
+ 
+ const presentation = {
+   displayName: "GitHub Copilot",
+@@ -20,42 +21,71 @@ const presentation = {
+ };
+ const emptyCapabilities = createModelCapabilities({ optionDescriptors: [] });
+ 
+-export function modelsFromSdk(models: ReadonlyArray<ModelInfo>, settings: CopilotSettings) {
++export function modelsFromSdk(
++  models: ReadonlyArray<ModelCatalog["models"][number]>,
++  settings: CopilotSettings,
++  auto?: AutoCatalog,
++) {
+   const seen = new Set<string>();
+   return providerModelsFromSettings(
+-    models.flatMap((model) => {
+-      const slug = model.id.trim();
+-      if (!slug || !model.name.trim() || seen.has(slug) || model.policy?.state === "disabled")
+-        return [];
+-      seen.add(slug);
+-      const efforts = model.supportedReasoningEfforts ?? [];
+-      return [
+-        {
+-          slug,
+-          name: model.name,
+-          isCustom: false,
+-          ...(seen.size === 1 ? { isDefault: true } : {}),
+-          capabilities: createModelCapabilities({
+-            optionDescriptors: efforts.length
+-              ? [
+-                  buildSelectOptionDescriptor({
+-                    id: "reasoningEffort",
+-                    label: "Reasoning",
+-                    options: efforts.map((effort) => ({
+-                      value: effort,
+-                      label:
+-                        effort === "xhigh"
+-                          ? "Extra High"
+-                          : effort[0]!.toUpperCase() + effort.slice(1),
+-                      isDefault: effort === model.defaultReasoningEffort,
+-                    })),
+-                  }),
+-                ]
+-              : [],
+-          }),
+-        },
+-      ];
+-    }),
++    models
++      .flatMap((model) => {
++        const slug = model.id.trim();
++        if (
++          !slug ||
++          !model.name.trim() ||
++          seen.has(slug) ||
++          model.policy?.state === "disabled" ||
++          (slug === "auto" && !auto)
++        )
++          return [];
++        seen.add(slug);
++        const efforts = model.supportedReasoningEfforts ?? [];
++        const routing = slug === "auto" && auto ? routingDescriptor(auto) : undefined;
++        return [
++          {
++            slug,
++            name: model.name,
++            isCustom: false,
++            ...(seen.size === 1 ? { isDefault: true } : {}),
++            capabilities: createModelCapabilities({
++              optionDescriptors: [
++                ...(routing ? [routing] : []),
++                ...(efforts.length
++                  ? [
++                      buildSelectOptionDescriptor({
++                        id: "reasoningEffort",
++                        label: "Reasoning",
++                        options: efforts.map((effort) => ({
++                          value: effort,
++                          label:
++                            effort === "xhigh"
++                              ? "Extra High"
++                              : effort[0]!.toUpperCase() + effort.slice(1),
++                          isDefault: effort === model.defaultReasoningEffort,
++                        })),
++                      }),
++                    ]
++                  : []),
++              ],
++            }),
++          },
++        ];
++      })
++      .concat(
++        auto && !seen.has("auto") && !models.some((model) => model.id.trim() === "auto")
++          ? [
++              {
++                slug: "auto",
++                name: "Auto routing",
++                isCustom: false,
++                capabilities: createModelCapabilities({
++                  optionDescriptors: [routingDescriptor(auto)],
++                }),
++              },
++            ]
++          : [],
++      ),
+     settings.customModels,
+     emptyCapabilities,
+   );
+@@ -106,8 +136,8 @@ export const pendingSnapshot = (settings: CopilotSettings) =>
+ 
+ export type StatusClient = Pick<
+   CopilotClient,
+-  "start" | "stop" | "forceStop" | "getStatus" | "getAuthStatus" | "listModels"
+->;
++  "start" | "stop" | "forceStop" | "getStatus" | "getAuthStatus"
++> & { readonly rpc: { readonly models: Pick<CopilotClient["rpc"]["models"], "list"> } };
+ 
+ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
+   settings: CopilotSettings,
+@@ -150,8 +180,8 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
+         await client.start();
+         started = true;
+         const [status, auth] = await Promise.all([client.getStatus(), client.getAuthStatus()]);
+-        const models = auth.isAuthenticated ? await client.listModels() : [];
+-        return { status, auth, models };
++        const catalog = auth.isAuthenticated ? await client.rpc.models.list({}) : { models: [] };
++        return { status, auth, catalog };
+       });
+     }),
+   ).pipe(Effect.timeoutOption(30_000), Effect.result);
+@@ -175,12 +205,12 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
+       },
+     });
+   }
+-  const { status, auth, models } = result.success.value;
++  const { status, auth, catalog } = result.success.value;
+   return buildServerProvider({
+     presentation,
+     enabled: true,
+     checkedAt,
+-    models: modelsFromSdk(models, settings),
++    models: modelsFromSdk(catalog.models, settings, catalog.auto),
+     probe: {
+       installed: true,
+       version: status.version,
+@@ -190,7 +220,12 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
+         : { status: "unauthenticated" },
+       ...(!auth.isAuthenticated
+         ? { message: "Sign in with `copilot login` in this provider's account environment." }
+-        : {}),
++        : !catalog.auto
++          ? {
++              message:
++                "This account/runtime does not advertise Auto or Fusion routing. Explicit models remain available.",
++            }
++          : {}),
+     },
+   });
+ });
+diff --git a/packages/shared/src/model.test.ts b/packages/shared/src/model.test.ts
+index 396d4d9c8..39c437997 100644
+--- a/packages/shared/src/model.test.ts
++++ b/packages/shared/src/model.test.ts
+@@ -8,7 +8,9 @@ import {
+   createModelCapabilities,
+   createModelSelection,
+   getProviderOptionCurrentLabel,
++  getProviderOptionCurrentValue,
+   getProviderOptionDescriptors,
++  providerOptionChoicesInCycleOrder,
+   readCustomModelEntries,
+   modelSelectionsEqual,
+ } from "./model.ts";
+@@ -34,6 +36,67 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
+ });
+ 
+ describe("descriptor helpers", () => {
++  it("preserves an opaque saved routing request that the destination no longer advertises", () => {
++    const descriptors = getProviderOptionDescriptors({
++      caps: createModelCapabilities({
++        optionDescriptors: [
++          {
++            id: "autoTier",
++            label: "Routing",
++            type: "select",
++            currentValue: "standard",
++            options: [{ id: "standard", label: "Standard", isDefault: true }],
++          },
++        ],
++      }),
++      selections: [{ id: "autoTier", value: "former-account:opaque" }],
++    });
++    expect(
++      buildExplicitProviderOptionSelectionsFromDescriptors(descriptors, [
++        { id: "autoTier", value: "former-account:opaque" },
++      ]),
++    ).toEqual([{ id: "autoTier", value: "former-account:opaque" }]);
++  });
++  it("skips unavailable choices for defaults and navigation but preserves explicit unavailable requests", () => {
++    const descriptor = {
++      id: "routing",
++      label: "Routing",
++      type: "select" as const,
++      options: [
++        { id: "premium", label: "Premium", isDefault: true, disabledReason: "Not supported" },
++        { id: "standard", label: "Standard" },
++        { id: "economy", label: "Economy" },
++      ],
++    };
++    expect(getProviderOptionCurrentValue(descriptor)).toBeUndefined();
++    expect(
++      providerOptionChoicesInCycleOrder(descriptor, "standard", 1).map(({ id }) => id),
++    ).toEqual(["economy"]);
++    expect(
++      providerOptionChoicesInCycleOrder(descriptor, "economy", -1).map(({ id }) => id),
++    ).toEqual(["standard"]);
++    const descriptors = getProviderOptionDescriptors({
++      caps: createModelCapabilities({ optionDescriptors: [descriptor] }),
++      selections: [{ id: "routing", value: "premium" }],
++    });
++    expect(getProviderOptionCurrentLabel(descriptors[0])).toBe("Premium");
++    expect(
++      buildExplicitProviderOptionSelectionsFromDescriptors(descriptors, [
++        { id: "routing", value: "premium" },
++      ]),
++    ).toEqual([{ id: "routing", value: "premium" }]);
++    expect(
++      providerOptionChoicesInCycleOrder(
++        {
++          ...descriptor,
++          options: descriptor.options.slice(0, 1),
++        },
++        "premium",
++        1,
++      ),
++    ).toEqual([]);
++  });
++
+   it("builds dispatch options only from explicit selections", () => {
+     const descriptors = getProviderOptionDescriptors({
+       caps: codexCaps,
+diff --git a/packages/shared/src/model.ts b/packages/shared/src/model.ts
+index 51cc14303..71aa8a7be 100644
+--- a/packages/shared/src/model.ts
++++ b/packages/shared/src/model.ts
+@@ -136,21 +136,52 @@ function resolveDescriptorChoiceValue(
+ ): string | undefined {
+   const trimmed = trimOrNull(raw);
+   if (!trimmed) {
+-    return descriptor.currentValue ?? descriptor.options.find((option) => option.isDefault)?.id;
++    return (
++      descriptor.currentValue ??
++      descriptor.options.find((option) => option.isDefault && option.disabledReason === undefined)
++        ?.id
++    );
+   }
+   if (descriptor.options.length === 0) {
+     return trimmed;
+   }
++  if (descriptor.id === "autoTier") {
++    return trimmed;
++  }
++  if (
++    descriptor.options.some(
++      (option) => option.id === trimmed && option.disabledReason !== undefined,
++    )
++  ) {
++    return trimmed;
++  }
+   if (
+     descriptor.promptInjectedValues?.includes(trimmed) &&
+     descriptor.options.some((option) => option.id === trimmed)
+   ) {
+-    return descriptor.options.find((option) => option.isDefault)?.id;
++    return descriptor.options.find(
++      (option) => option.isDefault && option.disabledReason === undefined,
++    )?.id;
+   }
+   if (descriptor.options.some((option) => option.id === trimmed)) {
+     return trimmed;
+   }
+-  return descriptor.currentValue ?? descriptor.options.find((option) => option.isDefault)?.id;
++  return (
++    descriptor.currentValue ??
++    descriptor.options.find((option) => option.isDefault && option.disabledReason === undefined)?.id
++  );
++}
++
++export function providerOptionChoicesInCycleOrder(
++  descriptor: Extract<ProviderOptionDescriptor, { type: "select" }>,
++  current: string | null | undefined,
++  direction: 1 | -1,
++) {
++  const ordered = direction > 0 ? descriptor.options : [...descriptor.options].reverse();
++  const position = ordered.findIndex((option) => option.id === current);
++  return [...ordered.slice(position + 1), ...ordered.slice(0, Math.max(position, 0))].filter(
++    (option) => option.disabledReason === undefined,
++  );
+ }
+ 
+ function cloneDescriptor(descriptor: ProviderOptionDescriptor): ProviderOptionDescriptor {
+@@ -257,7 +288,9 @@ export function getProviderOptionCurrentValue(
+   if (descriptor.currentValue) {
+     return descriptor.currentValue;
+   }
+-  return descriptor.options.find((option) => option.isDefault)?.id;
++  return descriptor.options.find(
++    (option) => option.isDefault && option.disabledReason === undefined,
++  )?.id;
+ }
+ 
+ export function getProviderOptionCurrentLabel(

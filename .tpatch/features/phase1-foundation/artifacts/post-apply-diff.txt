@@ -1,0 +1,6 @@
+ .../phase1-foundation/artifacts/apply-recipe.json  | 466 +++++++++------------
+ .../phase1-foundation/artifacts/apply-session.json |   9 +-
+ .../artifacts/manual-validation.md                 |   6 +-
+ .../artifacts/post-apply-diff.txt                  |  32 +-
+ .tpatch/features/phase1-foundation/status.json     |  10 +-
+ 5 files changed, 207 insertions(+), 316 deletions(-)

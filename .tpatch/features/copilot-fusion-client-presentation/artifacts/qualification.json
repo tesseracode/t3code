@@ -1,0 +1,112 @@
+{
+  "feature": "copilot-fusion-client-presentation",
+  "baseline": "c715f234138b5f7af0e825cd67f2f0deb7a790b0",
+  "scope": "Opt-in Fusion catalog, shared effort/reset controls, committed answers and late run ownership",
+  "runtime": {
+    "sdk": "1.0.28",
+    "cli": "1.0.105",
+    "flags": ["DYNAMIC_AUTO_TIERS", "HYDRAFUSION_PLAN_V2"],
+    "defaultEnabled": false,
+    "flagScope": "Provider subprocess only; existing environment flags preserved",
+    "tierIds": "Account-advertised opaque identifiers, not hardcoded mappings"
+  },
+  "focusedValidation": {
+    "tests": 96,
+    "testFiles": 8,
+    "typechecks": ["provider-copilot", "shared", "client-runtime", "server"],
+    "scopedLint": "passed",
+    "coverage": [
+      "Off-by-default opt-in and unrelated flag preservation",
+      "Advertised tier availability and explicit reset serialization",
+      "Single, Cascade and Critique final-only output before late plans",
+      "Committed root output arriving before send acknowledgement",
+      "Late previous-run answers and unknown-origin rejection",
+      "Cold import filtering and explicit native null reset",
+      "Previously unassociated timeline positions promoted into confirmed runs"
+    ]
+  },
+  "integratedWeb": [
+    {
+      "selection": "Standard",
+      "routing": "auto_v2",
+      "selectedModel": "gpt-6-luna",
+      "result": "FUSION_STANDARD_RESULT: 10",
+      "answerCount": 1,
+      "reload": "passed",
+      "limitation": "Chosen-model telemetry has no native turn association; the gap remains explicit"
+    },
+    {
+      "selection": "High",
+      "pattern": "cascade",
+      "executedPhases": ["gpt-6.1-sol:solver", "gpt-6-luna:judge", "claude-opus-5.5:solver"],
+      "finalSourceModel": "claude-opus-5.5",
+      "answerCount": 1,
+      "case": "Actual escalation to a different final-source model"
+    },
+    {
+      "selection": "High",
+      "pattern": "cascade",
+      "executedPhases": ["gpt-6.1-sol:solver", "gpt-6-luna:judge"],
+      "finalSourceModel": "gpt-6.1-sol",
+      "answerCount": 1,
+      "case": "Fresh exact-origin association; user prompt precedes phase cards"
+    },
+    {
+      "selection": "Max",
+      "pattern": "single",
+      "executedPhases": ["claude-opus-5.5:solver"],
+      "finalSourceModel": "claude-opus-5.5",
+      "result": "FUSION_MAX_RESULT: C = 10",
+      "answerCount": 1,
+      "reload": "passed"
+    },
+    {
+      "selection": "Max",
+      "pattern": "cascade",
+      "executedPhases": ["claude-opus-5.5:solver", "gpt-6-sol:judge"],
+      "finalSourceModel": "claude-opus-5.5",
+      "result": "FUSION_MAX_GROUPED_RESULT: C = 10",
+      "answerCount": 1,
+      "reload": "passed",
+      "completedRun": "confirmed in isolated projection",
+      "case": "Final-source-tree delivery and correctly grouped phase cards",
+      "diagnostic": "Initial exact-text wait included a trailing period omitted by the model; the actual correct answer completed successfully"
+    },
+    {
+      "selection": "Provider default after Max",
+      "effectiveSelection": "Provider default",
+      "selectedModel": "gpt-6-luna",
+      "result": "FUSION_DEFAULT_RESULT: 10",
+      "answerCount": 1,
+      "fusionExecution": false
+    }
+  ],
+  "nativeIos": {
+    "runtime": "iOS 27.0, existing compatible development client",
+    "bundle": "Current worktree Metro bundle",
+    "pairing": "Fresh one-time credential for the disposable environment",
+    "observed": ["Real Standard answer", "Real High Cascade phases and answer", "Real Max Single and reset answers", "Real Max Cascade phases and answer"],
+    "pickerInteraction": "unqualified",
+    "limitation": "Semantic automation cannot load SimulatorKit.framework at its obsolete Xcode path; registered pairing/thread links and screenshots establish native result presentation, not picker interaction"
+  },
+  "desktop": {
+    "state": "unqualified",
+    "observed": "Existing dev workflow builds and launches with isolated T3/Electron state",
+    "limitation": "Owned Electron debugger listens but HTTP discovery and direct WebSocket automation both time out; no integrated desktop picker/result claim"
+  },
+  "remainingGates": [
+    "Native picker interaction",
+    "Integrated desktop interaction",
+    "Real client Critique and changed-draft revision",
+    "Packaged platform execution",
+    "Native tpatch overlapping-ancestor verification"
+  ],
+  "boundaries": {
+    "productionStateWrites": false,
+    "deployment": false,
+    "pullRequest": false,
+    "inferenceContext": "Bounded harmless fixture prompts only",
+    "historicalEvidence": "Preserved with all hard dependencies"
+  },
+  "screenshots": "Private session artifacts; no credential-bearing screenshots or PR-only assets committed"
+}

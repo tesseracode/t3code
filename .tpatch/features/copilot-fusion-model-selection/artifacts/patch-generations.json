@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "feature": "copilot-fusion-model-selection",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_327dc57fe61a",
+      "kind": "record",
+      "patch_sha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
+      "git_patch_id": "91833f1d4f5107139309700de2f945c8200e07b1",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "a9f07a134e711fc1edf0c793f3aadf9739e90de32f69031776b5981c0cc24550",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "d82592306068663ae4665d4500894030fe647dae",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx",
+        "apps/mobile/src/features/threads/ThreadSettingsSheet.tsx",
+        "apps/mobile/src/features/threads/thread-settings-options.test.ts",
+        "apps/mobile/src/lib/providerOptions.ts",
+        "apps/mobile/src/lib/threadActivity.ts",
+        "apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts",
+        "apps/server/src/orchestration-v2/ProviderEventIngestor.ts",
+        "apps/server/src/orchestration-v2/RunExecutionService.ts",
+        "apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+        "apps/web/src/components/chat/TraitsPicker.tsx",
+        "apps/web/src/session-logic.ts",
+        "docs/user/activity-log.md",
+        "docs/user/providers-copilot.md",
+        "packages/client-runtime/package.json",
+        "packages/client-runtime/src/modelTraits.ts",
+        "packages/client-runtime/src/work-log/itemDetail.test.ts",
+        "packages/client-runtime/src/work-log/itemDetail.ts",
+        "packages/client-runtime/src/work-log/modelExecution.test.ts",
+        "packages/client-runtime/src/work-log/modelExecution.ts",
+        "packages/contracts/src/model.ts",
+        "packages/contracts/src/orchestrationV2.test.ts",
+        "packages/contracts/src/orchestrationV2.ts",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-copilot/src/server/fusion.test.ts",
+        "packages/provider-copilot/src/server/fusion.ts",
+        "packages/provider-copilot/src/server/routing.test.ts",
+        "packages/provider-copilot/src/server/routing.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/status.ts",
+        "packages/shared/src/model.test.ts",
+        "packages/shared/src/model.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 24,
+          "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        },
+        {
+          "slug": "copilot-sdk-runtime-upgrade",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+          "parent_recipe_sha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

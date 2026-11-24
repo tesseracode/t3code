@@ -1,0 +1,457 @@
+diff --git a/docs/operations/release.md b/docs/operations/release.md
+index 5dbc48e93..c0270da49 100644
+--- a/docs/operations/release.md
++++ b/docs/operations/release.md
+@@ -293,6 +293,16 @@ executed installer suite on Linux/WSL and the packaged Windows/WSL gate;
+ portable shell checks alone do not qualify the full installer.
+ 
+ The current layout review covers SDK `1.0.8`, CLI `1.0.75` and Koffi `3.3.1`.
++The exact external closure also pins `vscode-jsonrpc` `8.2.1`, Zod `4.4.3`
++and `detect-libc` `2.1.2`. Generated stages do not reuse the source lockfile's
++importers: preserve the five owner-scoped overrides when emitting their
++workspace configurations. Every Copilot-bearing stage checks the SDK anchor,
++those overrides and installed owner-resolved versions before pruning. A
++root-level copy of the right version cannot mask a different SDK/runtime
++dependency. CLI archives perform this check before removing install metadata.
++Generated glibc stages additionally exclude the CLI's musl optional packages:
++cross-host pnpm resolution can retain both despite `supportedArchitectures.libc`.
++These exclusions are stage-only, not a change to source installation.
+ The stage resolves packages from their actual owning dependency contexts and
+ rejects paths outside the stage, unexpected native layouts and version drift
+ before removing anything. Keep the CLI, core natives, target `rg`/`tgrep`,
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index c520e7c58..3b830720f 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -46,6 +46,10 @@ overrides:
+   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-arm64': '-'
+   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-x64': '-'
+   '@github/copilot-sdk@1.0.8>@github/copilot': 1.0.75
++  '@github/copilot-sdk@1.0.8>koffi': 3.3.1
++  '@github/copilot-sdk@1.0.8>vscode-jsonrpc': 8.2.1
++  '@github/copilot-sdk@1.0.8>zod': 4.4.3
++  '@github/copilot@1.0.75>detect-libc': 2.1.2
+   '@clerk/backend': 3.18.1
+   '@clerk/clerk-js': 6.32.1
+   '@clerk/clerk-js>@base-org/account': '-'
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index 4c5cbb674..a6042a6af 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -107,6 +107,10 @@ overrides:
+   # Copilot SDK 1.0.8 loads the platform package's ./sdk export. Copilot CLI
+   # 1.0.82 removed that export, so keep the SDK on its compatible runtime.
+   "@github/copilot-sdk@1.0.8>@github/copilot": 1.0.75
++  "@github/copilot-sdk@1.0.8>koffi": 3.3.1
++  "@github/copilot-sdk@1.0.8>vscode-jsonrpc": 8.2.1
++  "@github/copilot-sdk@1.0.8>zod": 4.4.3
++  "@github/copilot@1.0.75>detect-libc": 2.1.2
+   "@clerk/backend": "catalog:"
+   "@clerk/clerk-js": "catalog:"
+   "@clerk/clerk-js>@base-org/account": "-"
+diff --git a/scripts/build-cli-archive.ts b/scripts/build-cli-archive.ts
+index 18e34cc3a..95f102f2a 100644
+--- a/scripts/build-cli-archive.ts
++++ b/scripts/build-cli-archive.ts
+@@ -161,6 +161,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+     yield* fs.readFileString(path.join(input.repoRoot, "pnpm-workspace.yaml")),
+   );
+   const catalog = workspace.catalog ?? {};
++  const overrides = resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server");
+   const serverDependencies = resolveCatalogDependencies(
+     serverPackageJson.dependencies,
+     catalog,
+@@ -200,7 +201,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+         arch: input.arch,
+         ...(workspace.allowBuilds ? { allowBuilds: workspace.allowBuilds } : {}),
+         patchedDependencies,
+-        overrides: resolveCatalogDependencies(workspace.overrides ?? {}, catalog, "apps/server"),
++        overrides,
+       }),
+       nodeLinker: "hoisted",
+     }),
+@@ -224,6 +225,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
+     platform: input.platform,
+     arch: input.arch,
+     dependencies,
++    overrides,
+   });
+ 
+   // pnpm's bookkeeping and the manifest only matter to pnpm; the runtime
+diff --git a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts
+index f5c2ed60f..50f12f4e7 100644
+--- a/scripts/build-desktop-artifact.ts
++++ b/scripts/build-desktop-artifact.ts
+@@ -30,7 +30,7 @@ import {
+ } from "./lib/brand-assets.ts";
+ import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
+ import { validateCopilotLinuxArchiveMembers } from "@t3tools/shared/copilotRuntime";
+-import { pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
++import { COPILOT_PAYLOAD_VERSIONS, pruneCopilotSdkServerPayload } from "./lib/copilot-payload.ts";
+ import {
+   findInlinedExternalPackages,
+   selectCliRuntimeExternalDependencies,
+@@ -1482,6 +1482,19 @@ export function createStageWorkspaceConfig(input: {
+   readonly overrides?: Record<string, string>;
+ }): StageWorkspaceConfig {
+   const { platform, arch, allowBuilds, patchedDependencies, overrides } = input;
++  // pnpm's cross-host install can include both libc variants despite the
++  // glibc target below. Exclude musl only in generated glibc stages, not source.
++  const stageOverrides =
++    platform === "linux" &&
++    overrides?.[`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`] !== undefined
++      ? {
++          ...overrides,
++          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-x64`]:
++            "-",
++          [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>@github/copilot-linuxmusl-arm64`]:
++            "-",
++        }
++      : overrides;
+   const hostOs = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
+   const hostCpu = arch === "universal" ? ["arm64", "x64"] : [arch];
+   // Linux AppImages execute a Linux/glibc Node process that loads
+@@ -1505,7 +1518,9 @@ export function createStageWorkspaceConfig(input: {
+     ...(patchedDependencies && Object.keys(patchedDependencies).length > 0
+       ? { patchedDependencies }
+       : {}),
+-    ...(overrides && Object.keys(overrides).length > 0 ? { overrides } : {}),
++    ...(stageOverrides && Object.keys(stageOverrides).length > 0
++      ? { overrides: stageOverrides }
++      : {}),
+   };
+ }
+ 
+@@ -2964,6 +2979,7 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
+     platform: "win",
+     arch: input.arch,
+     dependencies: sidecarDependencies,
++    overrides: input.overrides,
+   });
+   yield* fs.makeDirectory(path.dirname(input.asarPath), { recursive: true });
+   yield* packWindowsServerAsar({
+@@ -3725,6 +3741,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
+     platform: options.platform,
+     arch: options.arch,
+     dependencies: stageDependencies,
++    overrides: resolvedOverrides,
+   });
+ 
+   // Only the Windows artifact carries the server sidecar and the WSL runtime;
+diff --git a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts
+index c202c8a5c..61970db6c 100644
+--- a/scripts/lib/copilot-payload.test.ts
++++ b/scripts/lib/copilot-payload.test.ts
+@@ -6,8 +6,15 @@ import * as Path from "effect/Path";
+ import * as Schema from "effect/Schema";
+ 
+ import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
++import { fromYaml } from "@t3tools/shared/schemaYaml";
++import serverPackageJson from "../../apps/server/package.json" with { type: "json" };
++import { createStageWorkspaceConfig } from "../build-desktop-artifact.ts";
+ import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
+-import { pruneCopilotSdkServerPayload } from "./copilot-payload.ts";
++import {
++  COPILOT_DEPENDENCY_OVERRIDES,
++  pruneCopilotSdkServerPayload,
++  resolveCopilotDependencyClosure,
++} from "./copilot-payload.ts";
+ 
+ const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+ const dependencies = { "@github/copilot-sdk": "1.0.8" };
+@@ -85,6 +92,9 @@ const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
+     ["@github/copilot-sdk", "1.0.8"],
+     ["@github/copilot", "1.0.75"],
+     ["koffi", "3.3.1"],
++    ["vscode-jsonrpc", "8.2.1"],
++    ["zod", "4.4.3"],
++    ["detect-libc", "2.1.2"],
+   ]) {
+     yield* write(
+       `node_modules/${name}/package.json`,
+@@ -170,10 +180,145 @@ const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
+     if (platform === "linux")
+       removed.push(yield* write(`${binding}/musl_${target.arch}/koffi.node`));
+   }
+-  return { stageDir, retained, removed, write };
++  return { stageDir, retained, removed, write, overrides: COPILOT_DEPENDENCY_OVERRIDES };
+ });
+ 
+ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
++  it.effect("keeps source SDK and generated stage overrides on the reviewed closure", () =>
++    Effect.gen(function* () {
++      const fs = yield* FileSystem.FileSystem;
++      const path = yield* Path.Path;
++      const file = yield* path.fromFileUrl(new URL("../../pnpm-workspace.yaml", import.meta.url));
++      const workspace = yield* Schema.decodeEffect(
++        fromYaml(
++          Schema.Struct({
++            overrides: Schema.Record(Schema.String, Schema.String),
++          }),
++        ),
++      )(yield* fs.readFileString(file));
++      assert.equal(serverPackageJson.dependencies["@github/copilot-sdk"], "1.0.8");
++      for (const target of [...targets, { platform: "mac", arch: "universal" }] as const) {
++        const staged = createStageWorkspaceConfig({
++          platform: target.platform,
++          arch: target.arch,
++          overrides: { ...workspace.overrides },
++        });
++        for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
++          assert.equal(staged.overrides?.[selector], version, selector);
++        }
++        for (const arch of ["x64", "arm64"]) {
++          const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${arch}`;
++          assert.equal(staged.overrides?.[selector], target.platform === "linux" ? "-" : undefined);
++          assert.isUndefined(workspace.overrides[selector]);
++        }
++      }
++    }),
++  );
++
++  it.effect("rejects missing overrides and SDK anchor drift before pruning", () =>
++    Effect.scoped(
++      Effect.gen(function* () {
++        const fs = yield* FileSystem.FileSystem;
++        const stage = yield* makeStage("win", "x64");
++        for (const selector of Object.keys(COPILOT_DEPENDENCY_OVERRIDES)) {
++          for (const drift of [undefined, "99.0.0"]) {
++            const overrides: Record<string, string> = { ...stage.overrides };
++            if (drift === undefined) delete overrides[selector];
++            else overrides[selector] = drift;
++            const error = yield* pruneCopilotSdkServerPayload({
++              ...stage,
++              platform: "win",
++              arch: "x64",
++              dependencies,
++              overrides,
++            }).pipe(Effect.flip);
++            assert.include(error.message, `workspace override ${selector}`);
++          }
++        }
++        const error = yield* resolveCopilotDependencyClosure({
++          ...stage,
++          dependencies: { "@github/copilot-sdk": "^1.0.8" },
++        }).pipe(Effect.flip);
++        assert.include(error.message, "SDK dependency must be exactly");
++        for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++      }),
++    ),
++  );
++
++  for (const [name, version, owner] of [
++    ["koffi", "3.3.1", "@github/copilot-sdk"],
++    ["vscode-jsonrpc", "8.2.1", "@github/copilot-sdk"],
++    ["zod", "4.4.3", "@github/copilot-sdk"],
++    ["detect-libc", "2.1.2", "@github/copilot"],
++  ] as const) {
++    it.effect(`refuses missing or owner-local drift in ${name}, despite a correct root copy`, () =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const stage = yield* makeStage("win", "x64");
++          const ownerPath = `node_modules/${owner}/node_modules/${name}`;
++          yield* stage.write(`${ownerPath}/package.json`, encodeJson({ name, version: "99.0.0" }));
++          const drift = yield* pruneCopilotSdkServerPayload({
++            ...stage,
++            platform: "win",
++            arch: "x64",
++            dependencies,
++          }).pipe(Effect.flip);
++          assert.include(drift.message, `unreviewed ${name} version 99.0.0`);
++          yield* stage.write(`${ownerPath}/package.json`, encodeJson({ name, version }));
++          assert.isNotNull(yield* resolveCopilotDependencyClosure({ ...stage, dependencies }));
++          yield* fs.remove(`${stage.stageDir}/${ownerPath}`, { recursive: true });
++          yield* fs.remove(`${stage.stageDir}/node_modules/${name}`, { recursive: true });
++          const missing = yield* resolveCopilotDependencyClosure({ ...stage, dependencies }).pipe(
++            Effect.flip,
++          );
++          assert.include(missing.message, name);
++          assert.match(missing.message, /cannot resolve|missing or unreadable/);
++          for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
++        }),
++      ),
++    );
++  }
++
++  it.effect.skipIf(!symlinksSupported)(
++    "resolves strict in-stage owner links and refuses escaping transitives",
++    () =>
++      Effect.scoped(
++        Effect.gen(function* () {
++          const fs = yield* FileSystem.FileSystem;
++          const path = yield* Path.Path;
++          for (const escape of [false, true]) {
++            const stage = yield* makeStage("win", "x64");
++            const sdk = path.join(stage.stageDir, "node_modules/@github/copilot-sdk");
++            const physical = path.join(
++              stage.stageDir,
++              "node_modules/.pnpm/sdk/node_modules/@github/copilot-sdk",
++            );
++            yield* fs.makeDirectory(path.dirname(physical), { recursive: true });
++            yield* fs.rename(sdk, physical);
++            yield* fs.symlink(physical, sdk);
++            if (escape) {
++              const outside = yield* fs.makeTempDirectoryScoped({
++                prefix: "t3-copilot-transitive-",
++              });
++              yield* fs.writeFileString(
++                path.join(outside, "package.json"),
++                encodeJson({ name: "zod", version: "4.4.3" }),
++              );
++              yield* fs.makeDirectory(path.join(physical, "node_modules"), { recursive: true });
++              yield* fs.symlink(outside, path.join(physical, "node_modules/zod"));
++              const error = yield* resolveCopilotDependencyClosure({ ...stage, dependencies }).pipe(
++                Effect.flip,
++              );
++              assert.include(error.message, "outside the stage");
++            } else {
++              assert.isNotNull(yield* resolveCopilotDependencyClosure({ ...stage, dependencies }));
++            }
++          }
++        }),
++      ),
++  );
++
+   for (const target of targets) {
+     it.effect(
+       `preserves ${target.target} runtime bytes and removes exactly ${target.removed} unreachable natives`,
+@@ -233,6 +378,7 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+           platform: "win",
+           arch: "x64",
+           dependencies: {},
++          overrides: {},
+         });
+         assert.deepEqual(result, { pruned: false, removedNativeFiles: [] });
+         for (const file of stage.removed) assert.isTrue(yield* fs.exists(file));
+@@ -240,6 +386,7 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+     ),
+   );
+   for (const fault of [
++    "sdk-version",
+     "runtime-version",
+     "platform-version",
+     "koffi-version",
+@@ -257,6 +404,12 @@ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+           const fs = yield* FileSystem.FileSystem;
+           const stage = yield* makeStage("win", "x64");
+           switch (fault) {
++            case "sdk-version":
++              yield* stage.write(
++                "node_modules/@github/copilot-sdk/package.json",
++                encodeJson({ name: "@github/copilot-sdk", version: "1.0.9", main: "index.js" }),
++              );
++              break;
+             case "runtime-version":
+               yield* stage.write(
+                 "node_modules/@github/copilot/package.json",
+diff --git a/scripts/lib/copilot-payload.ts b/scripts/lib/copilot-payload.ts
+index 114304a79..a6b2426bb 100644
+--- a/scripts/lib/copilot-payload.ts
++++ b/scripts/lib/copilot-payload.ts
+@@ -12,8 +12,22 @@ export const COPILOT_PAYLOAD_VERSIONS = {
+   sdk: "1.0.8",
+   runtime: "1.0.75",
+   koffi: "3.3.1",
++  jsonrpc: "8.2.1",
++  zod: "4.4.3",
++  detectLibc: "2.1.2",
+ } as const;
+ 
++export const COPILOT_DEPENDENCY_OVERRIDES = {
++  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>@github/copilot`]:
++    COPILOT_PAYLOAD_VERSIONS.runtime,
++  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>koffi`]: COPILOT_PAYLOAD_VERSIONS.koffi,
++  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>vscode-jsonrpc`]:
++    COPILOT_PAYLOAD_VERSIONS.jsonrpc,
++  [`@github/copilot-sdk@${COPILOT_PAYLOAD_VERSIONS.sdk}>zod`]: COPILOT_PAYLOAD_VERSIONS.zod,
++  [`@github/copilot@${COPILOT_PAYLOAD_VERSIONS.runtime}>detect-libc`]:
++    COPILOT_PAYLOAD_VERSIONS.detectLibc,
++};
++
+ const PackageManifest = Schema.Struct({
+   name: Schema.optional(Schema.String),
+   version: Schema.optional(Schema.String),
+@@ -111,20 +125,15 @@ function targetLayout(platform: BuildPlatform, arch: "x64" | "arm64") {
+   return { target, os, arch, required, removed, foreignSearchTarget };
+ }
+ 
+-/**
+- * Prune only a reviewed SDK-server payload in an isolated production stage.
+- * Validate every target before deleting anything; never prune a package store
+- * reached outside the stage through Node resolution or a symlink.
+- */
+-export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayload")(
++/** Read-only closure validation shared with payload pruning, resolved from each package owner. */
++export const resolveCopilotDependencyClosure = Effect.fn("resolveCopilotDependencyClosure")(
+   function* (input: {
+     readonly stageDir: string;
+-    readonly platform: BuildPlatform;
+-    readonly arch: BuildArch;
+     readonly dependencies: Readonly<Record<string, string>>;
++    readonly overrides: Readonly<Record<string, string>>;
+   }) {
+     if (input.dependencies["@github/copilot-sdk"] === undefined) {
+-      return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> };
++      return null;
+     }
+     const fs = yield* FileSystem.FileSystem;
+     const path = yield* Path.Path;
+@@ -134,8 +143,13 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
+         detail,
+         ...(cause === undefined ? {} : { cause }),
+       });
+-    if (input.arch === "universal" && input.platform !== "mac") {
+-      return yield* failure("universal Copilot payloads are supported only on macOS");
++    if (input.dependencies["@github/copilot-sdk"] !== COPILOT_PAYLOAD_VERSIONS.sdk) {
++      return yield* failure(`SDK dependency must be exactly ${COPILOT_PAYLOAD_VERSIONS.sdk}`);
++    }
++    for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
++      if (input.overrides[selector] !== version) {
++        return yield* failure(`workspace override ${selector} must be exactly ${version}`);
++      }
+     }
+     const root = yield* fs.realPath(input.stageDir);
+     const contained = (candidate: string) => {
+@@ -198,6 +212,33 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
+       COPILOT_PAYLOAD_VERSIONS.runtime,
+     );
+     const koffi = yield* resolvePackage(sdk.loader, "koffi", COPILOT_PAYLOAD_VERSIONS.koffi);
++    yield* resolvePackage(sdk.loader, "vscode-jsonrpc", COPILOT_PAYLOAD_VERSIONS.jsonrpc);
++    yield* resolvePackage(sdk.loader, "zod", COPILOT_PAYLOAD_VERSIONS.zod);
++    yield* resolvePackage(runtime.loader, "detect-libc", COPILOT_PAYLOAD_VERSIONS.detectLibc);
++    return { fs, path, root, contained, realInside, resolvePackage, failure, sdk, runtime, koffi };
++  },
++);
++
++/**
++ * Prune only a reviewed SDK-server payload in an isolated production stage.
++ * Validate every target before deleting anything; never prune a package store
++ * reached outside the stage through Node resolution or a symlink.
++ */
++export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayload")(
++  function* (input: {
++    readonly stageDir: string;
++    readonly platform: BuildPlatform;
++    readonly arch: BuildArch;
++    readonly dependencies: Readonly<Record<string, string>>;
++    readonly overrides: Readonly<Record<string, string>>;
++  }) {
++    const closure = yield* resolveCopilotDependencyClosure(input);
++    if (closure === null) return { pruned: false, removedNativeFiles: [] as ReadonlyArray<string> };
++    const { fs, path, root, contained, realInside, resolvePackage, failure, runtime, koffi } =
++      closure;
++    if (input.arch === "universal" && input.platform !== "mac") {
++      return yield* failure("universal Copilot payloads are supported only on macOS");
++    }
+     const layouts = (input.arch === "universal" ? (["arm64", "x64"] as const) : [input.arch]).map(
+       (arch) => targetLayout(input.platform, arch),
+     );
+@@ -337,6 +378,7 @@ export const pruneCopilotSdkServerPayload = Effect.fn("pruneCopilotSdkServerPayl
+         platform: input.platform,
+         arch: input.arch,
+         removedNativeFiles: removedNativeFiles.length,
++        closureVersions: COPILOT_PAYLOAD_VERSIONS,
+       }),
+     );
+     return { pruned: true, removedNativeFiles };

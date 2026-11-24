@@ -1,0 +1,92 @@
+{
+  "tpatchVersion": "0.16.0",
+  "sourceCommit": "16d428db823f17c18ec16a79e1ec12ae4ba795c1",
+  "results": [
+    {
+      "slug": "copilot-cli-provider",
+      "exitCode": 0,
+      "failure": null,
+      "blockingChecks": []
+    },
+    {
+      "slug": "session-search",
+      "exitCode": 2,
+      "failure": "landing-evidence",
+      "blockingChecks": [
+        "recipe_replay_clean",
+        "post_apply_patch_replay_clean",
+        "write_file_preimage_fresh"
+      ]
+    },
+    {
+      "slug": "copilot-sdk-license-notice",
+      "exitCode": 2,
+      "failure": "parent-landing-drift",
+      "blockingChecks": [
+        "recipe_replay_clean"
+      ]
+    },
+    {
+      "slug": "copilot-runtime-packaging",
+      "exitCode": 2,
+      "failure": "parent-landing-drift",
+      "blockingChecks": [
+        "recipe_replay_clean"
+      ]
+    },
+    {
+      "slug": "phase1-foundation",
+      "exitCode": 2,
+      "failure": "parent-landing-drift",
+      "blockingChecks": [
+        "recipe_replay_clean",
+        "post_apply_patch_replay_clean"
+      ]
+    },
+    {
+      "slug": "attention-notifications",
+      "exitCode": 2,
+      "failure": "parent-landing-drift",
+      "blockingChecks": [
+        "recipe_replay_clean",
+        "post_apply_patch_replay_clean"
+      ]
+    },
+    {
+      "slug": "tpatch-local-capture-ignore",
+      "exitCode": 0,
+      "failure": null,
+      "blockingChecks": []
+    },
+    {
+      "slug": "fork-maintenance-policy",
+      "exitCode": 0,
+      "failure": null,
+      "blockingChecks": []
+    },
+    {
+      "slug": "fork-maintenance-check-scope",
+      "exitCode": 2,
+      "failure": "historical-anchor-unavailable",
+      "blockingChecks": [
+        "recipe_replay_clean",
+        "post_apply_patch_replay_clean",
+        "write_file_preimage_fresh"
+      ]
+    },
+    {
+      "slug": "foundation-v014-client-compat",
+      "exitCode": 0,
+      "failure": null,
+      "blockingChecks": []
+    },
+    {
+      "slug": "attention-policy-completion-watermarks",
+      "exitCode": 2,
+      "failure": "parent-landing-drift",
+      "blockingChecks": [
+        "recipe_replay_clean"
+      ]
+    }
+  ]
+}

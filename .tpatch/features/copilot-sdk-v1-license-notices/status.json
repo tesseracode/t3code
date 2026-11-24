@@ -1,0 +1,37 @@
+{
+  "id": "copilot-sdk-v1-license-notices",
+  "slug": "copilot-sdk-v1-license-notices",
+  "title": "Restore strict license manifest generation for SDK 1.0.28 and its native packages using the pinned upstream MIT attribution. Keep the historical 1.0.8 override, retain exact version scoping, and cover native packages sharing the SDK repository without bypassing notice validation.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-11-02T21:58:38Z",
+  "updated_at": "2026-11-02T22:01:51Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-11-02T22:01:54Z",
+  "apply": {
+    "completed_at": "2026-11-02T22:00:56Z",
+    "base_commit": "8a3e34631cca72fcf79327c5c625077ba71800ae",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "copilot-sdk-runtime-upgrade",
+      "kind": "hard"
+    },
+    {
+      "slug": "copilot-sdk-license-notice",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-11-02T22:01:46Z",
+    "passed": false,
+    "recipe_hash_at_verify": "836ff890573b5b981b810b63b278914201a399a931212fc641ff282c3d2ba3c5",
+    "patch_hash_at_verify": "65933499a1fe2a21bed526161e9333733a571ef59a61db46490c51a1212a9cb2",
+    "parent_snapshot": {
+      "copilot-sdk-license-notice": "applied",
+      "copilot-sdk-runtime-upgrade": "applied"
+    }
+  }
+}

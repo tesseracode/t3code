@@ -1,0 +1,118 @@
+{
+  "method": "isolated-index ordered canonical patch replay, with leaf recipe content and supplied preimage checks at its capture boundary",
+  "head": "1ac0398c61b6124415d7c450856e5b6afe2d6a7c",
+  "baselineTree": "06d9d9f1a609ddee65ed03e7c29de199071bd33c",
+  "targetTree": "2a43d394e1e33dcb4fe7f15dd71085fc5c0cafc3",
+  "result": "pass; complete ordered replay reconstructs the exact HEAD tree",
+  "limitation": "This is not a native tpatch verify pass. Its fixed-anchor closure arbitration rejects an earlier parent's postimage after a later hard dependency intentionally edits it.",
+  "steps": [
+    {
+      "feature": "copilot-cli-provider",
+      "hardDependencies": [],
+      "patchSha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+      "recipeSha256": "ce4213531e74b01fc8b637cf2990fb53a928325a4b729392d0cc03736db07ea8",
+      "beforeTree": "06d9d9f1a609ddee65ed03e7c29de199071bd33c",
+      "afterTree": "d248a2cab6cb7942f9909a40877f941c9fe5c136",
+      "recipeOperations": 28,
+      "recipePostimageChecked": false,
+      "recipeScope": "Historical parent recipes target their own snapshots; only authoritative canonical patches are composed here.",
+      "legacyWritesWithoutPreimageHash": 0
+    },
+    {
+      "feature": "copilot-sdk-license-notice",
+      "hardDependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard"
+        }
+      ],
+      "patchSha256": "d6be21044ffda12ef416021400bfc83a1c1dc6aa0f2f832c772e8e21e56d9a56",
+      "recipeSha256": "a9b559a44ef9ae987aa756d9d9ec90c038d8ed4c23f712986d0fdd72524689b5",
+      "beforeTree": "d248a2cab6cb7942f9909a40877f941c9fe5c136",
+      "afterTree": "4063815d7f4079beaceee26346a8358311e1205a",
+      "recipeOperations": 1,
+      "recipePostimageChecked": false,
+      "recipeScope": "Historical parent recipes target their own snapshots; only authoritative canonical patches are composed here.",
+      "legacyWritesWithoutPreimageHash": 0
+    },
+    {
+      "feature": "copilot-runtime-packaging-replay",
+      "hardDependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard"
+        }
+      ],
+      "patchSha256": "097951c0d3a4fc2cb3948e24ea0f4b9d6890d665866f83f6b5317ac030e0d7ce",
+      "recipeSha256": "e00b849de89074d98a1df96185c5e712e9bce8341192c1b43b96ce7211cd0e0b",
+      "beforeTree": "4063815d7f4079beaceee26346a8358311e1205a",
+      "afterTree": "73315010d19582d2cd2b745a34f494344778fb3c",
+      "recipeOperations": 31,
+      "recipePostimageChecked": false,
+      "recipeScope": "Historical parent recipes target their own snapshots; only authoritative canonical patches are composed here.",
+      "legacyWritesWithoutPreimageHash": 0
+    },
+    {
+      "feature": "copilot-sdk-runtime-upgrade",
+      "hardDependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard"
+        },
+        {
+          "slug": "copilot-runtime-packaging-replay",
+          "kind": "hard"
+        }
+      ],
+      "patchSha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+      "recipeSha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad",
+      "beforeTree": "73315010d19582d2cd2b745a34f494344778fb3c",
+      "afterTree": "96730195ea2851518eb641a6e7727c9484660385",
+      "recipeOperations": 16,
+      "recipePostimageChecked": false,
+      "recipeScope": "Historical parent recipes target their own snapshots; only authoritative canonical patches are composed here.",
+      "legacyWritesWithoutPreimageHash": 0
+    },
+    {
+      "feature": "copilot-fusion-model-selection",
+      "hardDependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard"
+        },
+        {
+          "slug": "copilot-sdk-runtime-upgrade",
+          "kind": "hard"
+        }
+      ],
+      "patchSha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
+      "recipeSha256": "a9f07a134e711fc1edf0c793f3aadf9739e90de32f69031776b5981c0cc24550",
+      "beforeTree": "96730195ea2851518eb641a6e7727c9484660385",
+      "afterTree": "57ed73420b4f3b1492d7595861a11f3d674e64c7",
+      "recipeOperations": 32,
+      "recipePostimageChecked": false,
+      "recipeScope": "Historical parent recipes target their own snapshots; only authoritative canonical patches are composed here.",
+      "legacyWritesWithoutPreimageHash": 0
+    },
+    {
+      "feature": "copilot-sdk-v1-license-notices",
+      "hardDependencies": [
+        {
+          "slug": "copilot-sdk-runtime-upgrade",
+          "kind": "hard"
+        },
+        {
+          "slug": "copilot-sdk-license-notice",
+          "kind": "hard"
+        }
+      ],
+      "patchSha256": "65933499a1fe2a21bed526161e9333733a571ef59a61db46490c51a1212a9cb2",
+      "recipeSha256": "836ff890573b5b981b810b63b278914201a399a931212fc641ff282c3d2ba3c5",
+      "beforeTree": "57ed73420b4f3b1492d7595861a11f3d674e64c7",
+      "afterTree": "2a43d394e1e33dcb4fe7f15dd71085fc5c0cafc3",
+      "recipeOperations": 2,
+      "recipePostimageChecked": true,
+      "legacyWritesWithoutPreimageHash": 0
+    }
+  ]
+}

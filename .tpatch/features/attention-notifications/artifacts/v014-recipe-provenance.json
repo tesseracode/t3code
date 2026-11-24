@@ -1,0 +1,214 @@
+{
+  "kind": "manual-agent-authored-recipe-attestation",
+  "generated_at": "2026-10-29T16:55:41.323839+00:00",
+  "base_commit": "4de99f4a515055662ccd5d59f6f705b2ff973bd4",
+  "canonical_source_commit": "964529c024c2d79944cc7219590bcad38aa40a1d",
+  "recipe_sha256": "8d9797d8e72e39081b7a66612c42f8813f13cd09f93a72317349ec2678153c52",
+  "path_count": 29,
+  "note": "Derived from actual target source and actual baseline Git blobs; not provider-generated or a patch-generation manifest. Product tests deferred by maintainer.",
+  "paths": [
+    {
+      "path": "apps/web/src/attentionNotificationPolicy.test.ts",
+      "baseline_sha256": null,
+      "canonical_sha256": "bbf747059cf11ff70657823035c6f89bba217742cf980b478903d37020f1229a",
+      "target_sha256": "bbf747059cf11ff70657823035c6f89bba217742cf980b478903d37020f1229a",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/attentionNotificationPolicy.ts",
+      "baseline_sha256": null,
+      "canonical_sha256": "ff0048cab274dbbd0a44daffc329389f9c22ed36efff65fe3bd31e0443105daf",
+      "target_sha256": "ff0048cab274dbbd0a44daffc329389f9c22ed36efff65fe3bd31e0443105daf",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/components/AppSidebarLayout.tsx",
+      "baseline_sha256": "12acb27741e23573c8cfac4e80c100d2223f7469745d60147fcfbb0ebee4594c",
+      "canonical_sha256": "b02a806a774db5c5b2adf3b54c530524d2901ea67d2ca0a77844306bdce70f0b",
+      "target_sha256": "647be0336aef4f1d80539cf30e09a82cb259454d1078f5e6a8f9417ffe53dbfc",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/components/CommandPalette.tsx",
+      "baseline_sha256": "9519c28f3e587f26ec2740a864c0515d285682ca4ad4fae3b4231b09a55f9abc",
+      "canonical_sha256": "cf446f2d55909d30c743959e0c6e180e44376ead2fdbc05c1feb70d4939b49ae",
+      "target_sha256": "4eb7833784dcca445f0417eb43faedb50eb5207fc9952494c6b70e7b83193c97",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+      "baseline_sha256": "7ca206257ab5d6152878f0ea2cac2435244b5cedce59edc4daf202e8b0576d92",
+      "canonical_sha256": "d29fa364eb74f281f6765e82a7fccf9a7356e9cd4488479ece59cb2c762a0ed6",
+      "target_sha256": "80297a80040ed98d2c879de7a5aee192bf6f507bd8c4ce634aae7c0f04ad428c",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/components/ThreadNotificationCoordinator.tsx",
+      "baseline_sha256": "99a49a1dceb589ad82dd6cb60a141539f7d4f111ca3bb5aca6a869b1249f7ee6",
+      "canonical_sha256": "f9729156a891b878ded748f0f45c3c9c1bea4957f77ae020f6eb9e90fc09bc14",
+      "target_sha256": "976444aa3f27d76cebd8dd8863ac6cd96b8e9e48fa0d3ca7298ea31f2ddd66c6",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/components/attention/AttentionInbox.tsx",
+      "baseline_sha256": null,
+      "canonical_sha256": "c41746e42ade405d8d7170fc90c3e0dc4a66f494926678b1653002871dc305b9",
+      "target_sha256": "f6838707277ccb161a934f53f16b382362f5d071257cd6edcf55202243b73965",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/components/attention/AttentionSidebarItem.tsx",
+      "baseline_sha256": null,
+      "canonical_sha256": "2ec11928221e4151ac4860bdb8d5e64f6c9b3e6efe5cfcf8e255d9ed028b1d58",
+      "target_sha256": "2ec11928221e4151ac4860bdb8d5e64f6c9b3e6efe5cfcf8e255d9ed028b1d58",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+      "baseline_sha256": null,
+      "canonical_sha256": "bb884688bfa54e073fb1c9e01c54e54726bd24af47aaed87e46078463e046e0c",
+      "target_sha256": "fc42e0187d3f5b62b4121bd9d9c31633c1471ede688eca04b79faa2debea6198",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/components/attention/attentionInbox.logic.test.ts",
+      "baseline_sha256": null,
+      "canonical_sha256": "dec029f609fbeb75543d77cc1b20250b491a92c7cb509a681cc82dcd022b9ffb",
+      "target_sha256": "dec029f609fbeb75543d77cc1b20250b491a92c7cb509a681cc82dcd022b9ffb",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/components/attention/attentionInbox.logic.ts",
+      "baseline_sha256": null,
+      "canonical_sha256": "e7f98440f860d418aaf15aac387066f21f676ec5c4979fb576824a52c1c760f8",
+      "target_sha256": "e7f98440f860d418aaf15aac387066f21f676ec5c4979fb576824a52c1c760f8",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/components/attention/useOpenAttentionInbox.ts",
+      "baseline_sha256": null,
+      "canonical_sha256": "006d93330f9860f34c2dad1813a28d6e458412e63147df4b0effbf741617a522",
+      "target_sha256": "006d93330f9860f34c2dad1813a28d6e458412e63147df4b0effbf741617a522",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/components/settings/NotificationSettings.tsx",
+      "baseline_sha256": "195bd8158d10b9e1bb0da3d08ea3a417f9b74e306ad266858e5000bc2c7b5c2a",
+      "canonical_sha256": "e63ef01d4ba1ce861b0f0b86649cef33d6edb426d267760755d15600a7688c79",
+      "target_sha256": "e63ef01d4ba1ce861b0f0b86649cef33d6edb426d267760755d15600a7688c79",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/components/settings/SettingsPanels.tsx",
+      "baseline_sha256": "a9116ff45f91a771c911cdc75cb30d2133c97d5c170c5c0ca62010c3344e3afe",
+      "canonical_sha256": "ef462351d9ea3a7d392fd1d8ca1977b1f2f4465e051f2a66ddf91f878038c3ec",
+      "target_sha256": "13b5ad319c83ad88f63a06bda4344b6768f551b51f4cb00f22f261dbcd439b65",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/components/settings/settingsSearch.ts",
+      "baseline_sha256": "d17c61a3c2aa3d05938cb5eac62a5796d3ea7bdf89c0108f772cce5683cd9615",
+      "canonical_sha256": "dc261eed2cc7bc8462d56850ee782676964d51100220316fe0d3d623895a885d",
+      "target_sha256": "f9ea87d29a493a32a8cc15af1951a95f49a9dbd9792088eedb7fce63adeeb4e2",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/components/sidebar/SidebarChrome.tsx",
+      "baseline_sha256": "9aae972b20b12fd91b3f7501c654c11e4888cb5e27ba5be3eba958eed2d7b5e9",
+      "canonical_sha256": "60dc7f5d14e819855cd80cb78aa38711a3206c36716188176295eb117a7d4e1f",
+      "target_sha256": "11ccee355252b10c2daaccbc1f4c177927497cfecc31227f00d5eeaa12d95976",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/routeTree.gen.ts",
+      "baseline_sha256": "c8461d692c18c547504f78364fb03fe138844e7dbf83a0a57706536552002700",
+      "canonical_sha256": "2bb6dddc5171f292516e79c5bbc370ad7c6de666dd5b7ab12d089a386397bc5e",
+      "target_sha256": "2bb6dddc5171f292516e79c5bbc370ad7c6de666dd5b7ab12d089a386397bc5e",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/routes/_chat.attention.tsx",
+      "baseline_sha256": null,
+      "canonical_sha256": "21635182efef544041da3a69057d8ddc5abe16616a8635c7be17c4980b008343",
+      "target_sha256": "21635182efef544041da3a69057d8ddc5abe16616a8635c7be17c4980b008343",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "apps/web/src/threadNotifications.test.ts",
+      "baseline_sha256": "c8461405d14da67b2883efb05e222710a28b3a2a3d27833a1ea53e52f6767b6c",
+      "canonical_sha256": "c8461405d14da67b2883efb05e222710a28b3a2a3d27833a1ea53e52f6767b6c",
+      "target_sha256": "97be80ce84d223ee27131a88e0edf2fcd1a27d0b0618cae2683cf2600ddc5cd6",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "apps/web/src/threadNotifications.ts",
+      "baseline_sha256": "c1c5d0f1768c71100235717dfc67300366d26c8b2fd5d83a54c105de61a831b3",
+      "canonical_sha256": "233a78ba7d5da9d65ea0e9cde96d49723eb5faae99644a36f81dc1629d0e80b5",
+      "target_sha256": "d9a10ec6a8996d97f46330774fd74d8e9f8bafb6946aef3224986f7d54d55a56",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "docs/internals/attention-notifications.md",
+      "baseline_sha256": null,
+      "canonical_sha256": "1dedd4aaf0dae7b70efc54ad5f0bb0605efdf2e7ec9676748f7c9440b06450a4",
+      "target_sha256": "1dedd4aaf0dae7b70efc54ad5f0bb0605efdf2e7ec9676748f7c9440b06450a4",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "docs/internals/overview.md",
+      "baseline_sha256": "430e4b4d3ead46341043cdde849506df684e14695e8f317201799ec1af0912e3",
+      "canonical_sha256": "014db4f8d2658a3c6505b939ae79263325a00ff20560ab2f1d71ff083725907a",
+      "target_sha256": "a1bc16767a627177e7fb9f30c01a3eec75112e7acab962d7a1aefe227f9783fb",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "docs/user/attention.md",
+      "baseline_sha256": null,
+      "canonical_sha256": "b031702348e1aa9f28a6d47e9d2aade1e6b6ef68a573a69d708d0ad780e55595",
+      "target_sha256": "b031702348e1aa9f28a6d47e9d2aade1e6b6ef68a573a69d708d0ad780e55595",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "docs/user/keybindings.md",
+      "baseline_sha256": "1575a37dc521cb18073fde180ce1072fa51f5e24084aa77361b28415257206af",
+      "canonical_sha256": "f2bae2139465889eeab0d5a4d968e18f06b8224c261ff02c6cc5618fe25461e2",
+      "target_sha256": "ff9300045ed8e8615d108af477ebe07fd31b14387ab597e3a111c803570357d6",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "docs/user/notifications.md",
+      "baseline_sha256": null,
+      "canonical_sha256": "802cbe98f23c9bdd3a6f98e054893f422a022f7eafa0821eef1ed9d4b19be446",
+      "target_sha256": "802cbe98f23c9bdd3a6f98e054893f422a022f7eafa0821eef1ed9d4b19be446",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "docs/user/thread-sidebar.md",
+      "baseline_sha256": "b1fe4e0b18009997ac40555e262ca4427745ef81b3f0ece8c28fac7234c4cf5d",
+      "canonical_sha256": "7e5ddf0c5439f2c1955834d543c89d4b83909e34ba351b11598d2c16e67f4f4c",
+      "target_sha256": "d11077bf2fe8a2111ceb2efb53ee8252f1c324230bc9d9a99896101ee58729e1",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "packages/contracts/src/keybindings.ts",
+      "baseline_sha256": "d9bbde256378b9e83ce3168b3241ec7da3af62ebe533577766f8f9f2d8af84f9",
+      "canonical_sha256": "e0698f857492e7221954399e9ad46613c8a2c6d7b5fe12262713864b4fefe4da",
+      "target_sha256": "b39fbfd3ac3ece176572034c88fcd2b9f16bab7dc56d0ca96f0cbe51e947836a",
+      "canonical_bytes_retained": false
+    },
+    {
+      "path": "packages/contracts/src/settings.test.ts",
+      "baseline_sha256": "d28d0f1f821c3a596da477cd4c107dc7f529e381f5834cd1661e3a57ab95e958",
+      "canonical_sha256": "a38294ba97d7d042dd3947370250f844f5cec9d12a368b01de9204253c068050",
+      "target_sha256": "a38294ba97d7d042dd3947370250f844f5cec9d12a368b01de9204253c068050",
+      "canonical_bytes_retained": true
+    },
+    {
+      "path": "packages/contracts/src/settings.ts",
+      "baseline_sha256": "8e9d033882e608b3d67ef0c45d91766060e5ebb28c22ec1398c9558b1dc69e50",
+      "canonical_sha256": "f6423928e07741cd5281bcc2a161faff3c4d9a0a59c0153291e3d1be9c41d5d2",
+      "target_sha256": "304f77a7b9d3f23bd638dd4032d033a29aa18c0e41ca88ab48e21087049e1922",
+      "canonical_bytes_retained": false
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "attention-policy-completion-watermarks",
+  "slug": "attention-policy-completion-watermarks",
+  "title": "Preserve handled and skipped completion watermarks when notification policy changes. Consume pending completions without resetting observations, preventing unsupported legacy attention servers from replaying an old completion after opt-in, category, or mute changes. Add an actual-coordinator headless regression proving failure before and success after; preserve all canonical attention/Foundation behavior.",
+  "state": "applied",
+  "compatibility": "unknown",
+  "requested_at": "2026-10-29T17:32:13Z",
+  "updated_at": "2026-10-29T17:36:23Z",
+  "last_command": "verify",
+  "notes": "landed at 2026-10-29T17:36:50Z",
+  "apply": {
+    "completed_at": "2026-10-29T17:35:38Z",
+    "base_commit": "ee5c462a9d408f38ac2c7495ec91dfcc617b1ac1",
+    "has_patch": true
+  },
+  "reconcile": {},
+  "depends_on": [
+    {
+      "slug": "attention-notifications",
+      "kind": "hard"
+    }
+  ],
+  "verify": {
+    "verified_at": "2026-10-29T17:36:19Z",
+    "passed": false,
+    "recipe_hash_at_verify": "751a98b9b03c47a5b8a404a06025ce14663c4fdb3c91f30eb81f767067c3e0bd",
+    "patch_hash_at_verify": "c93803f59c055124c2c58954dea3b2a92891d891a7e12e65c5c235cdf40b1369",
+    "parent_snapshot": {
+      "attention-notifications": "applied"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "feature": "copilot-extension-opt-out",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_e510520db5f3",
+      "kind": "record",
+      "patch_sha256": "cee87244cb829ee3a7cfd9704dc979616f68d29bce090490191ea5d53a03ffac",
+      "git_patch_id": "d08870936f393240d33962429f95925060822e96",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "f1838e253f2fbc4c4350453b9a11ed33d486bf37246390baee3ff132b8137244",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "",
+      "base_commit": "6b43f8280c25fa4734ac823c2fc97cdfb614f390",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 24,
+          "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+          "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

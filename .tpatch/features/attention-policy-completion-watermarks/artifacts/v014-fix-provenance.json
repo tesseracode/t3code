@@ -1,0 +1,25 @@
+{
+  "kind": "manual-complete-four-path-recipe-attestation",
+  "generated_at": "2026-10-29T17:33:36.104288+00:00",
+  "base_commit": "ee5c462a9d408f38ac2c7495ec91dfcc617b1ac1",
+  "paths": [
+    "apps/web/src/components/ThreadNotificationCoordinator.logic.ts",
+    "apps/web/src/components/ThreadNotificationCoordinator.tsx",
+    "apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+    "docs/internals/attention-notifications.md"
+  ],
+  "preserved_canonical_roots": {
+    "phase1-foundation": {
+      "post-apply.patch": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+      "apply-recipe.json": "4faef0270a0d1158331829689f018dafd9fc9416653ec5e809f3359e27839d0e"
+    },
+    "attention-notifications": {
+      "post-apply.patch": "6feb99da51a9427557a215cfcfcde7a8b8f7de07489c01d724556f2876e860d1",
+      "apply-recipe.json": "8d9797d8e72e39081b7a66612c42f8813f13cd09f93a72317349ec2678153c52"
+    },
+    "foundation-v014-client-compat": {
+      "post-apply.patch": "9ac66594f926d0d35387331473d86d5e8059f00edbef5b773b46daf5084609a4",
+      "apply-recipe.json": "5524869561befb4e5016d2ff64e2b979cebc6c6a310b124fcfcf41beffc0499d"
+    }
+  }
+}

@@ -1,0 +1,3264 @@
+{
+  "candidate": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+  "frozen_main": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+  "pinned_upstream": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "exclusions": [
+    ".tpatch administrative metadata only"
+  ],
+  "includes_file_modes": true,
+  "roots": [
+    {
+      "slug": "device-session-release",
+      "landing": "fe6a486505b5605c61034d0515f211ac0f014fc6",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "patch_sha256": "08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08",
+      "recipe_sha256": "72be83ab03900c276c51b6751b73e485d43ad42b062472b9d5d69126cbf72e6d",
+      "generation": 2,
+      "parsed_trailers": "Tpatch-Feature: device-session-release\nTpatch-Patch-SHA: 08f25bbcaa1674d79ae5be559a8ceb7c741c8e88aa7440152403c2e9c01f1b08\nTpatch-Recipe-SHA: 72be83ab03900c276c51b6751b73e485d43ad42b062472b9d5d69126cbf72e6d\nTpatch-Base-Commit: 0490e7bb2753ee455d58f9832f6ea943af81b0e0\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "trailers_exact": true,
+      "manifest_hashes_exact": true,
+      "landing_parents": [
+        "0490e7bb2753ee455d58f9832f6ea943af81b0e0"
+      ],
+      "base_is_exact_first_parent": true,
+      "parent_generations": [],
+      "canonical": {
+        "tree": "30f41030cb46092bb7397ae898ea84ceb5470381",
+        "residual": [],
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx b/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DeviceControlsRail.tsx b/apps/web/src/components/device/DeviceControlsRail.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DevicePanel.tsx b/apps/web/src/components/device/DevicePanel.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DeviceWorkspace.tsx b/apps/web/src/components/device/DeviceWorkspace.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/devices.md b/docs/user/devices.md",
+            "result": "forward"
+          }
+        ],
+        "exact": true
+      },
+      "recipe": {
+        "tree": "30f41030cb46092bb7397ae898ea84ceb5470381",
+        "residual": [],
+        "operations": [
+          {
+            "path": "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/device/DeviceControlsRail.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/device/DevicePanel.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/device/DeviceWorkspace.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/user/devices.md",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "slug": "copilot-session-import",
+      "landing": "edaafaa1d0715000cb44acb06ea75a0058dbd5e4",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "patch_sha256": "09cb61d94051e31518518bbd7b76b2bd7501b6daadab32044b20c15c7ca7ac7b",
+      "recipe_sha256": "3b1595c718dc1d6a436e01270fb01cf2b2f4ff59ca224682e24725a08d105ec4",
+      "generation": 3,
+      "parsed_trailers": "Tpatch-Feature: copilot-session-import\nTpatch-Patch-SHA: 09cb61d94051e31518518bbd7b76b2bd7501b6daadab32044b20c15c7ca7ac7b\nTpatch-Recipe-SHA: 3b1595c718dc1d6a436e01270fb01cf2b2f4ff59ca224682e24725a08d105ec4\nTpatch-Base-Commit: 0490e7bb2753ee455d58f9832f6ea943af81b0e0\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "trailers_exact": true,
+      "manifest_hashes_exact": true,
+      "landing_parents": [
+        "0490e7bb2753ee455d58f9832f6ea943af81b0e0"
+      ],
+      "base_is_exact_first_parent": true,
+      "parent_generations": [],
+      "canonical": {
+        "tree": "b1a6c60559f18fda9c0f9e6a77564e7fbe00db89",
+        "residual": [],
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/threads/ThreadDetailScreen.tsx b/apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts b/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/threadOutboxDelivery.ts b/apps/mobile/src/state/threadOutboxDelivery.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/use-thread-composer-state.ts b/apps/mobile/src/state/use-thread-composer-state.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts b/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProjectionStore.ts b/apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ThreadMessageIntake.ts b/apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionImporter.test.ts b/apps/server/src/project/AgentSessionImporter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionImporter.ts b/apps/server/src/project/AgentSessionImporter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.test.ts b/apps/server/src/project/AgentSessionScanner.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/ChatView.tsx b/apps/web/src/components/ChatView.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/onboarding/WelcomeWizard.tsx b/apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/welcome-wizard.md b/docs/user/welcome-wizard.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/models.ts b/packages/client-runtime/src/state/models.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/threadWorkflows.ts b/packages/client-runtime/src/state/threadWorkflows.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/agentSessions.ts b/packages/contracts/src/agentSessions.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "forward"
+          }
+        ],
+        "exact": true
+      },
+      "recipe": {
+        "tree": "b1a6c60559f18fda9c0f9e6a77564e7fbe00db89",
+        "residual": [],
+        "operations": [
+          {
+            "path": "apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/mobile/src/state/threadOutboxDelivery.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/mobile/src/state/use-thread-composer-state.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/Orchestrator.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionImporter.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionImporter.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/ChatView.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/user/providers-copilot.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/user/welcome-wizard.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/client-runtime/src/state/models.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/client-runtime/src/state/threadWorkflows.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/contracts/src/agentSessions.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/contracts/src/orchestrationV2.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "slug": "scanner-canonical-path-exclusion",
+      "landing": "d7ff2a45390df46ec7370ce2ea2ba39cc6af4783",
+      "base": "edaafaa1d0715000cb44acb06ea75a0058dbd5e4",
+      "patch_sha256": "fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879",
+      "recipe_sha256": "54c06a9fbb5bd8e7e9f2fc751364d292a9b055516b35c735a31b4e283c2a6115",
+      "generation": 1,
+      "parsed_trailers": "Tpatch-Feature: scanner-canonical-path-exclusion\nTpatch-Patch-SHA: fe2e123ba39f58bbd63585deb13eda1ae9218b65000450d4cf83962560f27879\nTpatch-Recipe-SHA: 54c06a9fbb5bd8e7e9f2fc751364d292a9b055516b35c735a31b4e283c2a6115\nTpatch-Base-Commit: edaafaa1d0715000cb44acb06ea75a0058dbd5e4\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "trailers_exact": true,
+      "manifest_hashes_exact": true,
+      "landing_parents": [
+        "edaafaa1d0715000cb44acb06ea75a0058dbd5e4"
+      ],
+      "base_is_exact_first_parent": true,
+      "parent_generations": [
+        {
+          "slug": "copilot-session-import",
+          "captured": null,
+          "current_generation": 3,
+          "patch_sha256": "09cb61d94051e31518518bbd7b76b2bd7501b6daadab32044b20c15c7ca7ac7b",
+          "recipe_sha256": "3b1595c718dc1d6a436e01270fb01cf2b2f4ff59ca224682e24725a08d105ec4",
+          "captured_exact": false,
+          "current_manifest_recipe_sha256": "3b1595c718dc1d6a436e01270fb01cf2b2f4ff59ca224682e24725a08d105ec4",
+          "captured_matches_parent_manifest": false,
+          "base_generation": 3,
+          "changed_between_recorded_base_and_target": false,
+          "changed_since_main": true
+        }
+      ],
+      "canonical": {
+        "tree": "a91b8b571821b48ee4197bf01471e574900e2e3f",
+        "residual": [],
+        "operations": [
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "forward"
+          }
+        ],
+        "exact": true
+      },
+      "recipe": {
+        "tree": "a91b8b571821b48ee4197bf01471e574900e2e3f",
+        "residual": [],
+        "operations": [
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "slug": "workspace-handoff-recovery",
+      "landing": "8c6c1e8badce2cb04cd253ab6d752ded6ed9faa2",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "patch_sha256": "63c60325d843cc661cd733936110b3abb6b600b7f9c231624ffbd93c2eedb95e",
+      "recipe_sha256": "49c9d885fc2caf5fbc039e529135a5333789f3b7efd8348c142a334c07dc5e48",
+      "generation": 2,
+      "parsed_trailers": "Tpatch-Feature: workspace-handoff-recovery\nTpatch-Patch-SHA: 63c60325d843cc661cd733936110b3abb6b600b7f9c231624ffbd93c2eedb95e\nTpatch-Recipe-SHA: 49c9d885fc2caf5fbc039e529135a5333789f3b7efd8348c142a334c07dc5e48\nTpatch-Base-Commit: 0490e7bb2753ee455d58f9832f6ea943af81b0e0\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "trailers_exact": true,
+      "manifest_hashes_exact": true,
+      "landing_parents": [
+        "0490e7bb2753ee455d58f9832f6ea943af81b0e0"
+      ],
+      "base_is_exact_first_parent": true,
+      "parent_generations": [],
+      "canonical": {
+        "tree": "1f6af2d7381a4ff679092ce702517b631b7454e0",
+        "residual": [],
+        "operations": [
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderSessionManager.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.test.ts b/apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/providers.md b/docs/internals/providers.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/source-control.md b/docs/user/source-control.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "forward"
+          }
+        ],
+        "exact": true
+      },
+      "recipe": {
+        "tree": "1f6af2d7381a4ff679092ce702517b631b7454e0",
+        "residual": [],
+        "operations": [
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/internals/providers.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/user/source-control.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-core/src/server/ProviderAdapter.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "slug": "copilot-native-ingress-supervision",
+      "landing": "0c550b84876fc1a74692dadb74c99aa9b46dcf99",
+      "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+      "patch_sha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+      "recipe_sha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+      "generation": 1,
+      "parsed_trailers": "Tpatch-Feature: copilot-native-ingress-supervision\nTpatch-Patch-SHA: 3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e\nTpatch-Recipe-SHA: 7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548\nTpatch-Base-Commit: 0490e7bb2753ee455d58f9832f6ea943af81b0e0\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "trailers_exact": true,
+      "manifest_hashes_exact": true,
+      "landing_parents": [
+        "0490e7bb2753ee455d58f9832f6ea943af81b0e0"
+      ],
+      "base_is_exact_first_parent": true,
+      "parent_generations": [
+        {
+          "slug": "copilot-idle-agent-completion",
+          "captured": {
+            "slug": "copilot-idle-agent-completion",
+            "kind": "hard",
+            "satisfied_by": "",
+            "parent_generation": 1,
+            "parent_patch_sha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+            "parent_recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3"
+          },
+          "current_generation": 1,
+          "patch_sha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+          "recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
+          "captured_exact": true,
+          "current_manifest_recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
+          "captured_matches_parent_manifest": true,
+          "base_generation": 1,
+          "changed_between_recorded_base_and_target": false,
+          "changed_since_main": false
+        },
+        {
+          "slug": "copilot-routing-late-telemetry",
+          "captured": {
+            "slug": "copilot-routing-late-telemetry",
+            "kind": "hard",
+            "satisfied_by": "",
+            "parent_generation": 1,
+            "parent_patch_sha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+            "parent_recipe_sha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df"
+          },
+          "current_generation": 1,
+          "patch_sha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+          "recipe_sha256": "d2ea728ea2927fa958e78ffff9414a9183a27d5cf44f879525c89a0995c4b4d5",
+          "captured_exact": false,
+          "current_manifest_recipe_sha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df",
+          "captured_matches_parent_manifest": true,
+          "base_generation": 1,
+          "changed_between_recorded_base_and_target": false,
+          "changed_since_main": false
+        },
+        {
+          "slug": "stable-main-preservation-v014",
+          "captured": {
+            "slug": "stable-main-preservation-v014",
+            "kind": "hard",
+            "satisfied_by": "",
+            "parent_generation": 1,
+            "parent_patch_sha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+            "parent_recipe_sha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f"
+          },
+          "current_generation": 1,
+          "patch_sha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+          "recipe_sha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f",
+          "captured_exact": true,
+          "current_manifest_recipe_sha256": "ba33677108acd6b1ec8835a9e91c909001709e83918882b95352799a2802ce6f",
+          "captured_matches_parent_manifest": true,
+          "base_generation": 1,
+          "changed_between_recorded_base_and_target": false,
+          "changed_since_main": false
+        }
+      ],
+      "canonical": {
+        "tree": "6979aa0306bb5369258a2f372f22e0c8865646c4",
+        "residual": [],
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ],
+        "exact": true
+      },
+      "recipe": {
+        "tree": "6979aa0306bb5369258a2f372f22e0c8865646c4",
+        "residual": [],
+        "operations": [
+          {
+            "path": "packages/provider-copilot/src/server/adapter.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "slug": "copilot-text-generation-failure-diagnostics",
+      "landing": "62c69bff27e982b23fd23754703e4c757dfeaae1",
+      "base": "83efed3d9cf01d911d7d77c0e987ede131c71d08",
+      "patch_sha256": "2110e4d6aa3151331938fa4a3b22fe5bcaf24f5baa72a751d55ced25a579379f",
+      "recipe_sha256": "449305587f19b6a7bc2190ffef87c35a2e0bcd4312c49b59208d2c8df3b2ad2e",
+      "generation": 1,
+      "parsed_trailers": "Tpatch-Feature: copilot-text-generation-failure-diagnostics\nTpatch-Patch-SHA: 2110e4d6aa3151331938fa4a3b22fe5bcaf24f5baa72a751d55ced25a579379f\nTpatch-Recipe-SHA: 449305587f19b6a7bc2190ffef87c35a2e0bcd4312c49b59208d2c8df3b2ad2e\nTpatch-Base-Commit: 83efed3d9cf01d911d7d77c0e987ede131c71d08\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "trailers_exact": true,
+      "manifest_hashes_exact": true,
+      "landing_parents": [
+        "83efed3d9cf01d911d7d77c0e987ede131c71d08"
+      ],
+      "base_is_exact_first_parent": true,
+      "parent_generations": [
+        {
+          "slug": "copilot-background-routing",
+          "captured": {
+            "slug": "copilot-background-routing",
+            "kind": "hard",
+            "satisfied_by": "",
+            "parent_generation": 1,
+            "parent_patch_sha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+            "parent_recipe_sha256": "d4aa6e25f3df994850c4d86fc97939c984ad2298d51c2c7b365972d01cc4bcb6"
+          },
+          "current_generation": 1,
+          "patch_sha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+          "recipe_sha256": "d4aa6e25f3df994850c4d86fc97939c984ad2298d51c2c7b365972d01cc4bcb6",
+          "captured_exact": true,
+          "current_manifest_recipe_sha256": "d4aa6e25f3df994850c4d86fc97939c984ad2298d51c2c7b365972d01cc4bcb6",
+          "captured_matches_parent_manifest": true,
+          "base_generation": 1,
+          "changed_between_recorded_base_and_target": false,
+          "changed_since_main": false
+        }
+      ],
+      "canonical": {
+        "tree": "b864b526abf4b9803eccfe5d9ad397244351b295",
+        "residual": [],
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "forward"
+          }
+        ],
+        "exact": true
+      },
+      "recipe": {
+        "tree": "b864b526abf4b9803eccfe5d9ad397244351b295",
+        "residual": [],
+        "operations": [
+          {
+            "path": "packages/provider-copilot/src/server/textGeneration.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/textGeneration.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "slug": "copilot-root-aborted-idle",
+      "landing": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+      "base": "3e6a6d4ee53d7f6c02109d5731df745cf997fd7c",
+      "patch_sha256": "2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963",
+      "recipe_sha256": "1397679380a80b9b583a88cd9437b2d017aa48a939be64ba06478aeccf0f7eb3",
+      "generation": 1,
+      "parsed_trailers": "Tpatch-Feature: copilot-root-aborted-idle\nTpatch-Patch-SHA: 2fd1866650a237cabdeb0c8563357ee9ff209bf05854070512337b9c9e936963\nTpatch-Recipe-SHA: 1397679380a80b9b583a88cd9437b2d017aa48a939be64ba06478aeccf0f7eb3\nTpatch-Base-Commit: 3e6a6d4ee53d7f6c02109d5731df745cf997fd7c\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\n",
+      "trailers_exact": true,
+      "manifest_hashes_exact": true,
+      "landing_parents": [
+        "3e6a6d4ee53d7f6c02109d5731df745cf997fd7c"
+      ],
+      "base_is_exact_first_parent": true,
+      "parent_generations": [
+        {
+          "slug": "copilot-idle-agent-completion",
+          "captured": {
+            "slug": "copilot-idle-agent-completion",
+            "kind": "hard",
+            "satisfied_by": "",
+            "parent_generation": 1,
+            "parent_patch_sha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+            "parent_recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3"
+          },
+          "current_generation": 1,
+          "patch_sha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+          "recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
+          "captured_exact": true,
+          "current_manifest_recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
+          "captured_matches_parent_manifest": true,
+          "base_generation": 1,
+          "changed_between_recorded_base_and_target": false,
+          "changed_since_main": false
+        },
+        {
+          "slug": "copilot-native-ingress-supervision",
+          "captured": {
+            "slug": "copilot-native-ingress-supervision",
+            "kind": "hard",
+            "satisfied_by": "",
+            "parent_generation": 1,
+            "parent_patch_sha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+            "parent_recipe_sha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548"
+          },
+          "current_generation": 1,
+          "patch_sha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+          "recipe_sha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+          "captured_exact": true,
+          "current_manifest_recipe_sha256": "7cb203dc135261bb063261c416a3338855ce8775f931ed2bd190e94e3bf8f548",
+          "captured_matches_parent_manifest": true,
+          "base_generation": 1,
+          "changed_between_recorded_base_and_target": false,
+          "changed_since_main": true
+        }
+      ],
+      "canonical": {
+        "tree": "d0d9cf1235e289cc527d2651f8c08bf7e2f1cee8",
+        "residual": [],
+        "operations": [
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ],
+        "exact": true
+      },
+      "recipe": {
+        "tree": "d0d9cf1235e289cc527d2651f8c08bf7e2f1cee8",
+        "residual": [],
+        "operations": [
+          {
+            "path": "docs/user/providers-copilot.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ],
+        "exact": true
+      }
+    }
+  ],
+  "composition": {
+    "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+    "target": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+    "method": "canonical",
+    "steps": [
+      {
+        "slug": "device-session-release",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx b/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DeviceControlsRail.tsx b/apps/web/src/components/device/DeviceControlsRail.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DevicePanel.tsx b/apps/web/src/components/device/DevicePanel.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DeviceWorkspace.tsx b/apps/web/src/components/device/DeviceWorkspace.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/devices.md b/docs/user/devices.md",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-session-import",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/threads/ThreadDetailScreen.tsx b/apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts b/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/threadOutboxDelivery.ts b/apps/mobile/src/state/threadOutboxDelivery.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/use-thread-composer-state.ts b/apps/mobile/src/state/use-thread-composer-state.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts b/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProjectionStore.ts b/apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ThreadMessageIntake.ts b/apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionImporter.test.ts b/apps/server/src/project/AgentSessionImporter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionImporter.ts b/apps/server/src/project/AgentSessionImporter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.test.ts b/apps/server/src/project/AgentSessionScanner.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/ChatView.tsx b/apps/web/src/components/ChatView.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/onboarding/WelcomeWizard.tsx b/apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/welcome-wizard.md b/docs/user/welcome-wizard.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/models.ts b/packages/client-runtime/src/state/models.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/threadWorkflows.ts b/packages/client-runtime/src/state/threadWorkflows.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/agentSessions.ts b/packages/contracts/src/agentSessions.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "scanner-canonical-path-exclusion",
+        "operations": [
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "workspace-handoff-recovery",
+        "operations": [
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderSessionManager.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.test.ts b/apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/providers.md b/docs/internals/providers.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/source-control.md b/docs/user/source-control.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-native-ingress-supervision",
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "boundary_commit": "83efed3d9c",
+        "operations": []
+      },
+      {
+        "slug": "copilot-text-generation-failure-diagnostics",
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-root-aborted-idle",
+        "operations": [
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      }
+    ],
+    "tree": "c273d9ac96a0229493eee0e484b3cec5c461f67d",
+    "residual": []
+  },
+  "recipe_composition": {
+    "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+    "target": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+    "method": "recipe",
+    "steps": [
+      {
+        "slug": "device-session-release",
+        "operations": [
+          {
+            "path": "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/device/DeviceControlsRail.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/device/DevicePanel.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/device/DeviceWorkspace.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/user/devices.md",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-session-import",
+        "operations": [
+          {
+            "path": "apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/mobile/src/state/threadOutboxDelivery.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/mobile/src/state/use-thread-composer-state.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/Orchestrator.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionImporter.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionImporter.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/ChatView.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/user/providers-copilot.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/user/welcome-wizard.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/client-runtime/src/state/models.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/client-runtime/src/state/threadWorkflows.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/contracts/src/agentSessions.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/contracts/src/orchestrationV2.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ]
+      },
+      {
+        "slug": "scanner-canonical-path-exclusion",
+        "operations": [
+          {
+            "path": "apps/server/src/project/AgentSessionScanner.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ]
+      },
+      {
+        "slug": "workspace-handoff-recovery",
+        "operations": [
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/internals/providers.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "docs/user/source-control.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-core/src/server/ProviderAdapter.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-native-ingress-supervision",
+        "operations": [
+          {
+            "path": "packages/provider-copilot/src/server/adapter.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ]
+      },
+      {
+        "boundary_commit": "83efed3d9c",
+        "operations": []
+      },
+      {
+        "slug": "copilot-text-generation-failure-diagnostics",
+        "operations": [
+          {
+            "path": "packages/provider-copilot/src/server/textGeneration.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/textGeneration.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-root-aborted-idle",
+        "operations": [
+          {
+            "path": "docs/user/providers-copilot.md",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.test.ts",
+            "type": "write-file",
+            "mode": "100644"
+          },
+          {
+            "path": "packages/provider-copilot/src/server/adapter.ts",
+            "type": "write-file",
+            "mode": "100644"
+          }
+        ]
+      }
+    ],
+    "tree": "c273d9ac96a0229493eee0e484b3cec5c461f67d",
+    "residual": []
+  },
+  "intended_patch_composition": {
+    "base": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+    "target": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+    "method": "canonical",
+    "steps": [
+      {
+        "intended_patch_sha256": "6817e90ec92168870f3bccea2c7e884529d06cbf823bb53ae33b819b839e9c2d",
+        "operations": [
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "device-session-release",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx b/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DeviceControlsRail.tsx b/apps/web/src/components/device/DeviceControlsRail.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DevicePanel.tsx b/apps/web/src/components/device/DevicePanel.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DeviceWorkspace.tsx b/apps/web/src/components/device/DeviceWorkspace.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/devices.md b/docs/user/devices.md",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-session-import",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/threads/ThreadDetailScreen.tsx b/apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts b/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/threadOutboxDelivery.ts b/apps/mobile/src/state/threadOutboxDelivery.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/use-thread-composer-state.ts b/apps/mobile/src/state/use-thread-composer-state.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts b/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProjectionStore.ts b/apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ThreadMessageIntake.ts b/apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionImporter.test.ts b/apps/server/src/project/AgentSessionImporter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionImporter.ts b/apps/server/src/project/AgentSessionImporter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.test.ts b/apps/server/src/project/AgentSessionScanner.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/ChatView.tsx b/apps/web/src/components/ChatView.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/onboarding/WelcomeWizard.tsx b/apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/welcome-wizard.md b/docs/user/welcome-wizard.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/models.ts b/packages/client-runtime/src/state/models.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/threadWorkflows.ts b/packages/client-runtime/src/state/threadWorkflows.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/agentSessions.ts b/packages/contracts/src/agentSessions.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "scanner-canonical-path-exclusion",
+        "operations": [
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "workspace-handoff-recovery",
+        "operations": [
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderSessionManager.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.test.ts b/apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/providers.md b/docs/internals/providers.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/source-control.md b/docs/user/source-control.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-native-ingress-supervision",
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "boundary_commit": "83efed3d9c",
+        "operations": []
+      },
+      {
+        "slug": "copilot-text-generation-failure-diagnostics",
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "forward"
+          }
+        ]
+      }
+    ],
+    "tree": "c273d9ac96a0229493eee0e484b3cec5c461f67d",
+    "residual": []
+  },
+  "upstream_composition": {
+    "base": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+    "target": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+    "steps": [
+      {
+        "slug": "copilot-cli-provider",
+        "patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
+        "operations": [
+          {
+            "section": "a/apps/server/package.json b/apps/server/package.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/provider/builtInDrivers.ts b/apps/server/src/provider/builtInDrivers.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/serverSettings.test.ts b/apps/server/src/serverSettings.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/serverSettings.ts b/apps/server/src/serverSettings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/providers.md b/docs/internals/providers.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/package.json b/packages/client-runtime/package.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/providerClients.ts b/packages/client-runtime/src/providerClients.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/package.json b/packages/provider-copilot/package.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/client.ts b/packages/provider-copilot/src/client.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server.ts b/packages/provider-copilot/src/server.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/capabilities.ts b/packages/provider-copilot/src/server/capabilities.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/driver.test.ts b/packages/provider-copilot/src/server/driver.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/driver.ts b/packages/provider-copilot/src/server/driver.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/tools.ts b/packages/provider-copilot/src/server/tools.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/testing.ts b/packages/provider-copilot/src/testing.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/tsconfig.json b/packages/provider-copilot/tsconfig.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/pnpm-lock.yaml b/pnpm-lock.yaml",
+            "result": "forward"
+          },
+          {
+            "section": "a/pnpm-workspace.yaml b/pnpm-workspace.yaml",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "session-search",
+        "patch_sha256": "e98b6ddf7a85432e3adb7ce5bb29ffc4cfae0a2d196c6239bd7d893955f20019",
+        "operations": [
+          {
+            "section": "a/apps/server/src/orchestration-v2/ThreadFind.test.ts b/apps/server/src/orchestration-v2/ThreadFind.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ThreadFind.ts b/apps/server/src/orchestration-v2/ThreadFind.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/MessagesTimeline.logic.ts b/apps/web/src/components/chat/MessagesTimeline.logic.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/MessagesTimeline.tsx b/apps/web/src/components/chat/MessagesTimeline.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx b/apps/web/src/components/chat/ThreadFindBar.browser.test.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/ThreadFindBar.tsx b/apps/web/src/components/chat/ThreadFindBar.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx b/apps/web/src/components/chat/TimelinePendingApprovalRow.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/TimelineWorkGroupRows.tsx b/apps/web/src/components/chat/TimelineWorkGroupRows.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/threadFindHighlights.browser.test.tsx b/apps/web/src/components/chat/threadFindHighlights.browser.test.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/threadFindHighlights.ts b/apps/web/src/components/chat/threadFindHighlights.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/threadFindPosition.ts b/apps/web/src/components/chat/threadFindPosition.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/timelineRowContext.ts b/apps/web/src/components/chat/timelineRowContext.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/useThreadFind.ts b/apps/web/src/components/chat/useThreadFind.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/useThreadFindNavigation.ts b/apps/web/src/components/chat/useThreadFindNavigation.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/useThreadFindPositionReader.ts b/apps/web/src/components/chat/useThreadFindPositionReader.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/thread-find.md b/docs/internals/thread-find.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/keybindings.md b/docs/user/keybindings.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/threadFindText.ts b/packages/shared/src/threadFindText.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/threadSearch.test.ts b/packages/shared/src/threadSearch.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/threadSearch.ts b/packages/shared/src/threadSearch.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-sdk-license-notice",
+        "patch_sha256": "d6be21044ffda12ef416021400bfc83a1c1dc6aa0f2f832c772e8e21e56d9a56",
+        "operations": [
+          {
+            "section": "a/third-party-licenses.config.json b/third-party-licenses.config.json",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-runtime-packaging-replay",
+        "patch_sha256": "097951c0d3a4fc2cb3948e24ea0f4b9d6890d665866f83f6b5317ac030e0d7ce",
+        "operations": [
+          {
+            "section": "a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/app/DesktopClerk.test.ts b/apps/desktop/src/app/DesktopClerk.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/app/DesktopClerk.ts b/apps/desktop/src/app/DesktopClerk.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/app/DesktopConfig.ts b/apps/desktop/src/app/DesktopConfig.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/app/DesktopEnvironment.ts b/apps/desktop/src/app/DesktopEnvironment.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts b/apps/desktop/src/app/DesktopLegacyLocalStorage.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/app/DesktopLegacyLocalStorage.ts b/apps/desktop/src/app/DesktopLegacyLocalStorage.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/app/DesktopUserData.test.ts b/apps/desktop/src/app/DesktopUserData.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/app/DesktopUserData.ts b/apps/desktop/src/app/DesktopUserData.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/backend/DesktopBackendConfiguration.test.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/backend/DesktopBackendConfiguration.ts b/apps/desktop/src/backend/DesktopBackendConfiguration.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/desktop/src/wsl/DesktopWslEnvironment.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/operations/fork-native-preview.md b/docs/operations/fork-native-preview.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/operations/release.md b/docs/operations/release.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/package.json b/packages/shared/package.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/copilotRuntime.test.ts b/packages/shared/src/copilotRuntime.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/copilotRuntime.ts b/packages/shared/src/copilotRuntime.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/build-cli-archive.ts b/scripts/build-cli-archive.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/fork-preview-bootstrap.cjs b/scripts/fork-preview-bootstrap.cjs",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/fork-preview-manifest.mjs b/scripts/fork-preview-manifest.mjs",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/cli-external-packages.test.ts b/scripts/lib/cli-external-packages.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/cli-external-packages.ts b/scripts/lib/cli-external-packages.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/copilot-payload.ts b/scripts/lib/copilot-payload.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/fork-preview.test.ts b/scripts/lib/fork-preview.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/fork-preview.ts b/scripts/lib/fork-preview.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/runtime-external-dependencies.test.ts b/scripts/lib/runtime-external-dependencies.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/runtime-external-dependencies.ts b/scripts/lib/runtime-external-dependencies.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "phase1-foundation",
+        "patch_sha256": "0ff017d936d51ba53c48b2c91eb8d250ee47c932c4d194c71fccb0733b6f043c",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/state/attention.ts b/apps/mobile/src/state/attention.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/tws.ts b/apps/mobile/src/state/tws.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/auth/RpcAuthorization.ts b/apps/server/src/auth/RpcAuthorization.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/environment/ServerEnvironment.ts b/apps/server/src/environment/ServerEnvironment.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/observability/RpcInstrumentation.ts b/apps/server/src/observability/RpcInstrumentation.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/AttentionEvidence.ts b/apps/server/src/orchestration-v2/AttentionEvidence.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/AttentionSync.ts b/apps/server/src/orchestration-v2/AttentionSync.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/EffectWorker.test.ts b/apps/server/src/orchestration-v2/EffectWorker.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/EffectWorker.ts b/apps/server/src/orchestration-v2/EffectWorker.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/EventSink.ts b/apps/server/src/orchestration-v2/EventSink.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/FoundationProjection.test.ts b/apps/server/src/orchestration-v2/FoundationProjection.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/FoundationProjection.ts b/apps/server/src/orchestration-v2/FoundationProjection.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProjectionMaintenance.ts b/apps/server/src/orchestration-v2/ProjectionMaintenance.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations.test.ts b/apps/server/src/persistence/ForkMigrations.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations.ts b/apps/server/src/persistence/ForkMigrations.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.test.ts b/apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.ts b/apps/server/src/persistence/ForkMigrations/044_ProjectionThreadAttentionAudit.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/045_TwsBindings.test.ts b/apps/server/src/persistence/ForkMigrations/045_TwsBindings.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/045_TwsBindings.ts b/apps/server/src/persistence/ForkMigrations/045_TwsBindings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/ForkMigrations/046_ProjectionThreadAttentionCurrent.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts b/apps/server/src/persistence/ForkMigrations/047_ProjectionThreadAwareness.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts b/apps/server/src/persistence/ForkMigrations/048_AttentionDelivery.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/049_TwsContext.ts b/apps/server/src/persistence/ForkMigrations/049_TwsContext.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/ForkMigrations/050_FoundationV2.ts b/apps/server/src/persistence/ForkMigrations/050_FoundationV2.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionAudit.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Layers/ProjectionThreadAttentionCurrent.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Layers/TwsBindings.test.ts b/apps/server/src/persistence/Layers/TwsBindings.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Layers/TwsBindings.ts b/apps/server/src/persistence/Layers/TwsBindings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Migrations.test.ts b/apps/server/src/persistence/Migrations.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Migrations.ts b/apps/server/src/persistence/Migrations.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/OrchestrationEventStore.ts b/apps/server/src/persistence/OrchestrationEventStore.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Services/ProjectionThreadAttentionAudit.ts b/apps/server/src/persistence/Services/ProjectionThreadAttentionAudit.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts b/apps/server/src/persistence/Services/ProjectionThreadAttentionCurrent.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/persistence/Services/TwsBindings.ts b/apps/server/src/persistence/Services/TwsBindings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/server.ts b/apps/server/src/server.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/serverRuntimeStartup.autoPull.test.ts b/apps/server/src/serverRuntimeStartup.autoPull.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/serverRuntimeStartup.test.ts b/apps/server/src/serverRuntimeStartup.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/serverRuntimeStartup.ts b/apps/server/src/serverRuntimeStartup.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsBindingMatch.test.ts b/apps/server/src/tws/TwsBindingMatch.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsBindingMatch.ts b/apps/server/src/tws/TwsBindingMatch.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsCliAdapter.test.ts b/apps/server/src/tws/TwsCliAdapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsCliAdapter.ts b/apps/server/src/tws/TwsCliAdapter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsCliDecoder.test.ts b/apps/server/src/tws/TwsCliDecoder.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsCliDecoder.ts b/apps/server/src/tws/TwsCliDecoder.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsContextInference.ts b/apps/server/src/tws/TwsContextInference.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsContextModel.ts b/apps/server/src/tws/TwsContextModel.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsContextService.test.ts b/apps/server/src/tws/TwsContextService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsContextService.ts b/apps/server/src/tws/TwsContextService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsContextStore.ts b/apps/server/src/tws/TwsContextStore.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsExecutionResolver.ts b/apps/server/src/tws/TwsExecutionResolver.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsTopology.test.ts b/apps/server/src/tws/TwsTopology.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsTopology.ts b/apps/server/src/tws/TwsTopology.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsTopologyRefresh.ts b/apps/server/src/tws/TwsTopologyRefresh.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/runtimeLayer.ts b/apps/server/src/tws/runtimeLayer.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/ws.test.ts b/apps/server/src/ws.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/ws.ts b/apps/server/src/ws.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/settings/TwsIntegrationSettings.tsx b/apps/web/src/components/settings/TwsIntegrationSettings.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/settings/WorktreesSettings.tsx b/apps/web/src/components/settings/WorktreesSettings.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/settings/settingsSearch.ts b/apps/web/src/components/settings/settingsSearch.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/state/attention.ts b/apps/web/src/state/attention.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/state/tws.ts b/apps/web/src/state/tws.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/foundation.md b/docs/internals/foundation.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/tws-context.md b/docs/internals/tws-context.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/tws.md b/docs/user/tws.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/package.json b/packages/client-runtime/package.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/attentionSync.test.ts b/packages/client-runtime/src/attentionSync.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/attentionSync.ts b/packages/client-runtime/src/attentionSync.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/rpc/client.ts b/packages/client-runtime/src/rpc/client.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/attention.test.ts b/packages/client-runtime/src/state/attention.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/attention.ts b/packages/client-runtime/src/state/attention.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/attentionNotifications.test.ts b/packages/client-runtime/src/state/attentionNotifications.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/attentionNotifications.ts b/packages/client-runtime/src/state/attentionNotifications.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/attentionProjection.ts b/packages/client-runtime/src/state/attentionProjection.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/tws.ts b/packages/client-runtime/src/state/tws.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/attention.test.ts b/packages/contracts/src/attention.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/attention.ts b/packages/contracts/src/attention.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/attentionSync.test.ts b/packages/contracts/src/attentionSync.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/attentionSync.ts b/packages/contracts/src/attentionSync.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/clientRpcPermissions.ts b/packages/contracts/src/clientRpcPermissions.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/environment.ts b/packages/contracts/src/environment.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/rpc.ts b/packages/contracts/src/rpc.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/twsBindings.test.ts b/packages/contracts/src/twsBindings.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/twsBindings.ts b/packages/contracts/src/twsBindings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/twsContext.test.ts b/packages/contracts/src/twsContext.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/twsContext.ts b/packages/contracts/src/twsContext.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/workItem.test.ts b/packages/contracts/src/workItem.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/workItem.ts b/packages/contracts/src/workItem.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "attention-notifications",
+        "patch_sha256": "6feb99da51a9427557a215cfcfcde7a8b8f7de07489c01d724556f2876e860d1",
+        "operations": [
+          {
+            "section": "a/apps/web/src/attentionNotificationPolicy.test.ts b/apps/web/src/attentionNotificationPolicy.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/attentionNotificationPolicy.ts b/apps/web/src/attentionNotificationPolicy.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/AppSidebarLayout.tsx b/apps/web/src/components/AppSidebarLayout.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/CommandPalette.tsx b/apps/web/src/components/CommandPalette.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts b/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/ThreadNotificationCoordinator.tsx b/apps/web/src/components/ThreadNotificationCoordinator.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/attention/AttentionInbox.tsx b/apps/web/src/components/attention/AttentionInbox.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/attention/AttentionSidebarItem.tsx b/apps/web/src/components/attention/AttentionSidebarItem.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx b/apps/web/src/components/attention/AttentionWorkspaceRetention.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/attention/attentionInbox.logic.test.ts b/apps/web/src/components/attention/attentionInbox.logic.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/attention/attentionInbox.logic.ts b/apps/web/src/components/attention/attentionInbox.logic.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/attention/useOpenAttentionInbox.ts b/apps/web/src/components/attention/useOpenAttentionInbox.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/settings/NotificationSettings.tsx b/apps/web/src/components/settings/NotificationSettings.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/settings/SettingsPanels.tsx b/apps/web/src/components/settings/SettingsPanels.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/settings/settingsSearch.ts b/apps/web/src/components/settings/settingsSearch.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/sidebar/SidebarChrome.tsx b/apps/web/src/components/sidebar/SidebarChrome.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/routeTree.gen.ts b/apps/web/src/routeTree.gen.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/routes/_chat.attention.tsx b/apps/web/src/routes/_chat.attention.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/threadNotifications.test.ts b/apps/web/src/threadNotifications.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/threadNotifications.ts b/apps/web/src/threadNotifications.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/attention-notifications.md b/docs/internals/attention-notifications.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/overview.md b/docs/internals/overview.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/attention.md b/docs/user/attention.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/keybindings.md b/docs/user/keybindings.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/notifications.md b/docs/user/notifications.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/thread-sidebar.md b/docs/user/thread-sidebar.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/keybindings.ts b/packages/contracts/src/keybindings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/settings.test.ts b/packages/contracts/src/settings.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "tpatch-local-capture-ignore",
+        "patch_sha256": "2534669ad7e0a2e7fe801555eab601a73bba3a5a6a4a52ff109b13e03f65e729",
+        "operations": [
+          {
+            "section": "a/.gitignore b/.gitignore",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "fork-maintenance-policy",
+        "patch_sha256": "fba7028e530ab08be19b311c57a0d89f8ef1aefc4a1c7cbe7bec5ba5e4c12368",
+        "operations": [
+          {
+            "section": "a/docs/internals/fork-maintenance.md b/docs/internals/fork-maintenance.md",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "fork-maintenance-check-scope",
+        "patch_sha256": "dc0acca276a3999c02e1da071d3b01fad31b1c931bb02f5b2407cde5386011a4",
+        "operations": [
+          {
+            "section": "a/.github/scripts/ci-changes.cjs b/.github/scripts/ci-changes.cjs",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/ci-changes.test.ts b/scripts/lib/ci-changes.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/vite.config.ts b/vite.config.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "foundation-v014-client-compat",
+        "patch_sha256": "9ac66594f926d0d35387331473d86d5e8059f00edbef5b773b46daf5084609a4",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/state/attention.ts b/apps/mobile/src/state/attention.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/tws.ts b/apps/mobile/src/state/tws.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/tws/TwsCliDecoder.ts b/apps/server/src/tws/TwsCliDecoder.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/tws-context.md b/docs/internals/tws-context.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/attention.test.ts b/packages/client-runtime/src/state/attention.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/attention.ts b/packages/client-runtime/src/state/attention.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "attention-policy-completion-watermarks",
+        "patch_sha256": "c93803f59c055124c2c58954dea3b2a92891d891a7e12e65c5c235cdf40b1369",
+        "operations": [
+          {
+            "section": "a/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts b/apps/web/src/components/ThreadNotificationCoordinator.badge.browser.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/ThreadNotificationCoordinator.logic.ts b/apps/web/src/components/ThreadNotificationCoordinator.logic.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/ThreadNotificationCoordinator.tsx b/apps/web/src/components/ThreadNotificationCoordinator.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/attention-notifications.md b/docs/internals/attention-notifications.md",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-sdk-runtime-upgrade",
+        "patch_sha256": "eda78ddc6f2accf4361917521a3f920c815bb01320a2504c9b25a005a1fb78bc",
+        "operations": [
+          {
+            "section": "a/apps/server/package.json b/apps/server/package.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/package.json b/packages/provider-copilot/package.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/tools.ts b/packages/provider-copilot/src/server/tools.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/copilotRuntime.test.ts b/packages/shared/src/copilotRuntime.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/copilotRuntime.ts b/packages/shared/src/copilotRuntime.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/pnpm-lock.yaml b/pnpm-lock.yaml",
+            "result": "forward"
+          },
+          {
+            "section": "a/pnpm-workspace.yaml b/pnpm-workspace.yaml",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/build-desktop-artifact.ts b/scripts/build-desktop-artifact.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/cli-external-packages.test.ts b/scripts/lib/cli-external-packages.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/scripts/lib/copilot-payload.ts b/scripts/lib/copilot-payload.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-sdk-v1-license-notices",
+        "patch_sha256": "65933499a1fe2a21bed526161e9333733a571ef59a61db46490c51a1212a9cb2",
+        "operations": [
+          {
+            "section": "a/scripts/lib/third-party-licenses.test.ts b/scripts/lib/third-party-licenses.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/third-party-licenses.config.json b/third-party-licenses.config.json",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-fusion-model-selection",
+        "patch_sha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx b/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx b/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/features/threads/thread-settings-options.test.ts b/apps/mobile/src/features/threads/thread-settings-options.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/lib/providerOptions.ts b/apps/mobile/src/lib/providerOptions.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/lib/threadActivity.ts b/apps/mobile/src/lib/threadActivity.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts b/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderEventIngestor.ts b/apps/server/src/orchestration-v2/ProviderEventIngestor.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/TraitsPicker.tsx b/apps/web/src/components/chat/TraitsPicker.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/session-logic.ts b/apps/web/src/session-logic.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/activity-log.md b/docs/user/activity-log.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/package.json b/packages/client-runtime/package.json",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/modelTraits.ts b/packages/client-runtime/src/modelTraits.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/work-log/itemDetail.test.ts b/packages/client-runtime/src/work-log/itemDetail.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/work-log/itemDetail.ts b/packages/client-runtime/src/work-log/itemDetail.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/model.ts b/packages/contracts/src/model.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.test.ts b/packages/contracts/src/orchestrationV2.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/fusion.test.ts b/packages/provider-copilot/src/server/fusion.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/fusion.ts b/packages/provider-copilot/src/server/fusion.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/model.test.ts b/packages/shared/src/model.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/model.ts b/packages/shared/src/model.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-auto-default-routing",
+        "patch_sha256": "08fb073397bbcf694f48141c4345d6376caff996ab489ae88b58483f711c8e2a",
+        "operations": [
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-routing-late-telemetry",
+        "patch_sha256": "bd69a2b0332420f3b4f33cd639f2cd4383847b06df93fb2fba98dd6fa6920aa7",
+        "operations": [
+          {
+            "section": "a/docs/user/activity-log.md b/docs/user/activity-log.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/fusion.test.ts b/packages/provider-copilot/src/server/fusion.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/fusion.ts b/packages/provider-copilot/src/server/fusion.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-fusion-client-presentation",
+        "patch_sha256": "1200ced90fd0e8fedeb4b3c8a5dd94de8b47e2e9d48170e2687c3bece46b4b8f",
+        "operations": [
+          {
+            "section": "a/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts b/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/TurnItemPositionStore.ts b/apps/server/src/orchestration-v2/TurnItemPositionStore.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/activity-log.md b/docs/user/activity-log.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/modelTraits.test.ts b/packages/client-runtime/src/modelTraits.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/model.ts b/packages/contracts/src/model.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/model.test.ts b/packages/shared/src/model.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/shared/src/model.ts b/packages/shared/src/model.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "windows-preview-zip-artifact",
+        "patch_sha256": "3935397e093aa88b0361399991329857942a3bad8aa9e52d3ed33c62bde061a1",
+        "operations": [
+          {
+            "section": "a/.github/workflows/fork-native-preview.yml b/.github/workflows/fork-native-preview.yml",
+            "result": "already-present-strict-reverse"
+          }
+        ]
+      },
+      {
+        "slug": "linux-runtime-libatomic-prerequisite",
+        "patch_sha256": "23a17244dee8af51e9eb9f6a5704688c08352fa83b70a8704deb486fe22b30a6",
+        "operations": [
+          {
+            "section": "a/docs/operations/fork-native-preview.md b/docs/operations/fork-native-preview.md",
+            "result": "already-present-strict-reverse"
+          },
+          {
+            "section": "a/docs/user/install.md b/docs/user/install.md",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-fusion-runtime-transition",
+        "patch_sha256": "faa9f5dc40c9044ce53aff0f03303d24d1bbec95b51b591405ad8bb35ff532d8",
+        "operations": [
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-idle-agent-completion",
+        "patch_sha256": "23dbd4238ab60bd84d8753785f9c237859e4d7af7d0cd999b0f2c28f83c86412",
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-background-routing",
+        "patch_sha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
+        "operations": [
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-context-occupancy",
+        "patch_sha256": "7fe62a01cbd83a1ec1f97964d78e917664e728ab97e410cd54e12dd17a4b82aa",
+        "operations": [
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts b/apps/server/src/orchestration-v2/testkit/ProviderSwitch.integration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-extension-opt-out",
+        "patch_sha256": "cee87244cb829ee3a7cfd9704dc979616f68d29bce090490191ea5d53a03ffac",
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "provider-direct-dispatch-selection-restart",
+        "patch_sha256": "a31c6244ea7b13ce27cbb685cb67834306bb7ccd76e37e0a8a15c5ba66b55664",
+        "operations": [
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "composer-shortcut-keyboard-guidance",
+        "patch_sha256": "8d7c2a6b3db67c74319da7a51c3685d6b72db3d6b14ff9737b7f9cc6e6d8bee6",
+        "operations": [
+          {
+            "section": "a/docs/user/keybindings.md b/docs/user/keybindings.md",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-runtime-knip-declaration",
+        "patch_sha256": "626513e72e70b3d6b0c938e1489c648a6f5a87acd4772dc9404ea4891a3c0a7c",
+        "operations": [
+          {
+            "section": "a/knip.jsonc b/knip.jsonc",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "turn-fold-bottom-affordance",
+        "patch_sha256": "34f0e6dfa0c5bfa44a7a9057953051d604acd22c96ac7d9ccda619dc45c6afaf",
+        "operations": [
+          {
+            "section": "a/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx b/apps/web/src/components/chat/MessagesTimeline.browser.test.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/MessagesTimeline.logic.ts b/apps/web/src/components/chat/MessagesTimeline.logic.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/MessagesTimeline.tsx b/apps/web/src/components/chat/MessagesTimeline.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/timelineRowContext.ts b/apps/web/src/components/chat/timelineRowContext.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "fork-patch-flow-convention",
+        "patch_sha256": "3f0b49bc0d03de3d9779dba837a6daf6d01a687eefdf041e768b6068ee3f928f",
+        "operations": [
+          {
+            "section": "a/docs/internals/fork-maintenance.md b/docs/internals/fork-maintenance.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/operations/patch-flow.md b/docs/operations/patch-flow.md",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "stable-main-preservation-v014",
+        "patch_sha256": "d5858c4eecd5a55c1659b007e3710227bf9d5f129adc841387b55e0786734e09",
+        "operations": [
+          {
+            "section": "a/README.md b/README.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/auth/RpcAuthorization.test.ts b/apps/server/src/auth/RpcAuthorization.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/auth/RpcAuthorization.ts b/apps/server/src/auth/RpcAuthorization.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/observability/RpcInstrumentation.ts b/apps/server/src/observability/RpcInstrumentation.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/provider/ProviderRegistry.test.ts b/apps/server/src/provider/ProviderRegistry.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/provider/ProviderRegistry.ts b/apps/server/src/provider/ProviderRegistry.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/provider/providerMaintenanceRunner.test.ts b/apps/server/src/provider/providerMaintenanceRunner.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/provider/testUtils/providerRegistryMock.ts b/apps/server/src/provider/testUtils/providerRegistryMock.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/serverSettings.test.ts b/apps/server/src/serverSettings.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/ws.ts b/apps/server/src/ws.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/chat/composerProviderState.tsx b/apps/web/src/components/chat/composerProviderState.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/index.css b/apps/web/src/index.css",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/commandPermissions.test.ts b/packages/client-runtime/src/state/commandPermissions.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/clientRpcPermissions.ts b/packages/contracts/src/clientRpcPermissions.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/rpc.ts b/packages/contracts/src/rpc.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/server.ts b/packages/contracts/src/server.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/driver.ts b/packages/provider-copilot/src/server/driver.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-core/src/server/driver.ts b/packages/provider-core/src/server/driver.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-native-ingress-supervision",
+        "patch_sha256": "3c116cf3950f360ba73a701da872a3c0120a207f5bbee0875713f39095b1829e",
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "device-session-release",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx b/apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DeviceControlsRail.tsx b/apps/web/src/components/device/DeviceControlsRail.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DevicePanel.tsx b/apps/web/src/components/device/DevicePanel.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/device/DeviceWorkspace.tsx b/apps/web/src/components/device/DeviceWorkspace.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/devices.md b/docs/user/devices.md",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-session-import",
+        "operations": [
+          {
+            "section": "a/apps/mobile/src/features/threads/ThreadDetailScreen.tsx b/apps/mobile/src/features/threads/ThreadDetailScreen.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts b/apps/mobile/src/state/threadOutboxDelivery.permissions.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/threadOutboxDelivery.ts b/apps/mobile/src/state/threadOutboxDelivery.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/mobile/src/state/use-thread-composer-state.ts b/apps/mobile/src/state/use-thread-composer-state.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts b/apps/server/src/orchestration-v2/Orchestrator.control-reads.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/Orchestrator.ts b/apps/server/src/orchestration-v2/Orchestrator.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProjectionStore.ts b/apps/server/src/orchestration-v2/ProjectionStore.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ThreadMessageIntake.ts b/apps/server/src/orchestration-v2/ThreadMessageIntake.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionImporter.test.ts b/apps/server/src/project/AgentSessionImporter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionImporter.ts b/apps/server/src/project/AgentSessionImporter.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.test.ts b/apps/server/src/project/AgentSessionScanner.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/ChatView.tsx b/apps/web/src/components/ChatView.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/web/src/components/onboarding/WelcomeWizard.tsx b/apps/web/src/components/onboarding/WelcomeWizard.tsx",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/welcome-wizard.md b/docs/user/welcome-wizard.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/models.ts b/packages/client-runtime/src/state/models.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/client-runtime/src/state/threadWorkflows.ts b/packages/client-runtime/src/state/threadWorkflows.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/agentSessions.ts b/packages/contracts/src/agentSessions.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "scanner-canonical-path-exclusion",
+        "operations": [
+          {
+            "section": "a/apps/server/src/project/AgentSessionScanner.ts b/apps/server/src/project/AgentSessionScanner.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "workspace-handoff-recovery",
+        "operations": [
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderSessionManager.ts b/apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/ProviderTurnStartService.ts b/apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.test.ts b/apps/server/src/orchestration-v2/RunExecutionService.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts b/apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/internals/providers.md b/docs/internals/providers.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/docs/user/source-control.md b/docs/user/source-control.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-core/src/server/ProviderAdapter.ts b/packages/provider-core/src/server/ProviderAdapter.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "boundary_commit": "83efed3d9c",
+        "operations": []
+      },
+      {
+        "slug": "copilot-text-generation-failure-diagnostics",
+        "operations": [
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts",
+            "result": "forward"
+          }
+        ]
+      },
+      {
+        "slug": "copilot-root-aborted-idle",
+        "operations": [
+          {
+            "section": "a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts",
+            "result": "forward"
+          },
+          {
+            "section": "a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts",
+            "result": "forward"
+          }
+        ]
+      }
+    ],
+    "tree": "911b40e7c56c356a0fbd889d81e061569b1d238e",
+    "residual": []
+  }
+}

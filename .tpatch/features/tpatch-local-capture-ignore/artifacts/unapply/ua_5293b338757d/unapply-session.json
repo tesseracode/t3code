@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "feature": "tpatch-local-capture-ignore",
+  "attempt_id": "ua_5293b338757d",
+  "attempted_at": "2026-10-29T07:21:29Z",
+  "mode": "patch",
+  "actor": "jdbencardinop@unal.edu.co",
+  "previous_state": "applied",
+  "result": "unapplied",
+  "canonical_patch_sha256": "4a98d535ab2c50cb167472648dd0146dd36ec741585793d8a84389eda6b743f4",
+  "reverse_patch": "artifacts/unapply/ua_5293b338757d/reverse.patch",
+  "touched_paths": [
+    ".gitignore"
+  ],
+  "dependency_blockers": [],
+  "preflight": {
+    "clean_tree": true,
+    "conflict_markers": [],
+    "leftovers": []
+  }
+}

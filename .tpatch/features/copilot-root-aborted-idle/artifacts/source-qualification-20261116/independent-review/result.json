@@ -1,0 +1,65 @@
+{
+  "candidate": "cf9ef8999bb82d52c622bacdb8441170b8398301",
+  "frozen_main": "0490e7bb2753ee455d58f9832f6ea943af81b0e0",
+  "pinned_upstream": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "product_code_findings": [],
+  "provenance_findings": [
+    {
+      "priority": "P2",
+      "file": ".tpatch/features/copilot-native-ingress-supervision/artifacts/patch-generations.json",
+      "title": "Inherited parent recipe checksum does not match committed recipe bytes",
+      "parent": "copilot-routing-late-telemetry",
+      "captured_and_parent_manifest_recipe_sha256": "41f9ee538b7ad9245515ad32dd59a15ad3391592e0bd4e173cc709d3bb95a3df",
+      "actual_and_parent_landing_recipe_sha256": "d2ea728ea2927fa958e78ffff9414a9183a27d5cf44f879525c89a0995c4b4d5",
+      "inherited_from_frozen_main": true,
+      "product_replay_failure": false
+    },
+    {
+      "priority": "P3",
+      "file": ".tpatch/features/scanner-canonical-path-exclusion/artifacts/patch-generations.json",
+      "title": "Declared hard import dependency is missing from recorded generation snapshot",
+      "parent": "copilot-session-import",
+      "parent_generation_changed_since_recorded_base": false,
+      "parent_bytes_changed_since_recorded_base": false,
+      "product_replay_failure": false
+    }
+  ],
+  "candidate_roots_checked": 7,
+  "candidate_own_trailers_and_hashes_exact": true,
+  "candidate_bases_are_exact_single_landing_parents": true,
+  "canonical_and_recipe_per_landing_exact": true,
+  "canonical_composition_from_frozen_main_exact": true,
+  "recipe_composition_from_frozen_main_exact": true,
+  "intended_local_patch_plus_other_roots_exact": true,
+  "canonical_composition_from_pinned_upstream_exact": true,
+  "file_modes_compared": true,
+  "excluded_paths": [".tpatch administrative metadata only"],
+  "product_residual_paths": [],
+  "changed_parent_generations_since_each_recorded_base": [],
+  "independent_mocked_provider_tests": {
+    "command": "./node_modules/.bin/vp test run packages/provider-copilot/src/server/adapter.test.ts packages/provider-copilot/src/server/textGeneration.test.ts",
+    "passed_files": 2,
+    "passed_tests": 44
+  },
+  "native_verification": {
+    "passed": [
+      "device-session-release",
+      "copilot-session-import",
+      "scanner-canonical-path-exclusion",
+      "workspace-handoff-recovery"
+    ],
+    "failed": [
+      "copilot-native-ingress-supervision",
+      "copilot-text-generation-failure-diagnostics",
+      "copilot-root-aborted-idle"
+    ],
+    "failure": "parent-landing-drift",
+    "parent": "copilot-cli-provider",
+    "historical_landing": "132c85398c55a623f9cf72dfecff884da6554abc",
+    "failed_native_checks_reclassified_as_pass": false
+  },
+  "review": "review.md",
+  "independent_proof": "replay.json",
+  "independent_procedure": "replay.py",
+  "promotion_or_runtime_qualification_authorized": false
+}

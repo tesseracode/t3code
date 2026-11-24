@@ -1,0 +1,53 @@
+{
+  "slug": "fork-maintenance-policy",
+  "title": "Document the approved fork integration, feature, reconciliation and candidate-release branch targets, exact replay accounting, and visual/behavioral reviewer gates. Preserve upstream defaults and require explicit production promotion.",
+  "outcome": "reapplied",
+  "phase": "phase-4-forward-apply-strict",
+  "upstream_ref": "v0.1.4",
+  "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+  "notes": [
+    "Patch applies cleanly (strict) — safe to auto-apply"
+  ],
+  "evidence": [
+    {
+      "schema_version": 1,
+      "feature_slug": "fork-maintenance-policy",
+      "attempt_id": "re_7dd447a8574c",
+      "upstream_ref": "v0.1.4",
+      "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+      "base_commit": "f595ef56ebb18ccb6a1ddacdd862b9de97e3fb5e",
+      "raw_reconcile_verdict": "reapplied",
+      "phase": "phase-4",
+      "evidence_kind": "forward-apply",
+      "confidence": "medium",
+      "matched_paths": [],
+      "matched_operations": [],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "not-checked",
+      "requires_confirmation": true,
+      "reason_code": "phase-4-forward-apply-strict"
+    },
+    {
+      "schema_version": 1,
+      "feature_slug": "fork-maintenance-policy",
+      "attempt_id": "re_71886d95fe44",
+      "upstream_ref": "v0.1.4",
+      "upstream_commit": "783581d461dc72cdd8f78fc8abb4ad536dfc4547",
+      "base_commit": "f595ef56ebb18ccb6a1ddacdd862b9de97e3fb5e",
+      "raw_reconcile_verdict": "reapplied",
+      "phase": "phase-3.5",
+      "evidence_kind": "file-novelty",
+      "confidence": "high",
+      "matched_paths": [
+        "docs/internals/fork-maintenance.md"
+      ],
+      "matched_operations": [],
+      "match_origin": "unknown",
+      "upstream_commit_refs": [],
+      "pre_reconcile_presence": "absent",
+      "requires_confirmation": true,
+      "reason_code": "all-new-files"
+    }
+  ]
+}

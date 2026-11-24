@@ -1,0 +1,40 @@
+{
+  "feature": "windows-preview-zip-artifact",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": ".github/workflows/fork-native-preview.yml",
+      "search": "      version:\n        description: Unsigned preview version (leave empty for a unique run version)\n        required: false\n        type: string\n",
+      "replace": "      version:\n        description: Unsigned preview version (leave empty for a unique run version)\n        required: false\n        type: string\n      windows_target:\n        description: Windows delivery format (ZIP supports side-by-side validation)\n        required: true\n        default: nsis\n        type: choice\n        options:\n          - nsis\n          - zip\n",
+      "created_by": "copilot-runtime-packaging"
+    },
+    {
+      "type": "replace-in-file",
+      "path": ".github/workflows/fork-native-preview.yml",
+      "search": "    env:\n      TEMP: C:\\t3\\tmp\n",
+      "replace": "    env:\n      WINDOWS_TARGET: ${{ inputs.windows_target || 'nsis' }}\n      TEMP: C:\\t3\\tmp\n",
+      "created_by": "copilot-runtime-packaging"
+    },
+    {
+      "type": "replace-in-file",
+      "path": ".github/workflows/fork-native-preview.yml",
+      "search": "      - name: Build isolated unsigned Windows installer\n        run: |\n          node scripts/build-desktop-artifact.ts --platform win --arch x64 --target nsis --fork-preview --build-version $env:PREVIEW_VERSION --wsl-runtime \"C:\\t3\\wsl\\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz\" --output-dir C:\\t3\\release --keep-stage --verbose\n",
+      "replace": "      - name: Build isolated unsigned Windows preview\n        run: |\n          if ($env:WINDOWS_TARGET -notin @('nsis', 'zip')) { throw 'Unsupported Windows preview target' }\n          node scripts/build-desktop-artifact.ts --platform win --arch x64 --target $env:WINDOWS_TARGET --fork-preview --build-version $env:PREVIEW_VERSION --wsl-runtime \"C:\\t3\\wsl\\t3-$env:PREVIEW_VERSION-linux-x64.tar.gz\" --output-dir C:\\t3\\release --keep-stage --verbose\n",
+      "created_by": "copilot-runtime-packaging"
+    },
+    {
+      "type": "replace-in-file",
+      "path": ".github/workflows/fork-native-preview.yml",
+      "search": "      - name: Upload installer and provenance\n",
+      "replace": "      - name: Upload Windows preview and provenance\n",
+      "created_by": "copilot-runtime-packaging"
+    },
+    {
+      "type": "replace-in-file",
+      "path": ".github/workflows/fork-native-preview.yml",
+      "search": "            C:\\t3\\release\\*.exe\n",
+      "replace": "            C:\\t3\\release\\*.exe\n            C:\\t3\\release\\*.zip\n",
+      "created_by": "copilot-runtime-packaging"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "feature": "windows-preview-zip-artifact",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_3ee683838623",
+      "kind": "record",
+      "patch_sha256": "3935397e093aa88b0361399991329857942a3bad8aa9e52d3ed33c62bde061a1",
+      "git_patch_id": "aed02cdbea58ed6f6a97a0330c2c75d1a52571a6",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "b323d9c09174f026b0a5a780264c27a1d24793ca826259e8f7ec3a42c4a5c8bc",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/001-record.patch",
+      "base_commit": "63b22001d98b2a77c222f962a409975f4504768e",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        ".github/workflows/fork-native-preview.yml"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-runtime-packaging",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 15,
+          "parent_patch_sha256": "009ecb7d9a722e78ec8d271043c07ef6184a1ddbf9d16cb61223e74f7c81e860",
+          "parent_recipe_sha256": "51b9a9efa32b33a41e4f420f31935f9aa9ed122c18b789b89c59805deb203e6d"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,431 @@
+diff --git a/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts b/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
+index 9ea2d25bf..88a59bfbe 100644
+--- a/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
++++ b/apps/desktop/src/wsl/DesktopWslEnvironment.test.ts
+@@ -2,10 +2,6 @@
+ import { describe, it } from "@effect/vitest";
+ import { afterAll, expect } from "vite-plus/test";
+ import * as NodeChildProcess from "node:child_process";
+-import * as NodeFS from "node:fs";
+-import * as NodeOS from "node:os";
+-import * as NodePath from "node:path";
+-import { copilotLinuxExecutableMembers } from "@t3tools/shared/copilotRuntime";
+ import * as Duration from "effect/Duration";
+ import * as Effect from "effect/Effect";
+ import * as Fiber from "effect/Fiber";
+@@ -38,17 +34,13 @@ const encoder = new TextEncoder();
+ // else the executed suite skips and the generated-text assertions stand alone.
+ const REQUIRED_SHELL_TOOLS = ["flock", "sha256sum", "tar", "mktemp"] as const;
+ 
+-const posixShellRunner = (() => {
++const findShellRunner = (probe: string) => {
+   // Candidates rather than a platform switch: wsl.exe simply fails to spawn
+   // where it does not exist, which is the same answer as a shell missing flock.
+   const candidates = [
+     { file: "bash", args: [] as ReadonlyArray<string> },
+     { file: "wsl.exe", args: ["-e", "bash"] as ReadonlyArray<string> },
+   ];
+-  const probe = [
+-    "[ -d /proc/1 ] || exit 1",
+-    ...REQUIRED_SHELL_TOOLS.map((tool) => `command -v ${tool} >/dev/null || exit 1`),
+-  ].join("\n");
+   return (
+     candidates.find((candidate) => {
+       const result = NodeChildProcess.spawnSync(candidate.file, [...candidate.args, "-c", probe], {
+@@ -57,17 +49,30 @@ const posixShellRunner = (() => {
+       return result.status === 0;
+     }) ?? null
+   );
+-})();
++};
+ 
+-const runShell = (script: string) => {
+-  if (posixShellRunner === null) throw new Error("no POSIX shell runner available");
++const posixShellRunner = findShellRunner(
++  [
++    "[ -d /proc/1 ] || exit 1",
++    ...REQUIRED_SHELL_TOOLS.map((tool) => `command -v ${tool} >/dev/null || exit 1`),
++  ].join("\n"),
++);
++const readinessShellRunner = findShellRunner(
++  [
++    'case "$(uname -s)" in Linux|Darwin) ;; *) exit 1 ;; esac',
++    'case "$(uname -m)" in x86_64|amd64|aarch64|arm64) ;; *) exit 1 ;; esac',
++    "command -v sha256sum >/dev/null && command -v mktemp >/dev/null",
++  ].join("\n"),
++);
++
++const runShell = (script: string, runner = posixShellRunner) => {
++  if (runner === null) throw new Error("no POSIX shell runner available");
+   // The install script arrives on stdin in production too, which is what lets
+   // its own /proc scan not match itself.
+-  const result = NodeChildProcess.spawnSync(
+-    posixShellRunner.file,
+-    [...posixShellRunner.args, "-s"],
+-    { input: script, encoding: "utf8" },
+-  );
++  const result = NodeChildProcess.spawnSync(runner.file, [...runner.args, "-s"], {
++    input: script,
++    encoding: "utf8",
++  });
+   return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+ };
+ 
+@@ -83,55 +88,53 @@ const readField = (stdout: string, field: string) => {
+ // script only asks it for `--version`.
+ const SERVER_ENTRY_SOURCE = '#!/bin/sh\necho "t3code wsl runtime test server 0.0.0"\n';
+ 
+-describe.skipIf(NodeChildProcess.spawnSync("bash", ["-c", "command -v sha256sum"]).status !== 0)(
++describe.skipIf(readinessShellRunner === null)(
+   "WSL cache readiness functions (executed without Linux installation)",
+   () => {
+     it("remembers a Copilot-bearing archive when its entire payload disappears", () => {
+-      const home = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-wsl-readiness-"));
+-      try {
+-        const root = NodePath.join(home, ".t3/wsl-runtime/test");
+-        const arch = ["arm64", "aarch64"].includes(
+-          NodeChildProcess.spawnSync("uname", ["-m"], { encoding: "utf8" }).stdout.trim(),
+-        )
+-          ? "arm64"
+-          : "x64";
+-        const write = (relative: string, content: string) => {
+-          const file = NodePath.join(root, relative);
+-          NodeFS.mkdirSync(NodePath.dirname(file), { recursive: true });
+-          NodeFS.writeFileSync(file, content, { mode: 0o755 });
+-        };
+-        write("t3", SERVER_ENTRY_SOURCE);
+-        const prefix = buildWslRuntimeInstallScript("/unused", "test", "0".repeat(64)).split(
+-          'mkdir -p "$runtime_parent"',
+-        )[0]!;
+-        const run = (action: string) =>
+-          NodeChildProcess.spawnSync("bash", ["-s"], {
+-            input: `${prefix}\n${action}`,
+-            encoding: "utf8",
+-            env: { ...process.env, HOME: home },
+-          });
+-        const markReady =
+-          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"\nruntime_is_ready';
+-        expect(run(markReady).status).toBe(0);
+-        for (const name of ["copilot", "copilot-sdk", `copilot-linux-${arch}`]) {
+-          write(`node_modules/@github/${name}/package.json`, "{}");
+-        }
+-        for (const file of copilotLinuxExecutableMembers(arch)) write(file, "#!/bin/sh\nexit 0\n");
+-        const installed = run(markReady);
+-        expect(installed.status, installed.stderr).toBe(0);
+-        expect(
+-          NodeFS.readFileSync(NodePath.join(root, ".t3code-wsl-runtime-ready"), "utf8"),
+-        ).toMatch(/^[a-f0-9]{64}:copilot\n$/);
+-        NodeFS.chmodSync(NodePath.join(root, copilotLinuxExecutableMembers(arch)[1]!), 0o644);
+-        expect(run("runtime_is_ready").status).not.toBe(0);
+-        expect(
+-          run('normalize_copilot_executable_modes "$runtime_root"\nruntime_is_ready').status,
+-        ).toBe(0);
+-        NodeFS.rmSync(NodePath.join(root, "node_modules/@github"), { recursive: true });
+-        expect(run("runtime_is_ready").status).not.toBe(0);
+-      } finally {
+-        NodeFS.rmSync(home, { recursive: true, force: true });
+-      }
++      const prefix = buildWslRuntimeInstallScript("/unused", "test", "0".repeat(64)).split(
++        'mkdir -p "$runtime_parent"',
++      )[0]!;
++      // Create, inspect and execute inside the same selected shell/filesystem,
++      // including when Windows reaches that shell through wsl.exe.
++      const result = runShell(
++        [
++          "set -eu",
++          "fixture_home=$(mktemp -d)",
++          `trap 'rm -rf "$fixture_home"' EXIT`,
++          'export HOME="$fixture_home"',
++          'case "$(uname -m)" in x86_64|amd64) arch=x64 ;; aarch64|arm64) arch=arm64 ;; *) exit 1 ;; esac',
++          prefix,
++          'mkdir -p "$runtime_root"',
++          `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$runtime_root/t3"`,
++          'chmod 0755 "$runtime_root/t3"',
++          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"',
++          "runtime_is_ready",
++          'for name in copilot copilot-sdk "copilot-linux-$arch"; do',
++          '  mkdir -p "$runtime_root/node_modules/@github/$name"',
++          "  printf '{}\\n' > \"$runtime_root/node_modules/@github/$name/package.json\"",
++          "done",
++          'platform_root="$runtime_root/node_modules/@github/copilot-linux-$arch"',
++          'mkdir -p "$platform_root/ripgrep/bin/linux-$arch" "$platform_root/tgrep/bin/linux-$arch"',
++          'for command in "$platform_root/copilot" "$platform_root/ripgrep/bin/linux-$arch/rg" "$platform_root/tgrep/bin/linux-$arch/tgrep"; do',
++          `  printf '#!/bin/sh\\nexit 0\\n' > "$command"`,
++          '  chmod 0755 "$command"',
++          "done",
++          'runtime_server_entry_digest "$runtime_root" > "$ready_marker"',
++          "runtime_is_ready",
++          "grep -Eq '^[a-f0-9]{64}:copilot$' \"$ready_marker\"",
++          'chmod 0644 "$platform_root/ripgrep/bin/linux-$arch/rg"',
++          'if runtime_is_ready; then printf "Damaged mode was accepted\\n" >&2; exit 1; fi',
++          'normalize_copilot_executable_modes "$runtime_root"',
++          "runtime_is_ready",
++          'rm -r "$runtime_root/node_modules/@github"',
++          'if runtime_is_ready; then printf "Missing Copilot payload was accepted\\n" >&2; exit 1; fi',
++          'printf "cache-readiness:passed\\n"',
++        ].join("\n"),
++        readinessShellRunner,
++      );
++      expect(result.status, result.stderr).toBe(0);
++      expect(result.stdout).toBe("cache-readiness:passed\n");
+     });
+   },
+ );
+diff --git a/scripts/build-desktop-artifact.test.ts b/scripts/build-desktop-artifact.test.ts
+index fbb2d95dd..f54c0af67 100644
+--- a/scripts/build-desktop-artifact.test.ts
++++ b/scripts/build-desktop-artifact.test.ts
+@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+ import * as Option from "effect/Option";
+ import * as Path from "effect/Path";
++import * as Schema from "effect/Schema";
+ import * as Sink from "effect/Sink";
+ import * as Stream from "effect/Stream";
+ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+@@ -93,6 +94,10 @@ import {
+ import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
+ import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+ import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
++import { SpawnExecutableResolution } from "@t3tools/shared/shell";
++import { fromYaml } from "@t3tools/shared/schemaYaml";
++import serverPackageJson from "../apps/server/package.json" with { type: "json" };
++import { COPILOT_DEPENDENCY_OVERRIDES } from "./lib/copilot-payload.ts";
+ 
+ // A minimal stand-in for the Linux CLI release archive: one top-level
+ // directory named after the archive stem holding the executable, the web
+@@ -252,6 +257,39 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
+ });
+ 
+ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
++  it.effect("keeps source SDK and generated stage overrides on the reviewed closure", () =>
++    Effect.gen(function* () {
++      const fs = yield* FileSystem.FileSystem;
++      const path = yield* Path.Path;
++      const file = yield* path.fromFileUrl(new URL("../pnpm-workspace.yaml", import.meta.url));
++      const workspace = yield* Schema.decodeEffect(
++        fromYaml(Schema.Struct({ overrides: Schema.Record(Schema.String, Schema.String) })),
++      )(yield* fs.readFileString(file));
++      assert.equal(serverPackageJson.dependencies["@github/copilot-sdk"], "1.0.8");
++      for (const platform of ["win", "linux", "mac"] as const) {
++        const arches =
++          platform === "mac"
++            ? (["x64", "arm64", "universal"] as const)
++            : (["x64", "arm64"] as const);
++        for (const arch of arches) {
++          const staged = createStageWorkspaceConfig({
++            platform,
++            arch,
++            overrides: { ...workspace.overrides },
++          });
++          for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
++            assert.equal(staged.overrides?.[selector], version, selector);
++          }
++          for (const cpu of ["x64", "arm64"]) {
++            const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${cpu}`;
++            assert.equal(staged.overrides?.[selector], platform === "linux" ? "-" : undefined);
++            assert.isUndefined(workspace.overrides[selector]);
++          }
++        }
++      }
++    }),
++  );
++
+   it("resolves the dedicated nightly updater channel from nightly versions", () => {
+     assert.equal(resolveDesktopUpdateChannel("0.0.17-nightly.20260413.42"), "nightly");
+     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");
+@@ -1091,64 +1129,90 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+       Effect.gen(function* () {
+         const fs = yield* FileSystem.FileSystem;
+         const path = yield* Path.Path;
++        const actualHost = yield* HostProcessPlatform;
+         const repoRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-kde-stage-test-" });
+         const protocols = path.join(repoRoot, "native/hyprland-snap-shot/protocols");
+         yield* fs.makeDirectory(protocols, { recursive: true });
+         yield* fs.writeFileString(path.join(protocols, "capture.xml"), "BSD protocol notice");
+-        for (const backend of ["kde", "hyprland"] as const) {
+-          for (const [arch, target] of [
+-            ["x64", "x86_64-unknown-linux-gnu"],
+-            ["arm64", "aarch64-unknown-linux-gnu"],
+-          ] as const) {
+-            const binary = path.join(
+-              repoRoot,
+-              `native/${backend}-snap-shot/target`,
+-              target,
+-              `release/t3-${backend}-snap-shot`,
+-            );
+-            const stageResourcesDir = path.join(repoRoot, "stage", backend, arch);
+-            const spawner = Layer.succeed(
+-              ChildProcessSpawner.ChildProcessSpawner,
+-              ChildProcessSpawner.make((command) =>
+-                Effect.gen(function* () {
+-                  assert.equal(command._tag, "StandardCommand");
+-                  if (command._tag !== "StandardCommand") return mockProcess(1);
+-                  assert.equal(command.command, "cargo");
+-                  assert.deepEqual(command.args, [
+-                    "build",
+-                    "--locked",
+-                    "--release",
+-                    "--manifest-path",
+-                    path.join(repoRoot, `native/${backend}-snap-shot/Cargo.toml`),
+-                    "--target",
+-                    target,
+-                  ]);
+-                  yield* fs.makeDirectory(path.dirname(binary), { recursive: true });
+-                  yield* fs.writeFileString(binary, `helper-${arch}`);
+-                  return mockProcess(0);
+-                }),
+-              ),
+-            );
+-            yield* stageLinuxCaptureHelper({
+-              backend,
+-              repoRoot,
+-              stageResourcesDir,
+-              arch,
+-              verbose: false,
+-            }).pipe(Effect.provide(spawner));
+-            const installed = path.join(
+-              stageResourcesDir,
+-              `${backend}-capture/t3-${backend}-snap-shot`,
+-            );
+-            assert.equal(yield* fs.readFileString(installed), `helper-${arch}`);
+-            assert.equal((yield* fs.stat(installed)).mode & 0o777, 0o755);
+-            if (backend === "hyprland")
+-              assert.equal(
+-                yield* fs.readFileString(
+-                  path.join(stageResourcesDir, "hyprland-capture/protocols/capture.xml"),
++        for (const hostPlatform of ["linux", "win32"] as const) {
++          for (const backend of ["kde", "hyprland"] as const) {
++            for (const [arch, target] of [
++              ["x64", "x86_64-unknown-linux-gnu"],
++              ["arm64", "aarch64-unknown-linux-gnu"],
++            ] as const) {
++              const binary = path.join(
++                repoRoot,
++                `native/${backend}-snap-shot/target`,
++                target,
++                `release/t3-${backend}-snap-shot`,
++              );
++              const stageResourcesDir = path.join(repoRoot, "stage", hostPlatform, backend, arch);
++              const cargo = hostPlatform === "win32" ? "C:\\Rustup Tools\\bin\\cargo.EXE" : "cargo";
++              const chmodCalls: Array<{ file: string; mode: number }> = [];
++              const spawner = Layer.succeed(
++                ChildProcessSpawner.ChildProcessSpawner,
++                ChildProcessSpawner.make((command) =>
++                  Effect.gen(function* () {
++                    assert.equal(command._tag, "StandardCommand");
++                    if (command._tag !== "StandardCommand") return mockProcess(1);
++                    assert.equal(command.command, cargo);
++                    assert.deepEqual(command.args, [
++                      "build",
++                      "--locked",
++                      "--release",
++                      "--manifest-path",
++                      path.join(repoRoot, `native/${backend}-snap-shot/Cargo.toml`),
++                      "--target",
++                      target,
++                    ]);
++                    yield* fs.makeDirectory(path.dirname(binary), { recursive: true });
++                    yield* fs.writeFileString(binary, `helper-${arch}`);
++                    return mockProcess(0);
++                  }),
+                 ),
+-                "BSD protocol notice",
+               );
++              yield* stageLinuxCaptureHelper({
++                backend,
++                repoRoot,
++                stageResourcesDir,
++                arch,
++                verbose: false,
++              }).pipe(
++                Effect.provide(spawner),
++                Effect.provideService(HostProcessPlatform, hostPlatform),
++                Effect.provideService(SpawnExecutableResolution, (name) => {
++                  assert.equal(name, "cargo");
++                  return cargo;
++                }),
++                Effect.provideService(FileSystem.FileSystem, {
++                  ...fs,
++                  chmod: (file, mode) =>
++                    fs.chmod(file, mode).pipe(
++                      Effect.tap(() =>
++                        Effect.sync(() => {
++                          chmodCalls.push({ file, mode });
++                        }),
++                      ),
++                    ),
++                }),
++                Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }))),
++              );
++              const installed = path.join(
++                stageResourcesDir,
++                `${backend}-capture/t3-${backend}-snap-shot`,
++              );
++              assert.equal(yield* fs.readFileString(installed), `helper-${arch}`);
++              assert.deepEqual(chmodCalls, [{ file: installed, mode: 0o755 }]);
++              if (actualHost !== "win32")
++                assert.equal((yield* fs.stat(installed)).mode & 0o777, 0o755);
++              if (backend === "hyprland")
++                assert.equal(
++                  yield* fs.readFileString(
++                    path.join(stageResourcesDir, "hyprland-capture/protocols/capture.xml"),
++                  ),
++                  "BSD protocol notice",
++                );
++            }
+           }
+         }
+       }),
+diff --git a/scripts/lib/copilot-payload.test.ts b/scripts/lib/copilot-payload.test.ts
+index 61970db6c..557eeadb8 100644
+--- a/scripts/lib/copilot-payload.test.ts
++++ b/scripts/lib/copilot-payload.test.ts
+@@ -6,9 +6,6 @@ import * as Path from "effect/Path";
+ import * as Schema from "effect/Schema";
+ 
+ import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+-import { fromYaml } from "@t3tools/shared/schemaYaml";
+-import serverPackageJson from "../../apps/server/package.json" with { type: "json" };
+-import { createStageWorkspaceConfig } from "../build-desktop-artifact.ts";
+ import type { BuildArch, BuildPlatform } from "./build-target-arch.ts";
+ import {
+   COPILOT_DEPENDENCY_OVERRIDES,
+@@ -184,37 +181,6 @@ const makeStage = Effect.fn("test.makeCopilotPayloadStage")(function* (
+ });
+ 
+ it.layer(NodeServices.layer)("reviewed Copilot payload", (it) => {
+-  it.effect("keeps source SDK and generated stage overrides on the reviewed closure", () =>
+-    Effect.gen(function* () {
+-      const fs = yield* FileSystem.FileSystem;
+-      const path = yield* Path.Path;
+-      const file = yield* path.fromFileUrl(new URL("../../pnpm-workspace.yaml", import.meta.url));
+-      const workspace = yield* Schema.decodeEffect(
+-        fromYaml(
+-          Schema.Struct({
+-            overrides: Schema.Record(Schema.String, Schema.String),
+-          }),
+-        ),
+-      )(yield* fs.readFileString(file));
+-      assert.equal(serverPackageJson.dependencies["@github/copilot-sdk"], "1.0.8");
+-      for (const target of [...targets, { platform: "mac", arch: "universal" }] as const) {
+-        const staged = createStageWorkspaceConfig({
+-          platform: target.platform,
+-          arch: target.arch,
+-          overrides: { ...workspace.overrides },
+-        });
+-        for (const [selector, version] of Object.entries(COPILOT_DEPENDENCY_OVERRIDES)) {
+-          assert.equal(staged.overrides?.[selector], version, selector);
+-        }
+-        for (const arch of ["x64", "arm64"]) {
+-          const selector = `@github/copilot@1.0.75>@github/copilot-linuxmusl-${arch}`;
+-          assert.equal(staged.overrides?.[selector], target.platform === "linux" ? "-" : undefined);
+-          assert.isUndefined(workspace.overrides[selector]);
+-        }
+-      }
+-    }),
+-  );
+-
+   it.effect("rejects missing overrides and SDK anchor drift before pruning", () =>
+     Effect.scoped(
+       Effect.gen(function* () {

@@ -1,0 +1,17 @@
+{
+  "feature": "copilot-extension-opt-out",
+  "operations": [
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "search": "            enableSkills: true,\n            enableConfigDiscovery:",
+      "replace": "            enableSkills: true,\n            requestExtensions: false,\n            enableConfigDiscovery:"
+    },
+    {
+      "type": "replace-in-file",
+      "path": "packages/provider-copilot/src/server/adapter.test.ts",
+      "search": "function fakeSdk() {",
+      "replace": "function fakeSdk(options: { persistedExtensions?: boolean } = {}) {"
+    }
+  ]
+}

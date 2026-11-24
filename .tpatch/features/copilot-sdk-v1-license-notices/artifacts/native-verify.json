@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.1",
+  "slug": "copilot-sdk-v1-license-notices",
+  "verified_at": "2026-11-02T22:01:46Z",
+  "verdict": "failed",
+  "exit_code": 2,
+  "repository": {
+    "object_format": "sha1",
+    "commit_id_hex_len": 40,
+    "shallow": false,
+    "partial_clone": false,
+    "git_version": "git version 2.55.0",
+    "git_floor_satisfied": true
+  },
+  "baseline": {
+    "mode": "head-anchored",
+    "current_commit": "d5ed1cdf5971b4beb4c8462f991e62f4de2b0a2f"
+  },
+  "landing_evidence": {
+    "state": "none",
+    "candidates": 0
+  },
+  "target_mode": "forward",
+  "checks": [
+    {
+      "id": "status_loaded",
+      "severity": "block-abort",
+      "passed": true
+    },
+    {
+      "id": "intent_files_present",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_parses",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "recipe_op_targets_resolve",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "dep_metadata_valid",
+      "severity": "block",
+      "passed": true
+    },
+    {
+      "id": "satisfied_by_reachable",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "no satisfied_by deps to check"
+    },
+    {
+      "id": "dependency_gate_satisfied",
+      "severity": "warn",
+      "passed": true
+    },
+    {
+      "id": "recipe_replay_clean",
+      "severity": "block",
+      "passed": false,
+      "remediation": "hard parent copilot-cli-provider landed at 132c85398c55a623f9cf72dfecff884da6554abc but its canonical patch is not present at the verification baseline; verify copilot-cli-provider first — do not re-apply it into the shadow",
+      "mode": "forward"
+    },
+    {
+      "id": "post_apply_patch_replay_clean",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "skipped: parent-replay aborted before V8",
+      "mode": "forward"
+    },
+    {
+      "id": "reconcile_outcome_consistent",
+      "severity": "warn",
+      "passed": true,
+      "skipped": true,
+      "reason": "no Reconcile.Outcome set"
+    },
+    {
+      "id": "write_file_preimage_fresh",
+      "severity": "block",
+      "passed": true,
+      "skipped": true,
+      "reason": "skipped: parent-replay aborted before V10",
+      "mode": "provenance-anchor"
+    }
+  ],
+  "lifecycle_state": "applied",
+  "recipe_hash_at_verify": "836ff890573b5b981b810b63b278914201a399a931212fc641ff282c3d2ba3c5",
+  "patch_hash_at_verify": "65933499a1fe2a21bed526161e9333733a571ef59a61db46490c51a1212a9cb2",
+  "parent_snapshot": {
+    "copilot-sdk-license-notice": "applied",
+    "copilot-sdk-runtime-upgrade": "applied"
+  },
+  "failed_at": "parent-landing-drift",
+  "parent_slug": "copilot-cli-provider"
+}

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "feature": "provider-direct-dispatch-selection-restart",
+  "current_generation": 1,
+  "generations": [
+    {
+      "generation": 1,
+      "generation_id": "pg_01f658e382ea",
+      "kind": "record",
+      "patch_sha256": "a31c6244ea7b13ce27cbb685cb67834306bb7ccd76e37e0a8a15c5ba66b55664",
+      "git_patch_id": "6ebbafbcb91696da1383876ca358cda53b388ca2",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "c916654f2e1b005d7fa1fa247a86cb256da4a79ca4104521afee69dfe92a83ac",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "30fad02f12291b5383ae1403a19e1c7adb881b5f",
+      "upper": {
+        "kind": "working-tree",
+        "ref": "working-tree",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "working-tree-all",
+        "pathspecs": [
+          "apps/server/src/orchestration-v2/Orchestrator.ts",
+          "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/src/orchestration-v2/Orchestrator.ts",
+        "apps/server/src/orchestration-v2/SelectionRestart.integration.test.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-fusion-runtime-transition",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 1,
+          "parent_patch_sha256": "faa9f5dc40c9044ce53aff0f03303d24d1bbec95b51b591405ad8bb35ff532d8",
+          "parent_recipe_sha256": "d94c8bacfa502f7dae4413b361792c39e9bcfa076221192184a33f8a7301b454"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    }
+  ]
+}

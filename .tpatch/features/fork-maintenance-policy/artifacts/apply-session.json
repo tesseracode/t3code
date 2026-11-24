@@ -1,0 +1,8 @@
+{
+  "slug": "fork-maintenance-policy",
+  "completed_at": "2026-10-29T16:34:16Z",
+  "base_commit": "16a55122c16fdd957ac7bba8e00aed970584d0f2",
+  "has_patch": true,
+  "validation_status": "needs_review",
+  "validation_notes": "Complete documentation inspected; runtime validation is not applicable. Final reviewer and exact replay follow full integration."
+}

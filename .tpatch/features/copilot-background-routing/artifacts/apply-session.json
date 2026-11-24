@@ -1,0 +1,8 @@
+{
+  "slug": "copilot-background-routing",
+  "completed_at": "2026-11-05T07:47:30Z",
+  "base_commit": "0c0303b8f468934d08ebf6f45f72b19da29a23ce",
+  "has_patch": true,
+  "validation_status": "passed",
+  "validation_notes": "tpatch test — command: vp test run packages/provider-copilot/src/server/textGeneration.test.ts packages/provider-copilot/src/server/routing.test.ts"
+}

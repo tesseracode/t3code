@@ -1,0 +1,3 @@
+ .../provider-copilot/src/server/adapter.test.ts    | 33 ++++++++++++++++++++--
+ packages/provider-copilot/src/server/adapter.ts    |  1 +
+ 2 files changed, 31 insertions(+), 3 deletions(-)

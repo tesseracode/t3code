@@ -1,0 +1,1174 @@
+diff --git a/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts b/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts
+index 579c82f03..070507aaa 100644
+--- a/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts
++++ b/apps/server/src/orchestration-v2/TurnItemPositionStore.test.ts
+@@ -11,7 +11,7 @@ const layerTest = TurnItemPositionStore.layer.pipe(
+   Layer.provideMerge(SqlitePersistence.layerMemory),
+ );
+ 
+-it.effect("reuses an item's position without attempting another allocation insert", () =>
++it.effect("reuses positions without redundant inserts and binds late run ownership", () =>
+   Effect.gen(function* () {
+     const sql = yield* SqlClient.SqlClient;
+     const positions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
+@@ -45,11 +45,28 @@ it.effect("reuses an item's position without attempting another allocation inser
+     assert.equal(
+       yield* positions.allocate({
+         ...input,
+-        runId: RunId.make("run:moved"),
+-        runOrdinal: 2,
++        turnItemId: TurnItemId.make("item:next"),
++        runId: RunId.make("run:not-yet-known"),
+       }),
+-      first,
++      next,
+     );
++    const associated = {
++      ...input,
++      runId: RunId.make("run:moved"),
++      runOrdinal: 2,
++    };
++    const moved = yield* positions.allocate(associated);
++    assert.equal(moved, 2_000_001);
++    assert.equal(yield* positions.allocate(associated), moved);
++    assert.equal(
++      yield* positions.allocate({
++        ...associated,
++        turnItemId: TurnItemId.make("item:next"),
++      }),
++      moved + 1,
++    );
++    assert.equal(yield* positions.allocate(input), moved);
++    assert.equal(yield* positions.allocate({ ...associated, runOrdinal: 3 }), moved);
+     assert.equal(
+       yield* positions.allocate({ ...input, threadId: ThreadId.make("thread:other") }),
+       1,
+diff --git a/apps/server/src/orchestration-v2/TurnItemPositionStore.ts b/apps/server/src/orchestration-v2/TurnItemPositionStore.ts
+index 03636b341..8ebe8c828 100644
+--- a/apps/server/src/orchestration-v2/TurnItemPositionStore.ts
++++ b/apps/server/src/orchestration-v2/TurnItemPositionStore.ts
+@@ -49,7 +49,8 @@ export const layer: Layer.Layer<TurnItemPositionStoreV2, never, SqlClient.SqlCli
+           WHERE thread_id = ${threadId} AND turn_item_id = ${turnItemId}
+           LIMIT 1
+         `;
+-          if (existing[0] !== undefined) return existing[0].ordinal;
++          if (existing[0] !== undefined && (existing[0].ordinal >= 1_000_000 || runId === null))
++            return existing[0].ordinal;
+ 
+           const runRows =
+             runId === null
+@@ -63,7 +64,23 @@ export const layer: Layer.Layer<TurnItemPositionStoreV2, never, SqlClient.SqlCli
+           const runOrdinal = suppliedRunOrdinal ?? runRows[0]?.ordinal ?? null;
+           const lowerBound = runOrdinal === null ? 0 : runOrdinal * 1_000_000;
+           const upperBound = runOrdinal === null ? 999_999 : lowerBound + 999_999;
+-          yield* sql`
++          if (existing[0] !== undefined) {
++            if (runOrdinal === null) return existing[0].ordinal;
++            // Late ownership evidence moves an unassociated item into its run's range.
++            yield* sql`
++              UPDATE orchestration_v2_turn_item_positions
++              SET ordinal = (
++                SELECT COALESCE(MAX(ordinal), ${lowerBound}) + 1
++                FROM orchestration_v2_turn_item_positions
++                WHERE thread_id = ${threadId}
++                  AND ordinal >= ${lowerBound}
++                  AND ordinal <= ${upperBound}
++              )
++              WHERE thread_id = ${threadId} AND turn_item_id = ${turnItemId}
++                AND ordinal < 1000000
++            `;
++          } else
++            yield* sql`
+           INSERT INTO orchestration_v2_turn_item_positions (thread_id, turn_item_id, ordinal)
+           SELECT
+             ${threadId},
+diff --git a/docs/user/activity-log.md b/docs/user/activity-log.md
+index 3eb3f41cb..b899877b3 100644
+--- a/docs/user/activity-log.md
++++ b/docs/user/activity-log.md
+@@ -30,8 +30,11 @@ Auto model-resolution entries show the selected model, not proof that it complet
+ Events without a native turn association remain visibly unassociated; late routing and phase
+ events enrich existing activity rather than creating additional user turns.
+ 
+-For Copilot, select **Auto routing** and its **Routing** option when your connected account
++For Copilot, enable **Fusion** in provider settings to opt in to its available tiers.
++Select **Fusion** and its separate **Fusion effort** control when your connected account
+ advertises them. Available preferences come from that account; unavailable choices show their
+-reason. Explicit models and your default model are unchanged. You can switch back to an explicit
+-model at any time. A requested preference may be pending or activating: the routing entry shows
+-the confirmed effective preference separately, including activation failures.
++reason. Without Fusion metadata, ordinary **Auto** routing remains available. Explicit models
++and your default model are unchanged. Choose **Provider default** to clear a saved routing
++preference, or switch back to an explicit model. A requested preference may be pending or
++activating: the routing entry shows the confirmed effective preference separately, including
++activation failures. Intermediate Fusion drafts are not final answers and stay out of chat.
+diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
+index 7d8c907a8..dc8a0c31d 100644
+--- a/docs/user/providers-copilot.md
++++ b/docs/user/providers-copilot.md
+@@ -17,6 +17,22 @@ Requests can remain pending before they take effect; the activity log distinguis
+ effective, and activating routing and shows reported model phases and timing. See
+ [Activity log](activity-log.md). Explicit-model selection and defaults are unchanged.
+ 
++To opt in to dynamic Fusion tiers, turn on **Enable Fusion** for this provider in
++**Settings > Providers**. The setting affects new Copilot runtimes on that
++environment and is off by default. When the account advertises Fusion, the model
++picker shows **Fusion**, with a separate **Fusion effort** control for its available
++tiers, such as **Standard**, **High**, and **Max**. Names and availability come from
++your account; choosing an effort does not pin the solver or reviewer model.
++
++Choose **Provider default** in the effort control to explicitly clear a saved
++preference. Omitting a preference on reconnect instead restores the committed
++selection. A change may remain pending until the next turn.
++
++Fusion can use one model or multiple draft/review phases. The activity log shows
++reported phases and the final source model, while chat shows the committed final
++answer rather than intermediate drafts. Fusion-enabled Auto answers appear as full
++responses; ordinary model streaming remains available.
++
+ The default runtime uses the bundled Copilot executable. **Binary path** can
+ override it. **COPILOT_HOME path** selects the account's configuration and native
+ session directory; separate provider instances can use separate directories.
+diff --git a/packages/client-runtime/src/modelTraits.test.ts b/packages/client-runtime/src/modelTraits.test.ts
+new file mode 100644
+index 000000000..781f5cda8
+--- /dev/null
++++ b/packages/client-runtime/src/modelTraits.test.ts
+@@ -0,0 +1,33 @@
++import { describe, expect, it } from "vite-plus/test";
++import type { SelectProviderOptionDescriptor } from "@t3tools/contracts";
++import { getPromptControlledTraits, getTraitSelectChange } from "./modelTraits.ts";
++
++describe("Fusion effort changes", () => {
++  it("dispatches advertised IDs and explicit reset without changing the prompt", () => {
++    const descriptor: SelectProviderOptionDescriptor = {
++      id: "autoTier",
++      label: "Fusion effort",
++      type: "select",
++      options: [
++        { id: "opaque-high", label: "High" },
++        { id: "disabled", label: "Max", disabledReason: "Account policy" },
++        { id: "reset", label: "Provider default", isReset: true },
++      ],
++      currentValue: "opaque-high",
++    };
++    const selected = {
++      ...getPromptControlledTraits([descriptor], "A bounded demo"),
++      descriptors: [descriptor],
++    };
++    expect(getTraitSelectChange(selected, descriptor, "A bounded demo", "reset")).toEqual({
++      prompt: "A bounded demo",
++      modelOptions: [{ id: "autoTier", value: false }],
++    });
++    expect(getTraitSelectChange(selected, descriptor, "A bounded demo", "opaque-high")).toEqual({
++      prompt: "A bounded demo",
++      modelOptions: [{ id: "autoTier", value: "opaque-high" }],
++    });
++    expect(getTraitSelectChange(selected, descriptor, "A bounded demo", "disabled")).toBeNull();
++    expect(getTraitSelectChange(selected, descriptor, "A bounded demo", "high")).toBeNull();
++  });
++});
+diff --git a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts
+index d123a5216..74e6e6629 100644
+--- a/packages/client-runtime/src/work-log/modelExecution.test.ts
++++ b/packages/client-runtime/src/work-log/modelExecution.test.ts
+@@ -19,6 +19,26 @@ const phase: OrchestrationV2ModelExecution = {
+ };
+ 
+ describe("model execution presentation", () => {
++  it("shows an explicit provider-default reset separately from unknown preference", () => {
++    const reset: OrchestrationV2ModelExecution = {
++      ...phase,
++      kind: "selection",
++      requestedModel: "auto",
++      requestedProviderDefault: true,
++      status: "effective",
++    };
++    expect(modelExecutionSummary(reset)).toContain("effective provider default");
++    expect(modelExecutionDetail(reset)).toContain("Requested routing: provider default");
++    expect(modelExecutionDetail(reset)).toContain("Effective routing: provider default");
++    const pending = {
++      ...reset,
++      status: "pending",
++      effectivePreference: "previous-tier",
++      pendingPreference: null,
++    };
++    expect(modelExecutionDetail(pending)).toContain("Effective routing: previous-tier");
++    expect(modelExecutionDetail(pending)).toContain("Pending routing: none");
++  });
+   it("uses provider duration rather than receipt latency and distinguishes timing evidence", () => {
+     expect(modelExecutionSummary(phase)).toContain("actual-model · completed · 4.8s");
+     const detail = modelExecutionDetail(phase);
+diff --git a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts
+index aa89b5a09..80f2577a8 100644
+--- a/packages/client-runtime/src/work-log/modelExecution.ts
++++ b/packages/client-runtime/src/work-log/modelExecution.ts
+@@ -13,7 +13,9 @@ export function modelExecutionSummary(execution: OrchestrationV2ModelExecution):
+             execution.pattern,
+             execution.status === "resolved" && execution.model
+               ? `selected ${execution.model}`
+-              : undefined,
++              : execution.requestedProviderDefault
++                ? `${execution.status === "effective" ? "effective" : "requested"} provider default`
++                : undefined,
+             execution.effectivePreference
+               ? `effective ${execution.effectivePreference}`
+               : execution.requestedPreference
+@@ -68,8 +70,17 @@ export function modelExecutionDetail(
+     );
+   add("Requested model", execution.requestedModel);
+   add("Resolved virtual model", execution.syntheticModel);
+-  add("Requested routing", execution.requestedPreference);
+-  add("Effective routing", execution.effectivePreference);
++  add(
++    "Requested routing",
++    execution.requestedProviderDefault ? "provider default" : execution.requestedPreference,
++  );
++  add(
++    "Effective routing",
++    execution.effectivePreference ??
++      (execution.requestedProviderDefault && execution.status === "effective"
++        ? "provider default"
++        : undefined),
++  );
+   add("Pending routing", execution.pendingPreference);
+   add("Activating routing", execution.activatingPreference);
+   add(
+diff --git a/packages/contracts/src/model.ts b/packages/contracts/src/model.ts
+index c677a696e..ffb4866bc 100644
+--- a/packages/contracts/src/model.ts
++++ b/packages/contracts/src/model.ts
+@@ -13,6 +13,8 @@ export const ProviderOptionChoice = Schema.Struct({
+   description: Schema.optional(TrimmedNonEmptyString),
+   disabledReason: Schema.optional(TrimmedNonEmptyString),
+   isDefault: Schema.optional(Schema.Boolean),
++  /** A select choice that dispatches false to explicitly reset the provider preference. */
++  isReset: Schema.optional(Schema.Boolean),
+ });
+ export type ProviderOptionChoice = typeof ProviderOptionChoice.Type;
+ 
+diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts
+index 156046a77..1099a23b1 100644
+--- a/packages/contracts/src/orchestrationV2.ts
++++ b/packages/contracts/src/orchestrationV2.ts
+@@ -1571,6 +1571,7 @@ export const OrchestrationV2ModelExecution = Schema.Struct({
+   syntheticModel: Schema.optional(ModelExecutionText),
+   requestedModel: Schema.optional(ModelExecutionText),
+   requestedPreference: Schema.optional(ModelExecutionText),
++  requestedProviderDefault: Schema.optional(Schema.Boolean),
+   effectivePreference: Schema.optional(ModelExecutionText),
+   pendingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
+   activatingPreference: Schema.optional(Schema.NullOr(ModelExecutionText)),
+diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
+index 124041b05..75c971b7f 100644
+--- a/packages/provider-copilot/src/server/adapter.test.ts
++++ b/packages/provider-copilot/src/server/adapter.test.ts
+@@ -106,7 +106,7 @@ function fakeSdk() {
+     sessionId: "native-copilot",
+     send: async (message) => {
+       sent.push(typeof message === "string" ? { prompt: message } : message);
+-      return "native-user-message";
++      return `native-user-message-${sent.length}`;
+     },
+     abort: async () => {
+       emit("session.idle");
+@@ -331,6 +331,273 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+   );
+ 
+ describe("native Copilot V2", () => {
++  it.effect.each(["single", "cascade", "critique"])(
++    "publishes only committed root %s output before late plan telemetry",
++    (pattern) =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const autoSelection: ModelSelection = {
++            instanceId,
++            model: "auto",
++            options: [{ id: "autoTier", value: "opaque-high" }],
++          };
++          fake.setCatalog({
++            models: [],
++            auto: {
++              defaultTier: "opaque-high",
++              tiers: [
++                {
++                  id: "opaque-high",
++                  displayName: "High",
++                  description: "",
++                  type: "fusion",
++                  status: { enabled: true },
++                },
++              ],
++            },
++          });
++          const { start, drain, emitted, takeEvent } = yield* setup(fake, undefined, autoSelection);
++          yield* start();
++          const fusion = {
++            fusionId: "fusion-1",
++            phaseId: "solver",
++            sourceModel: "solver-model",
++            pattern,
++            role: "solver",
++            conversationScope: "root",
++          };
++          fake.emit("assistant.message_delta", {
++            messageId: "answer",
++            deltaContent: "DISCARDED DRAFT",
++          });
++          fake.emit("assistant.reasoning_delta", {
++            reasoningId: "reason",
++            deltaContent: "PRIVATE",
++          });
++          fake.emit("assistant.reasoning", { reasoningId: "reason", content: "PRIVATE" });
++          fake.emit("assistant.message", {
++            messageId: "answer",
++            content: "DISCARDED DRAFT",
++            fusion,
++          });
++          assert.equal((yield* drain()).messages.length, 0);
++          assert.isFalse(emitted.some((event) => event.type === "message.updated"));
++          fake.emit("assistant.message", {
++            messageId: "review",
++            content: "PRIVATE REVIEW",
++            fusion: { ...fusion, commitId: "review-commit", conversationScope: "review" },
++          });
++          fake.emit("assistant.message", {
++            messageId: "answer",
++            content: "Correct final answer",
++            originatingMessageId: "native-user-message-1",
++            fusion: { ...fusion, commitId: "final-commit" },
++          });
++          fake.emit("session.fusion_resolved", {
++            fusionId: "fusion-1",
++            turnId: "different-native-namespace",
++            primaryModel: "solver-model",
++            fallbackModel: "fallback-model",
++            contractVersion: 1,
++            syntheticModel: "opaque-high",
++            policy: "standard",
++            pattern,
++          });
++          fake.emit("assistant.message", {
++            messageId: "answer",
++            content: "Correct final answer",
++            fusion: { ...fusion, commitId: "final-commit" },
++          });
++          const route = yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution?.fusionId === "fusion-1" &&
++              event.turnItem.runId === RunId.make("run-1"),
++          );
++          const snapshot = yield* drain();
++          assert.deepEqual(
++            snapshot.messages.map((message) => message.text),
++            ["Correct final answer"],
++          );
++          assert.isFalse(snapshot.messages[0]!.streaming);
++          assert.ok(route.type === "turn_item.updated");
++          if (route.type === "turn_item.updated")
++            assert.equal(route.turnItem.runId, RunId.make("run-1"));
++          assert.isFalse(
++            emitted.some(
++              (event) => event.type === "turn_item.updated" && event.turnItem.type === "reasoning",
++            ),
++          );
++        }),
++      ),
++  );
++
++  it.effect(
++    "backfills Fusion ownership when its root message precedes the native send acknowledgement",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const gate = promiseGate();
++          fake.session.send = async () => {
++            fake.emit("assistant.message", {
++              messageId: "answer",
++              originatingMessageId: "late-ack",
++              content: "Correct final answer",
++              fusion: {
++                fusionId: "fusion-1",
++                phaseId: "solver",
++                conversationScope: "root",
++                commitId: "commit",
++              },
++            });
++            fake.emit("session.fusion_resolved", {
++              fusionId: "fusion-1",
++              turnId: "synthetic-turn",
++              primaryModel: "solver-model",
++              fallbackModel: "fallback-model",
++              contractVersion: 1,
++              syntheticModel: "opaque-high",
++              policy: "standard",
++              pattern: "single",
++            });
++            await gate.promise;
++            return "late-ack";
++          };
++          const { start, drain, takeEvent } = yield* setup(fake);
++          const running = yield* Effect.forkChild(start());
++          yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution?.fusionId === "fusion-1" &&
++              event.turnItem.runId === null,
++          );
++          assert.equal((yield* drain()).messages.length, 0);
++          gate.resolve();
++          yield* Fiber.join(running);
++          const route = yield* takeEvent(
++            (event) =>
++              event.type === "turn_item.updated" &&
++              event.turnItem.type === "system_notice" &&
++              event.turnItem.modelExecution?.fusionId === "fusion-1" &&
++              event.turnItem.runId === RunId.make("run-1"),
++          );
++          const snapshot = yield* drain();
++          assert.equal(snapshot.messages[0]?.text, "Correct final answer");
++          assert.equal(snapshot.messages[0]?.runId, RunId.make("run-1"));
++          assert.ok(route.type === "turn_item.updated");
++          if (route.type === "turn_item.updated")
++            assert.equal(route.turnItem.runId, RunId.make("run-1"));
++        }),
++      ),
++  );
++
++  it.effect(
++    "keeps late committed answers on their original run without guessing unknown origins",
++    () =>
++      provide(
++        Effect.gen(function* () {
++          const fake = fakeSdk();
++          const { start, drain } = yield* setup(fake);
++          const answer = {
++            messageId: "answer",
++            originatingMessageId: "native-user-message-1",
++            content: "Initial committed answer",
++            fusion: {
++              fusionId: "fusion-1",
++              phaseId: "solver",
++              conversationScope: "root",
++              commitId: "commit",
++            },
++          };
++          yield* start();
++          fake.emit("assistant.message", answer);
++          fake.emit("session.idle", {});
++          yield* drain();
++          yield* start(2);
++          fake.emit("assistant.message", { ...answer, content: "Updated committed answer" });
++          fake.emit("assistant.message", {
++            ...answer,
++            messageId: "unknown-answer",
++            originatingMessageId: "unassociated-history-message",
++            content: "Unassociated old answer",
++            fusion: { ...answer.fusion, fusionId: "unknown-fusion" },
++          });
++          const snapshot = yield* drain();
++          assert.deepEqual(
++            snapshot.messages.map((message) => message.text),
++            ["Updated committed answer"],
++          );
++          assert.equal(snapshot.messages[0]?.runId, RunId.make("run-1"));
++        }),
++      ),
++  );
++
++  it.effect("filters uncommitted and review-scoped messages on cold native import", () =>
++    provide(
++      Effect.gen(function* () {
++        const fake = fakeSdk();
++        const message = (
++          id: string,
++          content: string,
++          commitId?: string,
++          scope = "root",
++        ): SessionEvent => ({
++          id,
++          type: "assistant.message",
++          timestamp: "2026-10-29T00:00:01Z",
++          parentId: null,
++          data: {
++            messageId: "answer",
++            content,
++            toolRequests: [],
++            fusion: {
++              fusionId: "fusion-1",
++              phaseId: "solver",
++              pattern: "critique",
++              policy: "standard",
++              syntheticModel: "opaque-high",
++              sourceModel: "solver-model",
++              role: "solver",
++              conversationScope: scope,
++              ...(commitId ? { commitId } : {}),
++            },
++          },
++        });
++        fake.session.getEvents = async () => [
++          message("draft", "DISCARDED DRAFT"),
++          message("review", "PRIVATE REVIEW", "review-commit", "review"),
++          message("final", "Correct final answer", "final-commit"),
++        ];
++        const { drain } = yield* setup(fake, "owned-native-session");
++        assert.deepEqual(
++          (yield* drain()).messages.map((entry) => entry.text),
++          ["Correct final answer"],
++        );
++      }),
++    ),
++  );
++
++  it.effect("dispatches explicit default reset as null rather than preserving a prior tier", () =>
++    provide(
++      Effect.gen(function* () {
++        const fake = fakeSdk();
++        fake.setCurrent({ modelId: "auto" });
++        const reset: ModelSelection = {
++          instanceId,
++          model: "auto",
++          options: [{ id: "autoTier", value: false }],
++        };
++        const { start } = yield* setup(fake, "owned-native-session", reset);
++        yield* start();
++        assert.deepEqual(fake.modelChanges.at(-1), { model: "auto", options: { autoTier: null } });
++        assert.isUndefined(fake.config.capi);
++      }),
++    ),
++  );
+   it.effect(
+     "reimports duplicate Auto resolution with a stable item identity across cold starts",
+     () =>
+diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
+index 241306b16..e02ed4e4c 100644
+--- a/packages/provider-copilot/src/server/adapter.ts
++++ b/packages/provider-copilot/src/server/adapter.ts
+@@ -29,7 +29,10 @@ import {
+   type OrchestrationV2Subagent,
+   type ServerProviderSkill,
+ } from "@t3tools/contracts";
+-import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
++import {
++  getModelSelectionStringOptionValue,
++  getProviderOptionStatedValue,
++} from "@t3tools/shared/model";
+ import * as DateTime from "effect/DateTime";
+ import * as Deferred from "effect/Deferred";
+ import * as Effect from "effect/Effect";
+@@ -64,6 +67,15 @@ import {
+ 
+ export const COPILOT_DRIVER = ProviderDriverKind.make("githubCopilot");
+ const decodeModelExecution = Schema.decodeEffect(OrchestrationV2ModelExecution);
++function publishesFusionText(
++  fusion: Extract<SessionEvent, { type: "assistant.message" }>["data"]["fusion"],
++) {
++  return (
++    fusion === undefined ||
++    (fusion.commitId !== undefined &&
++      (fusion.conversationScope === undefined || fusion.conversationScope === "root"))
++  );
++}
+ const ref = (nativeId: string) => ({
+   driver: COPILOT_DRIVER,
+   nativeId,
+@@ -120,6 +132,7 @@ interface ActiveTurn {
+   providerTurn: OrchestrationV2ProviderTurn;
+   nextOrdinal: number;
+   readonly items: Map<string, OrchestrationV2TurnItem>;
++  readonly fusionText: boolean;
+   accepted: boolean;
+   idle: boolean;
+   interrupted: boolean;
+@@ -233,6 +246,9 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+       >();
+       const fusionOwners = new Map<string, ActiveTurn>();
+       const nativeTurnOwners = new Map<string, ActiveTurn>();
++      const nativeMessageOwners = new Map<string, ActiveTurn>();
++      const pendingFusionOrigins = new Map<string, string>();
++      const pendingFusionMessages = new Map<string, { origin: string; content: string }>();
+       let replayExecutionEvents: ReadonlyArray<SessionEvent> = [];
+       let omittedReplayEvents = 0;
+       const emit = (event: ProviderAdapter.ProviderAdapterV2Event) =>
+@@ -474,6 +490,8 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+         );
+         const now = DateTime.formatIso(yield* DateTime.now);
+         const requested = getModelSelectionStringOptionValue(selection, "autoTier");
++        const requestedProviderDefault =
++          getProviderOptionStatedValue("autoTier", selection) === false;
+         const execution: OrchestrationV2ModelExecution = {
+           version: 1,
+           kind: "selection",
+@@ -489,12 +507,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+                 ? current.modelId
+                   ? "different-model"
+                   : "unknown"
+-                : selection.model === "auto" && !current.autoTier
++                : selection.model === "auto" && !current.autoTier && !requestedProviderDefault
+                   ? "preference-unknown"
+                   : "effective",
+           requestedModel: selection.model,
+           ...(current.modelId ? { model: current.modelId } : {}),
+           ...(requested ? { requestedPreference: requested } : {}),
++          ...(requestedProviderDefault ? { requestedProviderDefault: true } : {}),
+           ...(current.autoTier ? { effectivePreference: current.autoTier } : {}),
+           ...(current.pendingAutoTier !== undefined
+             ? { pendingPreference: current.pendingAutoTier }
+@@ -512,6 +531,24 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+         if (selection.model === "auto" || failure)
+           yield* putExecution(`selection:${owner?.providerTurn.id ?? "current"}`, execution, owner);
+       });
++      const bindFusionOwner = Effect.fnUntraced(function* (fusionId: string, owner: ActiveTurn) {
++        fusionOwners.set(fusionId, owner);
++        if (fusionOwners.size > MAX_EXECUTION_ITEMS)
++          fusionOwners.delete(fusionOwners.keys().next().value!);
++        for (const [key, item] of executionItems) {
++          if (item.runId === null && item.modelExecution?.fusionId === fusionId)
++            yield* putExecution(
++              key,
++              {
++                ...item.modelExecution,
++                gaps: item.modelExecution.gaps.filter(
++                  (gap) => gap !== "Native execution could not be associated with a T3 run.",
++                ),
++              },
++              owner,
++            );
++        }
++      });
+       const recordFusion = Effect.fnUntraced(function* (event: SessionEvent, replay = false) {
+         const key = fusionExecutionKey(event);
+         if (!key || !native) return;
+@@ -531,26 +568,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             Date.parse(event.timestamp) < DateTime.toEpochMillis(owner.providerTurn.startedAt)
+           )
+             owner = undefined;
+-          if (owner && execution.fusionId && execution.kind === "route") {
+-            fusionOwners.set(execution.fusionId, owner);
+-            if (fusionOwners.size > MAX_EXECUTION_ITEMS)
+-              fusionOwners.delete(fusionOwners.keys().next().value!);
+-          }
+-          if (owner && execution.fusionId) {
+-            for (const [phaseKey, item] of executionItems) {
+-              if (item.runId === null && item.modelExecution?.fusionId === execution.fusionId)
+-                yield* putExecution(
+-                  phaseKey,
+-                  {
+-                    ...item.modelExecution,
+-                    gaps: item.modelExecution.gaps.filter(
+-                      (gap) => gap !== "Native execution could not be associated with a T3 run.",
+-                    ),
+-                  },
+-                  owner,
+-                );
+-            }
+-          }
++          if (owner && execution.fusionId) yield* bindFusionOwner(execution.fusionId, owner);
+         }
+         if (
+           owner &&
+@@ -1044,13 +1062,48 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             return;
+           }
+           case "assistant.message_delta":
++            // SDK deltas lack phase attribution; Fusion publishes its committed full snapshot.
++            if (turn?.fusionText) return;
+             if (turn)
+               yield* textEvent(turn, event.data.messageId, event.data.deltaContent, false, false);
+             return;
+-          case "assistant.message":
+-            if (turn) yield* textEvent(turn, event.data.messageId, event.data.content, true, false);
++          case "assistant.message": {
++            const messageOwner = event.data.originatingMessageId
++              ? nativeMessageOwners.get(event.data.originatingMessageId)
++              : undefined;
++            if (
++              event.data.fusion &&
++              event.data.originatingMessageId &&
++              (event.data.fusion.conversationScope === undefined ||
++                event.data.fusion.conversationScope === "root")
++            ) {
++              if (messageOwner) yield* bindFusionOwner(event.data.fusion.fusionId, messageOwner);
++              else {
++                pendingFusionOrigins.set(
++                  event.data.fusion.fusionId,
++                  event.data.originatingMessageId,
++                );
++                if (pendingFusionOrigins.size > MAX_EXECUTION_ITEMS)
++                  pendingFusionOrigins.delete(pendingFusionOrigins.keys().next().value!);
++              }
++            }
++            if (!publishesFusionText(event.data.fusion)) return;
++            if (event.data.fusion && event.data.originatingMessageId && !messageOwner) {
++              pendingFusionMessages.set(event.data.messageId, {
++                origin: event.data.originatingMessageId,
++                content: event.data.content,
++              });
++              if (pendingFusionMessages.size > MAX_EXECUTION_ITEMS)
++                pendingFusionMessages.delete(pendingFusionMessages.keys().next().value!);
++              return;
++            }
++            const owner = messageOwner ?? turn;
++            if (owner)
++              yield* textEvent(owner, event.data.messageId, event.data.content, true, false);
+             return;
++          }
+           case "assistant.reasoning_delta":
++            if (turn?.fusionText) return;
+             if (turn)
+               yield* textEvent(
+                 turn,
+@@ -1061,6 +1114,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+               );
+             return;
+           case "assistant.reasoning":
++            if (turn?.fusionText) return;
+             if (turn)
+               yield* textEvent(
+                 turn,
+@@ -1547,6 +1601,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+               cause: new Error("Copilot session is already in use by another client."),
+             });
+           }
++          if (autoTier === null)
++            yield* sdk("reset routing preference", () =>
++              native!.setModel("auto", { autoTier: null }),
++            );
+           const now = yield* DateTime.now;
+           if (nativeId) {
+             const transcript = yield* sdk("read native transcript", () => native!.getEvents()).pipe(
+@@ -1567,7 +1625,11 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+                   (event.type !== "assistant.message" && event.type !== "user.message")
+                 )
+                   continue;
+-                if (event.type === "assistant.message" && event.data.content.length === 0) continue;
++                if (
++                  event.type === "assistant.message" &&
++                  (event.data.content.length === 0 || !publishesFusionText(event.data.fusion))
++                )
++                  continue;
+                 const messageId = MessageId.make(`${open.providerSessionId}:history:${event.id}`);
+                 messages.set(messageId, {
+                   id: messageId,
+@@ -1674,21 +1736,17 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             reason: "previous_turn_active",
+           });
+         const effort = reasoningEffort(turnInput.modelSelection);
+-        const autoTier =
++        const autoCatalog =
+           turnInput.modelSelection.model === "auto"
+-            ? yield* sdk("validate routing selection", async () =>
+-                autoTierForSelection(
+-                  turnInput.modelSelection,
+-                  (await native!.rpc.model.list()).auto,
+-                ),
+-              )
+-            : yield* sdk("validate model selection", async () =>
+-                autoTierForSelection(turnInput.modelSelection),
+-              );
++            ? yield* sdk("list routing choices", async () => (await native!.rpc.model.list()).auto)
++            : undefined;
++        const autoTier = yield* sdk("validate model selection", async () =>
++          autoTierForSelection(turnInput.modelSelection, autoCatalog),
++        );
+         yield* sdk("set model", () =>
+           native!.setModel(turnInput.modelSelection.model, {
+             ...(effort ? { reasoningEffort: effort } : {}),
+-            ...(autoTier ? { autoTier } : {}),
++            ...(autoTier !== undefined ? { autoTier } : {}),
+           }),
+         );
+         const modeResult = yield* sdk("set mode", () =>
+@@ -1722,6 +1780,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+           providerTurn,
+           nextOrdinal: 1,
+           items: new Map(),
++          fusionText: autoCatalog?.tiers.some((tier) => tier.type === "fusion") === true,
+           accepted: false,
+           idle: false,
+           interrupted: false,
+@@ -1771,7 +1830,7 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+           attachments.push({ type: "file" as const, path, displayName: attachment.name });
+         }
+         history = "";
+-        yield* sdk(
++        const nativeMessageId = yield* sdk(
+           "send",
+           () =>
+             native!.send({
+@@ -1789,6 +1848,21 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+             }),
+           ),
+         );
++        nativeMessageOwners.set(nativeMessageId, turn);
++        if (nativeMessageOwners.size > MAX_EXECUTION_ITEMS)
++          nativeMessageOwners.delete(nativeMessageOwners.keys().next().value!);
++        for (const [fusionId, origin] of pendingFusionOrigins) {
++          if (origin === nativeMessageId) {
++            pendingFusionOrigins.delete(fusionId);
++            yield* bindFusionOwner(fusionId, turn);
++          }
++        }
++        for (const [messageId, message] of pendingFusionMessages) {
++          if (message.origin === nativeMessageId) {
++            pendingFusionMessages.delete(messageId);
++            yield* textEvent(turn, messageId, message.content, true, false);
++          }
++        }
+         turn.accepted = true;
+         yield* Queue.offer(inbox, { type: "accepted" });
+       });
+diff --git a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts
+index 16dc73802..1273a8e83 100644
+--- a/packages/provider-copilot/src/server/client.ts
++++ b/packages/provider-copilot/src/server/client.ts
+@@ -103,13 +103,27 @@ export function resolveClientConfiguration(
+       ? bundledCliPath(runtime)
+       : undefined;
+   const override = configured ?? bundled;
++  const fusionEnvironment = settings.enableFusion
++    ? {
++        COPILOT_CLI_ENABLED_FEATURE_FLAGS: [
++          ...new Set([
++            ...(environment.COPILOT_CLI_ENABLED_FEATURE_FLAGS ?? "")
++              .split(",")
++              .map((flag) => flag.trim())
++              .filter(Boolean),
++            "DYNAMIC_AUTO_TIERS",
++            "HYDRAFUSION_PLAN_V2",
++          ]),
++        ].join(","),
++      }
++    : {};
+   return {
+     effectiveHome,
+     options: {
+       mode: "copilot-cli",
+       workingDirectory: input.cwd,
+       baseDirectory: effectiveHome,
+-      env: { ...environment, COPILOT_HOME: effectiveHome },
++      env: { ...environment, ...fusionEnvironment, COPILOT_HOME: effectiveHome },
+       logLevel: "error",
+       ...(override
+         ? {
+diff --git a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts
+index b507bbfd8..f8cc1591a 100644
+--- a/packages/provider-copilot/src/server/routing.test.ts
++++ b/packages/provider-copilot/src/server/routing.test.ts
+@@ -39,11 +39,36 @@ export const autoCatalog: AutoCatalog = {
+ };
+ 
+ describe("account-advertised routing", () => {
++  it("distinguishes an explicit provider-default reset from an omitted preference", () => {
++    assert.isNull(
++      autoTierForSelection({
++        instanceId,
++        model: "auto",
++        options: [{ id: "autoTier", value: false }],
++      }),
++    );
++    assert.isUndefined(autoTierForSelection({ instanceId, model: "auto" }));
++    assert.throws(
++      () =>
++        autoTierForSelection({
++          instanceId,
++          model: "auto",
++          options: [{ id: "autoTier", value: true }],
++        }),
++      /advertised tier/,
++    );
++    const descriptor = routingDescriptor({
++      ...autoCatalog,
++      tiers: [...autoCatalog.tiers, { ...autoCatalog.tiers[0]!, id: "provider-default" }],
++    });
++    assert.equal(descriptor.options.at(-1)?.id, "_provider-default");
++    assert.isTrue(descriptor.options.at(-1)?.isReset);
++  });
+   it("uses opaque IDs without aliases, honors visibility, and exposes disabled reasons", () => {
+     const descriptor = routingDescriptor(autoCatalog);
+     assert.deepEqual(
+       descriptor.options.map((option) => option.id),
+-      ["standard", "fuse@2026:opaque", "blocked"],
++      ["standard", "fuse@2026:opaque", "blocked", "provider-default"],
+     );
+     assert.equal(descriptor.options[2]?.disabledReason, "Your account policy disables this.");
+     assert.equal(descriptor.currentValue, "standard");
+diff --git a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts
+index 9bbac0183..8f77f596d 100644
+--- a/packages/provider-copilot/src/server/routing.ts
++++ b/packages/provider-copilot/src/server/routing.ts
+@@ -1,13 +1,17 @@
+ import type { CopilotClient } from "@github/copilot-sdk";
+-import type { ModelSelection, SelectProviderOptionDescriptor } from "@t3tools/contracts";
+-import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
++import type {
++  ModelSelection,
++  ProviderOptionChoice,
++  SelectProviderOptionDescriptor,
++} from "@t3tools/contracts";
++import { getProviderOptionStatedValue } from "@t3tools/shared/model";
+ 
+ export type ModelCatalog = Awaited<ReturnType<CopilotClient["rpc"]["models"]["list"]>>;
+ export type AutoCatalog = NonNullable<ModelCatalog["auto"]>;
+ 
+ export function routingDescriptor(auto: AutoCatalog): SelectProviderOptionDescriptor {
+   const seen = new Set<string>();
+-  const options = auto.tiers.flatMap((tier) => {
++  const options: Array<ProviderOptionChoice> = auto.tiers.flatMap((tier) => {
+     if (
+       !tier.id ||
+       tier.id.length > 512 ||
+@@ -34,9 +38,17 @@ export function routingDescriptor(auto: AutoCatalog): SelectProviderOptionDescri
+       },
+     ];
+   });
++  let resetId = "provider-default";
++  while (seen.has(resetId)) resetId = `_${resetId}`;
++  options.push({
++    id: resetId,
++    label: "Provider default",
++    description: "Explicitly clear the saved routing preference.",
++    isReset: true,
++  });
+   return {
+     id: "autoTier",
+-    label: "Routing",
++    label: auto.tiers.some((tier) => tier.type === "fusion") ? "Fusion effort" : "Routing",
+     type: "select",
+     options,
+     ...(options.some((option) => option.id === auto.defaultTier && !option.disabledReason)
+@@ -46,13 +58,16 @@ export function routingDescriptor(auto: AutoCatalog): SelectProviderOptionDescri
+ }
+ 
+ export function autoTierForSelection(selection: ModelSelection, auto?: AutoCatalog) {
+-  const requested = getModelSelectionStringOptionValue(selection, "autoTier");
++  const requested = getProviderOptionStatedValue("autoTier", selection);
+   if (selection.model !== "auto") {
+-    if (requested)
++    if (requested !== undefined)
+       throw new Error("A Copilot routing preference requires the account-advertised auto model.");
+     return undefined;
+   }
+   if (requested === undefined) return undefined;
++  if (requested === false) return null;
++  if (typeof requested !== "string")
++    throw new Error("A Copilot routing preference must be an advertised tier or provider default.");
+   if (!auto)
+     throw new Error("This Copilot runtime/account does not advertise routing preferences.");
+   const id = requested;
+diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
+index 0b076b80f..0299516a6 100644
+--- a/packages/provider-copilot/src/server/status.test.ts
++++ b/packages/provider-copilot/src/server/status.test.ts
+@@ -32,6 +32,32 @@ const skill = (
+ });
+ 
+ describe("Copilot discovery and account isolation", () => {
++  it("opts in per subprocess, preserving unrelated flags and leaving the default environment alone", () => {
++    const environment = {
++      HOME: "/private",
++      COPILOT_CLI_ENABLED_FEATURE_FLAGS: "EXTENSIONS,DYNAMIC_AUTO_TIERS",
++    };
++    assert.isFalse(decode({}).enableFusion);
++    const disabled = resolveClientConfiguration({
++      settings: decode({}),
++      cwd: "/workspace",
++      environment,
++    });
++    assert.equal(
++      disabled.options.env?.COPILOT_CLI_ENABLED_FEATURE_FLAGS,
++      "EXTENSIONS,DYNAMIC_AUTO_TIERS",
++    );
++    const enabled = resolveClientConfiguration({
++      settings: decode({ enableFusion: true }),
++      cwd: "/workspace",
++      environment,
++    });
++    assert.equal(
++      enabled.options.env?.COPILOT_CLI_ENABLED_FEATURE_FLAGS,
++      "EXTENSIONS,DYNAMIC_AUTO_TIERS,HYDRAFUSION_PLAN_V2",
++    );
++    assert.equal(environment.COPILOT_CLI_ENABLED_FEATURE_FLAGS, "EXTENSIONS,DYNAMIC_AUTO_TIERS");
++  });
+   it("adds advertised Auto routing without replacing explicit-model defaults", () => {
+     const auto: AutoCatalog = {
+       defaultTier: "opaque-tier",
+@@ -53,6 +79,8 @@ describe("Copilot discovery and account isolation", () => {
+     assert.isTrue(result[0]?.isDefault);
+     assert.isUndefined(result[1]?.isDefault);
+     assert.equal(result[1]?.capabilities?.optionDescriptors?.[0]?.id, "autoTier");
++    assert.equal(result[1]?.name, "Fusion");
++    assert.equal(result[1]?.capabilities?.optionDescriptors?.[0]?.label, "Fusion effort");
+     assert.deepEqual(
+       modelsFromSdk([model("explicit")], decode({})).map((entry) => entry.slug),
+       ["explicit"],
+@@ -67,6 +95,7 @@ describe("Copilot discovery and account isolation", () => {
+     assert.isTrue(result[0]?.isDefault);
+     assert.isUndefined(result[1]?.isDefault);
+     assert.deepEqual(result[1]?.capabilities?.optionDescriptors, []);
++    assert.equal(result[1]?.name, "auto");
+     assert.deepEqual(
+       modelsFromSdk([model("auto", { policy: { state: "disabled", terms: "" } })], decode({})),
+       [],
+diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts
+index 019d99146..22e77715f 100644
+--- a/packages/provider-copilot/src/server/status.ts
++++ b/packages/provider-copilot/src/server/status.ts
+@@ -27,6 +27,7 @@ export function modelsFromSdk(
+   auto?: AutoCatalog,
+ ) {
+   const seen = new Set<string>();
++  const autoName = auto?.tiers.some((tier) => tier.type === "fusion") ? "Fusion" : undefined;
+   return providerModelsFromSettings(
+     models
+       .flatMap((model) => {
+@@ -39,7 +40,7 @@ export function modelsFromSdk(
+         return [
+           {
+             slug,
+-            name: model.name,
++            name: slug === "auto" && autoName ? autoName : model.name,
+             isCustom: false,
+             ...(seen.size === 1 ? { isDefault: true } : {}),
+             capabilities: createModelCapabilities({
+@@ -71,7 +72,7 @@ export function modelsFromSdk(
+           ? [
+               {
+                 slug: "auto",
+-                name: "Auto routing",
++                name: autoName ?? "Auto routing",
+                 isCustom: false,
+                 capabilities: createModelCapabilities({
+                   optionDescriptors: [routingDescriptor(auto)],
+diff --git a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts
+index 5e8196963..a2e78004b 100644
+--- a/packages/provider-copilot/src/settings.ts
++++ b/packages/provider-copilot/src/settings.ts
+@@ -36,11 +36,20 @@ export const CopilotSettings = makeProviderSettingsSchema(
+         providerSettingsForm: { control: "switch" },
+       }),
+     ),
++    enableFusion: Schema.Boolean.pipe(
++      Schema.withDecodingDefault(Effect.succeed(false)),
++      Schema.annotateKey({
++        title: "Enable Fusion",
++        description:
++          "Opt in to Copilot's dynamic Fusion tiers and plan-v2 runtime. Available tiers depend on your account. Existing sessions keep their runtime until reopened.",
++        providerSettingsForm: { control: "switch" },
++      }),
++    ),
+     customModels: Schema.Array(CustomModelSetting).pipe(
+       Schema.withDecodingDefault(Effect.succeed([])),
+       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+     ),
+   },
+-  { order: ["binaryPath", "homePath", "enableConfigDiscovery"] },
++  { order: ["binaryPath", "homePath", "enableFusion", "enableConfigDiscovery"] },
+ );
+ export type CopilotSettings = typeof CopilotSettings.Type;
+diff --git a/packages/shared/src/model.test.ts b/packages/shared/src/model.test.ts
+index 39c437997..539019dfc 100644
+--- a/packages/shared/src/model.test.ts
++++ b/packages/shared/src/model.test.ts
+@@ -36,6 +36,40 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
+ });
+ 
+ describe("descriptor helpers", () => {
++  it("round trips an explicit reset without dispatching the picker-only choice ID", () => {
++    const caps = createModelCapabilities({
++      optionDescriptors: [
++        {
++          id: "autoTier",
++          label: "Fusion effort",
++          type: "select",
++          currentValue: "balance",
++          options: [
++            { id: "balance", label: "Standard", isDefault: true },
++            { id: "reset", label: "Provider default", isReset: true },
++          ],
++        },
++      ],
++    });
++    const selection = createModelSelection(ProviderInstanceId.make("githubCopilot"), "auto", [
++      { id: "autoTier", value: false },
++    ]);
++    const descriptors = getProviderOptionDescriptors({ caps, selections: selection.options });
++    expect(getProviderOptionCurrentValue(descriptors[0])).toBe("reset");
++    expect(getProviderOptionCurrentLabel(descriptors[0], selection)).toBe("Provider default");
++    expect(
++      buildExplicitProviderOptionSelectionsFromDescriptors(descriptors, selection.options),
++    ).toEqual([{ id: "autoTier", value: false }]);
++    expect(buildProviderOptionSelectionsFromDescriptors(descriptors)).toEqual([
++      { id: "autoTier", value: false },
++    ]);
++    expect(getProviderOptionCurrentLabel(caps.optionDescriptors?.[0], selection)).toBe(
++      "Provider default",
++    );
++    expect(
++      buildExplicitProviderOptionSelectionsFromDescriptors(descriptors, undefined),
++    ).toBeUndefined();
++  });
+   it("preserves an opaque saved routing request that the destination no longer advertises", () => {
+     const descriptors = getProviderOptionDescriptors({
+       caps: createModelCapabilities({
+diff --git a/packages/shared/src/model.ts b/packages/shared/src/model.ts
+index 71aa8a7be..26b7f8e82 100644
+--- a/packages/shared/src/model.ts
++++ b/packages/shared/src/model.ts
+@@ -214,9 +214,11 @@ function withDescriptorCurrentValue(
+     return descriptor;
+   }
+   const currentValue =
+-    typeof rawCurrentValue === "string"
+-      ? resolveDescriptorChoiceValue(descriptor, rawCurrentValue)
+-      : resolveDescriptorChoiceValue(descriptor, descriptor.currentValue);
++    rawCurrentValue === false && descriptor.options.some((option) => option.isReset)
++      ? descriptor.options.find((option) => option.isReset)?.id
++      : typeof rawCurrentValue === "string"
++        ? resolveDescriptorChoiceValue(descriptor, rawCurrentValue)
++        : resolveDescriptorChoiceValue(descriptor, descriptor.currentValue);
+   if (!currentValue) {
+     const { currentValue: _unusedCurrentValue, ...rest } = descriptor;
+     return rest;
+@@ -278,9 +280,18 @@ export function getProviderOptionCurrentValue(
+     return undefined;
+   }
+   const hasExplicitOption = selection?.options?.some((option) => option.id === descriptor.id);
++  if (
++    descriptor.type === "select" &&
++    getProviderOptionStatedValue(descriptor.id, selection, reportedSelection) === false &&
++    descriptor.options.some((option) => option.isReset)
++  )
++    return descriptor.options.find((option) => option.isReset)?.id;
+   // Reported values are display-only; callers that build dispatch options omit this context.
+   const reportedValue = getReportedOptionValue(descriptor.id, selection, reportedSelection);
+-  if (reportedValue !== undefined) return reportedValue;
++  if (reportedValue !== undefined)
++    return descriptor.type === "select" && reportedValue === false
++      ? descriptor.options.find((option) => option.isReset)?.id
++      : reportedValue;
+   if (descriptor.id === "variant" && selection && !hasExplicitOption) return undefined;
+   if (descriptor.type === "boolean") {
+     return descriptor.currentValue;
+@@ -331,7 +342,14 @@ export function buildProviderOptionSelectionsFromDescriptors(
+   for (const descriptor of descriptors) {
+     const value = getProviderOptionCurrentValue(descriptor);
+     if (typeof value === "string" || typeof value === "boolean") {
+-      nextSelections.push({ id: descriptor.id, value });
++      nextSelections.push({
++        id: descriptor.id,
++        value:
++          descriptor.type === "select" &&
++          descriptor.options.find((option) => option.id === value)?.isReset
++            ? false
++            : value,
++      });
+     }
+   }
+ 

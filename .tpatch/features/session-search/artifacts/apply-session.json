@@ -1,0 +1,8 @@
+{
+  "slug": "session-search",
+  "completed_at": "2026-10-29T16:38:27Z",
+  "base_commit": "fed030d5cfba9b76789105d7f40933957d7b37cf",
+  "has_patch": true,
+  "validation_status": "needs_review",
+  "validation_notes": "Full v014 root inspected; staged root recorded before commit. Tests deferred until full integration. See v014-replay-review.md."
+}

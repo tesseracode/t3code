@@ -1,0 +1,43 @@
+{
+  "feature": "copilot-auto-default-routing",
+  "scope": "Fusion-layer ordinary Auto eligibility correction; no SDK version change",
+  "baseline": "2b383e8463042f4f2332707568dbeab9a39bfe38",
+  "focusedTests": {
+    "command": "node_modules/.bin/vp test run packages/provider-copilot/src/server/{routing,status,adapter}.test.ts",
+    "files": 3,
+    "passed": 34
+  },
+  "providerTypecheck": "passed",
+  "scopedLint": "passed",
+  "behavior": [
+    "Advertised plain Auto survives missing optional tier metadata without invented Routing choices",
+    "Policy-disabled and unadvertised models remain excluded",
+    "Create, cold resume, explicit-model switch and switch back to Auto send turns without a tier override",
+    "Explicit tiers still reject missing metadata, hidden, disabled and unknown preferences",
+    "Omitted preferences preserve runtime-owned routing even when the advertised default tier is absent or disabled"
+  ],
+  "surfaces": {
+    "entryPoints": "All model selection entry points consume the shared provider snapshot and validator",
+    "clients": "Web, desktop and mobile share this environment-owned provider behavior",
+    "providers": "Copilot only; other adapters unchanged",
+    "contracts": "No wire changes",
+    "reverseStates": "Auto to explicit model and back covered",
+    "connectionModes": "Environment-side discovery/validation covers local and remote clients",
+    "docs": "Updated user provider selection documentation"
+  },
+  "replay": {
+    "hardParent": "copilot-fusion-model-selection",
+    "exactLeafComposition": "passed; see replay-proof.json",
+    "hashedWritePreconditions": 6,
+    "nativeVerification": "blocked by existing overlapping provider ancestor; see native-verify.json",
+    "historicalEvidenceChanged": false,
+    "futureUpstreamCompatibilityProven": false
+  },
+  "remainingGates": [
+    "SDK advertised Fusion discovery/selection/execution",
+    "Existing packaged platform qualification",
+    "Native tpatch overlapping-ancestor verification"
+  ],
+  "pickerRedesign": "Not implemented as part of this correction",
+  "deployment": false
+}
