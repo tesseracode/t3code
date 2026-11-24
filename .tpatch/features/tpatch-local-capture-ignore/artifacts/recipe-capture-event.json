@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "feature": "tpatch-local-capture-ignore",
+  "patch_present": true,
+  "patch_sha256": "ced0127abc784f206351fd9326679aa55a9db63599ca36b16b60fc1f77227450",
+  "recipe_present": true,
+  "recipe_sha256": "e10b4c80caad0602d30a83e4dda8668ca563e6b834041fb9e614ba9f1d28088b",
+  "reference": {
+    "kind": "commit",
+    "commit": "28236c8146bd9cc659772d70b2660ff3f3f65440",
+    "preimage_set_sha256": "95c4b4cc78cba9307ff4cd0a38ae61ee7fe87c0c382be6695682f8409eab8f49"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      ".gitignore"
+    ],
+    "claim_ids": []
+  },
+  "event": {
+    "patch_rewritten": true,
+    "recipe_regenerated": true,
+    "bound_artifact_edited": false,
+    "stale_marker_present": false
+  },
+  "parent_created_paths": [],
+  "observations": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": ".gitignore",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "c41cb296f18ae35f8871aa73b8b8f1a5c7f2a324e7ca0d52dcfdad5b0a571d1c",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "1307b5b413bc54026b224af27cca5756bb80f5d867b3ccebc6db58e11e0ca18f",
+      "patch_fragment_sha256": "ced0127abc784f206351fd9326679aa55a9db63599ca36b16b60fc1f77227450"
+    }
+  ],
+  "coverage_sha256": "4db766246e22d7a491edac18837cb1351d6e102d26dc28fe30c9272160d1a38e"
+}

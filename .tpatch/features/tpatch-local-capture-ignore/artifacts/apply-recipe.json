@@ -2,10 +2,12 @@
   "feature": "tpatch-local-capture-ignore",
   "operations": [
     {
-      "type": "replace-in-file",
+      "type": "write-file",
       "path": ".gitignore",
-      "search": ".t3\n.idea/",
-      "replace": ".t3\n.tpatch/local/\n.idea/"
+      "content": "node_modules\n.bun\n.turbo\n.DS_Store\n*.log\n*.tsbuildinfo\napps/*/dist\napps/*/dist-exe\ninfra/*/dist\n.astro\npackages/*/dist\n.env\n.env.local\nbuild/\n.logs/\nrelease/\nrelease-mock/\n.t3\n.tpatch/local/\n.idea/\napps/web/.playwright\napps/web/playwright-report\napps/web/src/components/__screenshots__\n.vitest-*\n__screenshots__/\n.tanstack\nsquashfs-root/\n.vercel\n.gstack/\n.plans/\n/audits/\ndist-electron/\n.electron-runtime/\n.showcase/\napps/mobile/.showcase/\napps/mobile/.generated/\napps/mobile/.android-cache/\n/.generated/\nartifacts/app-store/screenshots/\nartifacts/mobile-e2e/\nartifacts/mobile-behavior/\nscripts/.e2e/\n.github/pr-assets/\nnative/**/target/\nnode_modules/\n.alchemy/\n*.log\n.env*\n!.env.example\n\n# pnpm content-addressable store; never belongs in the repo.\n.pnpm-store/\n\n/packages/ssh/.ssh-launcher-test-*/\n",
+      "search": "",
+      "replace": "",
+      "preimage_hash": "sha256:c41cb296f18ae35f8871aa73b8b8f1a5c7f2a324e7ca0d52dcfdad5b0a571d1c"
     }
   ]
 }
