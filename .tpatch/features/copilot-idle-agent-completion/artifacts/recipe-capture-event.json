@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "feature": "copilot-idle-agent-completion",
+  "patch_present": true,
+  "patch_sha256": "066667837658ecff7e3f0a4713e9d2ea2f1ee89fc048b34821c5e6abe5c70d37",
+  "recipe_present": true,
+  "recipe_sha256": "1895411f17af9efd023aef5f87d55b97b501a3cb4ee571c7bad1c827e0136511",
+  "reference": {
+    "kind": "commit",
+    "commit": "1679f8dcaacacbc383d9a07b162408e84ed2ea2d",
+    "preimage_set_sha256": "60aa4af32885f60a803bb26bf1818045940fb00e0c1b18907a817086856ac00d"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "packages/provider-copilot/src/server/adapter.test.ts",
+      "packages/provider-copilot/src/server/adapter.ts"
+    ],
+    "claim_ids": []
+  },
+  "event": {
+    "patch_rewritten": true,
+    "recipe_regenerated": true,
+    "bound_artifact_edited": false,
+    "stale_marker_present": false
+  },
+  "parent_created_paths": [],
+  "observations": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.test.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "4ceaf813b238306ef2238b3207dec165dba83e3997d7dd3a78ca8eaa98e47865",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "f9477e9927717ab6b6f24ce94e60b952a9b4f7b82ab71f09f5ae9138763ac3d1",
+      "patch_fragment_sha256": "605687bf2f23e6770373bc9c016036d92d5839557a5679be81d2380ba2b94295"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/adapter.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "27018ba90645153e446b85ea2880123b7818f27c4320f5b260cce44057071957",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "4fca91c32163661af112e56aea0df21bff4c151e9e534f7d88cf9f8e65103c5a",
+      "patch_fragment_sha256": "a6410c15a0e0bcdd411239eba90523fedaafce598c81ebaf4dd36af4e36270d8"
+    }
+  ],
+  "coverage_sha256": "062e37b151ad2e73f5df7b439331c5413953944c50406b2a4eae85759fbd112d"
+}

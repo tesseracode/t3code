@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-idle-agent-completion",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "d95da3143edbdaa9c00225e50c7f819d07d7a290",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "13bb1e6b3417f87fc7ce96d590053661b76e85533aecea40b8adb453a8aeb1a3",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "0947fd992e5e8ddab8d0c28f008b4ad72ec7f912",
       "upper": {
@@ -39,6 +39,51 @@
           "parent_generation": 24,
           "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
           "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_6141ef8d467f",
+      "kind": "amend-refresh",
+      "patch_sha256": "066667837658ecff7e3f0a4713e9d2ea2f1ee89fc048b34821c5e6abe5c70d37",
+      "git_patch_id": "d95da3143edbdaa9c00225e50c7f819d07d7a290",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "1895411f17af9efd023aef5f87d55b97b501a3cb4ee571c7bad1c827e0136511",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "1679f8dcaacacbc383d9a07b162408e84ed2ea2d",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 25,
+          "parent_patch_sha256": "e8e7a6cb8d90c481d0e754ed68390e95e26d286d16f2240b03fd77a7d91006f6",
+          "parent_recipe_sha256": "ff2a277c5e21317cc58b1d8b04df2ccf7a8377b40ea07bc76cf5576404092c81"
         }
       ],
       "refs": {
