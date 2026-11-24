@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "feature": "copilot-text-generation-failure-diagnostics",
+  "patch_present": true,
+  "patch_sha256": "27d8cf59d21020bdb10ad906a8329adf9fd302cbb9f5946024f578d2c01a6b8c",
+  "recipe_present": true,
+  "recipe_sha256": "df017a6daa24ebe802c38a04c98d85a86254c830403d46a845f4462e72567188",
+  "reference": {
+    "kind": "commit",
+    "commit": "eb939480da4441ffd6cb6a8b4373051d5dec1c8d",
+    "preimage_set_sha256": "5edf1431d36009d74d8199cc40faea91c1a57d8d0178a0ccca90499e0858239f"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "packages/provider-copilot/src/server/textGeneration.test.ts",
+      "packages/provider-copilot/src/server/textGeneration.ts"
+    ],
+    "claim_ids": []
+  },
+  "event": {
+    "patch_rewritten": true,
+    "recipe_regenerated": true,
+    "bound_artifact_edited": false,
+    "stale_marker_present": false
+  },
+  "parent_created_paths": [],
+  "observations": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/textGeneration.test.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "640222d1d117e019b8f025789a2f00ae372820fce4569ff2e1f8b5ae43c0b47d",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "c4941df1f778764b23601c4b271fbd9d9626bf0ee256e500dc16f2af5ff09bfd",
+      "patch_fragment_sha256": "898103ab27f57bd9ea3a2717b0260f090e03eed1570666f9a135b8a3c76d3610"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "packages/provider-copilot/src/server/textGeneration.ts",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "772f3a7444a0f3a60a3b90c9b7f485241979e260bdaf04391c387b9728449c2b",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "14496a6857a16f4191b5606385bb8ca87f82be6f2ce6c0660c916f67443990a5",
+      "patch_fragment_sha256": "6c86e6b9d723652d48c06fb81733f97de830ddde5bd49b16aef636043f82c568"
+    }
+  ],
+  "coverage_sha256": "720a99da2f379a61e3cfb81b237b23f93f7f573d9bfbe4643a4908aac1c349e7"
+}

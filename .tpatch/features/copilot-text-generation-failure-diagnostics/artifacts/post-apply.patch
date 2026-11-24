@@ -101,7 +101,7 @@ index 93f4a34749..ce3b21732a 100644
        assert.isFalse(sent);
      }),
 diff --git a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts
-index 5833632f3a..8a1fe471a3 100644
+index 07558bc4c0..07d748f1e9 100644
 --- a/packages/provider-copilot/src/server/textGeneration.ts
 +++ b/packages/provider-copilot/src/server/textGeneration.ts
 @@ -33,10 +33,10 @@ export function makeTextGeneration(
@@ -132,7 +132,16 @@ index 5833632f3a..8a1fe471a3 100644
                Effect.timeoutOption(timeoutMs),
                Effect.flatMap((result) =>
                  Effect.fromOption(result).pipe(
-@@ -110,7 +110,7 @@ export function makeTextGeneration(
+@@ -68,7 +68,7 @@ export function makeTextGeneration(
+               ),
+             );
+           const cleanup = <A>(operation: () => Promise<A>, timeoutMs = 5_000) =>
+-            Effect.tryPromise({ try: operation, catch: error }).pipe(
++            Effect.tryPromise({ try: operation, catch: error("cleanup") }).pipe(
+               Effect.timeoutOption(timeoutMs),
+               Effect.result,
+             );
+@@ -113,7 +113,7 @@ export function makeTextGeneration(
                : undefined;
            const autoTier = yield* Effect.try({
              try: () => autoTierForSelection(request.modelSelection, autoCatalog),
@@ -141,7 +150,7 @@ index 5833632f3a..8a1fe471a3 100644
            });
            const owned = yield* call(
              "session creation",
-@@ -177,6 +177,18 @@ export function makeTextGeneration(
+@@ -180,6 +180,18 @@ export function makeTextGeneration(
          });
        return generated;
      },

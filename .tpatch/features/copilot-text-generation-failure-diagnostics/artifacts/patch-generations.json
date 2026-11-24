@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-text-generation-failure-diagnostics",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "f36c442849517973a8d4d484c461d38d346ba503",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "449305587f19b6a7bc2190ffef87c35a2e0bcd4312c49b59208d2c8df3b2ad2e",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "83efed3d9cf01d911d7d77c0e987ede131c71d08",
       "upper": {
@@ -39,6 +39,51 @@
           "parent_generation": 1,
           "parent_patch_sha256": "9ca1b2145716aae7f9443a8988ede0cebcf5292f17d73e111fcd3a719b36a55e",
           "parent_recipe_sha256": "d4aa6e25f3df994850c4d86fc97939c984ad2298d51c2c7b365972d01cc4bcb6"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_5d45ec79271b",
+      "kind": "amend-refresh",
+      "patch_sha256": "27d8cf59d21020bdb10ad906a8329adf9fd302cbb9f5946024f578d2c01a6b8c",
+      "git_patch_id": "538926750501ad8708235d2e0725b87e38b72b81",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "df017a6daa24ebe802c38a04c98d85a86254c830403d46a845f4462e72567188",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "eb939480da4441ffd6cb6a8b4373051d5dec1c8d",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "packages/provider-copilot/src/server/textGeneration.test.ts",
+          "packages/provider-copilot/src/server/textGeneration.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "packages/provider-copilot/src/server/textGeneration.test.ts",
+        "packages/provider-copilot/src/server/textGeneration.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-background-routing",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "ecdb2609d2c59b203ab1b28da4023ca8ef9249d4459a6889b9300667429bfb9c",
+          "parent_recipe_sha256": "36415e27c49c6d931045975badfe8abe2b31f1fce961bdae4513bbc59554bf46"
         }
       ],
       "refs": {
