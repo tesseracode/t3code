@@ -69,7 +69,15 @@ describe("account-advertised routing", () => {
           autoCatalog,
         ),
       );
-    assert.throws(() => autoTierForSelection({ instanceId, model: "auto" }), /does not advertise/);
+    assert.throws(
+      () =>
+        autoTierForSelection({
+          instanceId,
+          model: "auto",
+          options: [{ id: "autoTier", value: "fuse@2026:opaque" }],
+        }),
+      /does not advertise/,
+    );
     assert.throws(
       () =>
         autoTierForSelection(
@@ -82,5 +90,11 @@ describe("account-advertised routing", () => {
         ),
       /requires/,
     );
+  });
+  it("leaves plain Auto routing to the runtime without requiring an advertised default tier", () => {
+    const selection = { instanceId, model: "auto" };
+    assert.isUndefined(autoTierForSelection(selection));
+    assert.isUndefined(autoTierForSelection(selection, { defaultTier: "unknown", tiers: [] }));
+    assert.isUndefined(autoTierForSelection(selection, { ...autoCatalog, defaultTier: "blocked" }));
   });
 });

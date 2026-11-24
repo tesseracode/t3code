@@ -58,6 +58,22 @@ describe("Copilot discovery and account isolation", () => {
       ["explicit"],
     );
   });
+  it("keeps advertised plain Auto without tier metadata or invented routing choices", () => {
+    const result = modelsFromSdk([model("explicit"), model("auto")], decode({}));
+    assert.deepEqual(
+      result.map((entry) => entry.slug),
+      ["explicit", "auto"],
+    );
+    assert.isTrue(result[0]?.isDefault);
+    assert.isUndefined(result[1]?.isDefault);
+    assert.deepEqual(result[1]?.capabilities?.optionDescriptors, []);
+    assert.deepEqual(
+      modelsFromSdk([model("auto", { policy: { state: "disabled", terms: "" } })], decode({})),
+      [],
+    );
+    assert.deepEqual(modelsFromSdk([], decode({})), []);
+  });
+
   it("keeps project/native skills in workspace results, including pathless built-ins", () => {
     const skills = skillsFromSdk([
       skill("project-skill", "project"),
@@ -177,12 +193,17 @@ describe("Copilot discovery and account isolation", () => {
           forceStop: async () => {},
           getStatus: async () => ({ version: "1.0.75", protocolVersion: 1 }),
           getAuthStatus: async () => ({ isAuthenticated: true, login: "octocat" }),
-          rpc: { models: { list: async () => ({ models: [model("gpt")] }) } },
+          rpc: { models: { list: async () => ({ models: [model("gpt"), model("auto")] }) } },
         }),
       );
       assert.equal(result.status, "ready");
       assert.equal(result.auth.label, "octocat");
       assert.equal(result.models[0]?.slug, "gpt");
+      assert.equal(result.models[1]?.slug, "auto");
+      assert.equal(
+        result.message,
+        "This account/runtime does not advertise routing preferences. Available models can still use their default routing.",
+      );
       assert.deepEqual(result.skills, []);
       assert.equal(stops, 1);
     }),

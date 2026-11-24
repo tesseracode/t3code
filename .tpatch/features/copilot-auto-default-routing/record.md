@@ -1,30 +1,19 @@
 # Implementation Record: copilot-auto-default-routing
 
-**Recorded**: 2026-11-03T09:04:40Z
+**Recorded**: 2026-11-24T07:16:21Z
 **Files changed**: 6
-**Patch size**: 8813 bytes
-**Capture mode**: working-tree-all
-**Pathspecs**: packages/provider-copilot/src/server/status.ts,packages/provider-copilot/src/server/routing.ts,packages/provider-copilot/src/server/status.test.ts,packages/provider-copilot/src/server/routing.test.ts,packages/provider-copilot/src/server/adapter.test.ts,docs/user/providers-copilot.md
-
-## Change Summary
-
-```
- docs/user/providers-copilot.md                     |  8 +++--
- .../provider-copilot/src/server/adapter.test.ts    | 35 ++++++++++++++++++++++
- .../provider-copilot/src/server/routing.test.ts    | 16 +++++++++-
- packages/provider-copilot/src/server/routing.ts    |  5 ++--
- .../provider-copilot/src/server/status.test.ts     | 23 +++++++++++++-
- packages/provider-copilot/src/server/status.ts     | 10 ++-----
- 6 files changed, 83 insertions(+), 14 deletions(-)
-```
+**Patch size**: 8825 bytes
+**Capture mode**: staged-index
+**Pathspecs**: docs/user/providers-copilot.md,packages/provider-copilot/src/server/adapter.test.ts,packages/provider-copilot/src/server/routing.test.ts,packages/provider-copilot/src/server/routing.ts,packages/provider-copilot/src/server/status.test.ts,packages/provider-copilot/src/server/status.ts
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: packages/provider-copilot/src/server/status.ts, packages/provider-copilot/src/server/routing.ts, packages/provider-copilot/src/server/status.test.ts, packages/provider-copilot/src/server/routing.test.ts, packages/provider-copilot/src/server/adapter.test.ts, docs/user/providers-copilot.md
+- **capture_mode**: `staged-index`
+- **pathspecs**: docs/user/providers-copilot.md, packages/provider-copilot/src/server/adapter.test.ts, packages/provider-copilot/src/server/routing.test.ts, packages/provider-copilot/src/server/routing.ts, packages/provider-copilot/src/server/status.test.ts, packages/provider-copilot/src/server/status.ts
 - **claim_ids**: (none)
-- **base_commit**: `2b383e8463042f4f2332707568dbeab9a39bfe38`
+- **base_commit**: `464f7cfdf11b8c28ee38854df55fb028882781c1`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 6 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-auto-default-routing",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "d04bdda59a5a7c45eef5c9c26d2a2a0a84f5c31d",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "6b8bc5012877e12e7a92b86536182a46a4c6f5df807dc7a0693c65b55ad8d944",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "2b383e8463042f4f2332707568dbeab9a39bfe38",
       "upper": {
@@ -47,6 +47,59 @@
           "parent_generation": 1,
           "parent_patch_sha256": "cdd8d64df4d56e55c018609297185ac5843be2b4c2c82d79a7e2cd57614386cb",
           "parent_recipe_sha256": "a9f07a134e711fc1edf0c793f3aadf9739e90de32f69031776b5981c0cc24550"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_3abeb52ce00f",
+      "kind": "amend-refresh",
+      "patch_sha256": "415badac872b895a86414aef923c550057ebd4d5442a2d739cb3e2ded9871a7f",
+      "git_patch_id": "d04bdda59a5a7c45eef5c9c26d2a2a0a84f5c31d",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "0514210c93aeb026255cb7e34d3c15f4f5c5732e0ae48a7bd4e5b290d70c2bd2",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "464f7cfdf11b8c28ee38854df55fb028882781c1",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "docs/user/providers-copilot.md",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/routing.test.ts",
+          "packages/provider-copilot/src/server/routing.ts",
+          "packages/provider-copilot/src/server/status.test.ts",
+          "packages/provider-copilot/src/server/status.ts"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "docs/user/providers-copilot.md",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/routing.test.ts",
+        "packages/provider-copilot/src/server/routing.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/status.ts"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-fusion-model-selection",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "c121679d7cf2d3443aeebfd7090e5c13ae8e9d3b3251fe2c561246b00e472eae",
+          "parent_recipe_sha256": "d9613039f7ece9abb67a234fbc69122e45f82fe77ab313cc73423d116ec2ebfb"
         }
       ],
       "refs": {

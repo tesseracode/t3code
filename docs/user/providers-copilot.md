@@ -7,8 +7,12 @@ not the ACP registry or a separately billed hosted model service.
 Sign in on that environment with `copilot login`, then refresh provider status.
 Models and reasoning options come from your account's available catalog.
 
-When your account advertises **Auto routing**, its **Routing** option includes the eligible
-preferences, including Fusion. Disabled preferences show their account-specific reason.
+When **Auto** is available in your model catalog, you can select it to let Copilot
+choose the model using its current routing preferences. Auto remains available
+even when the account does not supply routing-preference details.
+
+When your account advertises routing preferences, Auto's **Routing** option includes the
+eligible preferences, including Fusion. Disabled preferences show their account-specific reason.
 Requests can remain pending before they take effect; the activity log distinguishes requested,
 effective, and activating routing and shows reported model phases and timing. See
 [Activity log](activity-log.md). Explicit-model selection and defaults are unchanged.
