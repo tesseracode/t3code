@@ -179,6 +179,8 @@ export default defineConfig({
   },
   fmt: {
     ignorePatterns: [
+      // Tpatch capture receipts bind the exact bytes, including whitespace.
+      ".tpatch/**",
       ".repos/**",
       "infra/task-cache/vendor/**",
       // Macroscope requires one glob per line; Markdown formatting corrupts it.
