@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import type { SessionConfig } from "@github/copilot-sdk";
+import type { CopilotSession, SessionConfig } from "@github/copilot-sdk";
 import { ProviderInstanceId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -7,8 +7,22 @@ import * as Fiber from "effect/Fiber";
 import * as Schema from "effect/Schema";
 import { CopilotSettings } from "../settings.ts";
 import { makeTextGeneration } from "./textGeneration.ts";
+import type { ModelCatalog } from "./routing.ts";
 
 const settings = Schema.decodeSync(CopilotSettings)({});
+const catalog: ModelCatalog = {
+  models: [],
+  auto: {
+    defaultTier: "standard",
+    tiers: ["standard", "opaque-high", "opaque-max", "disabled", "hidden"].map((id) => ({
+      id,
+      displayName: id,
+      description: "",
+      type: "fusion",
+      status: { enabled: id !== "disabled", pickerVisible: id !== "hidden" },
+    })),
+  },
+};
 
 function gate() {
   let resolve!: () => void;
@@ -20,63 +34,147 @@ function gate() {
 
 describe("Copilot background text generation", () => {
   it.effect(
-    "uses a tool-free native session, validates JSON and deletes only its owned ephemeral session",
+    "honors routing in tool-free sessions and deletes only its owned ephemeral session",
     () =>
       Effect.gen(function* () {
-        let config: SessionConfig | undefined;
-        const cleanup: string[] = [];
+        for (const tier of [undefined, false, "standard", "opaque-high", "opaque-max"]) {
+          let config: SessionConfig | undefined;
+          const cleanup: string[] = [];
+          const changes: Array<Parameters<CopilotSession["setModel"]>> = [];
+          const generation = makeTextGeneration(
+            settings,
+            { HOME: "/account" },
+            {
+              clientFactory: (options) => {
+                assert.equal(options.mode, "copilot-cli");
+                return {
+                  start: async () => {},
+                  stop: async () => {
+                    cleanup.push("stop");
+                    return [];
+                  },
+                  forceStop: async () => {},
+                  rpc: {
+                    models: {
+                      list: async () => {
+                        assert.isString(tier);
+                        return catalog;
+                      },
+                    },
+                  },
+                  deleteSession: async (id) => {
+                    cleanup.push(`delete:${id}`);
+                  },
+                  createSession: async (created) => {
+                    config = created;
+                    return {
+                      sessionId: "ephemeral",
+                      setModel: async (...change) => {
+                        changes.push(change);
+                      },
+                      disconnect: async () => {
+                        cleanup.push("disconnect");
+                      },
+                      sendAndWait: async () => {
+                        assert.deepEqual(
+                          changes,
+                          tier === false ? [["auto", { autoTier: null }]] : [],
+                        );
+                        return {
+                          type: "assistant.message",
+                          data: { content: '{"title":"Native title"}' },
+                        } as Awaited<
+                          ReturnType<import("@github/copilot-sdk").CopilotSession["sendAndWait"]>
+                        >;
+                      },
+                    };
+                  },
+                };
+              },
+            },
+          );
+          const result = yield* generation.generateThreadTitle({
+            cwd: "/workspace",
+            message: "Title this work",
+            modelSelection: {
+              instanceId: ProviderInstanceId.make("githubCopilot"),
+              model: "auto",
+              ...(tier === undefined ? {} : { options: [{ id: "autoTier", value: tier }] }),
+            },
+          });
+          assert.equal(result.title, "Native title");
+          assert.deepEqual(config?.availableTools, []);
+          assert.deepEqual(config?.mcpServers, {});
+          assert.isFalse(config!.enableConfigDiscovery);
+          assert.isFalse(config!.enableSkills);
+          assert.deepEqual(config?.capi, typeof tier === "string" ? { autoTier: tier } : undefined);
+          assert.deepEqual(cleanup, ["disconnect", "delete:ephemeral", "stop"]);
+        }
+      }),
+  );
+
+  it.effect("rejects unavailable routing before creating a session or sending", () =>
+    Effect.gen(function* () {
+      const cases: Array<{
+        tier: string | boolean;
+        model?: string;
+        missingCatalog?: boolean;
+        discoveryFailure?: boolean;
+      }> = [
+        { tier: "unknown" },
+        { tier: "disabled" },
+        { tier: "hidden" },
+        { tier: true },
+        { tier: "opaque-high", missingCatalog: true },
+        { tier: "opaque-high", discoveryFailure: true },
+        { tier: "opaque-high", model: "gpt-4.1" },
+      ];
+      for (const scenario of cases) {
+        let created = false;
+        let stopped = false;
         const generation = makeTextGeneration(
           settings,
-          { HOME: "/account" },
+          {},
           {
-            clientFactory: (options) => {
-              assert.equal(options.mode, "copilot-cli");
-              return {
-                start: async () => {},
-                stop: async () => {
-                  cleanup.push("stop");
-                  return [];
+            clientFactory: () => ({
+              start: async () => {},
+              stop: async () => {
+                stopped = true;
+                return [];
+              },
+              forceStop: async () => {},
+              deleteSession: async () => {},
+              rpc: {
+                models: {
+                  list: async () => {
+                    if (scenario.discoveryFailure) throw new Error("Discovery failed.");
+                    return scenario.missingCatalog ? { models: [] } : catalog;
+                  },
                 },
-                forceStop: async () => {},
-                deleteSession: async (id) => {
-                  cleanup.push(`delete:${id}`);
-                },
-                createSession: async (created) => {
-                  config = created;
-                  return {
-                    sessionId: "ephemeral",
-                    disconnect: async () => {
-                      cleanup.push("disconnect");
-                    },
-                    sendAndWait: async () =>
-                      ({
-                        type: "assistant.message",
-                        data: { content: '{"title":"Native title"}' },
-                      }) as Awaited<
-                        ReturnType<import("@github/copilot-sdk").CopilotSession["sendAndWait"]>
-                      >,
-                  };
-                },
-              };
-            },
+              },
+              createSession: async () => {
+                created = true;
+                throw new Error("Must not create a session.");
+              },
+            }),
           },
         );
-        const result = yield* generation.generateThreadTitle({
-          cwd: "/workspace",
-          message: "Title this work",
-          modelSelection: {
-            instanceId: ProviderInstanceId.make("githubCopilot"),
-            model: "gpt-4.1",
-            options: [],
-          },
-        });
-        assert.equal(result.title, "Native title");
-        assert.deepEqual(config?.availableTools, []);
-        assert.deepEqual(config?.mcpServers, {});
-        assert.isFalse(config!.enableConfigDiscovery);
-        assert.isFalse(config!.enableSkills);
-        assert.deepEqual(cleanup, ["disconnect", "delete:ephemeral", "stop"]);
-      }),
+        const result = yield* Effect.exit(
+          generation.generateThreadTitle({
+            cwd: "/workspace",
+            message: "Title",
+            modelSelection: {
+              instanceId: ProviderInstanceId.make("githubCopilot"),
+              model: scenario.model ?? "auto",
+              options: [{ id: "autoTier", value: scenario.tier }],
+            },
+          }),
+        );
+        assert.isTrue(Exit.isFailure(result));
+        assert.isFalse(created);
+        assert.isTrue(stopped);
+      }
+    }),
   );
 
   it.effect("rejects malformed generation output while still cleaning up native resources", () =>
@@ -94,11 +192,19 @@ describe("Copilot background text generation", () => {
               return [];
             },
             forceStop: async () => {},
+            rpc: {
+              models: {
+                list: async () => {
+                  throw new Error("Concrete models need no routing discovery.");
+                },
+              },
+            },
             deleteSession: async () => {
               deleted++;
             },
             createSession: async () => ({
               sessionId: "ephemeral",
+              setModel: async () => {},
               disconnect: async () => {},
               sendAndWait: async () =>
                 ({ type: "assistant.message", data: { content: "not JSON" } }) as Awaited<
@@ -108,6 +214,7 @@ describe("Copilot background text generation", () => {
           }),
         },
       );
+
       const result = yield* generation
         .generateBranchName({
           cwd: "/workspace",
@@ -122,6 +229,53 @@ describe("Copilot background text generation", () => {
       assert.isTrue(Exit.isFailure(result));
       assert.equal(deleted, 1);
       assert.equal(stopped, 1);
+    }),
+  );
+
+  it.effect("cleans up a failed routing reset without sending under the wrong preference", () =>
+    Effect.gen(function* () {
+      let sent = false;
+      let deleted = false;
+      const generation = makeTextGeneration(
+        settings,
+        {},
+        {
+          clientFactory: () => ({
+            start: async () => {},
+            stop: async () => [],
+            forceStop: async () => {},
+            deleteSession: async () => {
+              deleted = true;
+            },
+            rpc: { models: { list: async () => catalog } },
+            createSession: async () => ({
+              sessionId: "ephemeral",
+              disconnect: async () => {},
+              setModel: async () => {
+                throw new Error("Reset failed.");
+              },
+              sendAndWait: async () => {
+                sent = true;
+                return undefined;
+              },
+            }),
+          }),
+        },
+      );
+      const result = yield* Effect.exit(
+        generation.generateThreadTitle({
+          cwd: "/workspace",
+          message: "Title",
+          modelSelection: {
+            instanceId: ProviderInstanceId.make("githubCopilot"),
+            model: "auto",
+            options: [{ id: "autoTier", value: false }],
+          },
+        }),
+      );
+      assert.isTrue(Exit.isFailure(result));
+      assert.isTrue(deleted);
+      assert.isFalse(sent);
     }),
   );
 
@@ -144,6 +298,7 @@ describe("Copilot background text generation", () => {
               return [];
             },
             forceStop: async () => {},
+            rpc: { models: { list: async () => catalog } },
             deleteSession: async () => {
               deleted++;
               cleaned.resolve();
@@ -153,6 +308,7 @@ describe("Copilot background text generation", () => {
               await release.promise;
               return {
                 sessionId: "late-session",
+                setModel: async () => {},
                 disconnect: async () => {},
                 sendAndWait: async () => {
                   sent++;
