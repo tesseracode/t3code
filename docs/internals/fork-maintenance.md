@@ -6,15 +6,24 @@
 automatic deployment trigger. There is no permanent `dev` branch. `upstream`
 remains the read-only upstream remote.
 
-- `tpatch/<slug>` starts from and targets `main`. A feature that depends on an
-  active reconciliation starts from and targets `reconcile/<upstream-tag>`;
-  record that dependency and target in its tracking issue.
+- `main` is maintained on one pinned, validated stable upstream. Preserve the
+  unmodified upstream commit under `baseline/upstream-<upstream-tag>` and each
+  validated fork snapshot under an immutable fork-prefixed tag.
+- `tpatch/<slug>` starts from and targets `main`. A feature that requires an
+  active reconciliation may target `reconcile/<upstream-tag>`, but is not
+  accepted into `main` until that baseline is promoted. Record the dependency
+  and target in its tracking issue.
 - `reconcile/<upstream-tag>` starts from an immutable, verified stable upstream
   commit and composes the selected maintained roots. It targets `main` only
-  after review and all required qualification gates.
+  after source replay, behavioral validation and independent review. Account
+  for features accepted into `main` while reconciliation was in progress before
+  validating the final proposed merge.
 - `release/<fork-version>` is temporary candidate qualification from a frozen
   integration commit. Production releases use immutable fork-prefixed tags
   (`fork-v<upstream-version>-<sequence>`), never upstream's tag names.
+- Older-version compatibility is optional. An approved `support/<upstream-tag>`
+  starts from that version's preserved fork snapshot and keeps its own patch
+  generations; ordinary feature work develops forward on current `main`.
 - Existing `phase*`, `build`, `request`, `landing`, `replay`, `validation` and
   `archive` branches remain historical evidence. Inventory semantic coverage
   before adopting their changes; do not delete, rename or force-push them as
@@ -23,6 +32,8 @@ remains the read-only upstream remote.
 Request registration does not approve implementation. A clean review does not
 authorize main promotion, a PR, publication, signing, deployment, or a live
 upgrade. Those actions require explicit approval.
+
+The operating procedure is [Fork patch flow](../operations/patch-flow.md).
 
 ## Reproducible source
 
@@ -51,7 +62,10 @@ internal, version-specific record of the base and target commits, ordered roots
 and patch hashes, replay command/results, file-mode comparison, residual paths,
 and excluded administrative metadata or declared build transforms. Preserve the
 failed verifier results. This exception does not waive source inspection,
-behavioral validation, independent review, or receiving-platform qualification.
+behavioral validation or independent review, and never excuses malformed
+landing evidence, unexplained product differences or an actual replay failure.
+Receiving-platform qualification remains a separate package/release gate;
+main promotion alone does not authorize release or installation.
 
 Administrative `.tpatch` history is not expected to be reproduced by product
 patches. All other tracked differences require a recorded root or an explicit

@@ -1,25 +1,19 @@
 # Implementation Record: fork-patch-flow-convention
 
-**Recorded**: 2026-11-06T06:45:16Z
+**Recorded**: 2026-11-24T07:13:38Z
 **Files changed**: 2
-**Patch size**: 11499 bytes
-**Capture mode**: working-tree-all
+**Patch size**: 11503 bytes
+**Capture mode**: staged-index
 **Pathspecs**: docs/internals/fork-maintenance.md,docs/operations/patch-flow.md
-
-## Change Summary
-
-```
- docs/internals/fork-maintenance.md | 24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
-```
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
+- **capture_mode**: `staged-index`
 - **pathspecs**: docs/internals/fork-maintenance.md, docs/operations/patch-flow.md
 - **claim_ids**: (none)
-- **base_commit**: `b898dfc62539010245036d8ed4b5675f77136deb`
+- **base_commit**: `4a1c13d5b0041ba2f6daf8ed8a2e1576bb6e1d72`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 2 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 

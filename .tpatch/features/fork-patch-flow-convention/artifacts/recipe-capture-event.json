@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "feature": "fork-patch-flow-convention",
+  "patch_present": true,
+  "patch_sha256": "6a3654b5edd1c4c2322a6187a418b6c319681000a9933a680de26bced6b09819",
+  "recipe_present": true,
+  "recipe_sha256": "a559175ab0cc01abbf8f1fa417224201501bef3fa5bebb55ffda6ed0e266927f",
+  "reference": {
+    "kind": "commit",
+    "commit": "4a1c13d5b0041ba2f6daf8ed8a2e1576bb6e1d72",
+    "preimage_set_sha256": "0b477925f5cfff302122f6ecdb537ffc4c6f490067cd21fe47fdadf50f651986"
+  },
+  "capture": {
+    "mode": "staged-index",
+    "pathspecs": [
+      "docs/internals/fork-maintenance.md",
+      "docs/operations/patch-flow.md"
+    ],
+    "claim_ids": []
+  },
+  "event": {
+    "patch_rewritten": true,
+    "recipe_regenerated": true,
+    "bound_artifact_edited": false,
+    "stale_marker_present": false
+  },
+  "parent_created_paths": [],
+  "observations": [
+    {
+      "ordinal": 1,
+      "change_kind": "modify",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "docs/internals/fork-maintenance.md",
+      "old_path": "",
+      "old_mode": "100644",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": true,
+      "preimage_sha256": "38c9c3edb0bcef0f4ff35f0028b67f620fc54467b3e7bedd6921f6b90a780411",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "cbc67d772e3fe3aee63f91e27fcf7cb84250307b408e552eec01c0661b94bd61",
+      "patch_fragment_sha256": "e7a0a52aa1aee60484f1ab863297333ba4b241c56cdde4439029dcd3b0e88391"
+    },
+    {
+      "ordinal": 2,
+      "change_kind": "add",
+      "content_kind": "text",
+      "object_kind": "regular",
+      "path": "docs/operations/patch-flow.md",
+      "old_path": "",
+      "old_mode": "",
+      "new_mode": "100644",
+      "preimage_observed": true,
+      "preimage_present": false,
+      "preimage_sha256": "",
+      "postimage_observed": true,
+      "postimage_present": true,
+      "postimage_sha256": "6e91ebb6002db4ebbfd574133ff9b047c6089663036aeab69225697fd90b45e5",
+      "patch_fragment_sha256": "2bb7f23ce868771ea7a6a03455a8bb47f79a2405ced8cc2e11252f346a172a30"
+    }
+  ],
+  "coverage_sha256": "e33d03cb2b0445b97e5549658f135459cd74f61ef6ffc7bdbbc9698243d93ee4"
+}
