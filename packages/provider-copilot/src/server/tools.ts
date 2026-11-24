@@ -26,8 +26,10 @@ export function boundedToolJson(value: unknown): string {
 }
 
 function argument(data: ToolStart, keys: ReadonlyArray<string>): string | undefined {
+  const args = data.arguments;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
   for (const key of keys) {
-    const value = data.arguments?.[key];
+    const value = args[key];
     if (typeof value === "string" && value.trim()) return value.slice(0, 8_000);
   }
   return undefined;

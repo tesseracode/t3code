@@ -1,7 +1,7 @@
 {
   "version": 1,
   "feature": "copilot-sdk-runtime-upgrade",
-  "current_generation": 1,
+  "current_generation": 2,
   "generations": [
     {
       "generation": 1,
@@ -11,7 +11,7 @@
       "git_patch_id": "0ba52b93300e3e4d11e7b6bace4307476ece4ee4",
       "git_patch_id_algorithm": "git-patch-id-stable",
       "recipe_sha256": "0ef06012c457dd9fb362aec5ad25a8564cccab98ba377c7d4b5c02ec294e6bad",
-      "canonical_patch": "artifacts/post-apply.patch",
+      "canonical_patch": "",
       "audit_patch": "",
       "base_commit": "a043de31d500054e1be2d1907c09e088ad0b74de",
       "upper": {
@@ -67,6 +67,91 @@
           "parent_generation": 24,
           "parent_patch_sha256": "b38ca86ea97e20032d4c9fb7a083e9102a9062440c74d5ff485bc3e9d1964a86",
           "parent_recipe_sha256": "efb15e706e17e187e519ca5878c782e5dfe8c9242a85d5cff8d3113a3308618a"
+        }
+      ],
+      "refs": {
+        "anchors": "",
+        "fingerprints": "",
+        "relations": "",
+        "vector_manifest": ""
+      }
+    },
+    {
+      "generation": 2,
+      "generation_id": "pg_016cb1720206",
+      "kind": "amend-refresh",
+      "patch_sha256": "1b4852d9ec329ba35fdb6e9c2c2ee4d6e050e6608ccc9b296582f306924776d2",
+      "git_patch_id": "c7dfd8e3a26143cc68fa863843541688fa56f9ca",
+      "git_patch_id_algorithm": "git-patch-id-stable",
+      "recipe_sha256": "e897fc3f7ed1ccdcc4aef2c44c624c5e73bb7ca828eef2a1f82bc91cb194fc63",
+      "canonical_patch": "artifacts/post-apply.patch",
+      "audit_patch": "patches/002-record.patch",
+      "base_commit": "039cc17975546a3c4a028d7a294ab81696e34833",
+      "upper": {
+        "kind": "index",
+        "ref": "index",
+        "commit": ""
+      },
+      "capture": {
+        "mode": "staged-index",
+        "pathspecs": [
+          "apps/server/package.json",
+          "knip.jsonc",
+          "packages/provider-copilot/package.json",
+          "packages/provider-copilot/src/server/adapter.test.ts",
+          "packages/provider-copilot/src/server/adapter.ts",
+          "packages/provider-copilot/src/server/client.ts",
+          "packages/provider-copilot/src/server/status.test.ts",
+          "packages/provider-copilot/src/server/tools.ts",
+          "packages/shared/src/copilotRuntime.test.ts",
+          "packages/shared/src/copilotRuntime.ts",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "scripts/build-desktop-artifact.test.ts",
+          "scripts/build-desktop-artifact.ts",
+          "scripts/lib/cli-external-packages.test.ts",
+          "scripts/lib/copilot-payload.test.ts",
+          "scripts/lib/copilot-payload.ts",
+          "third-party-licenses.config.json"
+        ],
+        "claim_ids": []
+      },
+      "touched_paths": [
+        "apps/server/package.json",
+        "knip.jsonc",
+        "packages/provider-copilot/package.json",
+        "packages/provider-copilot/src/server/adapter.test.ts",
+        "packages/provider-copilot/src/server/adapter.ts",
+        "packages/provider-copilot/src/server/client.ts",
+        "packages/provider-copilot/src/server/status.test.ts",
+        "packages/provider-copilot/src/server/tools.ts",
+        "packages/shared/src/copilotRuntime.test.ts",
+        "packages/shared/src/copilotRuntime.ts",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/build-desktop-artifact.test.ts",
+        "scripts/build-desktop-artifact.ts",
+        "scripts/lib/cli-external-packages.test.ts",
+        "scripts/lib/copilot-payload.test.ts",
+        "scripts/lib/copilot-payload.ts",
+        "third-party-licenses.config.json"
+      ],
+      "dependencies": [
+        {
+          "slug": "copilot-cli-provider",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 25,
+          "parent_patch_sha256": "e8e7a6cb8d90c481d0e754ed68390e95e26d286d16f2240b03fd77a7d91006f6",
+          "parent_recipe_sha256": "ff2a277c5e21317cc58b1d8b04df2ccf7a8377b40ea07bc76cf5576404092c81"
+        },
+        {
+          "slug": "copilot-runtime-packaging-replay",
+          "kind": "hard",
+          "satisfied_by": "",
+          "parent_generation": 2,
+          "parent_patch_sha256": "34fa72e7bd70a858cd91c06d3dfadc198b71e2a2e648020ed37e51286a336b96",
+          "parent_recipe_sha256": "0903c79ad0bcf501e9de0e5c3d3bc50e8afb0de0b4bc225240e86fa819cb38cd"
         }
       ],
       "refs": {

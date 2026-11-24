@@ -1343,11 +1343,17 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
             effort ? { reasoningEffort: effort } : {},
           ),
         );
-        yield* sdk("set mode", () =>
+        const modeResult = yield* sdk("set mode", () =>
           native!.rpc.mode.set({
             mode: turnInput.runtimePolicy.interactionMode === "plan" ? "plan" : "interactive",
           }),
         );
+        if (modeResult.modeApplied === false || modeResult.deferImplementation === true) {
+          return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+            driver: COPILOT_DRIVER,
+            detail: "Copilot did not apply the requested interaction mode.",
+          });
+        }
         yield* drain();
         const now = yield* DateTime.now;
         const providerTurn: OrchestrationV2ProviderTurn = {

@@ -102,10 +102,11 @@ describe("Copilot discovery and account isolation", () => {
         electron: true,
         platform: "win32",
         architecture: "x64",
-        resolve: () => "C:\\T3\\app.asar\\node_modules\\@github\\copilot-win32-x64\\copilot.exe",
+        resolve: () =>
+          "C:\\T3\\app.asar\\node_modules\\@github\\copilot-sdk-win32-x64\\package.json",
         exists: (path) => path.includes("app.asar.unpacked"),
       }),
-      "C:\\T3\\app.asar.unpacked\\node_modules\\@github\\copilot-win32-x64\\copilot.exe",
+      "C:\\T3\\app.asar.unpacked\\node_modules\\@github\\copilot-sdk-win32-x64\\prebuilds\\win32-x64\\copilot-runtime.exe",
     );
     assert.equal(
       bundledCliPath({
@@ -115,11 +116,21 @@ describe("Copilot discovery and account isolation", () => {
         architecture: "arm64",
         resolve: (name) => {
           if (!name.includes("linuxmusl")) throw new Error("not installed");
-          return "/native/copilot";
+          return "/native/package.json";
         },
         exists: () => true,
       }),
-      "/native/copilot",
+      "/native/prebuilds/linuxmusl-arm64/copilot-runtime",
+    );
+    assert.throws(() =>
+      bundledCliPath({
+        packaged: true,
+        electron: false,
+        platform: "darwin",
+        architecture: "arm64",
+        resolve: () => "/native/package.json",
+        exists: (path) => !path.endsWith("runtime.node"),
+      }),
     );
   });
 

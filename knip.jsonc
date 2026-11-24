@@ -74,6 +74,7 @@
         "@napi-rs/keyring",
         "ffi-rs",
         "transcribe-cpp",
+        "@github/copilot-sdk",
       ],
     },
     "apps/desktop": {

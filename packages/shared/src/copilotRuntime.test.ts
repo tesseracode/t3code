@@ -18,7 +18,7 @@ afterEach(() => {
 const uname = NodeChildProcess.spawnSync("uname", ["-m"], { encoding: "utf8" });
 const arch = ["arm64", "aarch64"].includes(uname.stdout?.trim()) ? "arm64" : "x64";
 
-function fixture(withCopilot = true) {
+function fixture(withCopilot = true, legacy = false) {
   const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-copilot-modes-"));
   roots.push(root);
   const write = (relative: string, source = "{}") => {
@@ -28,10 +28,14 @@ function fixture(withCopilot = true) {
     return file;
   };
   if (withCopilot) {
-    for (const name of ["copilot", "copilot-sdk", `copilot-linux-${arch}`]) {
+    for (const name of legacy
+      ? ["copilot", "copilot-sdk", `copilot-linux-${arch}`]
+      : ["copilot-sdk", `copilot-sdk-linux-${arch}`]) {
       write(`node_modules/@github/${name}/package.json`);
     }
-    for (const [index, relative] of copilotLinuxExecutableMembers(arch).entries()) {
+    if (!legacy)
+      write(`node_modules/@github/copilot-sdk-linux-${arch}/prebuilds/linux-${arch}/runtime.node`);
+    for (const [index, relative] of copilotLinuxExecutableMembers(arch, legacy).entries()) {
       write(relative, `#!/bin/sh\nprintf '${["copilot", "rg", "tgrep"][index]}\\n'\n`);
     }
   }
@@ -51,14 +55,26 @@ function fixture(withCopilot = true) {
 
 describe("Copilot Linux archive members", () => {
   const archiveMembers = (arch: "x64" | "arm64") => [
-    ...["copilot", "copilot-sdk", `copilot-linux-${arch}`].map(
+    ...["copilot-sdk", `copilot-sdk-linux-${arch}`].map(
       (name) => `node_modules/@github/${name}/package.json`,
     ),
     ...copilotLinuxExecutableMembers(arch),
+    `node_modules/@github/copilot-sdk-linux-${arch}/prebuilds/linux-${arch}/runtime.node`,
   ];
   it.each(["x64", "arm64"] as const)("accepts a complete %s payload", (arch) => {
     const members = archiveMembers(arch);
     expect(validateCopilotLinuxArchiveMembers(members, arch)).toBeNull();
+    expect(
+      validateCopilotLinuxArchiveMembers(
+        [
+          ...["copilot", "copilot-sdk", `copilot-linux-${arch}`].map(
+            (name) => `node_modules/@github/${name}/package.json`,
+          ),
+          ...copilotLinuxExecutableMembers(arch, true),
+        ],
+        arch,
+      ),
+    ).toBeNull();
     expect(validateCopilotLinuxArchiveMembers([], arch)).toBeNull();
   });
   it.each(["x64", "arm64"] as const)(
@@ -70,7 +86,7 @@ describe("Copilot Linux archive members", () => {
         members.slice(0, -1),
         [...members, members.at(-1)!],
         [...members, "node_modules/@github/copilot-win32-x64/copilot.exe"],
-        [...members, `node_modules/@github/copilot-linux-${arch}/ripgrep/bin/linux-wrong/rg`],
+        [...members, `node_modules/@github/copilot-sdk-linux-${arch}/ripgrep/bin/linux-wrong/rg`],
       ])
         expect(validateCopilotLinuxArchiveMembers(broken, arch)).not.toBeNull();
     },
@@ -80,18 +96,21 @@ describe("Copilot Linux archive members", () => {
 describe.skipIf(uname.status !== 0 || NodeOS.type() === "Windows_NT")(
   "production Copilot mode functions (executed)",
   () => {
-    it("normalizes all three commands and preserves explicit newline fixture output", () => {
-      const stage = fixture();
+    it.each([false, true])("normalizes commands without losing legacy=%s support", (legacy) => {
+      const stage = fixture(true, legacy);
       expect(stage.run('copilot_executable_payload_ready "$1"').status).not.toBe(0);
       const result = stage.run(
-        'normalize_copilot_executable_modes "$1"\n"$copilot_package_dir/copilot"\n"$copilot_package_dir/ripgrep/bin/$copilot_target/rg"\n"$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"',
+        'normalize_copilot_executable_modes "$1"\n"$copilot_executable"\n"$copilot_package_dir/ripgrep/bin/$copilot_target/rg"\n"$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"',
       );
       expect(result.status, result.stderr).toBe(0);
       expect(result.stdout).toBe("copilot\nrg\ntgrep\n");
-      for (const file of copilotLinuxExecutableMembers(arch)) {
+      for (const file of copilotLinuxExecutableMembers(arch, legacy)) {
         expect(NodeFS.statSync(NodePath.join(stage.root, file)).mode & 0o777).toBe(0o755);
       }
-      NodeFS.chmodSync(NodePath.join(stage.root, copilotLinuxExecutableMembers(arch)[1]!), 0o644);
+      NodeFS.chmodSync(
+        NodePath.join(stage.root, copilotLinuxExecutableMembers(arch, legacy)[1]!),
+        0o644,
+      );
       expect(stage.run('copilot_executable_payload_ready "$1"').status).not.toBe(0);
       expect(stage.run('normalize_copilot_executable_modes "$1"').status).toBe(0);
     });

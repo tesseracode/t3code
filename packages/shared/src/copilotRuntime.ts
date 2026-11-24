@@ -1,7 +1,10 @@
-export function copilotLinuxExecutableMembers(arch: "x64" | "arm64"): ReadonlyArray<string> {
-  const root = `node_modules/@github/copilot-linux-${arch}`;
+export function copilotLinuxExecutableMembers(
+  arch: "x64" | "arm64",
+  legacy = false,
+): ReadonlyArray<string> {
+  const root = `node_modules/@github/copilot-${legacy ? "" : "sdk-"}linux-${arch}`;
   return [
-    `${root}/copilot`,
+    legacy ? `${root}/copilot` : `${root}/prebuilds/linux-${arch}/copilot-runtime`,
     `${root}/ripgrep/bin/linux-${arch}/rg`,
     `${root}/tgrep/bin/linux-${arch}/tgrep`,
   ];
@@ -21,24 +24,32 @@ export function validateCopilotLinuxArchiveMembers(
     }),
   );
   if (packages.size === 0) return null;
-  const expected = new Set(["copilot", "copilot-sdk", `copilot-linux-${arch}`]);
+  const legacy = packages.has("copilot");
+  const expected = new Set(
+    legacy
+      ? ["copilot", "copilot-sdk", `copilot-linux-${arch}`]
+      : ["copilot-sdk", `copilot-sdk-linux-${arch}`],
+  );
   if (packages.size !== expected.size || [...packages].some((name) => !expected.has(name))) {
     return "Copilot archive must contain its SDK, runtime and exactly one matching Linux platform package.";
   }
   const required = [
     ...[...expected].map((name) => `${prefix}${name}/package.json`),
-    ...copilotLinuxExecutableMembers(arch),
+    ...copilotLinuxExecutableMembers(arch, legacy),
+    ...(!legacy ? [`${prefix}copilot-sdk-linux-${arch}/prebuilds/linux-${arch}/runtime.node`] : []),
   ];
   if (required.some((file) => members.filter((member) => member === file).length !== 1)) {
     return "Copilot archive has missing or duplicate runtime manifests or commands.";
   }
-  const platformRoot = `${prefix}copilot-linux-${arch}/`;
+  const platformRoot = `${prefix}copilot-${legacy ? "" : "sdk-"}linux-${arch}/`;
   const commands = members.filter(
     (member) =>
       member.startsWith(platformRoot) &&
-      /\/(?:copilot(?:\.exe)?|(?:ripgrep|tgrep)\/bin\/[^/]+\/(?:rg|tgrep)(?:\.exe)?)$/.test(member),
+      /\/(?:copilot(?:\.exe)?|prebuilds\/[^/]+\/copilot-runtime(?:\.exe)?|(?:ripgrep|tgrep)\/bin\/[^/]+\/(?:rg|tgrep)(?:\.exe)?)$/.test(
+        member,
+      ),
   );
-  const expectedCommands = new Set(copilotLinuxExecutableMembers(arch));
+  const expectedCommands = new Set(copilotLinuxExecutableMembers(arch, legacy));
   if (commands.length !== 3 || commands.some((member) => !expectedCommands.has(member))) {
     return "Copilot archive contains unexpected platform commands.";
   }
@@ -57,7 +68,7 @@ export function buildCopilotExecutableReadinessScript(): string {
     "copilot_payload_layout() {",
     '  [ -d "$1/node_modules" ] && [ ! -L "$1/node_modules" ] || return 1',
     '  [ -d "$1/node_modules/@github" ] && [ ! -L "$1/node_modules/@github" ] || return 1',
-    '  for candidate in "$1/node_modules/@github/copilot" "$1/node_modules/@github/copilot-sdk"; do',
+    '  for candidate in "$1/node_modules/@github/copilot-sdk"; do',
     '    [ -d "$candidate" ] && [ ! -L "$candidate" ] && [ -f "$candidate/package.json" ] && [ ! -L "$candidate/package.json" ] || return 1',
     "  done",
     "  copilot_package_count=0",
@@ -67,6 +78,8 @@ export function buildCopilotExecutableReadinessScript(): string {
     "      */copilot-sdk) continue ;;",
     "      */copilot-linux-x64) copilot_target=linux-x64 ;;",
     "      */copilot-linux-arm64) copilot_target=linux-arm64 ;;",
+    "      */copilot-sdk-linux-x64) copilot_target=linux-x64 ;;",
+    "      */copilot-sdk-linux-arm64) copilot_target=linux-arm64 ;;",
     "      *) return 1 ;;",
     "    esac",
     '    [ -d "$candidate" ] && [ ! -L "$candidate" ] || return 1',
@@ -74,6 +87,18 @@ export function buildCopilotExecutableReadinessScript(): string {
     "    copilot_package_count=$((copilot_package_count + 1))",
     "  done",
     '  [ "$copilot_package_count" -eq 1 ] || return 1',
+    '  case "$copilot_package_dir" in',
+    "    */copilot-sdk-linux-*)",
+    '      [ ! -e "$1/node_modules/@github/copilot" ] && [ ! -L "$1/node_modules/@github/copilot" ] || return 1',
+    '      copilot_executable="$copilot_package_dir/prebuilds/$copilot_target/copilot-runtime"',
+    '      for directory in "$copilot_package_dir/prebuilds" "$copilot_package_dir/prebuilds/$copilot_target"; do',
+    '        [ -d "$directory" ] && [ ! -L "$directory" ] || return 1',
+    "      done",
+    '      [ -f "$copilot_package_dir/prebuilds/$copilot_target/runtime.node" ] && [ ! -L "$copilot_package_dir/prebuilds/$copilot_target/runtime.node" ] || return 1 ;;',
+    "    *)",
+    '      [ -d "$1/node_modules/@github/copilot" ] && [ ! -L "$1/node_modules/@github/copilot" ] && [ -f "$1/node_modules/@github/copilot/package.json" ] && [ ! -L "$1/node_modules/@github/copilot/package.json" ] || return 1',
+    '      copilot_executable="$copilot_package_dir/copilot" ;;',
+    "  esac",
     '  case "$(uname -m)" in',
     '    x86_64|amd64) [ "$copilot_target" = linux-x64 ] || return 1 ;;',
     '    aarch64|arm64) [ "$copilot_target" = linux-arm64 ] || return 1 ;;',
@@ -86,7 +111,7 @@ export function buildCopilotExecutableReadinessScript(): string {
     '  for command_dir in "$copilot_package_dir"/ripgrep/bin/* "$copilot_package_dir"/tgrep/bin/*; do',
     '    [ "${command_dir##*/}" = "$copilot_target" ] || return 1',
     "  done",
-    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
+    '  for executable in "$copilot_executable" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
     '    [ -f "$executable" ] && [ ! -L "$executable" ] || return 1',
     "  done",
     "}",
@@ -96,7 +121,7 @@ export function buildCopilotExecutableReadinessScript(): string {
     "    printf 'Linux Copilot payload has a missing, ambiguous, or incompatible layout\\n' >&2",
     "    return 1",
     "  fi",
-    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
+    '  for executable in "$copilot_executable" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
     '    if [ ! -x "$executable" ]; then',
     "      printf 'Linux Copilot command is not executable: %s\\n' \"$executable\" >&2",
     "      return 1",
@@ -109,7 +134,7 @@ export function buildCopilotExecutableReadinessScript(): string {
     "    printf 'Linux Copilot payload has a missing, ambiguous, or incompatible layout\\n' >&2",
     "    return 1",
     "  fi",
-    '  for executable in "$copilot_package_dir/copilot" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
+    '  for executable in "$copilot_executable" "$copilot_package_dir/ripgrep/bin/$copilot_target/rg" "$copilot_package_dir/tgrep/bin/$copilot_target/tgrep"; do',
     '    if ! chmod 0755 "$executable"; then',
     "      printf 'Could not make Linux Copilot command executable: %s\\n' \"$executable\" >&2",
     "      return 1",
