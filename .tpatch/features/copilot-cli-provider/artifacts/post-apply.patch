@@ -1,9 +1,9 @@
 diff --git a/apps/server/package.json b/apps/server/package.json
-index 5abc76941..a9296dbf3 100644
+index af62337797..2c185b7cf0 100644
 --- a/apps/server/package.json
 +++ b/apps/server/package.json
-@@ -42,6 +42,7 @@
-     "@napi-rs/keyring": "^1.3.0",
+@@ -46,6 +46,7 @@
+     "@t3tools/issue-tracker-linear": "workspace:*",
      "@t3tools/provider-acp": "workspace:*",
      "@t3tools/provider-acp-registry": "workspace:*",
 +    "@t3tools/provider-copilot": "workspace:*",
@@ -11,7 +11,7 @@ index 5abc76941..a9296dbf3 100644
      "@t3tools/provider-cursor": "workspace:*",
      "@t3tools/provider-fx": "workspace:*",
 diff --git a/apps/server/src/provider/builtInDrivers.ts b/apps/server/src/provider/builtInDrivers.ts
-index 76819ce99..c82fefd5e 100644
+index 342a6780e9..336937ddd7 100644
 --- a/apps/server/src/provider/builtInDrivers.ts
 +++ b/apps/server/src/provider/builtInDrivers.ts
 @@ -8,6 +8,7 @@ import { CodexDriver, type CodexDriverEnv } from "./Drivers/CodexDriver.ts";
@@ -22,15 +22,15 @@ index 76819ce99..c82fefd5e 100644
  import { OpenCodeDriver, type OpenCodeDriverEnv } from "@t3tools/provider-opencode/server";
  import { MuseDriver, type MuseDriverEnv } from "@t3tools/provider-muse/server";
  import { PiDriver, type PiDriverEnv } from "@t3tools/provider-pi/server";
-@@ -24,6 +25,7 @@ export type BuiltInDriversEnv =
-   | CursorDriverEnv
+@@ -26,6 +27,7 @@ export type BuiltInDriversEnv =
    | FxDriverEnv
    | GrokDriverEnv
+   | KiroDriverEnv
 +  | CopilotDriverEnv
    | OpenCodeDriverEnv
    | PiDriverEnv
    | MuseDriverEnv;
-@@ -33,6 +35,7 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
+@@ -35,6 +37,7 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
    ClaudeDriver,
    CursorDriver,
    GrokDriver,
@@ -39,10 +39,10 @@ index 76819ce99..c82fefd5e 100644
    OpenCodeDriver,
    AntigravityDriver,
 diff --git a/apps/server/src/serverSettings.test.ts b/apps/server/src/serverSettings.test.ts
-index bd985cab2..3187067d5 100644
+index f837fd8ca9..9df3006e30 100644
 --- a/apps/server/src/serverSettings.test.ts
 +++ b/apps/server/src/serverSettings.test.ts
-@@ -867,6 +867,61 @@ it.layer(NodeServices.layer)("server settings", (it) => {
+@@ -986,6 +986,61 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
      }).pipe(Effect.provide(layerServerSettings())),
    );
  
@@ -105,10 +105,10 @@ index bd985cab2..3187067d5 100644
      Effect.gen(function* () {
        const serverConfig = yield* ServerConfig.ServerConfig;
 diff --git a/apps/server/src/serverSettings.ts b/apps/server/src/serverSettings.ts
-index a1e0d34c7..d1ab492ce 100644
+index 66f0595aab..863ecd9426 100644
 --- a/apps/server/src/serverSettings.ts
 +++ b/apps/server/src/serverSettings.ts
-@@ -74,7 +74,12 @@ const textDecoder = new TextDecoder();
+@@ -87,7 +87,12 @@ const textDecoder = new TextDecoder();
  const foldProviderInstanceEnabledFlags = (settings: ServerSettings): ServerSettings => {
    let changed = false;
    const providerInstances: Record<string, ProviderInstanceConfig> = {};
@@ -122,7 +122,7 @@ index a1e0d34c7..d1ab492ce 100644
      const config = instance.config;
      // Leave malformed flags for driver schema validation rather than silently repairing them.
      if (
-@@ -368,6 +373,11 @@ function migrateLegacyProviderSettings(
+@@ -464,6 +469,11 @@ function migrateLegacyProviderSettings(
    }
  
    const legacyEntries = new Map(Object.entries(legacyProviders));
@@ -134,7 +134,7 @@ index a1e0d34c7..d1ab492ce 100644
    for (const driver of HISTORY_RESTORED_DRIVERS) {
      if (!legacyEntries.has(driver)) legacyEntries.set(driver, {});
    }
-@@ -736,6 +746,9 @@ const make = Effect.gen(function* () {
+@@ -882,6 +892,9 @@ const make = Effect.gen(function* () {
              ),
            );
  
@@ -144,7 +144,7 @@ index a1e0d34c7..d1ab492ce 100644
      const loaded = foldProviderInstanceEnabledFlags(
        legacyProviders === undefined
          ? settings
-@@ -774,6 +787,7 @@ const make = Effect.gen(function* () {
+@@ -920,6 +933,7 @@ const make = Effect.gen(function* () {
        : folded;
      if (
        migrated !== loaded ||
@@ -153,7 +153,7 @@ index a1e0d34c7..d1ab492ce 100644
        hasLegacySourceControl
      ) {
 diff --git a/docs/internals/providers.md b/docs/internals/providers.md
-index 42f0a7010..3f9032879 100644
+index 102bffe4f0..97dc381899 100644
 --- a/docs/internals/providers.md
 +++ b/docs/internals/providers.md
 @@ -11,6 +11,39 @@ session or catalog state. For a new driver, start with [adding a provider](./add
@@ -198,7 +198,7 @@ index 42f0a7010..3f9032879 100644
  directory must not share one T3 MCP entry.
 diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
 new file mode 100644
-index 000000000..eca524ff4
+index 0000000000..eca524ff41
 --- /dev/null
 +++ b/docs/user/providers-copilot.md
 @@ -0,0 +1,45 @@
@@ -248,30 +248,30 @@ index 000000000..eca524ff4
 +native conversation rollback, and native forks are not exposed by this integration;
 +portable handoffs remain available.
 diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json
-index 66e79c749..33c52873f 100644
+index 182c28a319..f9096b1012 100644
 --- a/packages/client-runtime/package.json
 +++ b/packages/client-runtime/package.json
-@@ -512,6 +512,7 @@
-     "@pierre/diffs": "catalog:",
+@@ -649,6 +649,7 @@
      "@t3tools/contracts": "workspace:*",
+     "@t3tools/issue-tracker-linear": "workspace:*",
      "@t3tools/provider-acp-registry": "workspace:*",
 +    "@t3tools/provider-copilot": "workspace:*",
      "@t3tools/provider-core": "workspace:*",
      "@t3tools/provider-cursor": "workspace:*",
      "@t3tools/provider-fx": "workspace:*",
 diff --git a/packages/client-runtime/src/providerClients.ts b/packages/client-runtime/src/providerClients.ts
-index 37cd15209..ad15c8c89 100644
+index 3759cecbc7..3810bdf17c 100644
 --- a/packages/client-runtime/src/providerClients.ts
 +++ b/packages/client-runtime/src/providerClients.ts
 @@ -8,6 +8,7 @@ import {
  import { acpRegistryClient } from "@t3tools/provider-acp-registry/client";
- import { makeProviderClientRegistry } from "@t3tools/provider-core/client";
+ import { makeProviderClientRegistry, type ProviderIcon } from "@t3tools/provider-core/client";
  import { modelShortName } from "@t3tools/provider-core/modelShortName";
 +import { copilotClient } from "@t3tools/provider-copilot/client";
  import { cursorClient } from "@t3tools/provider-cursor/client";
  import { fxClient } from "@t3tools/provider-fx/client";
  import { grokClient } from "@t3tools/provider-grok/client";
-@@ -32,6 +33,7 @@ export const providerClients = makeProviderClientRegistry([
+@@ -44,6 +45,7 @@ export const providerClients = makeProviderClientRegistry([
    },
    cursorClient,
    grokClient,
@@ -280,21 +280,23 @@ index 37cd15209..ad15c8c89 100644
    openCodeClient,
    {
 diff --git a/packages/contracts/src/settings.ts b/packages/contracts/src/settings.ts
-index 438d8fa6e..013e4f3ee 100644
+index 378b8af0e4..6e77e8bc48 100644
 --- a/packages/contracts/src/settings.ts
 +++ b/packages/contracts/src/settings.ts
-@@ -1332,7 +1332,7 @@ export const providerInstanceConfigEnabledFlag = (config: unknown): boolean | un
+@@ -1620,8 +1620,8 @@ export const providerInstanceConfigEnabledFlag = (config: unknown): boolean | un
  
  // Must match each driver's enabled decoding default.
  const DEFAULT_DISABLED_PROVIDER_DRIVERS: ReadonlySet<ProviderDriverKind> = new Set(
--  ["cursor", "grok", "fx", "muse", "pi", "opencode", "antigravity"].map((driver) =>
-+  ["cursor", "grok", "fx", "muse", "pi", "opencode", "antigravity", "githubCopilot"].map((driver) =>
-     ProviderDriverKind.make(driver),
+-  ["cursor", "grok", "fx", "kiro", "muse", "pi", "opencode", "antigravity"].map((driver) =>
+-    ProviderDriverKind.make(driver),
++  ["cursor", "grok", "fx", "kiro", "muse", "pi", "opencode", "antigravity", "githubCopilot"].map(
++    (driver) => ProviderDriverKind.make(driver),
    ),
  );
+ 
 diff --git a/packages/provider-copilot/package.json b/packages/provider-copilot/package.json
 new file mode 100644
-index 000000000..82babd6eb
+index 0000000000..f9b72395c8
 --- /dev/null
 +++ b/packages/provider-copilot/package.json
 @@ -0,0 +1,27 @@
@@ -309,7 +311,7 @@ index 000000000..82babd6eb
 +    "./testing": "./src/testing.ts"
 +  },
 +  "scripts": {
-+    "typecheck": "tsc --noEmit",
++    "typecheck": "effect-tsgo tsrs --noEmit",
 +    "test": "vp test run --config ../../vite.config.ts --dir ."
 +  },
 +  "dependencies": {
@@ -327,7 +329,7 @@ index 000000000..82babd6eb
 +}
 diff --git a/packages/provider-copilot/src/client.ts b/packages/provider-copilot/src/client.ts
 new file mode 100644
-index 000000000..2a91413bd
+index 0000000000..2a91413bd5
 --- /dev/null
 +++ b/packages/provider-copilot/src/client.ts
 @@ -0,0 +1,18 @@
@@ -351,17 +353,17 @@ index 000000000..2a91413bd
 +});
 diff --git a/packages/provider-copilot/src/server.ts b/packages/provider-copilot/src/server.ts
 new file mode 100644
-index 000000000..5dea54a3c
+index 0000000000..5dea54a3cb
 --- /dev/null
 +++ b/packages/provider-copilot/src/server.ts
 @@ -0,0 +1 @@
 +export { CopilotDriver, type CopilotDriverEnv } from "./server/driver.ts";
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
 new file mode 100644
-index 000000000..13be8e74a
+index 0000000000..f92ce3ae96
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
-@@ -0,0 +1,940 @@
+@@ -0,0 +1,941 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import type {
 +  CopilotSession,
@@ -405,6 +407,7 @@ index 000000000..13be8e74a
 +};
 +const settings = Schema.decodeSync(CopilotSettings)({});
 +const host = ProviderHost.ProviderHost.of({
++  compatibility: () => Effect.undefined,
 +  paths: {
 +    cwd: "/workspace",
 +    baseDir: "/test",
@@ -1304,7 +1307,7 @@ index 000000000..13be8e74a
 +});
 diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
 new file mode 100644
-index 000000000..9f05143ee
+index 0000000000..9f05143eeb
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/adapter.ts
 @@ -0,0 +1,1589 @@
@@ -2899,7 +2902,7 @@ index 000000000..9f05143ee
 +});
 diff --git a/packages/provider-copilot/src/server/capabilities.ts b/packages/provider-copilot/src/server/capabilities.ts
 new file mode 100644
-index 000000000..aa24de211
+index 0000000000..aa24de2111
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/capabilities.ts
 @@ -0,0 +1,93 @@
@@ -2998,7 +3001,7 @@ index 000000000..aa24de211
 +} as const satisfies OrchestrationV2ProviderCapabilities;
 diff --git a/packages/provider-copilot/src/server/client.ts b/packages/provider-copilot/src/server/client.ts
 new file mode 100644
-index 000000000..88326753d
+index 0000000000..88326753dc
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/client.ts
 @@ -0,0 +1,111 @@
@@ -3115,10 +3118,10 @@ index 000000000..88326753d
 +}
 diff --git a/packages/provider-copilot/src/server/driver.test.ts b/packages/provider-copilot/src/server/driver.test.ts
 new file mode 100644
-index 000000000..87faf2e55
+index 0000000000..3a59860726
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/driver.test.ts
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,107 @@
 +import { assert, describe, it } from "@effect/vitest";
 +import type { CopilotClient } from "@github/copilot-sdk";
 +import { DEFAULT_SERVER_SETTINGS, ProviderInstanceId } from "@t3tools/contracts";
@@ -3134,6 +3137,7 @@ index 000000000..87faf2e55
 +
 +const settings = Schema.decodeSync(CopilotSettings)({});
 +const host = ProviderHost.ProviderHost.of({
++  compatibility: () => Effect.undefined,
 +  paths: {
 +    cwd: "/workspace",
 +    baseDir: "/test",
@@ -3227,10 +3231,10 @@ index 000000000..87faf2e55
 +});
 diff --git a/packages/provider-copilot/src/server/driver.ts b/packages/provider-copilot/src/server/driver.ts
 new file mode 100644
-index 000000000..ad29ed011
+index 0000000000..76ffd807c1
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/driver.ts
-@@ -0,0 +1,189 @@
+@@ -0,0 +1,201 @@
 +import { ProviderDriverKind, type ServerProviderSkill } from "@t3tools/contracts";
 +import * as Effect from "effect/Effect";
 +import * as Schema from "effect/Schema";
@@ -3355,19 +3359,31 @@ index 000000000..ad29ed011
 +            }),
 +            (client) =>
 +              Effect.gen(function* () {
-+                const stopped = yield* Effect.tryPromise(() => client.stop()).pipe(
-+                  Effect.timeoutOption(10_000),
-+                  Effect.result,
-+                );
++                const stopped = yield* Effect.tryPromise({
++                  try: () => client.stop(),
++                  catch: (cause) =>
++                    new ProviderDriverError({
++                      driver: driverKind,
++                      instanceId,
++                      detail: "Copilot discovery client stop failed.",
++                      cause,
++                    }),
++                }).pipe(Effect.timeoutOption(10_000), Effect.result);
 +                if (
 +                  stopped._tag === "Failure" ||
 +                  Option.isNone(stopped.success) ||
 +                  stopped.success.value.length
 +                ) {
-+                  yield* Effect.tryPromise(() => client.forceStop()).pipe(
-+                    Effect.timeoutOption(5_000),
-+                    Effect.ignore,
-+                  );
++                  yield* Effect.tryPromise({
++                    try: () => client.forceStop(),
++                    catch: (cause) =>
++                      new ProviderDriverError({
++                        driver: driverKind,
++                        instanceId,
++                        detail: "Copilot discovery client force-stop failed.",
++                        cause,
++                      }),
++                  }).pipe(Effect.timeoutOption(5_000), Effect.ignore);
 +                }
 +              }),
 +          );
@@ -3422,7 +3438,7 @@ index 000000000..ad29ed011
 +};
 diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
 new file mode 100644
-index 000000000..2f9b7e99d
+index 0000000000..2f9b7e99d5
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/status.test.ts
 @@ -0,0 +1,183 @@
@@ -3611,10 +3627,10 @@ index 000000000..2f9b7e99d
 +});
 diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts
 new file mode 100644
-index 000000000..8e895fc04
+index 0000000000..cb4a745fde
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/status.ts
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,201 @@
 +import type { CopilotClient, ModelInfo, SkillsLoadedSkill } from "@github/copilot-sdk";
 +import type { ServerProviderSkill } from "@t3tools/contracts";
 +import { createModelCapabilities } from "@t3tools/shared/model";
@@ -3737,38 +3753,43 @@ index 000000000..8e895fc04
 +  if (!settings.enabled) return yield* pendingSnapshot(settings);
 +  let started = false;
 +  let cleanupFailed = false;
++  const probeError = (cause: unknown) => ({ _tag: "CopilotStatusProbeError" as const, cause });
 +  const checkedAt = DateTime.formatIso(yield* DateTime.now);
 +  const result = yield* Effect.scoped(
 +    Effect.gen(function* () {
 +      const client = yield* Effect.acquireRelease(
-+        Effect.try(() =>
-+          factory(resolveClientConfiguration({ settings, cwd, environment }).options),
-+        ),
++        Effect.try({
++          try: () => factory(resolveClientConfiguration({ settings, cwd, environment }).options),
++          catch: probeError,
++        }),
 +        (client) =>
 +          Effect.gen(function* () {
-+            const stopped = yield* Effect.tryPromise(() => client.stop()).pipe(
-+              Effect.timeoutOption(10_000),
-+              Effect.result,
-+            );
++            const stopped = yield* Effect.tryPromise({
++              try: () => client.stop(),
++              catch: probeError,
++            }).pipe(Effect.timeoutOption(10_000), Effect.result);
 +            if (
 +              stopped._tag === "Failure" ||
 +              Option.isNone(stopped.success) ||
 +              stopped.success.value.length
 +            ) {
 +              cleanupFailed = true;
-+              yield* Effect.tryPromise(() => client.forceStop()).pipe(
++              yield* Effect.tryPromise({ try: () => client.forceStop(), catch: probeError }).pipe(
 +                Effect.timeoutOption(5_000),
 +                Effect.ignore,
 +              );
 +            }
 +          }),
 +      );
-+      return yield* Effect.tryPromise(async () => {
-+        await client.start();
-+        started = true;
-+        const [status, auth] = await Promise.all([client.getStatus(), client.getAuthStatus()]);
-+        const models = auth.isAuthenticated ? await client.listModels() : [];
-+        return { status, auth, models };
++      return yield* Effect.tryPromise({
++        try: async () => {
++          await client.start();
++          started = true;
++          const [status, auth] = await Promise.all([client.getStatus(), client.getAuthStatus()]);
++          const models = auth.isAuthenticated ? await client.listModels() : [];
++          return { status, auth, models };
++        },
++        catch: probeError,
 +      });
 +    }),
 +  ).pipe(Effect.timeoutOption(30_000), Effect.result);
@@ -3813,7 +3834,7 @@ index 000000000..8e895fc04
 +});
 diff --git a/packages/provider-copilot/src/server/textGeneration.test.ts b/packages/provider-copilot/src/server/textGeneration.test.ts
 new file mode 100644
-index 000000000..129d9378f
+index 0000000000..129d9378f8
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/textGeneration.test.ts
 @@ -0,0 +1,186 @@
@@ -4005,10 +4026,10 @@ index 000000000..129d9378f
 +});
 diff --git a/packages/provider-copilot/src/server/textGeneration.ts b/packages/provider-copilot/src/server/textGeneration.ts
 new file mode 100644
-index 000000000..0eee026ea
+index 0000000000..d7c4ade7b7
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/textGeneration.ts
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,162 @@
 +import type {
 +  CopilotClient,
 +  CopilotClientOptions,
@@ -4073,7 +4094,10 @@ index 000000000..0eee026ea
 +              ),
 +            );
 +          const cleanup = <A>(operation: () => Promise<A>, timeoutMs = 5_000) =>
-+            Effect.tryPromise(operation).pipe(Effect.timeoutOption(timeoutMs), Effect.result);
++            Effect.tryPromise({ try: operation, catch: error }).pipe(
++              Effect.timeoutOption(timeoutMs),
++              Effect.result,
++            );
 +          yield* Effect.addFinalizer(() =>
 +            Effect.gen(function* () {
 +              if (finalized) return;
@@ -4170,7 +4194,7 @@ index 000000000..0eee026ea
 +}
 diff --git a/packages/provider-copilot/src/server/tools.ts b/packages/provider-copilot/src/server/tools.ts
 new file mode 100644
-index 000000000..de6f9c681
+index 0000000000..de6f9c681d
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/tools.ts
 @@ -0,0 +1,70 @@
@@ -4246,7 +4270,7 @@ index 000000000..de6f9c681
 +}
 diff --git a/packages/provider-copilot/src/settings.ts b/packages/provider-copilot/src/settings.ts
 new file mode 100644
-index 000000000..5e8196963
+index 0000000000..5e8196963f
 --- /dev/null
 +++ b/packages/provider-copilot/src/settings.ts
 @@ -0,0 +1,46 @@
@@ -4298,7 +4322,7 @@ index 000000000..5e8196963
 +export type CopilotSettings = typeof CopilotSettings.Type;
 diff --git a/packages/provider-copilot/src/testing.ts b/packages/provider-copilot/src/testing.ts
 new file mode 100644
-index 000000000..649177e9d
+index 0000000000..649177e9d3
 --- /dev/null
 +++ b/packages/provider-copilot/src/testing.ts
 @@ -0,0 +1,4 @@
@@ -4308,7 +4332,7 @@ index 000000000..649177e9d
 +export { resolveClientConfiguration } from "./server/client.ts";
 diff --git a/packages/provider-copilot/tsconfig.json b/packages/provider-copilot/tsconfig.json
 new file mode 100644
-index 000000000..f9d61df25
+index 0000000000..f9d61df25e
 --- /dev/null
 +++ b/packages/provider-copilot/tsconfig.json
 @@ -0,0 +1,5 @@
@@ -4318,10 +4342,10 @@ index 000000000..f9d61df25
 +  "include": ["src"]
 +}
 diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
-index f2eabadf0..139cb3295 100644
+index 08a6a21359..b0eb0de981 100644
 --- a/pnpm-lock.yaml
 +++ b/pnpm-lock.yaml
-@@ -265,6 +265,11 @@ catalogs:
+@@ -271,6 +271,11 @@ catalogs:
        version: 11.0.5
  
  overrides:
@@ -4333,7 +4357,7 @@ index f2eabadf0..139cb3295 100644
    react-native-image-viewing: 0.2.2
    mdast-util-math: 3.0.0
    micromark-extension-llm-math: 3.1.0
-@@ -849,6 +854,9 @@ importers:
+@@ -886,6 +891,9 @@ importers:
        '@t3tools/provider-acp-registry':
          specifier: workspace:*
          version: link:../../packages/provider-acp-registry
@@ -4343,7 +4367,7 @@ index f2eabadf0..139cb3295 100644
        '@t3tools/provider-core':
          specifier: workspace:*
          version: link:../../packages/provider-core
-@@ -1437,6 +1445,9 @@ importers:
+@@ -1531,6 +1539,9 @@ importers:
        '@t3tools/provider-acp-registry':
          specifier: workspace:*
          version: link:../provider-acp-registry
@@ -4353,9 +4377,9 @@ index f2eabadf0..139cb3295 100644
        '@t3tools/provider-core':
          specifier: workspace:*
          version: link:../provider-core
-@@ -1618,6 +1629,34 @@ importers:
+@@ -1761,6 +1772,34 @@ importers:
          specifier: 1.4.0
-         version: 1.4.0(@astrojs/compiler-rs@0.5.1)(@tsc-rs/typescript@0.8.0)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(@tsc-rs/typescript@0.8.0))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.60.0)(terser@5.48.0)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
+         version: 1.4.0(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
  
 +  packages/provider-copilot:
 +    dependencies:
@@ -4372,25 +4396,25 @@ index f2eabadf0..139cb3295 100644
 +        specifier: workspace:*
 +        version: link:../shared
 +      effect:
-+        specifier: 4.0.5
-+        version: 4.0.5
++        specifier: 4.1.3
++        version: 4.1.3
 +    devDependencies:
 +      '@effect/vitest':
-+        specifier: 4.0.5
-+        version: 4.0.5(patch_hash=2731c9c3761c595f25ddc625a7d61ca376b389d5b3049ecb837c8940f21cfa02)(@astrojs/compiler-rs@0.5.1)(@tsc-rs/typescript@0.8.0)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(@tsc-rs/typescript@0.8.0))(bufferutil@4.1.0)(effect@4.0.5)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.60.0)(terser@5.48.0)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
++        specifier: 4.1.2
++        version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
 +      '@types/node':
 +        specifier: 24.12.4
 +        version: 24.12.4
 +      vite-plus:
 +        specifier: 1.4.0
-+        version: 1.4.0(@astrojs/compiler-rs@0.5.1)(@tsc-rs/typescript@0.8.0)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(@tsc-rs/typescript@0.8.0))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.60.0)(terser@5.48.0)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
++        version: 1.4.0(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
 +
    packages/provider-core:
      dependencies:
        '@t3tools/contracts':
-@@ -4311,6 +4350,66 @@ packages:
-   '@fontsource-variable/inter@5.3.0':
-     resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
+@@ -4650,6 +4689,66 @@ packages:
+   '@generaltranslation/vue-extractor@0.1.23':
+     resolution: {integrity: sha512-eGWcDLoFdJCcfNlwc16fBoTcjqfhS9e4UQo68wvceeK/2sMxYm+klGyEbOxC+pIXh5rhG9mK7l8sMzp4p1zVlA==}
  
 +  '@github/copilot-darwin-arm64@1.0.75':
 +    resolution: {integrity: sha512-avt2ganQwtycGkqz9z8JpARoEz2Fzi02O+WitbB8I8iF3jfvEGpQ8k3z9oSCPAAO0rIMBeSl05xEUUV5RJwfRA==}
@@ -4452,127 +4476,222 @@ index f2eabadf0..139cb3295 100644
 +    resolution: {integrity: sha512-rn7ZQmhydCZ9XRdG6V78QEhXIdYlChlUvOVAtyJ6KHJGt2O9/71si7PCt84amfmg0N7IXBT2UGRYF4GQDQBt+g==}
 +    hasBin: true
 +
-   '@hono/node-server@1.19.17':
-     resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
-     engines: {node: '>=18.14.1'}
-@@ -4682,6 +4781,106 @@ packages:
-     resolution: {integrity: sha512-hloP58zRVCRSpgDxmqCWJNlizAlUgJFqG2ypq79DCvyv9tHjRYMDOcPFjzfl/A1/YxDvRCZz8wvZvmapQnKwFQ==}
-     engines: {node: '>=12'}
+   '@handy-computer/models@0.2.3':
+     resolution: {integrity: sha512-EcyPojMY8hG5adDZGR/2h/m9jniqAnSND00gmiAErRLB1BQqMD9jrJaqsfoYF/UfPC8ocKZFUNSkTegoYqjF5w==}
+     engines: {node: '>=20.10'}
+@@ -4875,101 +4974,201 @@ packages:
+     peerDependencies:
+       jsep: ^0.4.0||^1.0.0
  
 +  '@koromix/koffi-android-arm64@3.3.1':
 +    resolution: {integrity: sha512-S3yMzUGca5UJRioY7wdBjeO+LuW9mQhrksL+Wd5ri1X7kWMB2IGLzrT1mn1xqx02Vicgvuy5GtkhHuxG5mkzYw==}
 +    cpu: [arm64]
 +    os: [android]
 +
+   '@koromix/koffi-android-arm64@3.3.6':
+     resolution: {integrity: sha512-wxsPuEMDrqOR5RUdABYFNDTabhh/xwDetCUDI+/CN93QF1T7Yeq218kvDWmYT/g1wV2kU1aYdRO4D7cH9PDskw==}
+     cpu: [arm64]
+     os: [android]
+ 
 +  '@koromix/koffi-android-x64@3.3.1':
 +    resolution: {integrity: sha512-QaKSyVi37j19CfN2tR3q8lQMosZ+mQIOQXcNQmWXfYDUs9x2CSCxzvMTeQyFyGdAqB58dBluEiy8V5ZMvARSHg==}
 +    cpu: [x64]
 +    os: [android]
 +
+   '@koromix/koffi-android-x64@3.3.6':
+     resolution: {integrity: sha512-fHZE6ejYLmAEe2eou2uoG61HUtolY45RhQEsTKAKNI5eKSW7Z2Jh8eP5EE+3CVQSbzbaMeHXRTcgEQGk5uEF5Q==}
+     cpu: [x64]
+     os: [android]
+ 
 +  '@koromix/koffi-darwin-arm64@3.3.1':
 +    resolution: {integrity: sha512-xVLQMZzACn6TQJsGp/mBF71mfRyuhmxTBGcQLfJM59YArNN/9+1JV8FFCElmgspffijASZsLwbSEdPwZMNeDhQ==}
 +    cpu: [arm64]
 +    os: [darwin]
 +
+   '@koromix/koffi-darwin-arm64@3.3.6':
+     resolution: {integrity: sha512-++V4qscXff/Ya5cE6vOPOomcxk3T5JQu81Uc0fvoso3VVELcoHt2/dz9E0FY0EPyQNIRcWOVg7CgvsPCKId9lg==}
+     cpu: [arm64]
+     os: [darwin]
+ 
 +  '@koromix/koffi-darwin-x64@3.3.1':
 +    resolution: {integrity: sha512-+VGqqnBQvR+AbAbRyRDsxK0D6wwAivUURWsyVX8NhR5agf+0+sSAdNMsSy+9DyO7CmioTUVwV+Do+12uWnFrmA==}
 +    cpu: [x64]
 +    os: [darwin]
 +
+   '@koromix/koffi-darwin-x64@3.3.6':
+     resolution: {integrity: sha512-eOyit0eyfkmdXCNlOkG8cNtpQUx+dikr1QsozJdwm7/zH1u7KP5dRtmsaGUMLSUY7cVYSRTUStkwHBrHjBtuzw==}
+     cpu: [x64]
+     os: [darwin]
+ 
 +  '@koromix/koffi-freebsd-arm64@3.3.1':
 +    resolution: {integrity: sha512-oPkfxEiLiZs1jV6qqw3DzZy3aigzOb9mGbRtK6ENNgoiZ2QdAw55cXUTOMNiAwgbkBwt7SsorFdUnYUuP5b0Gg==}
 +    cpu: [arm64]
 +    os: [freebsd]
 +
+   '@koromix/koffi-freebsd-arm64@3.3.6':
+     resolution: {integrity: sha512-7teGsq2BukkLZ60xxq4KyPxeJct51nV1G/MfNj8IoMTqlpd35w4aiIIoFWVwLL3j3DdT95Ye/FpVY4C7ZEuMHg==}
+     cpu: [arm64]
+     os: [freebsd]
+ 
 +  '@koromix/koffi-freebsd-ia32@3.3.1':
 +    resolution: {integrity: sha512-uLb93keIlk6TkECtb17z2d5nehEIJ2labIXF0ava3s+9w7VE7QZUw3O2IQVq4t95sIm5rMoE1Y+cFa0aN6444w==}
 +    cpu: [ia32]
 +    os: [freebsd]
 +
+   '@koromix/koffi-freebsd-ia32@3.3.6':
+     resolution: {integrity: sha512-WA7qEAMxTWS2WSFDceETVJTFrZgRwNvfG+FJpCC2XkJXftHwOhv8/X6d5HUEXh361sd7HwCHoT1wypL0nvI7Mw==}
+     cpu: [ia32]
+     os: [freebsd]
+ 
 +  '@koromix/koffi-freebsd-x64@3.3.1':
 +    resolution: {integrity: sha512-+Iuh+m5Ln0fjubgw/6bzEkliBcFBIFWWL7IqzmktPy0Q0Bq+XCGtUf+5/KTlodYlTOLv/SE/YTbVkk3c02+E6w==}
 +    cpu: [x64]
 +    os: [freebsd]
 +
+   '@koromix/koffi-freebsd-x64@3.3.6':
+     resolution: {integrity: sha512-OQ/eBhGefbtxcPs5VDkK9mwxoIeSwrIriOT1/JHHA/tbNAXdC0GiAYsBw82T4L4r2u0TuJ0CbgN3HrulzdPPig==}
+     cpu: [x64]
+     os: [freebsd]
+ 
 +  '@koromix/koffi-linux-arm64@3.3.1':
 +    resolution: {integrity: sha512-Itv2N+TvBFTSdEZdokM4ydjbBwr6GNKd51+UXoh/5HVXALBRnMQek2QhBnG7z6H9+/p2SB4rqBnvhuLQpv4B7g==}
 +    cpu: [arm64]
 +    os: [linux]
 +
+   '@koromix/koffi-linux-arm64@3.3.6':
+     resolution: {integrity: sha512-8LuJcdH74wTg7JcZjnRnb3z+qWPKcEDSv8HRPkWTVD56TFm0CXZXgl/WJ4maDbWem6ZoXxc87a8nQEA+wABzNA==}
+     cpu: [arm64]
+     os: [linux]
+ 
 +  '@koromix/koffi-linux-arm@3.3.1':
 +    resolution: {integrity: sha512-rE6QypE/h4nDHPlzzVPok5W2gL5CopvBYI44lJXO2SauxVAeV86bbf+ucmF/toYENdjF0DBdY7GbloyixwQpPQ==}
 +    cpu: [arm]
 +    os: [linux]
 +
+   '@koromix/koffi-linux-arm@3.3.6':
+     resolution: {integrity: sha512-0uo15z9L7GsAEGvPCVKcXzCtRJCyghCYDrWO2L3vXk4G5lgk+OBvWS7RmlDZ99X/A0oDiL3vLCplGaBCEZZ8Eg==}
+     cpu: [arm]
+     os: [linux]
+ 
 +  '@koromix/koffi-linux-ia32@3.3.1':
 +    resolution: {integrity: sha512-pb1NJ/Ih4MAPB1e2koQOKxGtLuPWKMT3QXxBrPptkkkDz/XpV6+bAA4ys7amXxpA0ybM2u/+VM0gGzdJRThkRg==}
 +    cpu: [ia32]
 +    os: [linux]
 +
+   '@koromix/koffi-linux-ia32@3.3.6':
+     resolution: {integrity: sha512-aTOjTMdy2Q6JqNA9KkT2OaCs77d0TzEG5KipfinzDyiV9DkYyUCvFykIY5GDHCUKXyJi+xy1IfuUxeL64wzzBQ==}
+     cpu: [ia32]
+     os: [linux]
+ 
 +  '@koromix/koffi-linux-loong64@3.3.1':
 +    resolution: {integrity: sha512-RdS57JuF39tLXS/yYq4KlFnU7CMrn1+x/4v171bji+1aPYOXPxzYDAJVjapv/6tnrESrMTnfWIja3jfzieFmpQ==}
 +    cpu: [loong64]
 +    os: [linux]
 +
+   '@koromix/koffi-linux-loong64@3.3.6':
+     resolution: {integrity: sha512-m33Zjrhj2Atpkcr0We61V2Zjm8wFb79QOtaOfzttmNFQMtryYpWZ4CBxx4gLKvcrR7NcK3GV/D9Qi2M0ppWK7A==}
+     cpu: [loong64]
+     os: [linux]
+ 
 +  '@koromix/koffi-linux-ppc64@3.3.1':
 +    resolution: {integrity: sha512-nmOTpQQS5pWG73X01y7K70JQaL+5T/v04i0G4BtXDAxQq3WHmyeJCgmdHhz5W0JVtjHicitSZoothTspAopF9A==}
 +    cpu: [ppc64]
 +    os: [linux]
 +
+   '@koromix/koffi-linux-ppc64@3.3.6':
+     resolution: {integrity: sha512-L1+1cjH5GtNtv7TYWy469jsDberOOwCfE96h0AWFKrVHycDn8hTKH5fEA/er42R04lZiNWbiC0+sMb50enYRGw==}
+     cpu: [ppc64]
+     os: [linux]
+ 
 +  '@koromix/koffi-linux-riscv64@3.3.1':
 +    resolution: {integrity: sha512-mk0Av5QmK0BPD3OHytOThVhEe4VCTrYv3+em6h75E1rNYiCfixzeh3d5+s5x2vCaby8zzxvNd39sO89Bp1juwg==}
 +    cpu: [riscv64]
 +    os: [linux]
 +
+   '@koromix/koffi-linux-riscv64@3.3.6':
+     resolution: {integrity: sha512-VnzoNRg3MfTdGXLDtUrBj4wJnZD3buX6LajGrvYm5Mf1U132bzQwxP1ryZhs8Q0Cl1pTsN2fIovjNwpwE7Hs3A==}
+     cpu: [riscv64]
+     os: [linux]
+ 
 +  '@koromix/koffi-linux-x64@3.3.1':
 +    resolution: {integrity: sha512-uU5cJNe145TvITqrUWvBmZO4WLNObdZ2Gnm8eNk/OdrhRFG9LB44RUv07aQwPbdo1438j+Cr+tFNnpjTBadZFQ==}
 +    cpu: [x64]
 +    os: [linux]
 +
+   '@koromix/koffi-linux-x64@3.3.6':
+     resolution: {integrity: sha512-RTRbVTZ1rf1GFowSsbuU2acYoRq66ZwJGh+rTgau1Cat3muv2884p0FRH6UKfwlgWkpjIHJ7N8N0liM7Oe2eAQ==}
+     cpu: [x64]
+     os: [linux]
+ 
 +  '@koromix/koffi-openbsd-arm64@3.3.1':
 +    resolution: {integrity: sha512-owXmXHI+5kkDyVjqGPfPgIHIzH1swsGY+YNbQ4ozkO23UKzJElAtmQPcmA1pQwiDCeyojHEelgd9+BV58uOIkA==}
 +    cpu: [arm64]
 +    os: [openbsd]
 +
+   '@koromix/koffi-openbsd-arm64@3.3.6':
+     resolution: {integrity: sha512-eXHyRZw/BACrBIuntkqlNTa8p8i9KobtREJjhxldsVoEPRQTREnhBq5IbqbvXesY89MwFGn4lHmzG1x5ueV63A==}
+     cpu: [arm64]
+     os: [openbsd]
+ 
 +  '@koromix/koffi-openbsd-ia32@3.3.1':
 +    resolution: {integrity: sha512-fvIKWycDdc9XL3ATQT0uvt/j82EB3/JWzJU4yqUCJbMotTP8mvo/c1D1Jus4mO+fNGEYM33YuFDkJcQkHJd9Dg==}
 +    cpu: [ia32]
 +    os: [openbsd]
 +
+   '@koromix/koffi-openbsd-ia32@3.3.6':
+     resolution: {integrity: sha512-xbJYOFY0IAIx3nyNdYad5g2f8cNAOY8OBcjPDYRlc7gkqQiPNER9ZA9g+M2LuVf48i65ZCn11XaWDSQymDJJBg==}
+     cpu: [ia32]
+     os: [openbsd]
+ 
 +  '@koromix/koffi-openbsd-x64@3.3.1':
 +    resolution: {integrity: sha512-UYk2xNAK5wEyskLtrgTRt+2lwfBOvgaK8UJDz4B2qm57VvRrqb7ye1hzKFZrRVa8NWRPUk6W/zsqZyFHu4BoLA==}
 +    cpu: [x64]
 +    os: [openbsd]
 +
+   '@koromix/koffi-openbsd-x64@3.3.6':
+     resolution: {integrity: sha512-bNL4uIxUBhA93naaL3dWwXdLgQGAss6krDbwljO1uS3iJ+8K7KSo8EGbJfRYUf1L+ctaHTJuDwgZ1XTSEC9FQQ==}
+     cpu: [x64]
+     os: [openbsd]
+ 
 +  '@koromix/koffi-win32-arm64@3.3.1':
 +    resolution: {integrity: sha512-SZsmAWUKxBHdUR6Z5IJTslOOy0VEFHxoDHMZkn3k0P5TuP/aOZfQYoEa34UwnLI8t2Fmgyhmympth+39tR/XUw==}
 +    cpu: [arm64]
 +    os: [win32]
 +
+   '@koromix/koffi-win32-arm64@3.3.6':
+     resolution: {integrity: sha512-WDVsrvWAaHbA7xiCMXX3PBmfDf4+VnfY67ryRAW86QNW8109W9WPS3YVGGD2YoPswDmSZsMBVzzZCEFUrLdJuA==}
+     cpu: [arm64]
+     os: [win32]
+ 
 +  '@koromix/koffi-win32-ia32@3.3.1':
 +    resolution: {integrity: sha512-pARisOvxCPkk6Wg1HkwRCnrkJIVS31kDweWLo+bQay/Dr1915s7skVydWpTKS30EcfOh4Jay7B4c0dgamTLBHg==}
 +    cpu: [ia32]
 +    os: [win32]
 +
+   '@koromix/koffi-win32-ia32@3.3.6':
+     resolution: {integrity: sha512-6hwsUGC7FCICiLdmEQwTK0+MOLmuraqWuVsUCBkdSCL6k62LQLScuTn2dzONFvN/H5EXq0zzX4ddgtq2abL/xQ==}
+     cpu: [ia32]
+     os: [win32]
+ 
 +  '@koromix/koffi-win32-x64@3.3.1':
 +    resolution: {integrity: sha512-LYoO19cTIA7xjl+3s4VeGagCAO38VNXZ969DNszb1wTwJUjrHLrAbHFkk8fYkXineM3HJkFwElW0VLmZqXcfRg==}
 +    cpu: [x64]
 +    os: [win32]
 +
-   '@legendapp/list@3.3.5':
-     resolution: {integrity: sha512-XTsLYtpg41SVb5uLBYA+YcDSA3w0tgoPq/W8ZggQ2tx+3lrC/rf+ehTP9KYHea9oFaZIuePAgzACs5/auVMJlQ==}
-     peerDependencies:
-@@ -9593,6 +9792,9 @@ packages:
+   '@koromix/koffi-win32-x64@3.3.6':
+     resolution: {integrity: sha512-g9KC6VKQLe88Tjgeubk3yhu0CjtqSeRq4XjWFWxUq4rsP0/wfLUBoeISvG60HoPmhYQp+U7hVd8Ms+amOMHDvA==}
+     cpu: [x64]
+@@ -10325,6 +10524,9 @@ packages:
      engines: {node: ^20.19.0 || >=22.12.0}
      hasBin: true
  
 +  koffi@3.3.1:
 +    resolution: {integrity: sha512-FZYfhBfYQr/cmHhZpaQ9rhbKpkjHhxaytn2A0mbPhiD5yV8QzF3SiQwR1w/34rCJ1fw+6qBQSj/ZoXRdC+Xc2Q==}
 +
-   lan-network@0.2.1:
-     resolution: {integrity: sha512-ONPnazC96VKDntab9j9JKwIWhZ4ZUceB4A9Epu4Ssg0hYFmtHZSeQ+n15nIwTFmcBUKtExOer8WTJ4GF9MO64A==}
-     hasBin: true
-@@ -12028,6 +12230,10 @@ packages:
+   koffi@3.3.6:
+     resolution: {integrity: sha512-pPqCZg8o4laLvzxySGEju/T1Fd+eCJTVnJmcH6h1u98HFRoBQ9EokNuBSj3NxIQdzkEPRxPnHKjhBVkLeB+X0g==}
+ 
+@@ -12863,6 +13065,10 @@ packages:
      resolution: {integrity: sha512-C+r0eKJUIfiDIfwJhria30+TYWPtuHJXHtI7J0YlOmKAo7ogxP20T0zxB7HZQIFhIyvoBPwWskjxrvAtfjyZfA==}
      engines: {node: '>=14.0.0'}
  
@@ -4583,19 +4702,31 @@ index f2eabadf0..139cb3295 100644
    vscode-languageserver-protocol@3.17.5:
      resolution: {integrity: sha512-mb1bvRJN8SVznADSGWM9u/b07H7Ecg0I3OgXDuLdn307rl/J3A9YD6/eYOssqhecL27hK1IPZAsaqh00i/Jljg==}
  
-@@ -12273,6 +12479,9 @@ packages:
-   zod@3.25.76:
-     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+@@ -13102,16 +13308,21 @@ packages:
+   yuku-core@0.19.0:
+     resolution: {integrity: sha512-kYK9e1XdfirNhkipzW0wmMcSWcVF/CWnuugodfVYRCUwvoBefweL9HzB96OiKEhsx78V5WbUxbJqlizMX869Qg==}
+     engines: {node: '>=14.18.0'}
++    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
+ 
+   yuku-parser@0.19.0:
+     resolution: {integrity: sha512-XrBh9ZiQK5mJVRxZBAvD6LwRyAYrK3MFtH3+onyuxFL5hFD44EC3QOmIC1FjTj6H2MMwq46/NAI+NZxLZPZgxg==}
+     engines: {node: '>=14.18.0'}
++    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
+ 
+   zod-to-json-schema@3.25.2:
+     resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
+     peerDependencies:
+       zod: ^3.25.28 || ^4
  
 +  zod@4.4.3:
 +    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 +
-   zod@4.5.4:
-     resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
+   zod@4.6.7:
+     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
  
-@@ -14423,6 +14632,50 @@ snapshots:
- 
-   '@fontsource-variable/inter@5.3.0': {}
+@@ -15393,6 +15604,50 @@ snapshots:
+     transitivePeerDependencies:
+       - supports-color
  
 +  '@github/copilot-darwin-arm64@1.0.75':
 +    optional: true
@@ -4641,79 +4772,136 @@ index f2eabadf0..139cb3295 100644
 +      '@github/copilot-win32-arm64': 1.0.75
 +      '@github/copilot-win32-x64': 1.0.75
 +
-   '@hono/node-server@1.19.17(hono@4.13.7)':
+   '@handy-computer/models@0.2.3': {}
+ 
+   '@hono/node-server@2.1.6(hono@4.13.17)':
+@@ -15561,63 +15816,123 @@ snapshots:
      dependencies:
-       hono: 4.13.7
-@@ -14689,6 +14942,66 @@ snapshots:
-     dependencies:
-       jsbi: 4.3.2
+       jsep: 1.6.0
  
 +  '@koromix/koffi-android-arm64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-android-arm64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-android-x64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-android-x64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-darwin-arm64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-darwin-arm64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-darwin-x64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-darwin-x64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-freebsd-arm64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-freebsd-arm64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-freebsd-ia32@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-freebsd-ia32@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-freebsd-x64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-freebsd-x64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-linux-arm64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-linux-arm64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-linux-arm@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-linux-arm@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-linux-ia32@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-linux-ia32@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-linux-loong64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-linux-loong64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-linux-ppc64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-linux-ppc64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-linux-riscv64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-linux-riscv64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-linux-x64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-linux-x64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-openbsd-arm64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-openbsd-arm64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-openbsd-ia32@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-openbsd-ia32@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-openbsd-x64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-openbsd-x64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-win32-arm64@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-win32-arm64@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-win32-ia32@3.3.1':
 +    optional: true
 +
+   '@koromix/koffi-win32-ia32@3.3.6':
+     optional: true
+ 
 +  '@koromix/koffi-win32-x64@3.3.1':
 +    optional: true
 +
-   '@legendapp/list@3.3.5(patch_hash=6cbdacd8c380d9a5afb9f73d4198dc2cc44be6ef28a955b1183c781469307896)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)':
-     dependencies:
-       react: 19.3.0
-@@ -19433,6 +19746,29 @@ snapshots:
+   '@koromix/koffi-win32-x64@3.3.6':
+     optional: true
+ 
+@@ -20673,6 +20988,29 @@ snapshots:
        yaml: 2.9.0
-       zod: 4.6.5
+       zod: 4.6.7
  
 +  koffi@3.3.1:
 +    optionalDependencies:
@@ -4738,10 +4926,10 @@ index f2eabadf0..139cb3295 100644
 +      '@koromix/koffi-win32-ia32': 3.3.1
 +      '@koromix/koffi-win32-x64': 3.3.1
 +
-   lan-network@0.2.1: {}
- 
-   lazy-val@1.0.5: {}
-@@ -22508,6 +22844,8 @@ snapshots:
+   koffi@3.3.6:
+     optionalDependencies:
+       '@koromix/koffi-android-arm64': 3.3.6
+@@ -24002,6 +24340,8 @@ snapshots:
  
    vscode-jsonrpc@8.2.0: {}
  
@@ -4750,29 +4938,21 @@ index f2eabadf0..139cb3295 100644
    vscode-languageserver-protocol@3.17.5:
      dependencies:
        vscode-jsonrpc: 8.2.0
-@@ -22747,6 +23085,8 @@ snapshots:
- 
-   zod@3.25.76: {}
+@@ -24244,6 +24584,8 @@ snapshots:
+     dependencies:
+       zod: 4.6.7
  
 +  zod@4.4.3: {}
 +
-   zod@4.5.4: {}
+   zod@4.6.7: {}
  
-   zod@4.6.5: {}
+   zustand@5.0.14(@types/react@19.3.0)(react@19.3.0)(use-sync-external-store@1.6.0(react@19.3.0)):
 diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
-index a07ad2b00..fda1054c5 100644
+index 04f881d6f1..a21b549b0d 100644
 --- a/pnpm-workspace.yaml
 +++ b/pnpm-workspace.yaml
-@@ -18,6 +18,7 @@ allowBuilds:
-   electron: false
-   electron-winstaller: false
-   esbuild: true
-+  koffi: true
-   msgpackr-extract: true
-   msw: false
-   node-pty: true
-@@ -229,6 +230,11 @@ minimumReleaseAgeExclude:
-   - agent-device@0.21.32
+@@ -100,6 +100,11 @@ catalog:
+   unified: 11.0.5
  
  overrides:
 +  "@github/copilot-sdk@1.0.8>@github/copilot": 1.0.75
