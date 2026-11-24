@@ -346,6 +346,15 @@ export class OrchestratorRuntimeModeAboveCeilingError extends Schema.TaggedError
   }
 }
 
+export class OrchestratorSnapshotReadOnlyError extends Schema.TaggedError<OrchestratorSnapshotReadOnlyError>()(
+  "OrchestratorSnapshotReadOnlyError",
+  { commandId: CommandId, threadId: ThreadId },
+) {
+  override get message(): string {
+    return "Imported Copilot snapshots are read-only; native continuation and history transfer are unavailable.";
+  }
+}
+
 export class OrchestratorCommandPreviouslyRejectedError extends Schema.TaggedError<OrchestratorCommandPreviouslyRejectedError>()(
   "OrchestratorCommandPreviouslyRejectedError",
   {
@@ -383,6 +392,7 @@ export const OrchestratorV2Error = Schema.Union([
   OrchestratorCommandPreviouslyRejectedError,
   OrchestratorCommandIdConflictError,
   OrchestratorSubagentThreadReadOnlyError,
+  OrchestratorSnapshotReadOnlyError,
   OrchestratorThreadAboveModeLimitError,
   OrchestratorProviderSelectionBusyError,
   OrchestratorRuntimeModeAboveCeilingError,
@@ -15406,6 +15416,25 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       }),
     );
 
+  const snapshotSafeCommands: ReadonlySet<OrchestrationV2ServerCommand["type"]> = new Set([
+    "thread.create",
+    "thread.visit",
+    "thread.delete",
+    "thread.archive",
+    "thread.unarchive",
+    "thread.settle",
+    "thread.unsettle",
+    "thread.snooze",
+    "thread.unsnooze",
+    "thread.auto-settle",
+    "thread.auto-settle.set",
+    "thread.pin",
+    "thread.unpin",
+    "thread.pin.reorder",
+    "thread.active.reorder",
+    "thread.mark-unread",
+    "thread.metadata.update",
+  ]);
   const dispatchOnce = Effect.fn("orchestrationV2.dispatch.once")(function* (
     command: OrchestrationV2ServerCommand,
     sideChatIds: ReadonlyArray<ThreadId>,
@@ -15426,6 +15455,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       "orchestration_v2.command_type": command.type,
       "orchestration_v2.thread_id": commandThreadId(command),
     });
+
+    const metadataMayExecute =
+      command.type === "thread.metadata.update" &&
+      (command.regenerateTitle === true ||
+        command.branch !== undefined ||
+        command.worktreePath !== undefined ||
+        command.limitRecovery !== undefined);
+    if (!snapshotSafeCommands.has(command.type) || metadataMayExecute) {
+      const threadIds =
+        command.type === "thread.fork" || command.type === "thread.merge_back"
+          ? [command.sourceThreadId, command.targetThreadId]
+          : [commandThreadId(command)];
+      for (const threadId of threadIds) {
+        const shell = yield* projectionStore
+          .findThread(threadId)
+          .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
+        if (shell?.sessionSnapshot !== undefined) {
+          return yield* new OrchestratorSnapshotReadOnlyError({
+            commandId: command.commandId,
+            threadId,
+          });
+        }
+      }
+    }
 
     const events = yield* Ref.make<Array<OrchestrationV2DomainEvent>>([]);
     const effects = yield* Ref.make<Array<PendingOrchestrationEffectV2>>([]);

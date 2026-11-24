@@ -1929,6 +1929,9 @@ export function threadShellFromProjection(
     ...(projection.thread.historyOrigin === undefined
       ? {}
       : { historyOrigin: projection.thread.historyOrigin }),
+    ...(projection.thread.sessionSnapshot === undefined
+      ? {}
+      : { sessionSnapshot: projection.thread.sessionSnapshot }),
     ...(projection.thread.linkOrigin === undefined
       ? {}
       : { linkOrigin: projection.thread.linkOrigin }),
@@ -2243,6 +2246,9 @@ function shellFromState(input: {
     ...(input.state.thread.historyOrigin === undefined
       ? {}
       : { historyOrigin: input.state.thread.historyOrigin }),
+    ...(input.state.thread.sessionSnapshot === undefined
+      ? {}
+      : { sessionSnapshot: input.state.thread.sessionSnapshot }),
     ...(input.state.thread.linkOrigin === undefined
       ? {}
       : { linkOrigin: input.state.thread.linkOrigin }),

@@ -1951,6 +1951,7 @@ const IMPORT_SOURCE_NAMES: Record<AgentSessionSource, string> = {
   claudeAgent: "Claude Code",
   codex: "Codex",
   pi: "Pi",
+  githubCopilot: "GitHub Copilot",
 };
 function useImportSourcesLabel() {
   return new Intl.ListFormat(useLocale(), { type: "conjunction" }).format(
@@ -1978,7 +1979,7 @@ function ImportRowMeta({
         ? gt("now", { $context: "relative time" })
         : relative.value;
   return (
-    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
+    <span className="ml-auto grid shrink-0 grid-cols-[repeat(4,1rem)_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
       {AgentSessionSource.literals.map((source) => (
         <span key={source} className="flex size-4 items-center justify-center">
           {sources?.includes(source) ? (

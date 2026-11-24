@@ -1,5 +1,10 @@
-import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeCrypto from "node:crypto";
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodePath from "node:path";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeCryptoServices from "@effect/platform-node/NodeCrypto";
 import {
   type AgentSessionSource,
   type ServerSettingsError,
@@ -75,7 +80,10 @@ function candidate(
       provider,
       providerInstanceId,
       providerSessionId,
-      filePath: `/tmp/${providerInstanceId}/${providerSessionId}.jsonl`,
+      filePath:
+        provider === "githubCopilot"
+          ? `/tmp/${providerInstanceId}/session-state/${providerSessionId}/events.jsonl`
+          : `/tmp/${providerInstanceId}/${providerSessionId}.jsonl`,
       size: 100,
       mtimeMs: 2,
       device: 3,
@@ -107,10 +115,78 @@ const nativeId = ({ source }: ReturnType<typeof candidate>) =>
   source.provider === "pi" ? source.filePath : source.providerSessionId;
 
 function importId(source: ReturnType<typeof candidate>) {
+  if (source.source.provider === "githubCopilot") {
+    const home = NodeCrypto.createHash("sha256")
+      .update(NodePath.dirname(NodePath.dirname(source.source.filePath)))
+      .digest("hex");
+    return ThreadId.make(
+      `import-snapshot:${source.source.providerInstanceId}:${home}:${source.source.providerSessionId}`,
+    );
+  }
   return ThreadId.make(
     `import:${source.source.providerInstanceId}:${source.source.providerSessionId}`,
   );
 }
+
+it.effect(
+  "imports immutable Copilot snapshots without native ownership or resumable runtime, separating homes",
+  () =>
+    Effect.gen(function* () {
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const runtimes = yield* ProviderSessionRuntime.ProviderSessionRuntimeRepository;
+      const copilot = candidate(
+        { instanceId: ProviderInstanceId.make("copilot-account"), model: "gpt-6.1-sol" },
+        "native-id",
+        "githubCopilot",
+      );
+      const otherHome = {
+        ...copilot,
+        source: {
+          ...copilot.source,
+          filePath: "/another-home/session-state/native-id/events.jsonl",
+        },
+      };
+      const importer = yield* makeImporter([copilot, otherHome]);
+      expect(yield* importer.run).toEqual({ importedCount: 2, skippedCount: 0 });
+      const eventCount = importer.published.length;
+      expect(yield* importer.run).toEqual({ importedCount: 0, skippedCount: 0 });
+      expect(importer.published).toHaveLength(eventCount);
+      for (const fixture of [copilot, otherHome]) {
+        const threadId = importId(fixture);
+        const records = yield* projections.getThreadRecords(threadId, [
+          "messages",
+          "providerThreads",
+        ]);
+        expect(records.thread.sessionSnapshot).toMatchObject({
+          kind: "copilot_text_snapshot",
+          providerInstanceId: copilot.source.providerInstanceId,
+          nativeSessionId: "native-id",
+        });
+        expect(records.thread.activeProviderThreadId).toBeNull();
+        expect(records.providerThreads).toEqual([]);
+        expect(records.messages.map((message) => message.text)).toEqual(["Fix it", "Fixed"]);
+        expect(yield* runtimes.getByThreadId({ threadId })).toEqual(Option.none());
+        expect((yield* projections.getThreadShell(threadId))?.sessionSnapshot).toEqual(
+          records.thread.sessionSnapshot,
+        );
+      }
+      const changed = {
+        ...copilot,
+        thread: {
+          ...copilot.thread,
+          messages: [
+            ...copilot.thread.messages,
+            { role: "user" as const, text: "Later native message", createdAt: timestamp },
+          ],
+        },
+      };
+      const secondImport = yield* makeImporter([changed]);
+      yield* secondImport.run;
+      expect(
+        (yield* projections.getThreadRecords(importId(copilot), ["messages"])).messages,
+      ).toHaveLength(2);
+    }).pipe(Effect.provide(persistence)),
+);
 
 const seedOwner = Effect.fn(function* (
   source: ReturnType<typeof candidate>,
@@ -228,6 +304,7 @@ const makeImporter = Effect.fn(function* (
   );
   const context = yield* Layer.build(
     AgentSessionImporter.layer.pipe(
+      Layer.provide(Layer.merge(NodeServices.layer, NodeCryptoServices.layer)),
       Layer.provide(
         Layer.mergeAll(
           sinkLayer,

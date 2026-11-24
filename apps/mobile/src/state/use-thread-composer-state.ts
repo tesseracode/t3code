@@ -2,7 +2,7 @@ import { useComposerAttachmentActions } from "./use-composer-attachment-actions"
 import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
 import * as Effect from "effect/Effect";
 import * as Dialog from "../components/ui/Dialog";
-import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
+import { AGENT_SESSION_SNAPSHOT_NOTICE, AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { readEnvironmentScope } from "./session";
 import { useAtomValue } from "@effect/atom-react";
 import { compactBeforeSendTokens } from "@t3tools/client-runtime/state/context-window";
@@ -625,6 +625,13 @@ export function useThreadComposerState(input: {
     ) => Promise<boolean | "responded">,
     onWillEnqueue?: () => void,
   ) => {
+    if (selectedThreadShell?.sessionSnapshot !== undefined) {
+      setThreadComposerError(
+        scopedThreadKey(selectedThreadShell.environmentId, selectedThreadShell.id),
+        AGENT_SESSION_SNAPSHOT_NOTICE,
+      );
+      return null;
+    }
     if (
       selectedThreadShell &&
       selectedEnvironmentRuntime?.connectionState === "connected" &&

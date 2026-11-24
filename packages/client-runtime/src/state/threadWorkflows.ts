@@ -104,6 +104,7 @@ export function threadSteersDuringCompaction(projection: Projection | null | und
 
 export function threadSupportsProviderHandoff(projection: Projection | null | undefined): boolean {
   if (projection == null) return false;
+  if (projection.thread.sessionSnapshot !== undefined) return false;
   const session = resolveThreadProviderSession(projection);
   if (session !== null) {
     return session.capabilities.sessions.supportsProviderSwitchingViaHandoff;

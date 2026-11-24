@@ -1,6 +1,8 @@
 import { ChildThreadApprovals } from "./ChildThreadApprovals";
 import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
 import { useOpenThreadInspector } from "./thread-inspector-navigation";
+import { AGENT_SESSION_SNAPSHOT_NOTICE } from "@t3tools/contracts";
+import { AppText as Text } from "../../components/ui/AppText";
 import { useSidebarWorkspaceTabs } from "../layout/workspace/useSystemWorkspaceTabBar";
 import { useWorkspaceTabs } from "../layout/workspace/WorkspaceTabsContext";
 import {
@@ -1896,93 +1898,107 @@ function ThreadDetailBody(
                     </View>
                   ) : (
                     <>
-                      <ThreadComposer
-                        isDraft={Boolean(props.draftMode)}
-                        canOperateThread={props.canOperateThread}
-                        reportedModelSelection={reportedModelSelection}
-                        editorRef={composerEditorRef}
-                        placeholder={
-                          props.activePendingApproval
-                            ? props.activePendingApproval.supportsFeedback
-                              ? gt("Send feedback to decline this request")
-                              : gt("Send a message to decline and redirect the agent")
-                            : gt("Ask anything")
-                        }
-                        contentMaxWidth={contentMaxWidth}
-                        draftControls={props.draftMode?.controls(draftViewportHeight)}
-                        connectionState={props.connectionStateLabel}
-                        environmentLabel={props.environmentLabel}
-                        selectedThread={props.selectedThread}
-                        compactBeforeSend={props.compactBeforeSend ?? null}
-                        hasCompactableConversation={
-                          hasCompactableConversation && !props.isCompacting
-                        }
-                        {...(freshSessionAvailable
-                          ? {
-                              onFreshSession: () => setFreshSessionPending(selectedThreadKey, true),
-                            }
-                          : {})}
-                        offersSideChat={
-                          props.offersSideChat &&
-                          !props.draftMode &&
-                          props.canOperateThread &&
-                          props.queuedRunEdit === null &&
-                          props.activePendingApproval === null &&
-                          props.activePendingUserInput === null
-                        }
-                        serverConfig={props.serverConfig}
-                        queueCount={props.selectedThreadQueueCount}
-                        activeThreadBusy={props.activeThreadBusy}
-                        redirectsApproval={
-                          props.activePendingApprovals.length > 0 &&
-                          props.activePendingUserInput === null
-                        }
-                        canStopThread={props.canStopThread}
-                        environmentId={props.environmentId}
-                        projectCwd={props.threadCwd ?? props.projectWorkspaceRoot}
-                        // Keep follow-ups in the draft until server creation succeeds, or rejection strands them in the outbox.
-                        sendBlockedReason={
-                          props.draftMode
-                            ? props.draftMode.sendBlockedReason
-                            : props.creationState?.kind === "preparing" &&
-                                !props.creationState.serverOwned
-                              ? gt("Starting the task…")
-                              : null
-                        }
-                        interactionLocked={props.draftMode?.interactionLocked}
-                        draftKey={props.composerDraftKey ?? undefined}
-                        followUpBehavior={
-                          props.activePendingApprovals.length > 0 &&
-                          props.activePendingUserInput === null
-                            ? "steer"
-                            : props.followUpBehavior
-                        }
-                        canSteerActiveTurn={props.canSteerActiveTurn}
-                        hidden={composerSlotHidden}
-                        queuedEdit={
-                          props.queuedRunEdit === null
-                            ? null
-                            : {
-                                existingAttachments: props.queuedRunEdit.existingAttachments,
-                                saving: props.isSavingQueuedEdit,
-                                onRemoveExistingAttachment: props.onRemoveQueuedEditAttachment,
+                      {props.selectedThread.sessionSnapshot !== undefined ? (
+                        <View className="px-4 py-3">
+                          <Text className="text-sm text-muted-foreground">
+                            {AGENT_SESSION_SNAPSHOT_NOTICE}
+                          </Text>
+                          <Text className="mt-1 text-xs text-muted-foreground">
+                            {gt("Native session: {id}", {
+                              id: props.selectedThread.sessionSnapshot.nativeSessionId,
+                            })}
+                          </Text>
+                        </View>
+                      ) : (
+                        <ThreadComposer
+                          isDraft={Boolean(props.draftMode)}
+                          canOperateThread={props.canOperateThread}
+                          reportedModelSelection={reportedModelSelection}
+                          editorRef={composerEditorRef}
+                          placeholder={
+                            props.activePendingApproval
+                              ? props.activePendingApproval.supportsFeedback
+                                ? gt("Send feedback to decline this request")
+                                : gt("Send a message to decline and redirect the agent")
+                              : gt("Ask anything")
+                          }
+                          contentMaxWidth={contentMaxWidth}
+                          draftControls={props.draftMode?.controls(draftViewportHeight)}
+                          connectionState={props.connectionStateLabel}
+                          environmentLabel={props.environmentLabel}
+                          selectedThread={props.selectedThread}
+                          compactBeforeSend={props.compactBeforeSend ?? null}
+                          hasCompactableConversation={
+                            hasCompactableConversation && !props.isCompacting
+                          }
+                          {...(freshSessionAvailable
+                            ? {
+                                onFreshSession: () =>
+                                  setFreshSessionPending(selectedThreadKey, true),
                               }
-                        }
-                        bottomInset={composerBottomInset}
-                        onChangeDraftMessage={props.onChangeDraftMessage}
-                        onPickDraftMedia={props.onPickDraftMedia}
-                        onPickDraftFiles={props.onPickDraftFiles}
-                        onNativePasteImages={props.onNativePasteImages}
-                        onNativePasteText={props.onNativePasteText}
-                        onRemoveDraftImage={props.onRemoveDraftImage}
-                        onStopThread={props.onStopThread}
-                        onResumeQueue={props.onResumeQueue}
-                        onSendMessage={handleSendMessage}
-                        onShowUsageLimits={showUsageLimits}
-                        canSwitchProvider={props.canSwitchThreadProvider}
-                        onHeightChange={handleComposerHeightChange}
-                        onEditorFocusChange={handleOwnedInputFocusChange}
-                      />
+                            : {})}
+                          offersSideChat={
+                            props.offersSideChat &&
+                            !props.draftMode &&
+                            props.canOperateThread &&
+                            props.queuedRunEdit === null &&
+                            props.activePendingApproval === null &&
+                            props.activePendingUserInput === null
+                          }
+                          serverConfig={props.serverConfig}
+                          queueCount={props.selectedThreadQueueCount}
+                          activeThreadBusy={props.activeThreadBusy}
+                          redirectsApproval={
+                            props.activePendingApprovals.length > 0 &&
+                            props.activePendingUserInput === null
+                          }
+                          canStopThread={props.canStopThread}
+                          environmentId={props.environmentId}
+                          projectCwd={props.threadCwd ?? props.projectWorkspaceRoot}
+                          // Keep follow-ups in the draft until server creation succeeds, or rejection strands them in the outbox.
+                          sendBlockedReason={
+                            props.draftMode
+                              ? props.draftMode.sendBlockedReason
+                              : props.creationState?.kind === "preparing" &&
+                                  !props.creationState.serverOwned
+                                ? gt("Starting the task…")
+                                : null
+                          }
+                          interactionLocked={props.draftMode?.interactionLocked}
+                          draftKey={props.composerDraftKey ?? undefined}
+                          followUpBehavior={
+                            props.activePendingApprovals.length > 0 &&
+                            props.activePendingUserInput === null
+                              ? "steer"
+                              : props.followUpBehavior
+                          }
+                          canSteerActiveTurn={props.canSteerActiveTurn}
+                          hidden={composerSlotHidden}
+                          queuedEdit={
+                            props.queuedRunEdit === null
+                              ? null
+                              : {
+                                  existingAttachments: props.queuedRunEdit.existingAttachments,
+                                  saving: props.isSavingQueuedEdit,
+                                  onRemoveExistingAttachment: props.onRemoveQueuedEditAttachment,
+                                }
+                          }
+                          bottomInset={composerBottomInset}
+                          onChangeDraftMessage={props.onChangeDraftMessage}
+                          onPickDraftMedia={props.onPickDraftMedia}
+                          onPickDraftFiles={props.onPickDraftFiles}
+                          onNativePasteImages={props.onNativePasteImages}
+                          onNativePasteText={props.onNativePasteText}
+                          onRemoveDraftImage={props.onRemoveDraftImage}
+                          onStopThread={props.onStopThread}
+                          onResumeQueue={props.onResumeQueue}
+                          onSendMessage={handleSendMessage}
+                          onShowUsageLimits={showUsageLimits}
+                          canSwitchProvider={props.canSwitchThreadProvider}
+                          onHeightChange={handleComposerHeightChange}
+                          onEditorFocusChange={handleOwnedInputFocusChange}
+                        />
+                      )}
                     </>
                   )}
                 </View>
