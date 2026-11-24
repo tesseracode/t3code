@@ -547,6 +547,13 @@ export function routeProviderEvent(
       return [ownsRun(event.runId), state];
     case "turn_item.updated": {
       if (
+        event.turnItem.type === "system_notice" &&
+        event.turnItem.modelExecution &&
+        event.turnItem.threadId === input.threadId &&
+        event.turnItem.providerThreadId === input.providerThreadId
+      )
+        return [true, state];
+      if (
         ownsRun(event.turnItem.runId) ||
         ownsChildThread(event.turnItem.threadId) ||
         ((event.turnItem.type === "todo_list" || event.turnItem.type === "proposed_plan") &&

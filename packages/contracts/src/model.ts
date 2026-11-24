@@ -11,6 +11,7 @@ export const ProviderOptionChoice = Schema.Struct({
   id: TrimmedNonEmptyString,
   label: TrimmedNonEmptyString,
   description: Schema.optional(TrimmedNonEmptyString),
+  disabledReason: Schema.optional(TrimmedNonEmptyString),
   isDefault: Schema.optional(Schema.Boolean),
 });
 export type ProviderOptionChoice = typeof ProviderOptionChoice.Type;

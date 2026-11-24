@@ -1,52 +1,19 @@
 # Implementation Record: copilot-fusion-model-selection
 
-**Recorded**: 2026-11-02T18:46:38Z
+**Recorded**: 2026-11-24T07:15:50Z
 **Files changed**: 32
-**Patch size**: 123533 bytes
-**Capture mode**: working-tree-all
-
-## Change Summary
-
-```
- .tpatch/FEATURES.md                                |   2 +-
- .../copilot-fusion-model-selection/exploration.md  |  10 +-
- .../copilot-fusion-model-selection/status.json     |  14 +-
- .../features/threads/ThreadSettingsRows.shared.tsx |   5 +-
- .../src/features/threads/ThreadSettingsSheet.tsx   |  12 +-
- .../threads/thread-settings-options.test.ts        |  20 ++
- apps/mobile/src/lib/providerOptions.ts             |   4 +-
- apps/mobile/src/lib/threadActivity.ts              |  13 +-
- .../orchestration-v2/ProviderEventIngestor.test.ts | 128 +++++++
- .../src/orchestration-v2/ProviderEventIngestor.ts  |  59 +++-
- .../src/orchestration-v2/RunExecutionService.ts    |   7 +
- .../src/components/chat/TimelineWorkEntryRow.tsx   |  13 +-
- apps/web/src/components/chat/TraitsPicker.tsx      |  28 +-
- apps/web/src/session-logic.ts                      |   5 +-
- docs/user/activity-log.md                          |  12 +
- docs/user/providers-copilot.md                     |   6 +
- packages/client-runtime/package.json               |   4 +
- packages/client-runtime/src/modelTraits.ts         |   6 +-
- .../client-runtime/src/work-log/itemDetail.test.ts |  30 +-
- packages/client-runtime/src/work-log/itemDetail.ts |   5 +-
- packages/contracts/src/model.ts                    |   1 +
- packages/contracts/src/orchestrationV2.test.ts     |  67 ++++
- packages/contracts/src/orchestrationV2.ts          |  51 +++
- .../provider-copilot/src/server/adapter.test.ts    | 390 ++++++++++++++++++++-
- packages/provider-copilot/src/server/adapter.ts    | 363 ++++++++++++++++++-
- .../provider-copilot/src/server/status.test.ts     |  31 +-
- packages/provider-copilot/src/server/status.ts     | 119 ++++---
- packages/shared/src/model.test.ts                  |  63 ++++
- packages/shared/src/model.ts                       |  41 ++-
- 29 files changed, 1406 insertions(+), 103 deletions(-)
-```
+**Patch size**: 124105 bytes
+**Capture mode**: staged-index
+**Pathspecs**: apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx,apps/mobile/src/features/threads/ThreadSettingsSheet.tsx,apps/mobile/src/features/threads/thread-settings-options.test.ts,apps/mobile/src/lib/providerOptions.ts,apps/mobile/src/lib/threadActivity.ts,apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts,apps/server/src/orchestration-v2/ProviderEventIngestor.ts,apps/server/src/orchestration-v2/RunExecutionService.ts,apps/web/src/components/chat/TimelineWorkEntryRow.tsx,apps/web/src/components/chat/TraitsPicker.tsx,apps/web/src/session-logic.ts,docs/user/activity-log.md,docs/user/providers-copilot.md,packages/client-runtime/package.json,packages/client-runtime/src/modelTraits.ts,packages/client-runtime/src/work-log/itemDetail.test.ts,packages/client-runtime/src/work-log/itemDetail.ts,packages/client-runtime/src/work-log/modelExecution.test.ts,packages/client-runtime/src/work-log/modelExecution.ts,packages/contracts/src/model.ts,packages/contracts/src/orchestrationV2.test.ts,packages/contracts/src/orchestrationV2.ts,packages/provider-copilot/src/server/adapter.test.ts,packages/provider-copilot/src/server/adapter.ts,packages/provider-copilot/src/server/fusion.test.ts,packages/provider-copilot/src/server/fusion.ts,packages/provider-copilot/src/server/routing.test.ts,packages/provider-copilot/src/server/routing.ts,packages/provider-copilot/src/server/status.test.ts,packages/provider-copilot/src/server/status.ts,packages/shared/src/model.test.ts,packages/shared/src/model.ts
 
 ## Capture Provenance
 
-- **capture_mode**: `working-tree-all`
-- **pathspecs**: (none)
+- **capture_mode**: `staged-index`
+- **pathspecs**: apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx, apps/mobile/src/features/threads/ThreadSettingsSheet.tsx, apps/mobile/src/features/threads/thread-settings-options.test.ts, apps/mobile/src/lib/providerOptions.ts, apps/mobile/src/lib/threadActivity.ts, apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts, apps/server/src/orchestration-v2/ProviderEventIngestor.ts, apps/server/src/orchestration-v2/RunExecutionService.ts, apps/web/src/components/chat/TimelineWorkEntryRow.tsx, apps/web/src/components/chat/TraitsPicker.tsx, apps/web/src/session-logic.ts, docs/user/activity-log.md, docs/user/providers-copilot.md, packages/client-runtime/package.json, packages/client-runtime/src/modelTraits.ts, packages/client-runtime/src/work-log/itemDetail.test.ts, packages/client-runtime/src/work-log/itemDetail.ts, packages/client-runtime/src/work-log/modelExecution.test.ts, packages/client-runtime/src/work-log/modelExecution.ts, packages/contracts/src/model.ts, packages/contracts/src/orchestrationV2.test.ts, packages/contracts/src/orchestrationV2.ts, packages/provider-copilot/src/server/adapter.test.ts, packages/provider-copilot/src/server/adapter.ts, packages/provider-copilot/src/server/fusion.test.ts, packages/provider-copilot/src/server/fusion.ts, packages/provider-copilot/src/server/routing.test.ts, packages/provider-copilot/src/server/routing.ts, packages/provider-copilot/src/server/status.test.ts, packages/provider-copilot/src/server/status.ts, packages/shared/src/model.test.ts, packages/shared/src/model.ts
 - **claim_ids**: (none)
-- **base_commit**: `d82592306068663ae4665d4500894030fe647dae`
+- **base_commit**: `a31da72b87a6a33e814b56a8ab01a1de6912e292`
 - **upper_commit**: `working-tree`
+- **dirty_state**: 32 staged paths, 0 unrelated unstaged paths
 
 ## Replay Instructions
 

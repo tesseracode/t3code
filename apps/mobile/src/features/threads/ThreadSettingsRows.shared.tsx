@@ -22,8 +22,8 @@ export type ModelRowProps = {
 export type ChoiceRowProps = {
   readonly label: string;
   readonly description?: string;
-  readonly selected: boolean;
   readonly disabled?: boolean;
+  readonly selected: boolean;
   readonly onPress: () => void;
   readonly isLast: boolean;
 };
@@ -176,6 +176,7 @@ export function ChoiceRowContent(props: ChoiceRowProps & RowSelectionProps) {
       className={cn(
         "min-h-14 flex-row items-center gap-3 bg-grouped-card px-4 py-3 active:bg-subtle",
         !props.isLast && "border-b border-border-subtle",
+        props.disabled && "opacity-50",
       )}
     >
       {props.leadingSelection}

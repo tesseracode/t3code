@@ -93,7 +93,13 @@ export function getTraitSelectChange(
   prompt: string,
   value: string,
 ) {
-  if (!value || descriptor.promptInjectedValues?.includes(value)) return null;
+  if (
+    !descriptor.options.some(
+      (option) => option.id === value && option.disabledReason === undefined,
+    ) ||
+    descriptor.promptInjectedValues?.includes(value)
+  )
+    return null;
   const isPrimary = descriptor.id === selected.primarySelectDescriptor?.id;
   if (isPrimary && selected.ultrathinkInBodyText) return null;
   return {

@@ -21,6 +21,7 @@ import { classifyToolActivity, collectToolFilePaths } from "@t3tools/shared/tool
 import { formatReadToolLabel, formatSearchToolLabel } from "@t3tools/shared/toolActivityCopy";
 import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
 import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
+import { modelExecutionSummary } from "@t3tools/client-runtime/work-log/model-execution";
 import type { McpAppReference } from "@t3tools/shared/mcpApp";
 import {
   htmlRenderFromToolItem,
@@ -453,8 +454,10 @@ function projectedWorkEntry(
     case "system_notice":
       return {
         ...common,
-        label: item.message,
-        ...(item.level === "info" ? {} : { sourceActivityKind: "runtime.warning" }),
+        label: item.modelExecution ? modelExecutionSummary(item.modelExecution) : item.message,
+        ...(item.modelExecution || item.level === "info"
+          ? {}
+          : { sourceActivityKind: "runtime.warning" }),
       };
     case "error": {
       const presentation = providerErrorPresentation(item, resolve);

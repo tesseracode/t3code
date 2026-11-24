@@ -1,24 +1,18 @@
 diff --git a/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx b/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx
-index 384195ec5..5879307b3 100644
+index 1ffa5b497c..804f219bca 100644
 --- a/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx
 +++ b/apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx
-@@ -21,6 +21,7 @@ export type ModelRowProps = {
+@@ -22,8 +22,8 @@ export type ModelRowProps = {
  export type ChoiceRowProps = {
    readonly label: string;
    readonly description?: string;
-+  readonly disabled?: boolean;
-   readonly selected: boolean;
+-  readonly selected: boolean;
+   readonly disabled?: boolean;
++  readonly selected: boolean;
    readonly onPress: () => void;
    readonly isLast: boolean;
-@@ -140,12 +141,14 @@ export function ChoiceRowContent(props: ChoiceRowProps & RowSelectionProps) {
-     <Pressable
-       accessibilityLabel={props.description ? `${props.label}. ${props.description}` : props.label}
-       accessibilityRole="radio"
--      accessibilityState={{ checked: props.selected }}
-+      accessibilityState={{ checked: props.selected, disabled: props.disabled === true }}
-+      disabled={props.disabled}
-       onPress={props.onPress}
-       style={props.minimumHeight === undefined ? undefined : { minHeight: props.minimumHeight }}
+ };
+@@ -176,6 +176,7 @@ export function ChoiceRowContent(props: ChoiceRowProps & RowSelectionProps) {
        className={cn(
          "min-h-14 flex-row items-center gap-3 bg-grouped-card px-4 py-3 active:bg-subtle",
          !props.isLast && "border-b border-border-subtle",
@@ -27,22 +21,15 @@ index 384195ec5..5879307b3 100644
      >
        {props.leadingSelection}
 diff --git a/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx b/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx
-index 11d871047..a494933ff 100644
+index 56be7cd27d..d31b0948ea 100644
 --- a/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx
 +++ b/apps/mobile/src/features/threads/ThreadSettingsSheet.tsx
-@@ -1093,6 +1093,7 @@ function ThreadSettingsChoiceContent(props: {
-             id: choice.mode,
-             label: choice.label,
-             description: choice.description,
-+            disabled: false,
-             selected: choice.mode === session.runtimeMode,
-             onPress: () => {
-               void Haptics.selectionAsync();
-@@ -1106,7 +1107,14 @@ function ThreadSettingsChoiceContent(props: {
+@@ -1251,8 +1251,14 @@ function ThreadSettingsChoiceContent(props: {
              rows: selectableChoices(activeDescriptor).map((choice) => ({
                id: choice.id,
                label: choice.label,
 -              description: choice.description,
+-              disabled: false,
 +              description:
 +                [
 +                  choice.description,
@@ -54,7 +41,7 @@ index 11d871047..a494933ff 100644
                selected:
                  choice.id ===
                  (session.promptTraits.ultrathinkPromptControlled &&
-@@ -1118,6 +1126,7 @@ function ThreadSettingsChoiceContent(props: {
+@@ -1264,6 +1270,7 @@ function ThreadSettingsChoiceContent(props: {
                        session.reportedModelSelection,
                      )),
                onPress: () => {
@@ -62,7 +49,7 @@ index 11d871047..a494933ff 100644
                  void Haptics.selectionAsync();
                  if (
                    session.promptTraits.ultrathinkInBodyText &&
-@@ -1161,6 +1170,7 @@ function ThreadSettingsChoiceContent(props: {
+@@ -1305,10 +1312,10 @@ function ThreadSettingsChoiceContent(props: {
            <ChoiceRow
              key={row.id}
              description={row.description}
@@ -70,14 +57,18 @@ index 11d871047..a494933ff 100644
              isLast={index === submenuContent.rows.length - 1}
              label={row.label}
              selected={row.selected}
+-            disabled={row.disabled}
+             onPress={row.onPress}
+           />
+         ))}
 diff --git a/apps/mobile/src/features/threads/thread-settings-options.test.ts b/apps/mobile/src/features/threads/thread-settings-options.test.ts
-index 81baead62..208411f76 100644
+index e4947ffb88..1c1d27e42d 100644
 --- a/apps/mobile/src/features/threads/thread-settings-options.test.ts
 +++ b/apps/mobile/src/features/threads/thread-settings-options.test.ts
-@@ -85,5 +85,25 @@ describe("prompt-controlled reasoning", () => {
-         "ultrathink",
-       ),
-     ).toEqual({ prompt: "/review" });
+@@ -128,5 +128,25 @@ describe("prompt-controlled reasoning", () => {
+     const selected = { ...getPromptControlledTraits(descriptors, prompt), descriptors };
+     expect(selected.ultrathinkInBodyText).toBe(true);
+     expect(getTraitSelectChange(selected, effortDescriptor, prompt, "low")).toBeNull();
 +    const unavailableDescriptor = {
 +      ...effortDescriptor,
 +      options: effortDescriptor.options.map((option) => ({
@@ -101,10 +92,10 @@ index 81baead62..208411f76 100644
    });
  });
 diff --git a/apps/mobile/src/lib/providerOptions.ts b/apps/mobile/src/lib/providerOptions.ts
-index 0199b0fbd..20c50489b 100644
+index 9692ceee82..b9da84fe03 100644
 --- a/apps/mobile/src/lib/providerOptions.ts
 +++ b/apps/mobile/src/lib/providerOptions.ts
-@@ -33,7 +33,9 @@ export function applyProviderOptionSelection(
+@@ -54,7 +54,9 @@ export function applyProviderOptionSelection(
      (descriptor.type === "boolean" && typeof change.value !== "boolean") ||
      (descriptor.type === "select" &&
        (typeof change.value !== "string" ||
@@ -116,12 +107,12 @@ index 0199b0fbd..20c50489b 100644
      return null;
    }
 diff --git a/apps/mobile/src/lib/threadActivity.ts b/apps/mobile/src/lib/threadActivity.ts
-index fc085a7c5..b4a2b4096 100644
+index 4254404a39..df33e17633 100644
 --- a/apps/mobile/src/lib/threadActivity.ts
 +++ b/apps/mobile/src/lib/threadActivity.ts
 @@ -4,6 +4,10 @@ import type {
-   ThreadUserInputQuestion,
  } from "@t3tools/client-runtime/state/thread-requests";
+ import { linkRequestTargetName } from "@t3tools/client-runtime/link-request";
  import { turnItemIsWorkspacePreparation } from "@t3tools/client-runtime/state/turn-item-presentation";
 +import {
 +  modelExecutionDetail,
@@ -129,19 +120,19 @@ index fc085a7c5..b4a2b4096 100644
 +} from "@t3tools/client-runtime/work-log/model-execution";
  import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
  import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
- import { isLiveSubagentTurnItem } from "@t3tools/client-runtime/state/subagentRuntime";
-@@ -653,7 +657,8 @@ function itemSummary(
-   toolPresentation: T3McpToolPresentation | null = null,
+ import {
+@@ -638,7 +642,8 @@ function itemSummary(
+   resolve: MessageResolver,
  ): string {
    if (item.type === "notification") return item.summary;
 -  if (item.type === "system_notice") return item.message;
 +  if (item.type === "system_notice")
 +    return item.modelExecution ? modelExecutionSummary(item.modelExecution) : item.message;
-   if (item.type === "compaction") return contextCompactionLabel(item);
+   if (item.type === "compaction") return contextCompactionLabel(item, resolve);
    const title =
      (item.type === "dynamic_tool"
-@@ -743,8 +748,9 @@ function itemPreview(item: OrchestrationV2TurnItem): string | null {
-         : `${item.files.length} changed files`;
+@@ -745,8 +750,9 @@ function itemPreview(item: OrchestrationV2TurnItem, resolve: MessageResolver): s
+           );
      case "run_interrupt_request":
      case "run_interrupt_result":
 -    case "system_notice":
@@ -151,7 +142,7 @@ index fc085a7c5..b4a2b4096 100644
      case "error":
        return item.failure.message;
      case "compaction":
-@@ -849,6 +855,9 @@ export function formatItemFullDetail(
+@@ -861,6 +867,9 @@ export function formatItemFullDetail(
    row: OrchestrationV2ProjectedTurnItem,
    item: OrchestrationV2TurnItem,
  ): string {
@@ -162,10 +153,10 @@ index fc085a7c5..b4a2b4096 100644
      {
        visibility: row.visibility,
 diff --git a/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts b/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts
-index 3fecc1c7d..836b083e8 100644
+index 938ad7e81e..d0236464de 100644
 --- a/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts
 +++ b/apps/server/src/orchestration-v2/ProviderEventIngestor.test.ts
-@@ -871,6 +871,134 @@ layer("ProviderEventIngestorV2", (it) => {
+@@ -1067,6 +1067,134 @@ layer("ProviderEventIngestorV2", (it) => {
      }),
    );
  
@@ -301,10 +292,10 @@ index 3fecc1c7d..836b083e8 100644
      Effect.gen(function* () {
        const now = yield* DateTime.now;
 diff --git a/apps/server/src/orchestration-v2/ProviderEventIngestor.ts b/apps/server/src/orchestration-v2/ProviderEventIngestor.ts
-index 6beb4d0e5..dbc70cf90 100644
+index e036bbe899..0b181f8ab2 100644
 --- a/apps/server/src/orchestration-v2/ProviderEventIngestor.ts
 +++ b/apps/server/src/orchestration-v2/ProviderEventIngestor.ts
-@@ -649,18 +649,63 @@ export const layer: Layer.Layer<
+@@ -574,18 +574,66 @@ export const layer: Layer.Layer<
                    nodeId: input.event.message.nodeId,
                  }),
                ];
@@ -323,9 +314,12 @@ index 6beb4d0e5..dbc70cf90 100644
 +                ) {
 +                  const oldExecution = previous.modelExecution;
 +                  const execution = item.modelExecution;
-+                  const completed = (Boolean(oldExecution.endedAt) && !execution.endedAt) ||
-+                    (oldExecution.kind === "phase" && oldExecution.status === "unknown" &&
-+                      previous.status !== "running" && execution.status === "running");
++                  const completed =
++                    (Boolean(oldExecution.endedAt) && !execution.endedAt) ||
++                    (oldExecution.kind === "phase" &&
++                      oldExecution.status === "unknown" &&
++                      previous.status !== "running" &&
++                      execution.status === "running");
 +                  const observed =
 +                    oldExecution.startSource === "observed" && execution.startSource !== "observed";
 +                  item = {
@@ -376,12 +370,12 @@ index 6beb4d0e5..dbc70cf90 100644
                return [
                  yield* makeDomainEvent(input, {
 diff --git a/apps/server/src/orchestration-v2/RunExecutionService.ts b/apps/server/src/orchestration-v2/RunExecutionService.ts
-index 3e3f37a15..ceb5c9aff 100644
+index af167bd76a..0873bf4bb7 100644
 --- a/apps/server/src/orchestration-v2/RunExecutionService.ts
 +++ b/apps/server/src/orchestration-v2/RunExecutionService.ts
-@@ -479,6 +479,13 @@ export function routeProviderEvent(
-     case "message.updated":
-       return [ownsRun(event.message.runId) || ownsChildThread(event.message.threadId), state];
+@@ -546,6 +546,13 @@ export function routeProviderEvent(
+     case "steer.updated":
+       return [ownsRun(event.runId), state];
      case "turn_item.updated": {
 +      if (
 +        event.turnItem.type === "system_notice" &&
@@ -390,22 +384,22 @@ index 3e3f37a15..ceb5c9aff 100644
 +        event.turnItem.providerThreadId === input.providerThreadId
 +      )
 +        return [true, state];
-       if (ownsRun(event.turnItem.runId) || ownsChildThread(event.turnItem.threadId)) {
-         return [true, state];
-       }
+       if (
+         ownsRun(event.turnItem.runId) ||
+         ownsChildThread(event.turnItem.threadId) ||
 diff --git a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
-index 6192cc99b..126bb6e75 100644
+index 385123fb21..d6cf2f67a1 100644
 --- a/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
 +++ b/apps/web/src/components/chat/TimelineWorkEntryRow.tsx
-@@ -22,6 +22,7 @@ import {
+@@ -24,6 +24,7 @@ import { t3ToolResultIndicatesFailure } from "@t3tools/client-runtime/t3ToolSumm
  import {
    turnItemHasDetail,
    turnItemNeedsDetailFetch,
 +  turnItemOutputText,
  } from "@t3tools/client-runtime/work-log/item-detail";
  import { claudeSkillInvocation } from "@t3tools/shared/toolActivity";
- import { threadFindActivityText } from "@t3tools/shared/threadFindText";
-@@ -325,11 +326,13 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
+ import { msg, T, useGT, useMessages, Var } from "gt-react";
+@@ -420,11 +421,13 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
        ? claudeSkillInvocation(payload.toolName, payload.input)
        : undefined;
    const plainOutput =
@@ -425,96 +419,103 @@ index 6192cc99b..126bb6e75 100644
      viewedImagePath && threadRef
        ? resolveViewedImageAsset(viewedImagePath, {
 diff --git a/apps/web/src/components/chat/TraitsPicker.tsx b/apps/web/src/components/chat/TraitsPicker.tsx
-index f02780bed..394f9c703 100644
+index 46da6b4caf..30245b7bc2 100644
 --- a/apps/web/src/components/chat/TraitsPicker.tsx
 +++ b/apps/web/src/components/chat/TraitsPicker.tsx
-@@ -23,6 +23,7 @@ import {
+@@ -21,6 +21,7 @@ import {
    getProviderOptionDescriptors,
    isClaudeUltrathinkPrompt,
    normalizeModelSlug,
 +  providerOptionChoicesInCycleOrder,
  } from "@t3tools/shared/model";
- import { memo, type ReactNode, useRef } from "react";
- import { GaugeIcon, ZapIcon } from "lucide-react";
-@@ -271,15 +272,14 @@ export function getReasoningTraitStep(input: {
-           { instanceId: input.instanceId, model: input.model, options: input.modelOptions ?? [] },
+ import { msg, T, useMessages } from "gt-react";
+ import { memo } from "react";
+@@ -267,7 +268,11 @@ export function getReasoningTraitStep(input: {
+   );
+   if (selected.modelIsUnavailable || selected.ultrathinkInBodyText) return null;
+   const descriptor = selected.selectDescriptors.find(isReasoningSelect);
+-  const choices = descriptor ? selectableProviderOptionChoices(descriptor) : [];
++  const choices = descriptor
++    ? selectableProviderOptionChoices(descriptor).filter(
++        (choice) => choice.disabledReason === undefined,
++      )
++    : [];
+   if (!descriptor || choices.length < 2) return null;
+   const isPrimary = descriptor.id === selected.primarySelectDescriptor?.id;
+   const current =
+@@ -279,12 +284,10 @@ export function getReasoningTraitStep(input: {
            input.reportedModelSelection,
          );
+   // Walk the full catalog order so a typed Ultrathink keeps its place, then land on a pickable level.
 -  const ordered = input.direction > 0 ? descriptor.options : descriptor.options.toReversed();
 -  const position =
 -    [current, getDescriptorStringValue(descriptor)]
 -      .map((value) => ordered.findIndex((option) => option.id === value))
 -      .find((index) => index >= 0) ?? -1;
--  for (const option of [
--    ...ordered.slice(position + 1),
--    ...ordered.slice(0, Math.max(position, 0)),
--  ]) {
+-  const next = [...ordered.slice(position + 1), ...ordered.slice(0, Math.max(position, 0))].find(
 +  const cycleCurrent = descriptor.options.some((option) => option.id === current)
 +    ? current
 +    : getDescriptorStringValue(descriptor);
-+  for (const option of providerOptionChoicesInCycleOrder(
-+    descriptor,
-+    cycleCurrent,
-+    input.direction,
-+  )) {
-     const change = getTraitSelectChange(selected, descriptor, input.prompt, option.id);
-     if (!change) return null;
-     if ("modelOptions" in change) {
-@@ -457,7 +457,10 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
-                     value={option.id}
-                     hideIndicator
-                     closeOnClick
--                    disabled={ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id}
-+                    disabled={
-+                      option.disabledReason !== undefined ||
-+                      (ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id)
-+                    }
-                   >
-                     <span className="flex w-full min-w-0 flex-col">
-                       <span className="flex min-w-0 items-center gap-1">
-@@ -469,6 +472,11 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
-                           {option.description}
-                         </span>
-                       ) : null}
-+                      {option.disabledReason ? (
-+                        <span className="max-w-56 text-pretty text-muted-foreground text-xs">
-+                          Unavailable: {option.disabledReason}
-+                        </span>
-+                      ) : null}
++  const next = providerOptionChoicesInCycleOrder(descriptor, cycleCurrent, input.direction).find(
+     (option) => choices.includes(option),
+   );
+   const change = next && getTraitSelectChange(selected, descriptor, input.prompt, next.id);
+@@ -451,16 +454,19 @@ const TraitsMenuContent = memo(function TraitsMenuContentImpl(props: TraitsSelec
+                   value={option.id}
+                   hideIndicator
+                   closeOnClick
+-                  disabled={ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id}
++                  disabled={
++                    option.disabledReason !== undefined ||
++                    (ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id)
++                  }
+                 >
+                   <span className="flex w-full min-w-0 flex-col">
+                     <span className="flex min-w-0 items-center gap-1">
+                       <span className="min-w-0 truncate">{option.label}</span>
+                       {option.isDefault ? <DefaultBadge /> : null}
                      </span>
-                   </MenuRadioItem>
-                 ))}
+-                    {option.description ? (
++                    {option.description || option.disabledReason ? (
+                       <span className="max-w-56 text-pretty text-muted-foreground/80 text-xs">
+-                        {option.description}
++                        {[option.description, option.disabledReason].filter(Boolean).join(": ")}
+                       </span>
+                     ) : null}
+                   </span>
 diff --git a/apps/web/src/session-logic.ts b/apps/web/src/session-logic.ts
-index 7b79dea6f..5a5da959c 100644
+index 482c927564..06799f8b92 100644
 --- a/apps/web/src/session-logic.ts
 +++ b/apps/web/src/session-logic.ts
-@@ -25,6 +25,7 @@ import {
- } from "@t3tools/shared/toolActivity";
+@@ -21,6 +21,7 @@ import { classifyToolActivity, collectToolFilePaths } from "@t3tools/shared/tool
+ import { formatReadToolLabel, formatSearchToolLabel } from "@t3tools/shared/toolActivityCopy";
  import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
  import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
 +import { modelExecutionSummary } from "@t3tools/client-runtime/work-log/model-execution";
  import type { McpAppReference } from "@t3tools/shared/mcpApp";
- import { htmlRenderFromToolItem, mcpAppFromToolItem } from "@t3tools/shared/toolOutput";
  import {
-@@ -479,8 +480,8 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
+   htmlRenderFromToolItem,
+@@ -453,8 +454,10 @@ function projectedWorkEntry(
      case "system_notice":
        return {
          ...common,
 -        label: item.message,
--        sourceActivityKind: "runtime.warning",
+-        ...(item.level === "info" ? {} : { sourceActivityKind: "runtime.warning" }),
 +        label: item.modelExecution ? modelExecutionSummary(item.modelExecution) : item.message,
-+        ...(item.modelExecution ? {} : { sourceActivityKind: "runtime.warning" }),
++        ...(item.modelExecution || item.level === "info"
++          ? {}
++          : { sourceActivityKind: "runtime.warning" }),
        };
      case "error": {
-       const presentation = providerErrorPresentation(item);
+       const presentation = providerErrorPresentation(item, resolve);
 diff --git a/docs/user/activity-log.md b/docs/user/activity-log.md
-index 0aad505e0..a798213fe 100644
+index 93b198aa18..8de5e2bc7f 100644
 --- a/docs/user/activity-log.md
 +++ b/docs/user/activity-log.md
-@@ -17,3 +17,15 @@ Failed calls do not count as successful messages or creations. Waiting on a thre
- it finished, and an interrupt or cancellation request does not mean the thread stopped. When tool
- details are unavailable, summaries use a broader description instead of guessing how many threads
- were affected.
+@@ -48,3 +48,15 @@ window title** in the same section. The window title then starts with the thread
+ screen reader says them first. When the turn ends, only the status goes away.
+ Anyone who can see your taskbar, window switcher, or shared screen sees it too, and time trackers
+ that group by window title count each status separately.
 +
 +When Copilot reports Fusion model activity, open a model phase or routing entry to inspect its
 +details on web, desktop, or mobile. Requested routing and planned work do not prove which model
@@ -528,7 +529,7 @@ index 0aad505e0..a798213fe 100644
 +model at any time. A requested preference may be pending or activating: the routing entry shows
 +the confirmed effective preference separately, including activation failures.
 diff --git a/docs/user/providers-copilot.md b/docs/user/providers-copilot.md
-index eca524ff4..a110d2019 100644
+index eca524ff41..a110d2019d 100644
 --- a/docs/user/providers-copilot.md
 +++ b/docs/user/providers-copilot.md
 @@ -7,6 +7,12 @@ not the ACP registry or a separately billed hosted model service.
@@ -545,10 +546,10 @@ index eca524ff4..a110d2019 100644
  override it. **COPILOT_HOME path** selects the account's configuration and native
  session directory; separate provider instances can use separate directories.
 diff --git a/packages/client-runtime/package.json b/packages/client-runtime/package.json
-index 0d95631cf..ce98e377d 100644
+index f9096b1012..dcecf40c60 100644
 --- a/packages/client-runtime/package.json
 +++ b/packages/client-runtime/package.json
-@@ -391,6 +391,10 @@
+@@ -475,6 +475,10 @@
        "types": "./src/work-log/itemDetail.ts",
        "default": "./src/work-log/itemDetail.ts"
      },
@@ -560,41 +561,54 @@ index 0d95631cf..ce98e377d 100644
        "types": "./src/work-log/presentation.ts",
        "default": "./src/work-log/presentation.ts"
 diff --git a/packages/client-runtime/src/modelTraits.ts b/packages/client-runtime/src/modelTraits.ts
-index 734a84c46..29004784b 100644
+index da2387da30..d59ddcc2db 100644
 --- a/packages/client-runtime/src/modelTraits.ts
 +++ b/packages/client-runtime/src/modelTraits.ts
-@@ -81,7 +81,11 @@ export function getTraitSelectChange(
+@@ -93,7 +93,13 @@ export function getTraitSelectChange(
    prompt: string,
    value: string,
  ) {
--  if (!value) return null;
+-  if (!value || descriptor.promptInjectedValues?.includes(value)) return null;
 +  if (
-+    !value ||
-+    !descriptor.options.some((option) => option.id === value && option.disabledReason === undefined)
++    !descriptor.options.some(
++      (option) => option.id === value && option.disabledReason === undefined,
++    ) ||
++    descriptor.promptInjectedValues?.includes(value)
 +  )
 +    return null;
-   if (descriptor.promptInjectedValues?.includes(value)) {
-     return {
-       prompt:
+   const isPrimary = descriptor.id === selected.primarySelectDescriptor?.id;
+   if (isPrimary && selected.ultrathinkInBodyText) return null;
+   return {
 diff --git a/packages/client-runtime/src/work-log/itemDetail.test.ts b/packages/client-runtime/src/work-log/itemDetail.test.ts
-index e15111708..2e256c0de 100644
+index c7a6f043a3..9ff46d143d 100644
 --- a/packages/client-runtime/src/work-log/itemDetail.test.ts
 +++ b/packages/client-runtime/src/work-log/itemDetail.test.ts
-@@ -2,9 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
+@@ -2,7 +2,12 @@ import { describe, expect, it } from "vite-plus/test";
  import { ThreadId, TurnItemId, type OrchestrationV2TurnItem } from "@t3tools/contracts";
  import * as DateTime from "effect/DateTime";
  
--import { turnItemOutputImages, turnItemOutputText } from "./itemDetail.ts";
-+import { turnItemHasDetail, turnItemOutputImages, turnItemOutputText } from "./itemDetail.ts";
+-import { isJsonToolText, turnItemOutputImages, turnItemOutputText } from "./itemDetail.ts";
++import {
++  isJsonToolText,
++  turnItemHasDetail,
++  turnItemOutputImages,
++  turnItemOutputText,
++} from "./itemDetail.ts";
+ 
+ describe("isJsonToolText", () => {
+   it.each([
+@@ -23,7 +28,7 @@ describe("isJsonToolText", () => {
+   });
+ });
  
 -function toolItem(output: unknown): OrchestrationV2TurnItem {
 +function toolItem(output: unknown): Extract<OrchestrationV2TurnItem, { type: "dynamic_tool" }> {
    return {
      id: TurnItemId.make("images"),
      threadId: ThreadId.make("thread"),
-@@ -52,3 +52,29 @@ describe("tool image output parsing", () => {
-     },
-   );
+@@ -182,3 +187,29 @@ describe("MCP app tool output", () => {
+     expect(turnItemOutputText(bounded)).toBe("chart\n[image]");
+   });
  });
 +
 +it("keeps typed model notices expandable without changing ordinary notice output", () => {
@@ -623,27 +637,27 @@ index e15111708..2e256c0de 100644
 +  expect(turnItemOutputText(executionNotice)).toContain("Incomplete model execution telemetry");
 +});
 diff --git a/packages/client-runtime/src/work-log/itemDetail.ts b/packages/client-runtime/src/work-log/itemDetail.ts
-index 5e16cf538..7e8cf5eb0 100644
+index 2630f89dc2..4c75c762ac 100644
 --- a/packages/client-runtime/src/work-log/itemDetail.ts
 +++ b/packages/client-runtime/src/work-log/itemDetail.ts
-@@ -1,6 +1,7 @@
- import type { AssetResource, OrchestrationV2TurnItem } from "@t3tools/contracts";
- import { toolOutputImageBlocks, toolOutputImages } from "@t3tools/shared/toolOutput";
+@@ -7,6 +7,7 @@ import {
+   toolOutputImages,
+ } from "@t3tools/shared/toolOutput";
  import * as DateTime from "effect/DateTime";
 +import { modelExecutionDetail } from "./modelExecution.ts";
  
  const MAX_TEXT_BLOCK_DEPTH = 4;
  
-@@ -159,6 +160,8 @@ function commandOutputText(output: string): string {
+@@ -204,6 +205,8 @@ function dynamicToolOutputText(
  
  export function turnItemOutputText(item: OrchestrationV2TurnItem): string | null {
    switch (item.type) {
 +    case "system_notice":
 +      return item.modelExecution ? modelExecutionDetail(item.modelExecution, item.message) : null;
-     case "command_execution":
-       return item.output?.trim() ? commandOutputText(item.output) || null : null;
-     case "dynamic_tool":
-@@ -238,7 +241,7 @@ export function turnItemHasDetail(item: OrchestrationV2TurnItem): boolean {
+     case "command_execution": {
+       const output = commandItemOutput(item);
+       return output?.trim() ? output : null;
+@@ -283,7 +286,7 @@ export function turnItemHasDetail(item: OrchestrationV2TurnItem): boolean {
      case "notification":
        return Boolean(item.detail?.trim());
      case "system_notice":
@@ -654,7 +668,7 @@ index 5e16cf538..7e8cf5eb0 100644
      case "proposed_plan":
 diff --git a/packages/client-runtime/src/work-log/modelExecution.test.ts b/packages/client-runtime/src/work-log/modelExecution.test.ts
 new file mode 100644
-index 000000000..97b7f7957
+index 0000000000..97b7f79573
 --- /dev/null
 +++ b/packages/client-runtime/src/work-log/modelExecution.test.ts
 @@ -0,0 +1,85 @@
@@ -745,7 +759,7 @@ index 000000000..97b7f7957
 +});
 diff --git a/packages/client-runtime/src/work-log/modelExecution.ts b/packages/client-runtime/src/work-log/modelExecution.ts
 new file mode 100644
-index 000000000..0d1f0e605
+index 0000000000..0d1f0e6058
 --- /dev/null
 +++ b/packages/client-runtime/src/work-log/modelExecution.ts
 @@ -0,0 +1,108 @@
@@ -858,7 +872,7 @@ index 000000000..0d1f0e605
 +  return lines.join("\n");
 +}
 diff --git a/packages/contracts/src/model.ts b/packages/contracts/src/model.ts
-index 8027c9079..c677a696e 100644
+index 1a2a519e1a..c5c5aebd4d 100644
 --- a/packages/contracts/src/model.ts
 +++ b/packages/contracts/src/model.ts
 @@ -11,6 +11,7 @@ export const ProviderOptionChoice = Schema.Struct({
@@ -870,10 +884,10 @@ index 8027c9079..c677a696e 100644
  });
  export type ProviderOptionChoice = typeof ProviderOptionChoice.Type;
 diff --git a/packages/contracts/src/orchestrationV2.test.ts b/packages/contracts/src/orchestrationV2.test.ts
-index 378230717..06a0a76ad 100644
+index bacf812ab8..d868e3383a 100644
 --- a/packages/contracts/src/orchestrationV2.test.ts
 +++ b/packages/contracts/src/orchestrationV2.test.ts
-@@ -33,8 +33,75 @@ const decodeOrchestrationV2ProviderThread = Schema.decodeUnknownSync(Orchestrati
+@@ -43,8 +43,75 @@ const decodeOrchestrationV2ProviderThread = Schema.decodeUnknownSync(Orchestrati
  const decodeOrchestrationV2ProviderCapabilities = Schema.decodeUnknownSync(
    OrchestrationV2ProviderCapabilities,
  );
@@ -950,10 +964,10 @@ index 378230717..06a0a76ad 100644
      const decodeWireItems = Schema.decodeUnknownSync(
        Schema.toCodecJson(Schema.Array(OrchestrationV2RpcSchemas.subscribeThread.output)),
 diff --git a/packages/contracts/src/orchestrationV2.ts b/packages/contracts/src/orchestrationV2.ts
-index 09482a808..156046a77 100644
+index 573607abc7..b31409b69a 100644
 --- a/packages/contracts/src/orchestrationV2.ts
 +++ b/packages/contracts/src/orchestrationV2.ts
-@@ -1549,6 +1549,55 @@ const OrchestrationV2LinkRequestFields = {
+@@ -1747,6 +1747,55 @@ const OrchestrationV2LinkRequestFields = {
    failure: Schema.optional(Schema.String),
  } as const;
  
@@ -1009,24 +1023,24 @@ index 09482a808..156046a77 100644
  export const OrchestrationV2TurnItem = Schema.Union([
    Schema.Struct({
      ...OrchestrationV2TurnItemBaseFields,
-@@ -1677,6 +1726,7 @@ export const OrchestrationV2TurnItem = Schema.Union([
-     ...OrchestrationV2TurnItemBaseFields,
+@@ -1885,6 +1934,7 @@ export const OrchestrationV2TurnItem = Schema.Union([
      type: Schema.Literal("system_notice"),
      message: Schema.String,
+     level: Schema.optional(OrchestrationV2SystemNoticeLevel),
 +    modelExecution: Schema.optional(OrchestrationV2ModelExecution),
    }),
    Schema.Struct({
      ...OrchestrationV2TurnItemBaseFields,
-@@ -2501,6 +2551,7 @@ export const OrchestrationV2TurnItemJson = Schema.Union([
-     ...OrchestrationV2TurnItemJsonBaseFields,
+@@ -2769,6 +2819,7 @@ export const OrchestrationV2TurnItemJson = Schema.Union([
      type: Schema.Literal("system_notice"),
      message: Schema.String,
+     level: Schema.optional(OrchestrationV2SystemNoticeLevel),
 +    modelExecution: Schema.optional(OrchestrationV2ModelExecution),
    }),
    Schema.Struct({
      ...OrchestrationV2TurnItemJsonBaseFields,
 diff --git a/packages/provider-copilot/src/server/adapter.test.ts b/packages/provider-copilot/src/server/adapter.test.ts
-index 43ddd0b79..06b3d0907 100644
+index fccfeb2bcd..03e67fd5e0 100644
 --- a/packages/provider-copilot/src/server/adapter.test.ts
 +++ b/packages/provider-copilot/src/server/adapter.test.ts
 @@ -16,6 +16,7 @@ import {
@@ -1045,7 +1059,7 @@ index 43ddd0b79..06b3d0907 100644
  
  const threadId = ThreadId.make("copilot-test");
  const instanceId = ProviderInstanceId.make("githubCopilot");
-@@ -78,13 +80,24 @@ function fakeSdk() {
+@@ -79,13 +81,24 @@ function fakeSdk() {
    > = [];
    let permissionResponse = async (): Promise<{ success: boolean }> => ({ success: true });
    let background: Awaited<ReturnType<SessionHandle["rpc"]["tasks"]["list"]>> = { tasks: [] };
@@ -1072,7 +1086,7 @@ index 43ddd0b79..06b3d0907 100644
        parentId: null,
        ...(agentId ? { agentId } : {}),
      } as SessionEvent);
-@@ -102,8 +115,14 @@ function fakeSdk() {
+@@ -103,8 +116,14 @@ function fakeSdk() {
        disconnected++;
      },
      getEvents: async () => [],
@@ -1088,7 +1102,7 @@ index 43ddd0b79..06b3d0907 100644
        mode: { set: async () => ({ status: "success", modelChanged: false, modeApplied: true }) },
        plan: {
          read: async () => ({
-@@ -127,6 +146,7 @@ function fakeSdk() {
+@@ -128,6 +147,7 @@ function fakeSdk() {
      },
    };
    const client: ClientHandle = {
@@ -1096,7 +1110,7 @@ index 43ddd0b79..06b3d0907 100644
      start: async () => {},
      stop: async () => {
        stopped++;
-@@ -151,6 +171,13 @@ function fakeSdk() {
+@@ -152,6 +172,13 @@ function fakeSdk() {
      session,
      sent,
      emit,
@@ -1110,7 +1124,7 @@ index 43ddd0b79..06b3d0907 100644
      get config() {
        return config!;
      },
-@@ -179,6 +206,25 @@ function fakeSdk() {
+@@ -180,6 +207,25 @@ function fakeSdk() {
    };
  }
  type Fake = ReturnType<typeof fakeSdk>;
@@ -1136,7 +1150,7 @@ index 43ddd0b79..06b3d0907 100644
  
  function promiseGate() {
    let resolve!: () => void;
-@@ -188,15 +234,20 @@ function promiseGate() {
+@@ -189,15 +235,20 @@ function promiseGate() {
    return { promise, resolve };
  }
  
@@ -1160,7 +1174,7 @@ index 43ddd0b79..06b3d0907 100644
      runtimePolicy: policy,
      ...(initialNativeThreadId ? { initialNativeThreadId } : {}),
    });
-@@ -220,17 +271,17 @@ const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: s
+@@ -221,17 +272,17 @@ const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: s
    });
    const thread = yield* runtime.ensureThread({
      threadId,
@@ -1181,7 +1195,7 @@ index 43ddd0b79..06b3d0907 100644
        runtimeMode: policy.runtimeMode,
        interactionMode: "default",
        branch: null,
-@@ -264,7 +315,7 @@ const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: s
+@@ -265,7 +316,7 @@ const setup = Effect.fnUntraced(function* (fake: Fake, initialNativeThreadId?: s
          createdBy: "user",
          creationSource: "web",
        },
@@ -1190,7 +1204,7 @@ index 43ddd0b79..06b3d0907 100644
        runtimePolicy: policy,
      });
    });
-@@ -280,6 +331,325 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+@@ -281,6 +332,325 @@ const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
    );
  
  describe("native Copilot V2", () => {
@@ -1517,7 +1531,7 @@ index 43ddd0b79..06b3d0907 100644
      "waits for the native permission receipt and never replaces V2-owned response delivery",
      () =>
 diff --git a/packages/provider-copilot/src/server/adapter.ts b/packages/provider-copilot/src/server/adapter.ts
-index 4db6536f4..241306b16 100644
+index 1b84e04f5f..c0699c5257 100644
 --- a/packages/provider-copilot/src/server/adapter.ts
 +++ b/packages/provider-copilot/src/server/adapter.ts
 @@ -24,6 +24,7 @@ import {
@@ -1570,7 +1584,7 @@ index 4db6536f4..241306b16 100644
    readonly createSession: (config: SessionConfig) => Promise<SessionHandle>;
    readonly resumeSession: (id: string, config: ResumeSessionConfig) => Promise<SessionHandle>;
  };
-@@ -214,6 +227,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -218,6 +231,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
        const tasks = new Map<string, Task>();
        const subagents = new Map<string, OrchestrationV2Subagent>();
        const taskOwners = new Map<string, ActiveTurn>();
@@ -1585,7 +1599,7 @@ index 4db6536f4..241306b16 100644
        const emit = (event: ProviderAdapter.ProviderAdapterV2Event) =>
          Queue.offer(events, event).pipe(Effect.asVoid);
        const sdk = <A>(operation: string, request: () => Promise<A>, timeoutMs = 10_000) =>
-@@ -364,11 +385,219 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -368,11 +389,219 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
        const putItem = (turn: ActiveTurn, key: string, item: OrchestrationV2TurnItem) =>
          Effect.sync(() => {
            turn.items.set(key, item);
@@ -1805,7 +1819,7 @@ index 4db6536f4..241306b16 100644
        const terminal = Effect.fnUntraced(function* (turn: ActiveTurn, failure?: unknown) {
          if (turn.finished || (!failure && !turn.accepted)) return;
          turn.finished = true;
-@@ -393,6 +622,15 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -397,6 +626,15 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
              completedAt: now,
              updatedAt: now,
              ...("streaming" in item ? { streaming: false } : {}),
@@ -1821,7 +1835,7 @@ index 4db6536f4..241306b16 100644
            });
          }
          for (const [id, message] of messages) {
-@@ -684,6 +922,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -686,6 +924,10 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
              }).pipe(Effect.catch((cause) => (active ? terminal(active, cause) : Effect.void)));
            return;
          }
@@ -1832,7 +1846,7 @@ index 4db6536f4..241306b16 100644
          // Child events never advance or complete the root's user-turn lifecycle.
          if (event.agentId) {
            if (
-@@ -701,6 +943,57 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -703,6 +945,57 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
          }
          const turn = active;
          switch (event.type) {
@@ -1890,7 +1904,7 @@ index 4db6536f4..241306b16 100644
            case "session.skills_loaded":
              options.onSkills?.(cwd, skillsFromSdk(event.data.skills));
              return;
-@@ -1165,11 +1458,23 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1167,11 +1460,23 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
            const previous = ensure.existingProviderThread;
            const nativeId = previous?.nativeThreadRef?.nativeId ?? open.initialNativeThreadId;
            const mcp = yield* mcpSessions.read(open.threadId);
@@ -1914,7 +1928,7 @@ index 4db6536f4..241306b16 100644
              ...(reasoningEffort(ensure.modelSelection)
                ? { reasoningEffort: reasoningEffort(ensure.modelSelection)! }
                : {}),
-@@ -1248,6 +1553,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1250,6 +1555,14 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
                Effect.result,
              );
              if (transcript._tag === "Success") {
@@ -1929,7 +1943,7 @@ index 4db6536f4..241306b16 100644
                for (const event of transcript.success) {
                  if (
                    event.agentId ||
-@@ -1306,6 +1619,30 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1308,6 +1621,30 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
              driver: COPILOT_DRIVER,
              providerThread: createdThread,
            });
@@ -1960,7 +1974,7 @@ index 4db6536f4..241306b16 100644
            const skills = yield* sdk("list skills", () => native!.rpc.skills.list()).pipe(
              Effect.result,
            );
-@@ -1337,11 +1674,22 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1339,11 +1676,22 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
              reason: "previous_turn_active",
            });
          const effort = reasoningEffort(turnInput.modelSelection);
@@ -1987,7 +2001,7 @@ index 4db6536f4..241306b16 100644
          );
          const modeResult = yield* sdk("set mode", () =>
            native!.rpc.mode.set({
-@@ -1392,8 +1740,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
+@@ -1394,8 +1742,13 @@ export const makeAdapter = Effect.fn("CopilotAdapter.make")(function* (
            status: "active",
            firstRunOrdinal: providerThread.firstRunOrdinal ?? turnInput.runOrdinal,
            lastRunOrdinal: turnInput.runOrdinal,
@@ -2004,7 +2018,7 @@ index 4db6536f4..241306b16 100644
            attachments: turnInput.message.attachments,
 diff --git a/packages/provider-copilot/src/server/fusion.test.ts b/packages/provider-copilot/src/server/fusion.test.ts
 new file mode 100644
-index 000000000..f0d7317eb
+index 0000000000..f0d7317eb7
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/fusion.test.ts
 @@ -0,0 +1,189 @@
@@ -2199,7 +2213,7 @@ index 000000000..f0d7317eb
 +});
 diff --git a/packages/provider-copilot/src/server/fusion.ts b/packages/provider-copilot/src/server/fusion.ts
 new file mode 100644
-index 000000000..da7eb6b0c
+index 0000000000..da7eb6b0cf
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/fusion.ts
 @@ -0,0 +1,215 @@
@@ -2420,7 +2434,7 @@ index 000000000..da7eb6b0c
 +}
 diff --git a/packages/provider-copilot/src/server/routing.test.ts b/packages/provider-copilot/src/server/routing.test.ts
 new file mode 100644
-index 000000000..43247659d
+index 0000000000..43247659d4
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/routing.test.ts
 @@ -0,0 +1,86 @@
@@ -2512,7 +2526,7 @@ index 000000000..43247659d
 +});
 diff --git a/packages/provider-copilot/src/server/routing.ts b/packages/provider-copilot/src/server/routing.ts
 new file mode 100644
-index 000000000..390a40760
+index 0000000000..390a407608
 --- /dev/null
 +++ b/packages/provider-copilot/src/server/routing.ts
 @@ -0,0 +1,66 @@
@@ -2583,7 +2597,7 @@ index 000000000..390a40760
 +  return requested;
 +}
 diff --git a/packages/provider-copilot/src/server/status.test.ts b/packages/provider-copilot/src/server/status.test.ts
-index bde8595cc..8ca6de9ca 100644
+index bde8595ccf..8ca6de9ca5 100644
 --- a/packages/provider-copilot/src/server/status.test.ts
 +++ b/packages/provider-copilot/src/server/status.test.ts
 @@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
@@ -2646,7 +2660,7 @@ index bde8595cc..8ca6de9ca 100644
            assert.equal(snapshot.status, "error");
            assert.equal(forced, 1);
 diff --git a/packages/provider-copilot/src/server/status.ts b/packages/provider-copilot/src/server/status.ts
-index 8e895fc04..5c863ab42 100644
+index cb4a745fde..15855652d8 100644
 --- a/packages/provider-copilot/src/server/status.ts
 +++ b/packages/provider-copilot/src/server/status.ts
 @@ -1,4 +1,4 @@
@@ -2780,18 +2794,18 @@ index 8e895fc04..5c863ab42 100644
  
  export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
    settings: CopilotSettings,
-@@ -150,8 +180,8 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
-         await client.start();
-         started = true;
-         const [status, auth] = await Promise.all([client.getStatus(), client.getAuthStatus()]);
--        const models = auth.isAuthenticated ? await client.listModels() : [];
--        return { status, auth, models };
-+        const catalog = auth.isAuthenticated ? await client.rpc.models.list({}) : { models: [] };
-+        return { status, auth, catalog };
+@@ -153,8 +183,8 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
+           await client.start();
+           started = true;
+           const [status, auth] = await Promise.all([client.getStatus(), client.getAuthStatus()]);
+-          const models = auth.isAuthenticated ? await client.listModels() : [];
+-          return { status, auth, models };
++          const catalog = auth.isAuthenticated ? await client.rpc.models.list({}) : { models: [] };
++          return { status, auth, catalog };
+         },
+         catch: probeError,
        });
-     }),
-   ).pipe(Effect.timeoutOption(30_000), Effect.result);
-@@ -175,12 +205,12 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
+@@ -180,12 +210,12 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
        },
      });
    }
@@ -2806,7 +2820,7 @@ index 8e895fc04..5c863ab42 100644
      probe: {
        installed: true,
        version: status.version,
-@@ -190,7 +220,12 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
+@@ -195,7 +225,12 @@ export const checkStatus = Effect.fn("Copilot.checkStatus")(function* (
          : { status: "unauthenticated" },
        ...(!auth.isAuthenticated
          ? { message: "Sign in with `copilot login` in this provider's account environment." }
@@ -2821,7 +2835,7 @@ index 8e895fc04..5c863ab42 100644
    });
  });
 diff --git a/packages/shared/src/model.test.ts b/packages/shared/src/model.test.ts
-index 396d4d9c8..39c437997 100644
+index 3bb7bf4a1a..5c82aa0bc1 100644
 --- a/packages/shared/src/model.test.ts
 +++ b/packages/shared/src/model.test.ts
 @@ -8,7 +8,9 @@ import {
@@ -2833,8 +2847,8 @@ index 396d4d9c8..39c437997 100644
 +  providerOptionChoicesInCycleOrder,
    readCustomModelEntries,
    modelSelectionsEqual,
- } from "./model.ts";
-@@ -34,6 +36,67 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
+   pickModelSelection,
+@@ -36,6 +38,67 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
  });
  
  describe("descriptor helpers", () => {
@@ -2903,10 +2917,10 @@ index 396d4d9c8..39c437997 100644
      const descriptors = getProviderOptionDescriptors({
        caps: codexCaps,
 diff --git a/packages/shared/src/model.ts b/packages/shared/src/model.ts
-index 51cc14303..71aa8a7be 100644
+index babe1347cc..c48826e103 100644
 --- a/packages/shared/src/model.ts
 +++ b/packages/shared/src/model.ts
-@@ -136,21 +136,52 @@ function resolveDescriptorChoiceValue(
+@@ -154,21 +154,52 @@ function resolveDescriptorChoiceValue(
  ): string | undefined {
    const trimmed = trimOrNull(raw);
    if (!trimmed) {
@@ -2962,7 +2976,7 @@ index 51cc14303..71aa8a7be 100644
  }
  
  function cloneDescriptor(descriptor: ProviderOptionDescriptor): ProviderOptionDescriptor {
-@@ -257,7 +288,9 @@ export function getProviderOptionCurrentValue(
+@@ -303,7 +334,9 @@ export function getProviderOptionCurrentValue(
    if (descriptor.currentValue) {
      return descriptor.currentValue;
    }

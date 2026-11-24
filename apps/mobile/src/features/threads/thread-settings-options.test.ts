@@ -128,5 +128,25 @@ describe("prompt-controlled reasoning", () => {
     const selected = { ...getPromptControlledTraits(descriptors, prompt), descriptors };
     expect(selected.ultrathinkInBodyText).toBe(true);
     expect(getTraitSelectChange(selected, effortDescriptor, prompt, "low")).toBeNull();
+    const unavailableDescriptor = {
+      ...effortDescriptor,
+      options: effortDescriptor.options.map((option) => ({
+        ...option,
+        disabledReason: "Unavailable for this session",
+      })),
+    };
+    for (const value of ["low", "ultrathink", "removed-tier"]) {
+      expect(
+        getTraitSelectChange(
+          {
+            ...getPromptControlledTraits([unavailableDescriptor], ""),
+            descriptors: [unavailableDescriptor],
+          },
+          unavailableDescriptor,
+          "",
+          value,
+        ),
+      ).toBeNull();
+    }
   });
 });

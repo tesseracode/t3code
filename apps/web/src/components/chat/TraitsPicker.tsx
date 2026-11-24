@@ -21,6 +21,7 @@ import {
   getProviderOptionDescriptors,
   isClaudeUltrathinkPrompt,
   normalizeModelSlug,
+  providerOptionChoicesInCycleOrder,
 } from "@t3tools/shared/model";
 import { msg, T, useMessages } from "gt-react";
 import { memo } from "react";
@@ -267,7 +268,11 @@ export function getReasoningTraitStep(input: {
   );
   if (selected.modelIsUnavailable || selected.ultrathinkInBodyText) return null;
   const descriptor = selected.selectDescriptors.find(isReasoningSelect);
-  const choices = descriptor ? selectableProviderOptionChoices(descriptor) : [];
+  const choices = descriptor
+    ? selectableProviderOptionChoices(descriptor).filter(
+        (choice) => choice.disabledReason === undefined,
+      )
+    : [];
   if (!descriptor || choices.length < 2) return null;
   const isPrimary = descriptor.id === selected.primarySelectDescriptor?.id;
   const current =
@@ -279,12 +284,10 @@ export function getReasoningTraitStep(input: {
           input.reportedModelSelection,
         );
   // Walk the full catalog order so a typed Ultrathink keeps its place, then land on a pickable level.
-  const ordered = input.direction > 0 ? descriptor.options : descriptor.options.toReversed();
-  const position =
-    [current, getDescriptorStringValue(descriptor)]
-      .map((value) => ordered.findIndex((option) => option.id === value))
-      .find((index) => index >= 0) ?? -1;
-  const next = [...ordered.slice(position + 1), ...ordered.slice(0, Math.max(position, 0))].find(
+  const cycleCurrent = descriptor.options.some((option) => option.id === current)
+    ? current
+    : getDescriptorStringValue(descriptor);
+  const next = providerOptionChoicesInCycleOrder(descriptor, cycleCurrent, input.direction).find(
     (option) => choices.includes(option),
   );
   const change = next && getTraitSelectChange(selected, descriptor, input.prompt, next.id);
@@ -451,16 +454,19 @@ const TraitsMenuContent = memo(function TraitsMenuContentImpl(props: TraitsSelec
                   value={option.id}
                   hideIndicator
                   closeOnClick
-                  disabled={ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id}
+                  disabled={
+                    option.disabledReason !== undefined ||
+                    (ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id)
+                  }
                 >
                   <span className="flex w-full min-w-0 flex-col">
                     <span className="flex min-w-0 items-center gap-1">
                       <span className="min-w-0 truncate">{option.label}</span>
                       {option.isDefault ? <DefaultBadge /> : null}
                     </span>
-                    {option.description ? (
+                    {option.description || option.disabledReason ? (
                       <span className="max-w-56 text-pretty text-muted-foreground/80 text-xs">
-                        {option.description}
+                        {[option.description, option.disabledReason].filter(Boolean).join(": ")}
                       </span>
                     ) : null}
                   </span>
